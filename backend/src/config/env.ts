@@ -17,8 +17,21 @@ export const env = {
   apiPrefix: process.env.API_PREFIX ?? '/api/v1',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
 
-  databaseUrl: required('DATABASE_URL', 'postgresql://adyapan:adyapan_secret@localhost:5432/adyapan_lms?schema=public'),
+  databaseUrl: required(
+    'DATABASE_URL',
+    'postgresql://postgres:[YOUR-PASSWORD]@db.kbwfydhyfjgnplmcrupq.supabase.co:5432/postgres'
+  ),
+  directUrl: process.env.DIRECT_URL,
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
+
+  supabase: {
+    url: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://kbwfydhyfjgnplmcrupq.supabase.co',
+    anonKey:
+      process.env.SUPABASE_ANON_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      'sb_publishable_rU-FweQxTdJeyH6hxXVzYQ_jt3E9WwM',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  },
 
   jwt: {
     accessSecret: required('JWT_ACCESS_SECRET', 'change_me_access_secret_dev_only'),
