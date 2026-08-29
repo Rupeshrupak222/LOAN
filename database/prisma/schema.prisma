@@ -1,0 +1,519 @@
+// Adyapan Loan Management System - Prisma schema
+// Money values use Decimal (PostgreSQL NUMERIC). Never floating point.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth / RBAC
+// ---------------------------------------------------------------------------
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  employeeId    String?    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  status        UserStatus @default(ACTIVE)
+  branchId      String?
+  branch        Branch?    @relation(fields: [branchId], references: [id])
+
+  // login security
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  mfaEnabled          Boolean   @default(false)
+
+  roles         UserRole[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  customer      Customer?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([branchId])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique // SUPER_ADMIN, ADMIN, LOAN_OFFICER, ...
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique // e.g. customers.read, loans.approve
+  description String?
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Branches
+// ---------------------------------------------------------------------------
+
+model Branch {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  city      String?
+  state     String?
+  isActive  Boolean  @default(true)
+  users     User[]
+  customers Customer[]
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Customers
+// ---------------------------------------------------------------------------
+
+enum CustomerStatus {
+  DRAFT
+  ACTIVE
+  KYC_PENDING
+  KYC_VERIFIED
+  BLOCKED
+  INACTIVE
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum RiskCategory {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Customer {
+  id              String         @id @default(uuid())
+  customerCode    String         @unique
+  userId          String?        @unique
+  user            User?          @relation(fields: [userId], references: [id])
+  branchId        String?
+  branch          Branch?        @relation(fields: [branchId], references: [id])
+
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime?
+  gender          String?
+  mobile          String
+  email           String?
+  addressLine     String?
+  city            String?
+  state           String?
+  pincode         String?
+
+  employmentType  String?
+  employerName    String?
+  monthlyIncome   Decimal?       @db.Decimal(14, 2)
+  existingObligations Decimal?   @db.Decimal(14, 2)
+
+  bankName        String?
+  bankAccountNo   String?
+  bankIfsc        String?
+
+  kycStatus       KycStatus      @default(NOT_STARTED)
+  riskCategory    RiskCategory?
+  status          CustomerStatus @default(DRAFT)
+
+  applications    LoanApplication[]
+  loans           Loan[]
+  documents       Document[]
+  payments        Payment[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([mobile])
+  @@index([email])
+  @@index([status])
+  @@index([branchId])
+}
+
+// ---------------------------------------------------------------------------
+// Loan products
+// ---------------------------------------------------------------------------
+
+enum InterestMethod {
+  FLAT
+  REDUCING
+}
+
+model LoanProduct {
+  id                 String         @id @default(uuid())
+  code               String         @unique
+  name               String
+  productType        String
+  minAmount          Decimal        @db.Decimal(14, 2)
+  maxAmount          Decimal        @db.Decimal(14, 2)
+  minTenureMonths    Int
+  maxTenureMonths    Int
+  interestRate       Decimal        @db.Decimal(6, 3) // annual %
+  interestMethod     InterestMethod @default(REDUCING)
+  processingFeePct   Decimal        @db.Decimal(6, 3) @default(0)
+  lateFeePct         Decimal        @db.Decimal(6, 3) @default(0)
+  gracePeriodDays    Int            @default(0)
+  eligibilityRules   Json?
+  isActive           Boolean        @default(true)
+
+  applications       LoanApplication[]
+  loans              Loan[]
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Loan applications
+// ---------------------------------------------------------------------------
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  KYC_PENDING
+  KYC_VERIFIED
+  UNDER_REVIEW
+  CREDIT_ASSESSMENT
+  UNDERWRITING
+  APPROVED
+  REJECTED
+  AGREEMENT_PENDING
+  READY_FOR_DISBURSEMENT
+  DISBURSED
+  CANCELLED
+}
+
+model LoanApplication {
+  id             String            @id @default(uuid())
+  applicationNo  String            @unique
+  customerId     String
+  customer       Customer          @relation(fields: [customerId], references: [id])
+  productId      String
+  product        LoanProduct       @relation(fields: [productId], references: [id])
+
+  requestedAmount Decimal          @db.Decimal(14, 2)
+  tenureMonths    Int
+  purpose         String?
+  status          ApplicationStatus @default(DRAFT)
+
+  statusHistory   ApplicationStatusHistory[]
+  eligibility     EligibilityAssessment?
+  riskAssessment  RiskAssessment?
+  underwriting    UnderwritingDecision?
+  loan            Loan?
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([applicationNo])
+  @@index([customerId])
+  @@index([status])
+}
+
+model ApplicationStatusHistory {
+  id            String            @id @default(uuid())
+  applicationId String
+  application   LoanApplication   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedBy     String?
+  reason        String?
+  createdAt     DateTime          @default(now())
+
+  @@index([applicationId])
+}
+
+model EligibilityAssessment {
+  id            String          @id @default(uuid())
+  applicationId String          @unique
+  application   LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  result        String // ELIGIBLE, CONDITIONALLY_ELIGIBLE, NOT_ELIGIBLE
+  factors       Json
+  createdAt     DateTime        @default(now())
+}
+
+model RiskAssessment {
+  id            String          @id @default(uuid())
+  applicationId String          @unique
+  application   LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  score         Int
+  category      RiskCategory
+  factors       Json
+  createdAt     DateTime        @default(now())
+}
+
+model UnderwritingDecision {
+  id            String          @id @default(uuid())
+  applicationId String          @unique
+  application   LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  decision      String // APPROVE, APPROVE_WITH_CONDITIONS, SEND_BACK, REJECT
+  reason        String?
+  decidedBy     String
+  createdAt     DateTime        @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Loans / repayment / disbursement
+// ---------------------------------------------------------------------------
+
+enum LoanStatus {
+  ACTIVE
+  OVERDUE
+  RESTRUCTURED
+  SETTLED
+  CLOSED
+  WRITTEN_OFF
+}
+
+model Loan {
+  id                 String       @id @default(uuid())
+  loanNo             String       @unique
+  applicationId      String?      @unique
+  application        LoanApplication? @relation(fields: [applicationId], references: [id])
+  customerId         String
+  customer           Customer     @relation(fields: [customerId], references: [id])
+  productId          String
+  product            LoanProduct  @relation(fields: [productId], references: [id])
+
+  principal          Decimal      @db.Decimal(14, 2)
+  interestRate       Decimal      @db.Decimal(6, 3)
+  tenureMonths       Int
+  emiAmount          Decimal      @db.Decimal(14, 2)
+
+  disbursementDate   DateTime?
+  maturityDate       DateTime?
+
+  outstandingPrincipal Decimal    @db.Decimal(14, 2)
+  outstandingInterest  Decimal    @db.Decimal(14, 2) @default(0)
+  outstandingFees      Decimal    @db.Decimal(14, 2) @default(0)
+  nextDueDate          DateTime?
+
+  status             LoanStatus   @default(ACTIVE)
+
+  schedule           RepaymentScheduleItem[]
+  disbursements      Disbursement[]
+  payments           Payment[]
+  transactions       Transaction[]
+
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([loanNo])
+  @@index([customerId])
+  @@index([status])
+  @@index([nextDueDate])
+}
+
+enum InstallmentStatus {
+  UPCOMING
+  DUE
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+model RepaymentScheduleItem {
+  id            String            @id @default(uuid())
+  loanId        String
+  loan          Loan              @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  emiNumber     Int
+  dueDate       DateTime
+  principal     Decimal           @db.Decimal(14, 2)
+  interest      Decimal           @db.Decimal(14, 2)
+  fees          Decimal           @db.Decimal(14, 2) @default(0)
+  totalDue      Decimal           @db.Decimal(14, 2)
+  paidAmount    Decimal           @db.Decimal(14, 2) @default(0)
+  outstanding   Decimal           @db.Decimal(14, 2)
+  status        InstallmentStatus @default(UPCOMING)
+
+  @@unique([loanId, emiNumber])
+  @@index([loanId])
+  @@index([dueDate])
+}
+
+enum DisbursementStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Disbursement {
+  id            String             @id @default(uuid())
+  loanId        String
+  loan          Loan               @relation(fields: [loanId], references: [id])
+  amount        Decimal            @db.Decimal(14, 2)
+  method        String
+  reference     String?
+  status        DisbursementStatus @default(PENDING)
+  disbursedBy   String?
+  createdAt     DateTime           @default(now())
+
+  @@index([loanId])
+}
+
+// ---------------------------------------------------------------------------
+// Payments / allocations / ledger
+// ---------------------------------------------------------------------------
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+  REFUNDED
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  paymentNo     String        @unique
+  loanId        String
+  loan          Loan          @relation(fields: [loanId], references: [id])
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  amount        Decimal       @db.Decimal(14, 2)
+  method        String
+  reference     String?
+  idempotencyKey String?      @unique
+  status        PaymentStatus @default(PENDING)
+  paidAt        DateTime      @default(now())
+
+  allocations   PaymentAllocation[]
+  createdAt     DateTime      @default(now())
+
+  @@index([loanId])
+  @@index([customerId])
+  @@index([reference])
+}
+
+model PaymentAllocation {
+  id          String   @id @default(uuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  bucket      String // FEES, PENALTY, INTEREST, PRINCIPAL
+  amount      Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+
+  @@index([paymentId])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  loanId      String?
+  loan        Loan?    @relation(fields: [loanId], references: [id])
+  type        String // DISBURSEMENT, PAYMENT, FEE, PENALTY, ADJUSTMENT
+  direction   String // DEBIT, CREDIT
+  amount      Decimal  @db.Decimal(14, 2)
+  reference   String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([loanId])
+  @@index([reference])
+}
+
+// ---------------------------------------------------------------------------
+// Documents
+// ---------------------------------------------------------------------------
+
+model Document {
+  id          String   @id @default(uuid())
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  category    String
+  fileName    String
+  storageKey  String // object storage key; served via signed URL
+  contentType String?
+  sizeBytes   Int?
+  verified    Boolean  @default(false)
+  expiryDate  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit + settings
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  role          String?
+  action        String
+  entity        String
+  entityId      String?
+  previousValue Json?
+  newValue      Json?
+  ipAddress     String?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  category  String?
+  updatedAt DateTime @updatedAt
+}

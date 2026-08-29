@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: adyapan_lms_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-adyapan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adyapan_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-adyapan_lms}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - adyapan_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-adyapan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: adyapan_lms_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - adyapan_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  adyapan_pgdata:
+  adyapan_redisdata:
