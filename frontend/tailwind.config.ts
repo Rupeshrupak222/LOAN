@@ -5,7 +5,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Adyapan brand — indigo/violet primary with a teal accent.
         brand: {
           50: '#eef2ff',
           100: '#e0e7ff',
@@ -36,20 +35,31 @@ const config: Config = {
       boxShadow: {
         soft: '0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06)',
         card: '0 1px 3px rgba(16, 24, 40, 0.06), 0 12px 32px -12px rgba(16, 24, 40, 0.12)',
-        glow: '0 8px 30px -8px rgba(79, 70, 229, 0.45)',
-      },
-      backgroundImage: {
-        'brand-gradient': 'linear-gradient(135deg, #4f46e5 0%, #6366f1 45%, #14b8a6 120%)',
-        'brand-radial': 'radial-gradient(1200px 600px at 100% 0%, rgba(20,184,166,0.18), transparent 60%)',
+        glow: '0 8px 30px -8px rgba(21, 94, 239, 0.35)',
       },
       keyframes: {
         'fade-up': {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        floating: {
+          '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+          '50%': { transform: 'translateY(-8px) rotate(0.5deg)' },
+        },
+        'floating-delayed': {
+          '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+          '50%': { transform: 'translateY(-10px) rotate(-0.5deg)' },
+        },
+        'floating-alt': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.4s ease-out',
+        floating: 'floating 4.5s ease-in-out infinite',
+        'floating-delayed': 'floating-delayed 5.2s ease-in-out infinite 0.8s',
+        'floating-alt': 'floating-alt 4s ease-in-out infinite 1.5s',
       },
     },
   },
