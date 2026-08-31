@@ -10,12 +10,13 @@ export interface PageParams {
   sortDir: 'asc' | 'desc';
 }
 
-export function getPageParams(req: Request, defaultSort = 'createdAt'): PageParams {
-  const page = Math.max(1, Number(req.query.page ?? 1));
-  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
-  const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
-  const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : defaultSort;
-  const sortDir = req.query.sortDir === 'asc' ? 'asc' : 'desc';
+export function getPageParams(req: Request | { query?: any } | any, defaultSort = 'createdAt'): PageParams {
+  const query = (req && 'query' in req) ? req.query : req || {};
+  const page = Math.max(1, Number(query.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(query.pageSize ?? 20)));
+  const search = typeof query.search === 'string' ? query.search.trim() : undefined;
+  const sortBy = typeof query.sortBy === 'string' ? query.sortBy : defaultSort;
+  const sortDir = query.sortDir === 'asc' ? 'asc' : 'desc';
 
   return {
     page,
@@ -27,6 +28,8 @@ export function getPageParams(req: Request, defaultSort = 'createdAt'): PagePara
     sortDir,
   };
 }
+
+export const parsePagination = getPageParams;
 
 export function buildPagination(page: number, pageSize: number, total: number) {
   return {

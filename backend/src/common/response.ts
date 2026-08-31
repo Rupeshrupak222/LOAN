@@ -7,17 +7,21 @@ export interface Pagination {
   totalPages: number;
 }
 
+export function success<T>(data: T, pagination?: Pagination) {
+  return { success: true, data, ...(pagination ? { pagination } : {}) };
+}
+
 export function ok<T>(res: Response, data: T, statusCode = 200): Response {
-  return res.status(statusCode).json({ success: true, data });
+  return res.status(statusCode).json(success(data));
 }
 
 export function paginated<T>(
   res: Response,
   data: T[],
   pagination: Pagination,
-  statusCode = 200,
+  statusCode = 200
 ): Response {
-  return res.status(statusCode).json({ success: true, data, pagination });
+  return res.status(statusCode).json(success(data, pagination));
 }
 
 export function created<T>(res: Response, data: T): Response {

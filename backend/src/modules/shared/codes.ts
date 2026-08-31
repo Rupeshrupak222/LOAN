@@ -9,5 +9,7 @@ function stamp(): string {
 
 export const generateCustomerCode = () => `CUST-${stamp()}`;
 export const generateApplicationNo = () => `APP-${stamp()}`;
-export const generateLoanNo = () => `LOAN-${stamp()}`;
-export const generatePaymentNo = () => `PAY-${stamp()}`;
+export const generateLoanNo = () => `LN-${stamp()}`;
+export const generatePaymentNo = () => `PMT-${stamp()}`;
+export const generateCaseNo = () => `COL-${stamp()}`;
+export const generateNocNo = () => `NOC-${stamp()}`;

@@ -1,55 +1,56 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Adyapan brand — indigo/violet primary with a teal accent.
+        // Professional FinTech palette: Navy/Slate base with crisp Indigo brand accent and Emerald success
         brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50: '#f5f7ff',
+          100: '#ebf0fe',
+          200: '#dce4fd',
+          300: '#b9cbfb',
+          400: '#7e9ef7',
+          500: '#4f75f2',
+          600: '#2550eb',
+          700: '#1d40d8',
+          800: '#1e37ae',
+          900: '#1e338a',
+          950: '#162054',
         },
-        accent: {
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-        },
-        ink: {
-          900: '#0b1020',
-          800: '#141a2e',
-          700: '#1e2740',
+        surface: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617',
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        soft: '0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06)',
-        card: '0 1px 3px rgba(16, 24, 40, 0.06), 0 12px 32px -12px rgba(16, 24, 40, 0.12)',
-        glow: '0 8px 30px -8px rgba(79, 70, 229, 0.45)',
-      },
-      backgroundImage: {
-        'brand-gradient': 'linear-gradient(135deg, #4f46e5 0%, #6366f1 45%, #14b8a6 120%)',
-        'brand-radial': 'radial-gradient(1200px 600px at 100% 0%, rgba(20,184,166,0.18), transparent 60%)',
+        card: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
+        'card-hover': '0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
+        elevated: '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04)',
+        dropdown: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
       },
       keyframes: {
-        'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
       animation: {
-        'fade-up': 'fade-up 0.4s ease-out',
+        'fade-in': 'fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
   },

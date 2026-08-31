@@ -15,7 +15,6 @@ import { Logo } from './Logo';
 import { Button } from './ui';
 import { cn } from '@/lib/utils';
 
-// Mega-menu columns for "Products" (structure inspired by M2P Fintech).
 const PRODUCT_COLUMNS = [
   {
     icon: Landmark,
@@ -34,7 +33,6 @@ const PRODUCT_COLUMNS = [
       'BNPL',
       'Credit Line on UPI',
       'Credit Cards',
-      'Corporate Credit Card',
     ],
   },
   {
@@ -45,7 +43,7 @@ const PRODUCT_COLUMNS = [
       'Cross-Border Payments',
       'Fleet Drive',
       'UPI',
-      'Merchant Acquiring Solutions',
+      'Merchant Acquiring',
     ],
   },
   {
@@ -81,7 +79,6 @@ export function LandingNav({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Small delay on close so the pointer can travel from trigger to panel.
   function open(menu: 'products' | 'resources') {
     if (closeTimer.current) clearTimeout(closeTimer.current);
     setOpenMenu(menu);
@@ -97,14 +94,13 @@ export function LandingNav({
         'sticky top-0 z-50 transition-all',
         scrolled || openMenu
           ? 'border-b border-slate-200/70 bg-white/90 backdrop-blur'
-          : 'bg-transparent',
+          : 'bg-white border-b border-slate-100',
       )}
       onMouseLeave={scheduleClose}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
         <Logo size={38} />
 
-        {/* Desktop nav */}
         <nav className="hidden items-center gap-7 md:flex">
           <DropdownTrigger
             label="Products"
