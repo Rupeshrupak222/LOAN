@@ -243,6 +243,14 @@ export const MotionNavbar: React.FC = () => {
 
   return (
     <>
+      {/* Dimmed Backdrop Scrim for Crystal Clear Focus on Mega Menu */}
+      {productsOpen && (
+        <div
+          onClick={() => setProductsOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-900/35 backdrop-blur-[2px] transition-opacity duration-300 pointer-events-auto"
+        />
+      )}
+
       <header
         ref={headerRef}
         className="fixed top-0 inset-x-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none transition-all duration-300"
@@ -318,24 +326,25 @@ export const MotionNavbar: React.FC = () => {
               {productsOpen && (
                 <div
                   ref={dropdownRef}
-                  className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-[880px] rounded-3xl bg-white/98 border border-[#D3E5FA] p-6 z-50 text-[#071A33] shadow-2xl backdrop-blur-2xl"
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-[920px] rounded-3xl bg-[#FFFFFF] border-2 border-[#CBD5E1] p-6 z-50 text-[#071A33] shadow-[0_30px_90px_rgba(7,26,51,0.35)]"
                   style={{
-                    boxShadow: '0 25px 60px -12px rgba(7, 26, 51, 0.22), 0 0 0 1px rgba(211, 229, 250, 0.8)',
+                    backgroundColor: '#FFFFFF',
+                    opacity: 1,
                     transformStyle: 'preserve-3d',
                   }}
                 >
                   {/* Top Header Bar inside Mega Menu */}
-                  <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
+                  <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-200">
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-[#155EEF]" />
-                      <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase font-mono">
+                      <span className="text-[11px] font-extrabold tracking-wider text-slate-600 uppercase font-mono">
                         Adyapan Financial Architecture
                       </span>
                     </div>
                     <Link
                       href="/dashboard"
                       onClick={() => setProductsOpen(false)}
-                      className="text-xs font-bold text-[#155EEF] hover:underline flex items-center gap-1 font-mono"
+                      className="text-xs font-bold text-[#155EEF] hover:text-[#0d47a1] flex items-center gap-1 font-mono hover:underline"
                     >
                       <span>Access LMS Suite</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -343,13 +352,13 @@ export const MotionNavbar: React.FC = () => {
                   </div>
 
                   {/* 4 Category Columns with 3D Hover Cards */}
-                  <div className="grid grid-cols-4 gap-5">
+                  <div className="grid grid-cols-4 gap-4">
                     {PRODUCTS_CATEGORIES.map((cat, idx) => {
                       const Icon = cat.icon;
                       return (
-                        <div key={idx} className="space-y-2.5">
-                          <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
-                            <div className="w-6 h-6 rounded-lg bg-[#EAF4FF] flex items-center justify-center text-[#155EEF]">
+                        <div key={idx} className="space-y-2 rounded-2xl bg-slate-50/80 border border-slate-200/80 p-3">
+                          <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                            <div className="w-6 h-6 rounded-lg bg-[#155EEF] flex items-center justify-center text-white shadow-xs">
                               <Icon className="w-3.5 h-3.5" />
                             </div>
                             <h4 className="text-xs font-black text-[#071A33] tracking-tight">
@@ -363,20 +372,20 @@ export const MotionNavbar: React.FC = () => {
                                 key={itemIdx}
                                 href={item.href}
                                 onClick={() => setProductsOpen(false)}
-                                className="group/item block p-2 rounded-xl text-left transition-all hover:bg-[#EAF4FF]/70 hover:border-[#155EEF]/20 border border-transparent"
+                                className="group/item block p-2 rounded-xl text-left transition-all bg-white hover:bg-[#EAF4FF] hover:border-[#155EEF]/30 border border-slate-200/60 shadow-xs"
                               >
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold text-slate-700 group-hover/item:text-[#155EEF] transition-transform duration-150 group-hover/item:translate-x-0.5">
+                                  <span className="text-xs font-bold text-[#071A33] group-hover/item:text-[#155EEF] transition-transform duration-150 group-hover/item:translate-x-0.5">
                                     {item.name}
                                   </span>
                                   {item.badge && (
-                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-[#155EEF]/10 text-[#155EEF] border border-[#155EEF]/20">
+                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-[#155EEF] text-white">
                                       {item.badge}
                                     </span>
                                   )}
                                 </div>
                                 {item.desc && (
-                                  <p className="text-[10px] text-slate-400 group-hover/item:text-slate-500 mt-0.5 leading-tight">
+                                  <p className="text-[10px] font-medium text-slate-500 group-hover/item:text-slate-700 mt-0.5 leading-tight">
                                     {item.desc}
                                   </p>
                                 )}
@@ -389,14 +398,14 @@ export const MotionNavbar: React.FC = () => {
                   </div>
 
                   {/* Mega Menu Footer Banner */}
-                  <div className="mt-5 pt-3.5 px-4 py-3 rounded-2xl flex items-center justify-between bg-gradient-to-r from-[#EAF4FF] to-white border border-[#D3E5FA]">
+                  <div className="mt-4 pt-3.5 px-4 py-3 rounded-2xl flex items-center justify-between bg-gradient-to-r from-blue-50 via-slate-50 to-blue-50 border border-blue-200">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-xl bg-[#155EEF] text-white flex items-center justify-center shadow-xs">
                         <Lock className="w-4 h-4" />
                       </div>
                       <div>
                         <p className="text-xs font-bold text-[#071A33]">Instant Digital Underwriting in 60s</p>
-                        <p className="text-[10px] text-slate-500">Zero paperwork. Bank-grade 256-bit DigiLocker integration.</p>
+                        <p className="text-[10px] font-medium text-slate-600">Zero paperwork. Bank-grade 256-bit DigiLocker integration.</p>
                       </div>
                     </div>
                     <a
