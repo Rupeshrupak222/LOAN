@@ -37,6 +37,14 @@ import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDate, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 
+function getDocumentDisplayUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.includes('res.cloudinary.com') && url.toLowerCase().endsWith('.pdf')) {
+    return url.replace(/\.pdf$/i, '.jpg');
+  }
+  return url;
+}
+
 export default function CustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -503,7 +511,7 @@ export default function CustomerDetailPage() {
                           </span>
                           {doc.storageKey?.startsWith('http') && (
                             <a
-                              href={doc.storageKey}
+                              href={getDocumentDisplayUrl(doc.storageKey)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded hover:bg-sky-100 transition"
@@ -540,7 +548,7 @@ export default function CustomerDetailPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           {doc.storageKey?.startsWith('http') && (
                             <a
-                              href={doc.storageKey}
+                              href={getDocumentDisplayUrl(doc.storageKey)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-brand-700 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition"
@@ -1097,28 +1105,21 @@ export default function CustomerDetailPage() {
             {/* Cloudinary Document Preview */}
             {selectedDoc.storageKey?.startsWith('http') && (
               <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-3 space-y-2 text-center">
-                {selectedDoc.contentType?.startsWith('image/') || selectedDoc.fileName?.match(/\.(jpg|jpeg|png|webp)$/i) ? (
-                  <div className="max-h-56 overflow-hidden rounded-lg flex items-center justify-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                    <img
-                      src={selectedDoc.storageKey}
-                      alt={selectedDoc.fileName}
-                      className="max-h-52 object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div className="py-4 flex flex-col items-center justify-center gap-1.5">
-                    <FileText className="h-10 w-10 text-brand-700 dark:text-brand-400" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">PDF / Compliance Document</p>
-                  </div>
-                )}
+                <div className="max-h-60 overflow-hidden rounded-lg flex items-center justify-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <img
+                    src={getDocumentDisplayUrl(selectedDoc.storageKey)}
+                    alt={selectedDoc.fileName}
+                    className="max-h-56 object-contain"
+                  />
+                </div>
                 <div className="flex justify-center">
                   <a
-                    href={selectedDoc.storageKey}
+                    href={getDocumentDisplayUrl(selectedDoc.storageKey)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-600 hover:text-sky-700 bg-white dark:bg-[#1E2445] border border-sky-200 dark:border-sky-900 px-3 py-1.5 rounded-lg shadow-2xs"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" /> View Original in Cloudinary CDN ↗
+                    <ExternalLink className="h-3.5 w-3.5" /> Open Full Document View ↗
                   </a>
                 </div>
               </div>
