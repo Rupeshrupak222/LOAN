@@ -1,11 +1,11 @@
 # ══════════════════════════════════════════════════════════════
 # Adyapan LMS — 1-Click Restore Script for Cross-Border Wire Redesign
 # ─────────────────────────────────────────────────────────────
-# Restores files to baseline checkpoint (f0ac6f9).
+# Restores files to baseline checkpoint (619aa59).
 # ══════════════════════════════════════════════════════════════
 
-Write-Host "Restoring Cross-Border Wire to baseline checkpoint (f0ac6f9)..." -ForegroundColor Cyan
+Write-Host "Restoring Cross-Border Wire to baseline checkpoint (619aa59)..." -ForegroundColor Cyan
 
-git reset --hard f0ac6f9
+git reset --hard 619aa59
 
 Write-Host "✓ Successfully restored Cross-Border Wire signature page." -ForegroundColor Green

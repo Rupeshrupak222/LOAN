@@ -5,27 +5,29 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   ArrowRight,
-  Globe,
-  Compass,
+  RotateCcw,
+  Sliders,
+  Scale,
+  FileText,
+  Lock,
   Layers,
   Sparkles,
-  Activity,
   CheckCircle2,
 } from 'lucide-react';
 import { GsapProvider } from '@/components/motion/GsapProvider';
 import { MotionScrollReveal3D } from '@/components/motion/MotionScrollReveal3D';
 import { MotionNavbar } from '@/components/motion/MotionNavbar';
 import { FintechFooter } from '@/components/fintech/FintechFooter';
-import { PlanetaryOriginHero3D } from '@/components/products/cross-border/PlanetaryOriginHero3D';
-import { OriginTransactionCapsule } from '@/components/products/cross-border/OriginTransactionCapsule';
-import { BorderCrossingArc } from '@/components/products/cross-border/BorderCrossingArc';
-import { CurrencyTransformationChamber } from '@/components/products/cross-border/CurrencyTransformationChamber';
-import { InvisibleRoutingCorridor } from '@/components/products/cross-border/InvisibleRoutingCorridor';
-import { SwiftDualJourney } from '@/components/products/cross-border/SwiftDualJourney';
-import { SettlementPrecisionPlane } from '@/components/products/cross-border/SettlementPrecisionPlane';
-import { DestinationArrival } from '@/components/products/cross-border/DestinationArrival';
-import { MacroGlobalPerspective } from '@/components/products/cross-border/MacroGlobalPerspective';
-import { FinalPlanetaryCTA } from '@/components/products/cross-border/FinalPlanetaryCTA';
+import { CurrencyDiscHero3D } from '@/components/products/cross-border/CurrencyDiscHero3D';
+import { PrecisionAmountOdometer } from '@/components/products/cross-border/PrecisionAmountOdometer';
+import { MechanicalFxChamber } from '@/components/products/cross-border/MechanicalFxChamber';
+import { OscillatingFxRibbon } from '@/components/products/cross-border/OscillatingFxRibbon';
+import { PrecisionBalanceMechanism } from '@/components/products/cross-border/PrecisionBalanceMechanism';
+import { DigitalInstructionSheet } from '@/components/products/cross-border/DigitalInstructionSheet';
+import { MechanicalSettlementLock } from '@/components/products/cross-border/MechanicalSettlementLock';
+import { DestinationCurrencyReveal } from '@/components/products/cross-border/DestinationCurrencyReveal';
+import { FinancialWorkbench } from '@/components/products/cross-border/FinancialWorkbench';
+import { FinalCurrencyCTA } from '@/components/products/cross-border/FinalCurrencyCTA';
 
 export default function CrossBorderWireSignaturePage() {
   return (
@@ -55,47 +57,47 @@ export default function CrossBorderWireSignaturePage() {
           </div>
         </div>
 
-        {/* ── SCENE 1: The World is the Interface 3D Planetary Hero ── */}
-        <PlanetaryOriginHero3D />
+        {/* ── SCENE 1: The Currency Disc 3D Hero ── */}
+        <CurrencyDiscHero3D />
 
-        {/* ── SCENE 2: Every Journey Starts Somewhere (Origin Transaction Capsule) ── */}
+        {/* ── SCENE 2: Start with the Value (Mechanical Amount Odometer) ── */}
         <MotionScrollReveal3D>
-          <OriginTransactionCapsule />
+          <PrecisionAmountOdometer />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 3: Then the Money Crosses a Border (3D Flight Arc) ── */}
+        {/* ── SCENE 3: Then the Value Changes Form (Hero FX Chamber) ── */}
         <MotionScrollReveal3D>
-          <BorderCrossingArc />
+          <MechanicalFxChamber />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 4: The Currency Transformation Chamber (Precision FX Engine) ── */}
+        {/* ── SCENE 4: The Rate Has a Story (3D Metallic Ribbon) ── */}
         <MotionScrollReveal3D>
-          <CurrencyTransformationChamber />
+          <OscillatingFxRibbon />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 5: The Invisible Corridor (High-Speed Infrastructure Tunnel) ── */}
+        {/* ── SCENE 5: Precision Matters (Two-Sided Balance Mechanism) ── */}
         <MotionScrollReveal3D>
-          <InvisibleRoutingCorridor />
+          <PrecisionBalanceMechanism />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 6: The Message Travels with the Money (Dual Stream) ── */}
+        {/* ── SCENE 6: The Payment Instruction (Signed Structured Sheet) ── */}
         <MotionScrollReveal3D>
-          <SwiftDualJourney />
+          <DigitalInstructionSheet />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 7: The Settlement Precision Plane ── */}
+        {/* ── SCENE 7: Settlement Lock (Precision Mechanical Click) ── */}
         <MotionScrollReveal3D>
-          <SettlementPrecisionPlane />
+          <MechanicalSettlementLock />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 8: Destination Arrival & Finality ── */}
+        {/* ── SCENE 8: One Value. A Different Currency. (Final Disc Reveal) ── */}
         <MotionScrollReveal3D>
-          <DestinationArrival />
+          <DestinationCurrencyReveal />
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 9: Global Financial Perspective (Multi-Corridor Mesh) ── */}
+        {/* ── SCENE 9: The Financial Workbench (Instrument Panel) ── */}
         <MotionScrollReveal3D>
-          <MacroGlobalPerspective />
+          <FinancialWorkbench />
         </MotionScrollReveal3D>
 
         {/* ── SCENE 10: Product Ecosystem Cross-Navigation ── */}
@@ -105,7 +107,7 @@ export default function CrossBorderWireSignaturePage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="text-left space-y-1">
                   <span className="text-xs font-bold uppercase tracking-widest text-[#155EEF] font-mono">
-                    Connected Global Settlement
+                    Connected Settlement Ecosystem
                   </span>
                   <h3 className="text-2xl sm:text-3xl font-black text-[#071A33] tracking-tight">
                     Explore Other Adyapan Architecture Solutions
@@ -173,9 +175,9 @@ export default function CrossBorderWireSignaturePage() {
           </section>
         </MotionScrollReveal3D>
 
-        {/* ── SCENE 11: Ready to Move Money Beyond Borders? (Final Payoff CTA) ── */}
+        {/* ── SCENE 11: Ready to Move Value Across Currencies? (Final Payoff CTA) ── */}
         <MotionScrollReveal3D>
-          <FinalPlanetaryCTA />
+          <FinalCurrencyCTA />
         </MotionScrollReveal3D>
 
         {/* ── Regulatory Midnight Navy Footer ── */}
