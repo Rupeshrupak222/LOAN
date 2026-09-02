@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
+import { ForbiddenError } from '../../common/errors';
 import { created, ok, paginated } from '../../common/response';
 import { getPageParams } from '../../common/pagination';
 import { authenticate, authorize } from '../../middleware/auth';
@@ -17,14 +18,27 @@ router.get(
   asyncHandler(async (req, res) => {
     const params = getPageParams(req);
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-    const result = await service.listApplications(params, status);
+    const isStaff = req.user?.roles.some((r) =>
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+    const userIdFilter = isStaff ? undefined : req.user?.id;
+    const result = await service.listApplications(params, status, userIdFilter);
     return paginated(res, result.data, result.pagination);
   }),
 );
 
 router.get(
   '/:id',
-  asyncHandler(async (req, res) => ok(res, await service.getApplication(req.params.id))),
+  asyncHandler(async (req, res) => {
+    const app = await service.getApplication(req.params.id);
+    const isStaff = req.user?.roles.some((r) =>
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+    if (!isStaff && app.customer?.userId !== req.user?.id) {
+      throw new ForbiddenError('Access forbidden: You cannot view another borrower loan application');
+    }
+    return ok(res, app);
+  }),
 );
 
 router.post(

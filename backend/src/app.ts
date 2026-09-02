@@ -33,11 +33,15 @@ export function createApp() {
   app.use(pinoHttp({ logger }));
   app.use(globalLimiter);
 
-  // Health checks (no prefix)
+  // Health checks
   app.use(healthRoutes);
+  app.use(env.apiPrefix, healthRoutes);
 
   // API docs
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
+
+  // Serve uploaded files statically
+  app.use('/uploads', express.static('uploads'));
 
   // Versioned API
   app.use(env.apiPrefix, apiRoutes);
