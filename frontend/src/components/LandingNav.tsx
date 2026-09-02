@@ -36,7 +36,7 @@ export function LandingNav({
         'fixed top-0 inset-x-0 z-50 transition-all duration-300 py-3 sm:py-3.5',
         scrolled
           ? 'bg-white/90 backdrop-blur-2xl border-b border-slate-200/80 shadow-sm'
-          : 'bg-transparent',
+          : 'bg-transparent'
       )}
     >
       <div className="mx-auto flex h-12 sm:h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">

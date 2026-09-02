@@ -1,21 +1,40 @@
+'use client';
+
 import { ReactNode } from 'react';
+import { useTheme } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 
 export function PageHeader({
   title,
   subtitle,
   action,
+  breadcrumb,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  breadcrumb?: string;
 }) {
+  const { isDark } = useTheme();
+
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+        {breadcrumb && (
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+            {breadcrumb}
+          </p>
+        )}
+        <h1 className={cn("text-xl font-bold tracking-tight", isDark ? "text-white" : "text-slate-900")}>
+          {title}
+        </h1>
+        {subtitle && (
+          <p className={cn("mt-0.5 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>
+            {subtitle}
+          </p>
+        )}
       </div>
-      {action}
+      {action && <div className="flex flex-wrap items-center gap-2.5">{action}</div>}
     </div>
   );
 }

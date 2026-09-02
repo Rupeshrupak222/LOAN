@@ -1,16 +1,46 @@
 import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes';
 import customerRoutes from '../modules/customer/customer.routes';
+import documentRoutes from '../modules/documents/document.routes';
 import productRoutes from '../modules/product/product.routes';
 import applicationRoutes from '../modules/application/application.routes';
+import eligibilityRoutes from '../modules/eligibility/eligibility.routes';
+import riskRoutes from '../modules/risk/risk.routes';
+import underwritingRoutes from '../modules/underwriting/underwriting.routes';
+import loanRoutes from '../modules/loans/loan.routes';
+import disbursementRoutes from '../modules/disbursements/disbursement.routes';
+import paymentRoutes from '../modules/payments/payment.routes';
+import collectionRoutes from '../modules/collections/collection.routes';
+import restructuringRoutes from '../modules/restructuring/restructuring.routes';
+import reportRoutes from '../modules/reports/report.routes';
+import branchRoutes from '../modules/branches/branch.routes';
+import userRoutes from '../modules/users/user.routes';
+import settingRoutes from '../modules/settings/settings.routes';
+import notificationRoutes from '../modules/notifications/notification.routes';
+import auditRoutes from '../modules/audit/audit.routes';
 import financeRoutes from '../modules/finance/finance.routes';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/customers', customerRoutes);
+router.use('/documents', documentRoutes);
 router.use('/loan-products', productRoutes);
 router.use('/applications', applicationRoutes);
+router.use('/eligibility', eligibilityRoutes);
+router.use('/risk', riskRoutes);
+router.use('/underwriting', underwritingRoutes);
+router.use('/loans', loanRoutes);
+router.use('/disbursements', disbursementRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/collections', collectionRoutes);
+router.use('/restructuring', restructuringRoutes);
+router.use('/reports', reportRoutes);
+router.use('/branches', branchRoutes);
+router.use('/users', userRoutes);
+router.use('/settings', settingRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/audit', auditRoutes);
 router.use('/finance', financeRoutes);
 
 export default router;

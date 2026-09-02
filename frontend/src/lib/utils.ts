@@ -24,3 +24,20 @@ export function formatDate(value: string | Date | null | undefined): string {
     year: 'numeric',
   });
 }
+
+export function formatDateTime(value: string | Date | null | undefined): string {
+  if (!value) return '-';
+  const d = new Date(value);
+  const dateStr = d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+  const timeStr = d.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${dateStr} · ${timeStr}`;
+}
+

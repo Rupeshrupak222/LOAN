@@ -1,12 +1,60 @@
 import { PrismaClient } from '@prisma/client';
 import { env } from './env';
+import { logger } from './logger';
 
 export const prisma = new PrismaClient({
+  datasourceUrl: env.databaseUrl,
   log: env.isProduction ? ['error', 'warn'] : ['error', 'warn'],
 });
 
-export async function connectDatabase(): Promise<void> {
-  await prisma.$connect();
+// Auto-retry queries on transient Supabase PgBouncer pooler connection drops
+prisma.$use(async (params, next) => {
+  const maxRetries = 3;
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await next(params);
+    } catch (err: any) {
+      lastError = err;
+      const isConnError =
+        err?.code === 'P1001' ||
+        err?.code === 'P2024' ||
+        err?.code === 'P2028' ||
+        err?.message?.includes("Can't reach database server") ||
+        err?.message?.includes('closed') ||
+        err?.message?.includes('connection');
+
+      if (isConnError && attempt < maxRetries) {
+        logger.warn(
+          { attempt, maxRetries, model: params.model, action: params.action, err: err.message },
+          'Prisma query auto-retrying on transient connection drop...'
+        );
+        await prisma.$connect().catch(() => {});
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+});
+
+export async function connectDatabase(maxRetries = 5, delayMs = 1500): Promise<void> {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      await prisma.$connect();
+      logger.info('Database connected successfully via Prisma');
+      return;
+    } catch (err: any) {
+      attempt++;
+      logger.warn({ attempt, maxRetries, err: err.message }, 'Database connection retry...');
+      if (attempt >= maxRetries) {
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {

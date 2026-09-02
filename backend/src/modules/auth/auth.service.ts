@@ -30,10 +30,38 @@ async function issueTokens(user: {
 }
 
 export async function login(identifier: string, password: string) {
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ email: identifier.toLowerCase() }, { employeeId: identifier }] },
+  const cleanId = identifier.trim();
+  let user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: cleanId.toLowerCase() },
+        { employeeId: cleanId },
+      ],
+    },
     include: { roles: { include: { role: true } } },
   });
+
+  // If not found by direct email/employeeId, check if it matches a Customer mobile or customerCode
+  if (!user) {
+    const cust = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          { mobile: cleanId },
+          { customerCode: { equals: cleanId, mode: 'insensitive' } },
+          { email: { equals: cleanId, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        user: {
+          include: { roles: { include: { role: true } } },
+        },
+      },
+    });
+
+    if (cust?.user) {
+      user = cust.user;
+    }
+  }
 
   // Generic error to avoid leaking which accounts exist.
   const invalid = new UnauthorizedError('Invalid credentials');
@@ -71,6 +99,11 @@ export async function login(identifier: string, password: string) {
   const roles = user.roles.map((r) => r.role.name);
   const tokens = await issueTokens({ id: user.id, email: user.email, roles });
 
+  const linkedCustomer = await prisma.customer.findUnique({
+    where: { userId: user.id },
+    select: { id: true, customerCode: true, kycStatus: true, firstName: true, lastName: true },
+  });
+
   return {
     ...tokens,
     user: {
@@ -79,6 +112,9 @@ export async function login(identifier: string, password: string) {
       firstName: user.firstName,
       lastName: user.lastName,
       roles,
+      customerId: linkedCustomer?.id,
+      customerCode: linkedCustomer?.customerCode,
+      kycStatus: linkedCustomer?.kycStatus,
     },
   };
 }
