@@ -1,278 +1,157 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  ChevronDown,
-  Landmark,
-  HandCoins,
-  CreditCard,
-  Sparkles,
   Menu,
   X,
+  Compass,
+  Calculator,
+  ShieldCheck,
+  Zap,
+  ArrowRight,
 } from 'lucide-react';
 import { Logo } from './Logo';
-import { Button } from './ui';
 import { cn } from '@/lib/utils';
 
-const PRODUCT_COLUMNS = [
-  {
-    icon: Landmark,
-    title: 'Banking',
-    items: ['Core Banking', 'Debit Cards', 'Neobanking', 'Connect'],
-  },
-  {
-    icon: HandCoins,
-    title: 'Lending',
-    items: [
-      'Core Lending Suite',
-      'Loan Origination System',
-      'Loan Management System',
-      'Microfinance',
-      'Debt Collections',
-      'BNPL',
-      'Credit Line on UPI',
-      'Credit Cards',
-    ],
-  },
-  {
-    icon: CreditCard,
-    title: 'Payments',
-    items: [
-      'Prepaid Cards',
-      'Cross-Border Payments',
-      'Fleet Drive',
-      'UPI',
-      'Merchant Acquiring',
-    ],
-  },
-  {
-    icon: Sparkles,
-    title: 'Value Added Services',
-    items: ['Recon360', 'KYC Suite', 'ACS', 'FRM & AML', 'Rewards'],
-  },
-];
-
-const RESOURCE_ITEMS = ['Blog', 'News', 'Newsletter', 'White papers', 'Brand assets'];
-
-const SIMPLE_LINKS = [
-  { href: '#about', label: 'About' },
-  { href: '#events', label: 'Events' },
-  { href: '#contact', label: 'Contact' },
-];
-
 export function LandingNav({
-  primaryCta,
-  primaryLabel,
+  primaryCta = '#launchpad',
+  primaryLabel = 'Check Offer in 60s',
 }: {
-  primaryCta: string;
-  primaryLabel: string;
+  primaryCta?: string;
+  primaryLabel?: string;
 }) {
   const [scrolled, setScrolled] = useState(false);
-  const [openMenu, setOpenMenu] = useState<null | 'products' | 'resources'>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 15);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  function open(menu: 'products' | 'resources') {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    setOpenMenu(menu);
-  }
-  function scheduleClose() {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setOpenMenu(null), 120);
-  }
-
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 transition-all',
-        scrolled || openMenu
-          ? 'border-b border-slate-200/70 bg-white/90 backdrop-blur'
-          : 'bg-white border-b border-slate-100',
+        'fixed top-0 inset-x-0 z-50 transition-all duration-300 py-3 sm:py-3.5',
+        scrolled
+          ? 'bg-white/90 backdrop-blur-2xl border-b border-slate-200/80 shadow-sm'
+          : 'bg-transparent'
       )}
-      onMouseLeave={scheduleClose}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
-        <Logo size={38} />
-
-        <nav className="hidden items-center gap-7 md:flex">
-          <DropdownTrigger
-            label="Products"
-            active={openMenu === 'products'}
-            onOpen={() => open('products')}
-          />
-          <a href="#about" className="text-sm font-medium text-slate-600 hover:text-brand-600">
-            About
-          </a>
-          <DropdownTrigger
-            label="Resources"
-            active={openMenu === 'resources'}
-            onOpen={() => open('resources')}
-          />
-          <a href="#events" className="text-sm font-medium text-slate-600 hover:text-brand-600">
-            Events
-          </a>
-          <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-brand-600">
-            Contact
-          </a>
-        </nav>
-
-        <div className="hidden items-center gap-3 md:flex">
-          <Link href="/login" className="text-sm font-semibold text-slate-700 hover:text-brand-600">
-            Sign in
+      <div className="mx-auto flex h-12 sm:h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-8">
+          <Link href="/" className="flex items-center gap-2 group">
+            <Logo size={36} variant="dark" />
           </Link>
-          <Link href={primaryCta}>
-            <Button>{primaryLabel}</Button>
-          </Link>
+
+          {/* Desktop Narrative Pill Nav */}
+          <nav className="hidden items-center gap-2 lg:flex">
+            <a
+              href="#branches"
+              className="flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white/90 px-4 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
+            >
+              <Compass className="w-3.5 h-3.5 text-indigo-600" />
+              <span>5 Directions</span>
+            </a>
+            <a
+              href="#simulator"
+              className="flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white/90 px-4 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
+            >
+              <Calculator className="w-3.5 h-3.5 text-teal-600" />
+              <span>Reality Simulator</span>
+            </a>
+            <a
+              href="#branches"
+              className="flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white/90 px-4 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>90s Disbursal Rail</span>
+            </a>
+            <Link
+              href="/dashboard"
+              className="flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white/90 px-4 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>LMS Portal</span>
+            </Link>
+          </nav>
         </div>
 
-        <button className="md:hidden" onClick={() => setMobileOpen((v) => !v)} aria-label="Menu">
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        {/* Right CTA Actions */}
+        <div className="hidden items-center gap-3 sm:flex">
+          <Link
+            href="/login"
+            className="text-xs font-bold text-slate-700 hover:text-indigo-600 px-4 py-2 rounded-xl transition-colors font-mono"
+          >
+            Sign In
+          </Link>
+          <a
+            href={primaryCta}
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 text-xs font-black shadow-md shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95"
+          >
+            <span>{primaryLabel}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
+
+        {/* Mobile Hamburger Toggle */}
+        <button
+          className="lg:hidden text-slate-700 hover:text-slate-900 p-2 rounded-xl bg-white border border-slate-200 shadow-xs"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="Toggle Menu"
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
-      {/* Products mega-menu */}
-      {openMenu === 'products' && (
-        <div
-          className="absolute inset-x-0 top-16 hidden border-t border-slate-100 bg-white shadow-card md:block"
-          onMouseEnter={() => open('products')}
-          onMouseLeave={scheduleClose}
-        >
-          <div className="mx-auto grid max-w-7xl grid-cols-4 gap-8 px-8 py-8">
-            {PRODUCT_COLUMNS.map((col) => (
-              <div key={col.title}>
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <col.icon className="h-4 w-4 text-brand-600" />
-                  <p className="text-sm font-semibold text-slate-900">{col.title}</p>
-                </div>
-                <ul className="mt-3 space-y-2.5">
-                  {col.items.map((item) => (
-                    <li key={item}>
-                      <Link
-                        href="/login"
-                        className="text-sm text-slate-600 transition hover:text-brand-600"
-                      >
-                        {item}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Resources dropdown */}
-      {openMenu === 'resources' && (
-        <div
-          className="absolute left-1/2 top-16 hidden w-56 -translate-x-1/2 border-t border-slate-100 bg-white shadow-card md:block"
-          onMouseEnter={() => open('resources')}
-          onMouseLeave={scheduleClose}
-        >
-          <ul className="p-3">
-            {RESOURCE_ITEMS.map((item) => (
-              <li key={item}>
-                <Link
-                  href="/login"
-                  className="block rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-                >
-                  {item}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Mobile menu */}
+      {/* Mobile Drawer */}
       {mobileOpen && (
-        <div className="border-t border-slate-200 bg-white px-4 py-4 md:hidden">
-          <MobileGroup title="Products">
-            {PRODUCT_COLUMNS.flatMap((c) => c.items).map((item) => (
-              <MobileItem key={item} label={item} onClick={() => setMobileOpen(false)} />
-            ))}
-          </MobileGroup>
-          <MobileGroup title="Resources">
-            {RESOURCE_ITEMS.map((item) => (
-              <MobileItem key={item} label={item} onClick={() => setMobileOpen(false)} />
-            ))}
-          </MobileGroup>
-          <nav className="mt-2 flex flex-col gap-1">
-            {SIMPLE_LINKS.map((n) => (
-              <a
-                key={n.href}
-                href={n.href}
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                {n.label}
-              </a>
-            ))}
-          </nav>
-          <Link href={primaryCta} className="mt-3 block">
-            <Button className="w-full">{primaryLabel}</Button>
-          </Link>
+        <div className="border-b border-slate-200 bg-white/95 backdrop-blur-2xl px-6 py-6 lg:hidden space-y-4 animate-fade-up shadow-xl">
+          <div className="flex flex-col space-y-2">
+            <a
+              href="#branches"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-slate-800"
+            >
+              <Compass className="w-4 h-4 text-indigo-600" />
+              <span>5 Goal Directions</span>
+            </a>
+            <a
+              href="#simulator"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-slate-800"
+            >
+              <Calculator className="w-4 h-4 text-teal-600" />
+              <span>Financial Reality Simulator</span>
+            </a>
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-slate-800"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>LMS Management Suite</span>
+            </Link>
+            <Link
+              href="/login"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-slate-800 font-mono"
+            >
+              <span>Sign In to Account</span>
+            </Link>
+          </div>
+
+          <a
+            href={primaryCta}
+            onClick={() => setMobileOpen(false)}
+            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold shadow-lg"
+          >
+            <span>{primaryLabel}</span>
+            <ArrowRight className="w-4 h-4" />
+          </a>
         </div>
       )}
     </header>
-  );
-}
-
-function DropdownTrigger({
-  label,
-  active,
-  onOpen,
-}: {
-  label: string;
-  active: boolean;
-  onOpen: () => void;
-}) {
-  return (
-    <button
-      onMouseEnter={onOpen}
-      onFocus={onOpen}
-      className={cn(
-        'inline-flex items-center gap-1 text-sm font-medium transition',
-        active ? 'text-brand-600' : 'text-slate-600 hover:text-brand-600',
-      )}
-    >
-      {label}
-      <ChevronDown className={cn('h-4 w-4 transition-transform', active && 'rotate-180')} />
-    </button>
-  );
-}
-
-function MobileGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-b border-slate-100 py-1">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-slate-800"
-      >
-        {title}
-        <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && <div className="grid grid-cols-2 gap-x-2 pb-2">{children}</div>}
-    </div>
-  );
-}
-
-function MobileItem({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <Link
-      href="/login"
-      onClick={onClick}
-      className="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-    >
-      {label}
-    </Link>
   );
 }
