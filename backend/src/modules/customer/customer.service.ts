@@ -141,7 +141,7 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
       const rawPassword =
         input.password && input.password.trim().length >= 6
           ? input.password.trim()
-          : 'Passw0rd!123';
+          : process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
       const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
 
       const user = await tx.user.upsert({
@@ -302,7 +302,7 @@ export async function updateCustomer(
     } else if (input.email) {
       // Create user if not linked previously
       const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
-      const rawPassword = input.password && input.password.trim().length >= 6 ? input.password.trim() : 'Passw0rd!123';
+      const rawPassword = input.password && input.password.trim().length >= 6 ? input.password.trim() : (process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026');
       const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
       const newUser = await tx.user.upsert({
         where: { email: input.email.toLowerCase().trim() },

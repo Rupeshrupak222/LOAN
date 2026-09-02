@@ -60,8 +60,8 @@ export async function createUser(data: {
 }) {
   const role = await prisma.role.findUnique({ where: { name: data.roleName } });
   if (!role) throw new NotFoundError('Role not found');
-
-  const passwordHash = await argon2.hash('Passw0rd!123', { type: argon2.argon2id });
+  const defaultPassword = process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
+  const passwordHash = await argon2.hash(defaultPassword, { type: argon2.argon2id });
 
   return prisma.user.create({
     data: {
