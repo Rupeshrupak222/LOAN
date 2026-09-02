@@ -86,6 +86,11 @@ export async function uploadAndRegisterDocument(
     });
     fileStorageUrl = cloudinaryResult.secure_url;
     uploadedPublicId = cloudinaryResult.public_id;
+
+    // If a PDF document is uploaded to Cloudinary image pipeline, delivery as .jpg renders cleanly without ACL 401
+    if (fileStorageUrl.includes('res.cloudinary.com') && fileStorageUrl.toLowerCase().endsWith('.pdf')) {
+      fileStorageUrl = fileStorageUrl.replace(/\.pdf$/i, '.jpg');
+    }
   } catch (err: any) {
     // Graceful fallback to local uploads directory if Cloudinary is unreachable or times out
     const fs = await import('fs');
