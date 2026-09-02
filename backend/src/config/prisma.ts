@@ -39,7 +39,7 @@ prisma.$use(async (params, next) => {
   throw lastError;
 });
 
-export async function connectDatabase(maxRetries = 5, delayMs = 1500): Promise<void> {
+export async function connectDatabase(maxRetries = 2, delayMs = 1000): Promise<void> {
   let attempt = 0;
   while (attempt < maxRetries) {
     try {
@@ -48,10 +48,17 @@ export async function connectDatabase(maxRetries = 5, delayMs = 1500): Promise<v
       return;
     } catch (err: any) {
       attempt++;
-      logger.warn({ attempt, maxRetries, err: err.message }, 'Database connection retry...');
       if (attempt >= maxRetries) {
+        if (!env.isProduction) {
+          logger.warn(
+            { err: err.message },
+            '⚠️ Database connection could not be established on startup. Server starting in development mode. Please ensure PostgreSQL is running or update DATABASE_URL in backend/.env.'
+          );
+          return;
+        }
         throw err;
       }
+      logger.warn({ attempt, maxRetries, err: err.message }, 'Database connection retry...');
       await new Promise((r) => setTimeout(r, delayMs));
     }
   }
