@@ -64,13 +64,16 @@ import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
 
+const now = new Date();
+const currentYear = now.getFullYear();
+
 const QUICK_PRESETS = [
-  { label: 'Today', subtext: '29 Aug 2026' },
-  { label: 'This Week', subtext: '24 Aug - 30 Aug' },
-  { label: 'This Month', subtext: '01 Aug - 31 Aug' },
-  { label: 'Last Month', subtext: '01 Jul - 31 Jul' },
-  { label: 'This Quarter', subtext: 'Q2 (Jul - Sep 2026)' },
-  { label: 'This Financial Year', subtext: 'FY 2026 - 2027' },
+  { label: 'Today', subtext: formatDate(now) },
+  { label: 'This Week', subtext: `${formatDate(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000))} - ${formatDate(now)}` },
+  { label: 'This Month', subtext: `${now.toLocaleString('default', { month: 'short' })} ${currentYear}` },
+  { label: 'Last Month', subtext: `${new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString('default', { month: 'short' })} ${currentYear}` },
+  { label: 'This Quarter', subtext: `Q${Math.floor(now.getMonth() / 3) + 1} (${currentYear})` },
+  { label: 'This Financial Year', subtext: `FY ${now.getMonth() >= 3 ? currentYear : currentYear - 1} - ${now.getMonth() >= 3 ? currentYear + 1 : currentYear}` },
   { label: 'All Time', subtext: 'Complete portfolio history' },
 ];
 
@@ -98,9 +101,9 @@ export default function DashboardPage() {
   const [dateFilter, setDateFilter] = useState('This Month');
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [pickerTab, setPickerTab] = useState<'presets' | 'months' | 'custom'>('presets');
-  const [selectedYear, setSelectedYear] = useState(2026);
-  const [customStart, setCustomStart] = useState('2026-08-01');
-  const [customEnd, setCustomEnd] = useState('2026-08-31');
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [customStart, setCustomStart] = useState(`${currentYear}-01-01`);
+  const [customEnd, setCustomEnd] = useState(new Date().toISOString().split('T')[0]);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -1461,19 +1464,13 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={
-                      Array.isArray(reportsData?.productDistribution) && reportsData.productDistribution.length > 0
+                      Array.isArray(reportsData?.productDistribution)
                         ? reportsData.productDistribution.map((p: any) => ({
                             name: p.name,
-                            disbursed: Number(p.amount) / 100000,
+                            disbursed: Number(p.amount || 0) / 100000,
                             collected: 0,
                           }))
-                        : [
-                            { name: 'Personal Loan', disbursed: 0, collected: 0 },
-                            { name: 'Business Loan', disbursed: 0, collected: 0 },
-                            { name: 'Education Loan', disbursed: 0, collected: 0 },
-                            { name: 'Vehicle Loan', disbursed: 0, collected: 0 },
-                            { name: 'Emergency Loan', disbursed: 0, collected: 0 },
-                          ]
+                        : []
                     }
                     margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
                   >
@@ -1592,19 +1589,16 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={
-                      Number(reportsData?.totalPrincipalDisbursed || 0) > 0
-                        ? [
-                            { date: 'W1', amount: (Number(reportsData.totalPrincipalDisbursed) * 0.2) / 100000 },
-                            { date: 'W2', amount: (Number(reportsData.totalPrincipalDisbursed) * 0.5) / 100000 },
-                            { date: 'W3', amount: (Number(reportsData.totalPrincipalDisbursed) * 0.8) / 100000 },
-                            { date: 'W4', amount: Number(reportsData.totalPrincipalDisbursed) / 100000 },
-                          ]
-                        : [
-                            { date: 'W1', amount: 0 },
-                            { date: 'W2', amount: 0 },
-                            { date: 'W3', amount: 0 },
-                            { date: 'W4', amount: 0 },
-                          ]
+                      loansList.filter((l: any) => l.status === 'ACTIVE' && l.disbursementDate).length > 0
+                        ? loansList
+                            .filter((l: any) => l.status === 'ACTIVE' && l.disbursementDate)
+                            .map((l: any) => ({
+                              date: formatDate(l.disbursementDate),
+                              amount: Number(l.principal || 0) / 100000,
+                            }))
+                        : Number(totalDisbursedValue || 0) > 0
+                        ? [{ date: 'Active', amount: Number(totalDisbursedValue) / 100000 }]
+                        : [{ date: 'No Disbursements', amount: 0 }]
                     }
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#2B3566' : '#f1f5f9'} />
