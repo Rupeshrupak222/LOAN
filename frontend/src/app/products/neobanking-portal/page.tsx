@@ -35,7 +35,7 @@ export default function NeobankingPortalSignaturePage() {
 
         {/* ── Top Context Breadcrumb & Back Link ── */}
         <div className="pt-28 sm:pt-32 pb-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 flex items-center justify-between">
             <Link
               href="/"
               className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#155EEF] transition-colors py-1.5 px-3 rounded-full hover:bg-white border border-transparent hover:border-slate-200 shadow-xs"
@@ -60,44 +60,44 @@ export default function NeobankingPortalSignaturePage() {
         {/* ── SCENE 2: Narrative Bridge — "Unified Financial Visibility" ── */}
         <MotionScrollReveal3D>
           <section className="relative py-20 bg-gradient-to-b from-[#EFF6FF] via-white to-white border-y border-slate-200/60">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 text-center space-y-8">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
                 <Sparkles className="w-3.5 h-3.5 text-[#155EEF]" />
                 <span>UNIFIED FINANCIAL VISIBILITY</span>
               </div>
 
-              <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight">
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight max-w-5xl mx-auto">
                 Every account, payout, and tax obligation.{' '}
                 <span className="bg-gradient-to-r from-[#155EEF] to-indigo-600 bg-clip-text text-transparent">
                   Finally connected in one intelligent workspace.
                 </span>
               </h2>
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-base sm:text-lg lg:text-xl text-slate-600 leading-relaxed max-w-4xl mx-auto">
                 Eliminate fragmented bank logins and delayed spreadsheet reconciliations. Adyapan Neobanking Portal provides real-time treasury visibility, automated tax reserves, and multi-sign approval policies for fast-scaling enterprises.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 text-left">
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 text-left max-w-[1360px] mx-auto">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-[#155EEF] uppercase">01 · Multi-Entity Treasury</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Sub-Second Aggregation</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Sub-Second Aggregation</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Consolidate multiple operating current accounts, disbursal escrows, and tax vaults in one real-time dashboard.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-emerald-600 uppercase">02 · Automated Compliance</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Auto-GST Tax Vaults</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Auto-GST Tax Vaults</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Automatically allocate 18% GST and TDS components into dedicated interest-bearing reserve vaults upon invoice receipt.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-indigo-600 uppercase">03 · Instant Multi-Sign</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Configurable Dual-Auth</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Configurable Dual-Auth</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Enforce biometric secondary approvals on high-value transfers without introducing operational friction.
                   </p>
                 </div>

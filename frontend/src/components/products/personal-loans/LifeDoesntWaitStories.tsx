@@ -74,23 +74,23 @@ export const LifeDoesntWaitStories: React.FC = () => {
   const [selectedStory, setSelectedStory] = useState<string>('education');
 
   return (
-    <section className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <Sparkles className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>HUMAN-CENTERED LENDING</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           When Life Doesn't Wait, Capital Moves Forward
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Personal milestones and urgent opportunities shouldn't be stalled by complex paperwork. Discover intuitive lending structured for real lives.
         </p>
       </div>
 
       {/* 5-Card Story Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-left">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1400px] mx-auto text-left">
         {STORIES.map((st) => {
           const Icon = st.icon;
           const isSelected = selectedStory === st.id;

@@ -152,14 +152,14 @@ export const WorkspaceHero3D: React.FC = () => {
       </div>
 
       {/* ── Central 3D Spatial Financial Command Center Canvas ── */}
-      <div className="relative z-20 w-full max-w-5xl mt-12 flex items-center justify-center">
+      <div className="relative z-20 w-full max-w-[1400px] mt-12 flex items-center justify-center">
         {/* Workspace Ambient Shadow */}
         <div className="absolute w-full h-[400px] rounded-3xl bg-[#071A33]/15 blur-3xl translate-y-12 pointer-events-none" />
 
         {/* ── 3D Floating Command Center Workspace ── */}
         <div
           ref={workspaceRef}
-          className={`relative w-full rounded-3xl border border-slate-300/80 bg-white/95 backdrop-blur-xl p-5 sm:p-7 shadow-2xl transition-all duration-700 select-none ${
+          className={`relative w-full rounded-3xl border border-slate-300/80 bg-white/95 backdrop-blur-xl p-6 sm:p-10 shadow-2xl transition-all duration-700 select-none ${
             isAssembled ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-6'
           }`}
           style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}

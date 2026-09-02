@@ -176,14 +176,14 @@ export const ApiBridgeHero3D: React.FC = () => {
       </div>
 
       {/* ── Central 3D API Bridge Canvas ── */}
-      <div className="relative z-20 w-full max-w-5xl mt-12 flex items-center justify-center">
+      <div className="relative z-20 w-full max-w-[1400px] mt-12 flex items-center justify-center">
         {/* Ambient Bridge Shadow */}
         <div className="absolute w-full h-[380px] rounded-3xl bg-[#071A33]/15 blur-3xl translate-y-12 pointer-events-none" />
 
         {/* ── 3D Spatial Bridge ── */}
         <div
           ref={bridgeRef}
-          className="relative w-full rounded-3xl border border-slate-300/80 bg-white/95 backdrop-blur-xl p-6 sm:p-8 shadow-2xl transition-transform duration-200 select-none"
+          className="relative w-full rounded-3xl border border-slate-300/80 bg-white/95 backdrop-blur-xl p-6 sm:p-10 shadow-2xl transition-transform duration-200 select-none"
           style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
         >
           {/* Header Bar */}

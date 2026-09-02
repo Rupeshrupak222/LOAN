@@ -71,7 +71,7 @@ export const ProductDetailShell: React.FC<ProductDetailShellProps> = ({ product 
 
         {/* ── Top Context Breadcrumb & Back Link ── */}
         <div className="pt-28 sm:pt-32 pb-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 flex items-center justify-between">
             <Link
               href="/"
               className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#155EEF] transition-colors py-1.5 px-3 rounded-full hover:bg-white border border-transparent hover:border-slate-200 shadow-xs"
@@ -91,7 +91,7 @@ export const ProductDetailShell: React.FC<ProductDetailShellProps> = ({ product 
         </div>
 
         {/* ── Main Content Body ── */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-16">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 py-10 sm:py-16 space-y-16">
           {/* ── Hero Section with Interactive 3D Visual ── */}
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 items-center">
             {/* Left Column: Narrative Headline & Metrics */}

@@ -21,23 +21,23 @@ export const BusinessControlConsole: React.FC = () => {
   const [tallySync, setTallySync] = useState(true);
 
   return (
-    <section id="controls" className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="controls" className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <Sliders className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>AUTONOMOUS TREASURY GOVERNANCE</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           Control Without the Operational Clutter
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Automate spending ceilings, multi-sign approval policies, and tax allocations with granular programmable switches.
         </p>
       </div>
 
       {/* Main Controls Deck */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch max-w-5xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch max-w-[1400px] mx-auto">
         {/* Left Column: Spending Threshold Gauge */}
         <div className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-7 sm:p-8 flex flex-col justify-between text-left space-y-6 shadow-sm">
           <div className="space-y-2">

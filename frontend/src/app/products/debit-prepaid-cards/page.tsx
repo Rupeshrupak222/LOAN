@@ -34,7 +34,7 @@ export default function DebitPrepaidCardsSignaturePage() {
 
         {/* ── Top Context Breadcrumb & Back Link ── */}
         <div className="pt-28 sm:pt-32 pb-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 flex items-center justify-between">
             <Link
               href="/"
               className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#155EEF] transition-colors py-1.5 px-3 rounded-full hover:bg-white border border-transparent hover:border-slate-200 shadow-xs"
@@ -59,44 +59,44 @@ export default function DebitPrepaidCardsSignaturePage() {
         {/* ── SCENE 2: Narrative Bridge — "Programmable Card Issuance" ── */}
         <MotionScrollReveal3D>
           <section className="relative py-20 bg-gradient-to-b from-[#EFF6FF] via-white to-white border-y border-slate-200/60">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 text-center space-y-8">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
                 <Sparkles className="w-3.5 h-3.5 text-[#155EEF]" />
                 <span>PROGRAMMABLE CARD ARCHITECTURE</span>
               </div>
 
-              <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight">
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight max-w-5xl mx-auto">
                 One physical card.{' '}
                 <span className="bg-gradient-to-r from-[#155EEF] to-indigo-600 bg-clip-text text-transparent">
-                  Unlimited programmatic spending rules.
+                  Unlimited programmable spending rules.
                 </span>
               </h2>
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-base sm:text-lg lg:text-xl text-slate-600 leading-relaxed max-w-4xl mx-auto">
                 From instant virtual provisioning to hardware tamper-resistant tokenization, Adyapan card systems give FinTechs and enterprises end-to-end control over transaction routing, spending limits, and channel authorizations.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 text-left">
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 text-left max-w-[1360px] mx-auto">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-[#155EEF] uppercase">01 · Instant Issuance</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Sub-2s Virtual PAN</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Sub-2s Virtual PAN</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Generate tokenized virtual cards instantly and push provision directly to Apple Pay and Google Wallet.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-emerald-600 uppercase">02 · Atomic Auth</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Sub-400ms Turnaround</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Sub-400ms Turnaround</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Direct switch integration ensuring ultra-low latency authorizations with real-time balance validation.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-indigo-600 uppercase">03 · Dynamic Controls</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Zero-Latency Freeze</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Zero-Latency Freeze</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Lock card rails, adjust MCC spending ceilings, and enable/disable international roaming via mobile in real-time.
                   </p>
                 </div>

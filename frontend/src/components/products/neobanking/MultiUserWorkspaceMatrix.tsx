@@ -46,23 +46,23 @@ export const MultiUserWorkspaceMatrix: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<string>('founder');
 
   return (
-    <section className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <Users className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>COLLABORATIVE TREASURY GOVERNANCE</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           Granular Role-Based Access for Finance Teams
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Delegate daily operational workflows while enforcing multi-sign policies and zero-trust auditability across your organization.
         </p>
       </div>
 
       {/* Interactive Role Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto text-left">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto text-left">
         {ROLES.map((r) => {
           const isSelected = selectedRole === r.id;
           return (

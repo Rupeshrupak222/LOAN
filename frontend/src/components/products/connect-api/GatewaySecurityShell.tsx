@@ -46,23 +46,23 @@ export const GatewaySecurityShell: React.FC = () => {
   const [activeLayer, setActiveLayer] = useState<string>('mtls');
 
   return (
-    <section className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <ShieldCheck className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>ZERO-TRUST SECURITY SHELL</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           Enterprise Security at the Gateway Boundary
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Multi-layer defense protecting your banking infrastructure before any untrusted byte touches backend services.
         </p>
       </div>
 
       {/* Grid of Security Layers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto text-left">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto text-left">
         {LAYERS.map((l) => {
           const isSelected = activeLayer === l.id;
           return (

@@ -38,7 +38,7 @@ export default function PersonalLoansSignaturePage() {
 
         {/* ── Top Context Breadcrumb & Back Link ── */}
         <div className="pt-28 sm:pt-32 pb-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 flex items-center justify-between">
             <Link
               href="/"
               className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#155EEF] transition-colors py-1.5 px-3 rounded-full hover:bg-white border border-transparent hover:border-slate-200 shadow-xs"
@@ -63,44 +63,44 @@ export default function PersonalLoansSignaturePage() {
         {/* ── SCENE 2: Narrative Bridge — "When You Need It, Capital Moves" ── */}
         <MotionScrollReveal3D>
           <section className="relative py-20 bg-gradient-to-b from-[#EFF6FF] via-white to-white border-y border-slate-200/60">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 text-center space-y-8">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
                 <Sparkles className="w-3.5 h-3.5 text-[#155EEF]" />
                 <span>MOMENTUM & CLARITY</span>
               </div>
 
-              <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight">
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight max-w-5xl mx-auto">
                 No branch visits. No physical paperwork.{' '}
                 <span className="bg-gradient-to-r from-[#155EEF] to-indigo-600 bg-clip-text text-transparent">
                   Just an intuitive digital lending flow designed for speed.
                 </span>
               </h2>
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-base sm:text-lg lg:text-xl text-slate-600 leading-relaxed max-w-4xl mx-auto">
                 Adyapan Personal Loans connects borrowers directly to automated credit scoring engines and instant IMPS settlement rails. Experience radical transparency from identity verification to account disbursal.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 text-left">
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 text-left max-w-[1360px] mx-auto">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-[#155EEF] uppercase">01 · Instant e-KYC</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Paperless Verification</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Paperless Verification</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Verify identity securely via Digilocker consent and instant penny drop bank account verification.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-emerald-600 uppercase">02 · Automated Underwriting</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Algorithmic Scoring</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Algorithmic Scoring</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Evaluate cash flow stability and bureau tradelines in real time to generate tailored repayment terms.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
                   <span className="text-xs font-mono font-bold text-indigo-600 uppercase">03 · Instant Disbursal</span>
-                  <h3 className="text-base font-bold text-[#071A33]">Direct Bank Credit</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <h3 className="text-lg font-bold text-[#071A33]">Direct Bank Credit</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Approved loan principal is credited directly to your primary bank account via instant IMPS clearing.
                   </p>
                 </div>
@@ -137,7 +137,7 @@ export default function PersonalLoansSignaturePage() {
         {/* ── SCENE 8: Product Ecosystem Cross-Navigation ── */}
         <MotionScrollReveal3D>
           <section className="relative py-16 sm:py-24 bg-slate-50 border-t border-slate-200">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 space-y-10">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="text-left space-y-1">
                   <span className="text-xs font-bold uppercase tracking-widest text-[#155EEF] font-mono">
@@ -159,48 +159,48 @@ export default function PersonalLoansSignaturePage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
                 <Link
                   href="/products/sme-business-credit"
-                  className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-xl hover:border-[#155EEF] transition-all group block space-y-3"
+                  className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-xl hover:border-[#155EEF] transition-all group block space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Lending Solutions</span>
                     <ArrowRight className="w-4 h-4 text-[#155EEF] transition-transform group-hover:translate-x-1" />
                   </div>
-                  <h4 className="text-base font-bold text-[#071A33] group-hover:text-[#155EEF] transition-colors">
+                  <h4 className="text-lg font-bold text-[#071A33] group-hover:text-[#155EEF] transition-colors">
                     SME Business Credit
                   </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Working capital revolvers and GST invoice discounting lines for fast-growing enterprises.
                   </p>
                 </Link>
 
                 <Link
                   href="/products/bnpl"
-                  className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-xl hover:border-[#155EEF] transition-all group block space-y-3"
+                  className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-xl hover:border-[#155EEF] transition-all group block space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Lending Solutions</span>
                     <ArrowRight className="w-4 h-4 text-[#155EEF] transition-transform group-hover:translate-x-1" />
                   </div>
-                  <h4 className="text-base font-bold text-[#071A33] group-hover:text-[#155EEF] transition-colors">
+                  <h4 className="text-lg font-bold text-[#071A33] group-hover:text-[#155EEF] transition-colors">
                     0% 3-Month BNPL
                   </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Instant zero-interest checkout installment splits for merchant e-commerce portals.
                   </p>
                 </Link>
 
                 <Link
                   href="/products/home-mortgages"
-                  className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-xl hover:border-[#155EEF] transition-all group block space-y-3"
+                  className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs hover:shadow-xl hover:border-[#155EEF] transition-all group block space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Lending Solutions</span>
                     <ArrowRight className="w-4 h-4 text-[#155EEF] transition-transform group-hover:translate-x-1" />
                   </div>
-                  <h4 className="text-base font-bold text-[#071A33] group-hover:text-[#155EEF] transition-colors">
+                  <h4 className="text-lg font-bold text-[#071A33] group-hover:text-[#155EEF] transition-colors">
                     Home Mortgages
                   </h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <p className="text-sm text-slate-500 leading-relaxed">
                     Long-term residential mortgage origination and property title verification infrastructure.
                   </p>
                 </Link>
@@ -215,7 +215,7 @@ export default function PersonalLoansSignaturePage() {
             {/* Ambient lighting */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[#155EEF]/20 blur-[140px] rounded-full pointer-events-none" />
 
-            <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 space-y-6">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-blue-300 bg-blue-950/80 border border-blue-800">
                 <HeartHandshake className="w-3.5 h-3.5 text-[#155EEF]" />
                 <span>PERSONAL LENDING PLATFORM</span>
@@ -228,7 +228,7 @@ export default function PersonalLoansSignaturePage() {
                 </span>
               </h2>
 
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-3xl mx-auto">
                 Explore the Adyapan personal loan experience with transparent terms, zero hidden charges, and rapid digital settlement.
               </p>
 

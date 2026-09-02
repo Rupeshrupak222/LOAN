@@ -99,44 +99,44 @@ export const FollowRequestJourney: React.FC = () => {
   const current = STAGES[activeStep];
 
   return (
-    <section id="journey" className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="journey" className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <Zap className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>REQUEST LIFECYCLE STEP-THROUGH</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           Follow an API Request Through the Gateway
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Trace a single API request from client dispatch and rate-limiting to binary Protobuf conversion and sub-10ms response return.
         </p>
       </div>
 
       {/* Progress Buttons */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-8 max-w-5xl mx-auto">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8 max-w-[1400px] mx-auto">
         {STAGES.map((st, idx) => {
           const isSelected = activeStep === idx;
           return (
             <button
               key={st.id}
               onClick={() => setActiveStep(idx)}
-              className={`p-3 rounded-2xl text-left border transition-all text-xs font-mono font-bold cursor-pointer ${
+              className={`p-4 rounded-2xl text-left border transition-all text-xs font-mono font-bold cursor-pointer ${
                 isSelected
                   ? 'bg-[#155EEF] text-white border-[#155EEF] shadow-lg shadow-[#155EEF]/20 scale-105'
                   : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
               }`}
             >
               <span className="block text-[9px] uppercase opacity-75">Step 0{idx + 1}</span>
-              <span className="truncate block mt-1 font-bold">{st.name.split('. ')[1]}</span>
+              <span className="truncate block mt-1 font-bold text-sm">{st.name.split('. ')[1]}</span>
             </button>
           );
         })}
       </div>
 
       {/* Main Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch max-w-5xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch max-w-[1400px] mx-auto">
         {/* Left Column: Stage Explanation */}
         <div className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-7 sm:p-8 flex flex-col justify-between text-left space-y-6 shadow-sm">
           <div className="space-y-3">

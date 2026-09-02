@@ -41,23 +41,23 @@ export const CashFlowRiverStream: React.FC = () => {
   const filteredItems = STREAM_ITEMS.filter((s) => (activeFilter === 'all' ? true : s.type === activeFilter));
 
   return (
-    <section id="cash-river" className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="cash-river" className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <Activity className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>REAL-TIME CAPITAL RIVER</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           See Money Move in Real Time
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Continuous liquidity streams connecting receivables, customer collections, payroll, and vendor disbursements into one dynamic treasury equilibrium.
         </p>
       </div>
 
       {/* Main Flow Canvas */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-10 max-w-5xl mx-auto shadow-sm space-y-8 text-left">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-12 max-w-[1400px] mx-auto shadow-sm space-y-8 text-left">
         {/* Top Metric Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-6 border-b border-slate-100">
           <div

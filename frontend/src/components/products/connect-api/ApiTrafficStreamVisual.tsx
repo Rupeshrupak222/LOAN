@@ -23,23 +23,23 @@ export const ApiTrafficStreamVisual: React.FC = () => {
   const [hoveredStream, setHoveredStream] = useState<string | null>(null);
 
   return (
-    <section className="relative py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative py-16 sm:py-24 max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
       {/* Section Header */}
-      <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+      <div className="max-w-4xl mx-auto text-center space-y-4 mb-16">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold font-mono text-[#155EEF] bg-blue-50 border border-blue-200">
           <Activity className="w-3.5 h-3.5 text-[#155EEF]" />
           <span>TRAFFIC & STREAM GOVERNANCE</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight">
+        <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight">
           Real-Time API Traffic & Stream Control
         </h2>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
           Monitor ingress velocity, sub-millisecond cache hits, and adaptive rate-limiting across all connected enterprise tenants.
         </p>
       </div>
 
       {/* Main Container */}
-      <div className="rounded-3xl border border-slate-800 bg-[#071A33] text-white p-7 sm:p-10 max-w-5xl mx-auto text-left shadow-2xl space-y-6">
+      <div className="rounded-3xl border border-slate-800 bg-[#071A33] text-white p-7 sm:p-12 max-w-[1400px] mx-auto text-left shadow-2xl space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
           <div>
             <span className="text-[10px] font-mono font-bold text-blue-400 uppercase">TELEMETRY AGGREGATOR</span>
