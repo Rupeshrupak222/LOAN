@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
   Menu,
   X,
@@ -20,30 +19,18 @@ import {
   Compass,
   Calculator,
   Mail,
+  Activity,
+  Percent,
+  Lock,
 } from 'lucide-react';
 import { Logo } from '../Logo';
 import { MagneticButton } from '../fintech/MagneticButton';
 import { Nav3DItem } from './Nav3DItem';
 
-/* ══════════════════════════════════════════════════════════════
-   Adyapan Master 3D Physical Navigation System
-   ─────────────────────────────────────────────────────────────
-   ▸ Nav items: Products (Mega-Menu), About, Resources, Contact
-   ▸ Physical 3D Surface & Inertial Damped Physics on Each Item
-   ▸ 4 Category Columns in Mega-Menu:
-       1. Banking
-       2. Lending
-       3. Payments
-       4. Value Added Services
-   ▸ Permanently visible floating navigation (stays fixed on scroll)
-   ▸ Continuous scroll compression & dynamic glassmorphic state
-   ▸ Scroll progress rail & Floating "Go to Top" button
-   ▸ Fully responsive desktop dropdown + mobile accordion drawer
-   ══════════════════════════════════════════════════════════════ */
-
 interface ProductItem {
   name: string;
   badge?: string;
+  desc?: string;
   href: string;
 }
 
@@ -55,48 +42,43 @@ interface ProductCategory {
 
 const PRODUCTS_CATEGORIES: ProductCategory[] = [
   {
-    title: 'Banking',
+    title: 'Banking & Core',
     icon: Landmark,
     items: [
-      { name: 'Core Banking', href: '/dashboard' },
-      { name: 'Debit Cards', href: '/dashboard' },
-      { name: 'Neobanking', badge: 'New', href: '/dashboard' },
-      { name: 'Connect API', href: '/dashboard' },
+      { name: 'Core Banking Engine', desc: 'Real-time ledger & settlement', href: '/dashboard' },
+      { name: 'Debit & Prepaid Cards', desc: 'Virtual card issuance API', href: '/dashboard' },
+      { name: 'Neobanking Portal', badge: 'New', desc: 'Full-stack SME banking', href: '/dashboard' },
+      { name: 'Connect API Gateway', desc: 'Plug & play core banking', href: '/dashboard' },
     ],
   },
   {
-    title: 'Lending',
+    title: 'Lending Solutions',
     icon: Building2,
     items: [
-      { name: 'Core Lending Suite', href: '/dashboard' },
-      { name: 'Loan Origination System', href: '#selector' },
-      { name: 'Loan Management System', badge: 'Live', href: '/dashboard' },
-      { name: 'Microfinance', href: '#selector' },
-      { name: 'Debt Collections', href: '/dashboard' },
-      { name: '0% 3-Month BNPL', badge: 'Hot', href: '#calculator' },
-      { name: 'Credit Line on UPI', href: '#launchpad' },
+      { name: 'Personal Loans', badge: '10.5%', desc: 'Instant 60s disbursal', href: '#launchpad' },
+      { name: 'SME Business Credit', badge: '13.5%', desc: 'Working capital line', href: '#selector' },
+      { name: 'Home Mortgages', badge: '8.5%', desc: 'Long-tenure low EMI', href: '#calculator' },
+      { name: '0% 3-Month BNPL', badge: 'Hot', desc: 'Split checkout payments', href: '#calculator' },
     ],
   },
   {
-    title: 'Payments',
+    title: 'Payments & Settlement',
     icon: CreditCard,
     items: [
-      { name: 'Prepaid Cards', href: '/dashboard' },
-      { name: 'Cross-Border Payments', href: '/dashboard' },
-      { name: 'Fleet Drive', href: '/dashboard' },
-      { name: 'NPCI UPI Network', href: '#security' },
-      { name: 'Merchant Solutions', href: '#launchpad' },
+      { name: 'NPCI UPI Network', desc: 'Direct UPI auto-debit & NACH', href: '#security' },
+      { name: 'Cross-Border Wire', desc: 'Instant SWIFT/FX settlement', href: '/dashboard' },
+      { name: 'Merchant QR Soundbox', desc: '4G IoT audio payment alerts', href: '#launchpad' },
+      { name: 'Credit Line on UPI', badge: 'Live', desc: 'Draw down on GPay/PhonePe', href: '#launchpad' },
     ],
   },
   {
-    title: 'Value Added Services',
+    title: 'AI Risk & Compliance',
     icon: Layers,
     items: [
-      { name: 'Recon360 Engine', href: '/dashboard' },
-      { name: 'DigiLocker KYC Suite', badge: 'e-KYC', href: '#security' },
-      { name: 'ACS & Authentication', href: '#security' },
-      { name: 'FRM & AI Underwriting', href: '#security' },
-      { name: 'Borrower Rewards', href: '#selector' },
+      { name: 'DigiLocker e-KYC', badge: 'Instant', desc: 'Aadhaar & PAN verification', href: '#security' },
+      { name: 'AI Underwriting Scorecard', desc: '4-pillar risk engine', href: '#security' },
+      { name: 'Immutable Audit Trail', desc: 'Append-only regulatory logs', href: '/dashboard' },
+      { name: 'Automated DTI Policy', desc: 'Real-time bureau rule engine', href: '#selector' },
     ],
   },
 ];
@@ -109,42 +91,122 @@ export const MotionNavbar: React.FC = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  const headerRef = useRef<HTMLElement>(null);
+  // 3D Capsule Tilt & Specular Cursor Follower Ref
   const navBarRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const productsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const ticking = useRef(false);
+
+  // 3D Gyro Physics state for the floating capsule
+  const gyro = useRef({
+    rx: 0,
+    ry: 0,
+    tx: 0,
+    ty: 0,
+    targetRx: 0,
+    targetRy: 0,
+    targetTx: 0,
+    targetTy: 0,
+    glareX: 50,
+    glareY: 50,
+    isHovered: false,
+    rafId: 0,
+  });
+
+  const updateGyroPhysics = useCallback(() => {
+    const g = gyro.current;
+    const factor = g.isHovered ? 0.12 : 0.08;
+
+    g.rx += (g.targetRx - g.rx) * factor;
+    g.ry += (g.targetRy - g.ry) * factor;
+    g.tx += (g.targetTx - g.tx) * factor;
+    g.ty += (g.targetTy - g.ty) * factor;
+
+    if (navBarRef.current) {
+      navBarRef.current.style.transform = `perspective(1200px) rotateX(${g.rx.toFixed(
+        2
+      )}deg) rotateY(${g.ry.toFixed(2)}deg) translate3d(${g.tx.toFixed(2)}px, ${g.ty.toFixed(
+        2
+      )}px, 0)`;
+    }
+
+    const isSettled =
+      !g.isHovered &&
+      Math.abs(g.rx) < 0.02 &&
+      Math.abs(g.ry) < 0.02 &&
+      Math.abs(g.tx) < 0.02 &&
+      Math.abs(g.ty) < 0.02;
+
+    if (!isSettled) {
+      g.rafId = requestAnimationFrame(updateGyroPhysics);
+    } else {
+      g.rx = 0;
+      g.ry = 0;
+      g.tx = 0;
+      g.ty = 0;
+      if (navBarRef.current) {
+        navBarRef.current.style.transform =
+          'perspective(1200px) rotateX(0deg) rotateY(0deg) translate3d(0, 0, 0)';
+      }
+      g.rafId = 0;
+    }
+  }, []);
+
+  const handleNavPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!navBarRef.current) return;
+    const rect = navBarRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const normX = (x / rect.width - 0.5) * 2;
+    const normY = (y / rect.height - 0.5) * 2;
+
+    const g = gyro.current;
+    g.isHovered = true;
+    g.targetRy = normX * 4.5; // Max 4.5deg subtle tilt
+    g.targetRx = -normY * 4.0;
+    g.targetTx = normX * 2.0;
+    g.targetTy = normY * 1.5;
+    g.glareX = (x / rect.width) * 100;
+    g.glareY = (y / rect.height) * 100;
+
+    if (!g.rafId) {
+      g.rafId = requestAnimationFrame(updateGyroPhysics);
+    }
+  };
+
+  const handleNavPointerLeave = () => {
+    const g = gyro.current;
+    g.isHovered = false;
+    g.targetRx = 0;
+    g.targetRy = 0;
+    g.targetTx = 0;
+    g.targetTy = 0;
+
+    if (!g.rafId) {
+      g.rafId = requestAnimationFrame(updateGyroPhysics);
+    }
+  };
 
   /* ── Continuous scroll tracking for height compression & progress ── */
-  const handleScroll = useCallback(() => {
-    if (ticking.current) return;
-    ticking.current = true;
-
-    requestAnimationFrame(() => {
+  useEffect(() => {
+    const onScroll = () => {
       const currentY = window.scrollY;
       const docHeight = document.documentElement.scrollHeight - window.innerHeight;
       const progress = docHeight > 0 ? currentY / docHeight : 0;
       setScrollProgress(progress);
-
-      setScrolled(currentY > 80);
+      setScrolled(currentY > 60);
       setShowScrollTop(currentY > 320);
+    };
 
-      ticking.current = false;
-    });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-
-  /* ── Desktop Mega Menu Hover Handlers with Intent Delay ── */
   const handleProductsEnter = () => {
-    if (productsTimeoutRef.current) {
-      clearTimeout(productsTimeoutRef.current);
-    }
+    if (productsTimeoutRef.current) clearTimeout(productsTimeoutRef.current);
     setProductsOpen(true);
   };
 
@@ -154,48 +216,16 @@ export const MotionNavbar: React.FC = () => {
     }, 220);
   };
 
-  /* ── Dropdown GSAP Animation ── */
   useEffect(() => {
-    if (dropdownRef.current) {
-      if (productsOpen) {
-        gsap.fromTo(
-          dropdownRef.current,
-          { opacity: 0, y: -6, scale: 0.98 },
-          { opacity: 1, y: 0, scale: 1, duration: 0.22, ease: 'power3.out' }
-        );
-      }
+    if (dropdownRef.current && productsOpen) {
+      gsap.fromTo(
+        dropdownRef.current,
+        { opacity: 0, y: -12, scale: 0.96, rotateX: -6 },
+        { opacity: 1, y: 0, scale: 1, rotateX: 0, duration: 0.3, ease: 'back.out(1.4)' }
+      );
     }
   }, [productsOpen]);
 
-  /* ── Initial entrance animation ── */
-  useEffect(() => {
-    if (navBarRef.current) {
-      gsap.fromTo(
-        navBarRef.current,
-        { y: -20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: 0.1 }
-      );
-    }
-  }, []);
-
-  /* ── Mobile drawer animation ── */
-  useEffect(() => {
-    if (drawerRef.current && mobileOpen) {
-      gsap.fromTo(
-        drawerRef.current,
-        { y: -16, opacity: 0, scale: 0.97 },
-        { y: 0, opacity: 1, scale: 1, duration: 0.35, ease: 'power3.out' }
-      );
-      const items = drawerRef.current.querySelectorAll('[data-drawer-item]');
-      gsap.fromTo(
-        items,
-        { y: 10, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.28, ease: 'power3.out', stagger: 0.04, delay: 0.08 }
-      );
-    }
-  }, [mobileOpen]);
-
-  /* ── Scroll progress bar animation ── */
   useEffect(() => {
     if (progressRef.current) {
       gsap.to(progressRef.current, {
@@ -208,191 +238,218 @@ export const MotionNavbar: React.FC = () => {
   }, [scrollProgress]);
 
   const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <>
       <header
         ref={headerRef}
-        className="fixed top-0 inset-x-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none"
-        style={{
-          paddingTop: scrolled ? '8px' : '12px',
-          transform: 'translateY(0)',
-          transition: 'padding-top 0.4s ease-out',
-        }}
+        className="fixed top-0 inset-x-0 z-50 flex justify-center px-3 sm:px-6 pointer-events-none transition-all duration-300"
+        style={{ paddingTop: scrolled ? '10px' : '16px' }}
       >
+        {/* 3D Floating Interactive Glass Capsule Bar */}
         <div
           ref={navBarRef}
-          className="pointer-events-auto w-full max-w-7xl mx-auto rounded-2xl border flex items-center justify-between px-4 sm:px-6 relative shadow-xs"
+          onPointerMove={handleNavPointerMove}
+          onPointerLeave={handleNavPointerLeave}
+          className="pointer-events-auto w-full max-w-7xl mx-auto rounded-full border flex items-center justify-between px-4 sm:px-6 relative shadow-2xl transition-all duration-300 group/navbar"
           style={{
-            backgroundColor: scrolled ? 'rgba(255, 255, 255, 0.97)' : 'rgba(255, 255, 255, 0.94)',
-            backdropFilter: scrolled ? 'blur(24px) saturate(180%)' : 'blur(14px) saturate(150%)',
-            borderColor: scrolled ? 'rgba(211, 229, 250, 0.95)' : 'rgba(211, 229, 250, 1)',
+            transformStyle: 'preserve-3d',
+            backgroundColor: scrolled ? 'rgba(255, 255, 255, 0.98)' : 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            borderColor: scrolled ? 'rgba(21, 94, 239, 0.35)' : 'rgba(211, 229, 250, 0.9)',
             boxShadow: scrolled
-              ? '0 8px 32px -8px rgba(7, 26, 51, 0.12), 0 2px 4px rgba(7, 26, 51, 0.04)'
-              : '0 2px 8px rgba(16, 24, 40, 0.05)',
-            padding: scrolled ? '6px 24px' : '10px 24px',
-            transition: 'all 0.4s cubic-bezier(0.25, 1, 0.5, 1)',
+              ? '0 20px 45px -10px rgba(7, 26, 51, 0.15), 0 0 0 1px rgba(21, 94, 239, 0.2)'
+              : '0 12px 35px -8px rgba(21, 94, 239, 0.12), 0 2px 8px rgba(16, 24, 40, 0.04)',
+            padding: scrolled ? '8px 26px' : '12px 30px',
+            willChange: 'transform',
           }}
         >
-          {/* Left: Brand Logo */}
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2 group transition-transform duration-200 hover:scale-105 active:scale-95">
+          {/* ── Left Cluster: 3D Brand Logo & Live Status Pulse ── */}
+          <div
+            className="flex items-center gap-4 sm:gap-6"
+            style={{ transform: 'translateZ(12px)', transformStyle: 'preserve-3d' }}
+          >
+            <Link
+              href="/"
+              className="flex items-center gap-2 group transition-transform duration-200 hover:scale-105 active:scale-95"
+            >
               <Logo size={scrolled ? 32 : 36} variant="dark" />
             </Link>
 
-            {/* Desktop Navigation with Physical 3D Surfaces */}
-            <nav className="hidden lg:flex items-center gap-1.5">
-              {/* 1. Products (3D Physical Item + Mega-Menu Dropdown) */}
-              <div
-                className="relative py-1"
-                onMouseEnter={handleProductsEnter}
-                onMouseLeave={handleProductsLeave}
-              >
-                <Nav3DItem
-                  asButton
-                  onClick={() => setProductsOpen((v) => !v)}
-                  isOpen={productsOpen}
-                  showUnderline={false}
-                >
-                  <span>Products</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      productsOpen ? 'rotate-180 text-[#155EEF]' : 'text-slate-400'
-                    }`}
-                  />
-                </Nav3DItem>
-
-                {/* ── Products Mega-Menu Dropdown Panel ── */}
-                {productsOpen && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute top-full left-0 mt-2 w-[860px] -translate-x-12 rounded-2xl bg-white border border-[#D3E5FA] shadow-2xl p-6 z-50 text-[#071A33]"
-                    style={{
-                      boxShadow: '0 20px 50px -12px rgba(7, 26, 51, 0.18), 0 0 0 1px rgba(211, 229, 250, 0.8)',
-                    }}
-                  >
-                    {/* Header bar inside mega menu */}
-                    <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#155EEF] animate-pulse" />
-                        <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase font-mono">
-                          Adyapan Fintech Architecture
-                        </span>
-                      </div>
-                      <Link
-                        href="/dashboard"
-                        className="text-[11px] font-bold text-[#155EEF] hover:underline flex items-center gap-1 font-mono"
-                      >
-                        <span>Access LMS Suite</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </Link>
-                    </div>
-
-                    {/* 4 Category Columns Grid */}
-                    <div className="grid grid-cols-4 gap-6">
-                      {PRODUCTS_CATEGORIES.map((cat, idx) => {
-                        const Icon = cat.icon;
-                        return (
-                          <div key={idx} className="space-y-3">
-                            <div className="flex items-center gap-2 pb-1 border-b border-slate-100/80">
-                              <div className="w-6 h-6 rounded-lg bg-[#EAF4FF] flex items-center justify-center text-[#155EEF]">
-                                <Icon className="w-3.5 h-3.5" />
-                              </div>
-                              <h4 className="text-xs font-black text-[#071A33] tracking-tight">
-                                {cat.title}
-                              </h4>
-                            </div>
-
-                            <ul className="space-y-1.5">
-                              {cat.items.map((item, itemIdx) => (
-                                <li key={itemIdx}>
-                                  <Link
-                                    href={item.href}
-                                    onClick={() => setProductsOpen(false)}
-                                    className="group/item flex items-center justify-between py-1 px-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-[#155EEF] hover:bg-[#EAF4FF]/60 transition-all"
-                                  >
-                                    <span className="transition-transform duration-150 group-hover/item:translate-x-0.5">
-                                      {item.name}
-                                    </span>
-                                    {item.badge && (
-                                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-[#155EEF]/10 text-[#155EEF] border border-[#155EEF]/20">
-                                        {item.badge}
-                                      </span>
-                                    )}
-                                  </Link>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Mega Menu Footer Banner */}
-                    <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#EAF4FF]/70 to-white p-3 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#155EEF] text-white flex items-center justify-center shadow-xs">
-                          <Zap className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-[#071A33]">Instant Digital Underwriting in 60s</p>
-                          <p className="text-[11px] text-slate-500">Zero paperwork. Bank-grade 256-bit DigiLocker integration.</p>
-                        </div>
-                      </div>
-                      <a
-                        href="#launchpad"
-                        onClick={() => setProductsOpen(false)}
-                        className="text-xs font-bold text-white bg-[#155EEF] hover:bg-[#104ec8] px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
-                      >
-                        <span>Check Pre-Approval</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. About (3D Physical Item) */}
-              <Nav3DItem href="#story-scene">
-                <span>About</span>
-              </Nav3DItem>
-
-              {/* 3. Resources (3D Physical Item) */}
-              <Nav3DItem href="#calculator">
-                <span>Resources</span>
-              </Nav3DItem>
-
-              {/* 4. Contact (3D Physical Item) */}
-              <Nav3DItem href="#launchpad">
-                <span>Contact</span>
-              </Nav3DItem>
-            </nav>
+            {/* 3D Elevated Live Status Pill */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold border font-mono bg-emerald-50/90 border-emerald-200 text-emerald-700 shadow-xs transition-all hover:scale-105">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>LMS Disbursal Active</span>
+            </div>
           </div>
 
-          {/* Right Actions */}
-          <div className="hidden sm:flex items-center gap-3">
-            {/* Sign In with 3D Physical Item */}
+          {/* ── Center Cluster: 3D Nav Tabs ── */}
+          <nav
+            className="hidden lg:flex items-center gap-1.5 font-sans"
+            style={{ transform: 'translateZ(14px)', transformStyle: 'preserve-3d' }}
+          >
+            {/* 1. Products (3D Physical Item + 3D Mega-Menu Deck) */}
+            <div
+              className="relative py-1"
+              onMouseEnter={handleProductsEnter}
+              onMouseLeave={handleProductsLeave}
+            >
+              <Nav3DItem
+                asButton
+                onClick={() => setProductsOpen((v) => !v)}
+                isOpen={productsOpen}
+                showUnderline={false}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#155EEF]" />
+                <span>Products</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    productsOpen ? 'rotate-180 text-[#155EEF]' : 'text-slate-400'
+                  }`}
+                />
+              </Nav3DItem>
+
+              {/* 3D Mega Menu Deck Dropdown */}
+              {productsOpen && (
+                <div
+                  ref={dropdownRef}
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-[880px] rounded-3xl bg-white/98 border border-[#D3E5FA] p-6 z-50 text-[#071A33] shadow-2xl backdrop-blur-2xl"
+                  style={{
+                    boxShadow: '0 25px 60px -12px rgba(7, 26, 51, 0.22), 0 0 0 1px rgba(211, 229, 250, 0.8)',
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  {/* Top Header Bar inside Mega Menu */}
+                  <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-[#155EEF]" />
+                      <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase font-mono">
+                        Adyapan Financial Architecture
+                      </span>
+                    </div>
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setProductsOpen(false)}
+                      className="text-xs font-bold text-[#155EEF] hover:underline flex items-center gap-1 font-mono"
+                    >
+                      <span>Access LMS Suite</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+
+                  {/* 4 Category Columns with 3D Hover Cards */}
+                  <div className="grid grid-cols-4 gap-5">
+                    {PRODUCTS_CATEGORIES.map((cat, idx) => {
+                      const Icon = cat.icon;
+                      return (
+                        <div key={idx} className="space-y-2.5">
+                          <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                            <div className="w-6 h-6 rounded-lg bg-[#EAF4FF] flex items-center justify-center text-[#155EEF]">
+                              <Icon className="w-3.5 h-3.5" />
+                            </div>
+                            <h4 className="text-xs font-black text-[#071A33] tracking-tight">
+                              {cat.title}
+                            </h4>
+                          </div>
+
+                          <div className="space-y-1">
+                            {cat.items.map((item, itemIdx) => (
+                              <Link
+                                key={itemIdx}
+                                href={item.href}
+                                onClick={() => setProductsOpen(false)}
+                                className="group/item block p-2 rounded-xl text-left transition-all hover:bg-[#EAF4FF]/70 hover:border-[#155EEF]/20 border border-transparent"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-700 group-hover/item:text-[#155EEF] transition-transform duration-150 group-hover/item:translate-x-0.5">
+                                    {item.name}
+                                  </span>
+                                  {item.badge && (
+                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-[#155EEF]/10 text-[#155EEF] border border-[#155EEF]/20">
+                                      {item.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                {item.desc && (
+                                  <p className="text-[10px] text-slate-400 group-hover/item:text-slate-500 mt-0.5 leading-tight">
+                                    {item.desc}
+                                  </p>
+                                )}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mega Menu Footer Banner */}
+                  <div className="mt-5 pt-3.5 px-4 py-3 rounded-2xl flex items-center justify-between bg-gradient-to-r from-[#EAF4FF] to-white border border-[#D3E5FA]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-[#155EEF] text-white flex items-center justify-center shadow-xs">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-[#071A33]">Instant Digital Underwriting in 60s</p>
+                        <p className="text-[10px] text-slate-500">Zero paperwork. Bank-grade 256-bit DigiLocker integration.</p>
+                      </div>
+                    </div>
+                    <a
+                      href="#launchpad"
+                      onClick={() => setProductsOpen(false)}
+                      className="text-xs font-black px-4 py-2 rounded-full bg-[#155EEF] text-white hover:bg-[#104ec8] transition-all shadow-md flex items-center gap-1.5"
+                    >
+                      <span>Check Rate</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. About (3D Physical Item) */}
+            <Nav3DItem href="#story-scene">
+              <span>About</span>
+            </Nav3DItem>
+
+            {/* 3. Resources (3D Physical Item) */}
+            <Nav3DItem href="#calculator">
+              <span>Resources</span>
+            </Nav3DItem>
+
+            {/* 4. Contact (3D Physical Item) */}
+            <Nav3DItem href="#launchpad">
+              <span>Contact</span>
+            </Nav3DItem>
+          </nav>
+
+          {/* ── Right Cluster: 3D Actions & Glowing Magnetic Button ── */}
+          <div
+            className="hidden sm:flex items-center gap-3"
+            style={{ transform: 'translateZ(16px)', transformStyle: 'preserve-3d' }}
+          >
+            {/* Sign In 3D Item */}
             <Nav3DItem href="/login" showUnderline={false}>
               <span className="font-mono text-xs">Sign In</span>
             </Nav3DItem>
 
-            {/* Check Eligibility CTA with Magnetic Button */}
+            {/* High-Impact 3D Magnetic Button */}
             <MagneticButton
               href="#launchpad"
               variant="primary"
-              className="px-5 py-2.5 text-xs font-black shadow-md shadow-[#155EEF]/20"
+              className="px-6 py-2.5 text-xs font-black rounded-full shadow-lg shadow-[#155EEF]/25 bg-gradient-to-r from-[#155EEF] via-[#2563EB] to-[#1d40d8] hover:opacity-95 text-white transition-all hover:scale-105 active:scale-95"
             >
               <span>Check Eligibility</span>
               <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-1" />
             </MagneticButton>
           </div>
 
-          {/* Mobile Hamburger Button */}
+          {/* Mobile Hamburger Toggle */}
           <button
             className="lg:hidden text-[#071A33] hover:text-[#155EEF] p-2 rounded-xl bg-white border border-[#D3E5FA] shadow-xs cursor-pointer"
             onClick={() => setMobileOpen((v) => !v)}
@@ -401,15 +458,14 @@ export const MotionNavbar: React.FC = () => {
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          {/* Scroll Progress Line at Bottom */}
+          {/* ── Real-Time Scroll Progress Energy Line ── */}
           <div
             ref={progressRef}
-            className="absolute bottom-0 left-0 h-[2px] origin-left hidden lg:block"
+            className="absolute bottom-0 left-6 right-6 h-[2px] origin-left hidden lg:block rounded-full overflow-hidden"
             style={{
-              background: 'linear-gradient(90deg, #155EEF, #3B82F6)',
-              width: '100%',
+              background: 'linear-gradient(90deg, #155EEF, #3B82F6, #60A5FA)',
               transform: 'scaleX(0)',
-              opacity: scrolled ? 0.75 : 0,
+              opacity: scrolled ? 0.9 : 0,
               transition: 'opacity 0.3s ease',
             }}
           />
@@ -419,17 +475,17 @@ export const MotionNavbar: React.FC = () => {
         {mobileOpen && (
           <div
             ref={drawerRef}
-            className="fixed top-20 inset-x-4 p-5 rounded-2xl bg-white border border-[#D3E5FA] shadow-2xl lg:hidden space-y-3 pointer-events-auto max-h-[82vh] overflow-y-auto"
+            className="fixed top-20 inset-x-4 p-5 rounded-3xl bg-white/98 text-[#071A33] border border-[#D3E5FA] shadow-2xl lg:hidden space-y-3 pointer-events-auto backdrop-blur-2xl max-h-[82vh] overflow-y-auto"
           >
             {/* Products Accordion */}
-            <div className="border border-slate-200/80 rounded-xl overflow-hidden" data-drawer-item>
+            <div className="border border-slate-200/80 rounded-2xl overflow-hidden">
               <button
                 onClick={() => setMobileProductsOpen((v) => !v)}
-                className="w-full flex items-center justify-between p-3 bg-[#EAF4FF] text-sm font-bold text-[#071A33]"
+                className="w-full flex items-center justify-between p-3.5 bg-[#EAF4FF] text-sm font-bold text-[#071A33]"
               >
                 <div className="flex items-center gap-2.5">
                   <Building2 className="w-4 h-4 text-[#155EEF]" />
-                  <span>Products</span>
+                  <span>Products & Lending</span>
                 </div>
                 <ChevronDown
                   className={`w-4 h-4 text-[#155EEF] transition-transform ${
@@ -439,7 +495,7 @@ export const MotionNavbar: React.FC = () => {
               </button>
 
               {mobileProductsOpen && (
-                <div className="p-3 bg-white space-y-3 text-xs">
+                <div className="p-3 space-y-3 text-xs bg-white">
                   {PRODUCTS_CATEGORIES.map((cat, idx) => (
                     <div key={idx} className="space-y-1">
                       <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">
@@ -451,7 +507,7 @@ export const MotionNavbar: React.FC = () => {
                             key={itemIdx}
                             href={item.href}
                             onClick={() => setMobileOpen(false)}
-                            className="py-1 font-semibold text-slate-700 hover:text-[#155EEF] flex items-center justify-between"
+                            className="py-1.5 font-semibold text-slate-700 hover:text-[#155EEF] flex items-center justify-between"
                           >
                             <span>{item.name}</span>
                             {item.badge && (
@@ -468,63 +524,59 @@ export const MotionNavbar: React.FC = () => {
               )}
             </div>
 
-            {/* Direct Links */}
             <a
               href="#story-scene"
               onClick={() => setMobileOpen(false)}
-              data-drawer-item
-              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-[#071A33] hover:bg-[#EAF4FF]"
+              className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 text-sm font-bold text-[#071A33] hover:bg-[#EAF4FF]"
             >
               <Compass className="w-4 h-4 text-[#155EEF]" />
-              <span>About</span>
+              <span>About Us</span>
             </a>
 
             <a
               href="#calculator"
               onClick={() => setMobileOpen(false)}
-              data-drawer-item
-              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-[#071A33] hover:bg-[#EAF4FF]"
+              className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 text-sm font-bold text-[#071A33] hover:bg-[#EAF4FF]"
             >
               <Calculator className="w-4 h-4 text-[#155EEF]" />
-              <span>Resources</span>
+              <span>Financial Resources</span>
             </a>
 
             <a
               href="#launchpad"
               onClick={() => setMobileOpen(false)}
-              data-drawer-item
-              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm font-bold text-[#071A33] hover:bg-[#EAF4FF]"
+              className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 text-sm font-bold text-[#071A33] hover:bg-[#EAF4FF]"
             >
               <Mail className="w-4 h-4 text-[#155EEF]" />
-              <span>Contact</span>
+              <span>Contact Support</span>
             </a>
 
-            <div className="pt-2 border-t border-slate-100 flex flex-col gap-2" data-drawer-item>
+            <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
-                className="w-full text-center py-2.5 text-xs font-bold text-[#071A33] border border-slate-200 rounded-xl"
+                className="w-full text-center py-3 text-xs font-bold text-[#071A33] border border-slate-200 rounded-2xl font-mono"
               >
                 Sign In to LMS Suite
               </Link>
               <a
                 href="#launchpad"
                 onClick={() => setMobileOpen(false)}
-                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#155EEF] text-white text-xs font-bold shadow-md shadow-[#155EEF]/20"
+                className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#155EEF] text-white text-xs font-bold shadow-lg"
               >
                 <span>Check Eligibility</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-4 h-4" />
               </a>
             </div>
           </div>
         )}
       </header>
 
-      {/* ── Floating Go to Top Arrow (Bottom-Right) ── */}
+      {/* ── 3D Floating Go to Top Arrow (Bottom-Right) ── */}
       <button
         onClick={scrollToTop}
         aria-label="Scroll to top"
-        className={`fixed bottom-7 right-7 z-50 p-3.5 rounded-2xl bg-white/95 text-[#155EEF] border border-[#D3E5FA] shadow-xl shadow-[#155EEF]/20 backdrop-blur-md transition-all duration-300 ease-out hover:bg-[#155EEF] hover:text-white hover:border-[#155EEF] hover:scale-110 active:scale-95 group cursor-pointer ${
+        className={`fixed bottom-7 right-7 z-50 p-3.5 rounded-full bg-white/95 text-[#155EEF] border border-[#D3E5FA] shadow-2xl backdrop-blur-md transition-all duration-300 ease-out hover:bg-[#155EEF] hover:text-white hover:scale-110 active:scale-95 group cursor-pointer ${
           showScrollTop
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-6 pointer-events-none'
