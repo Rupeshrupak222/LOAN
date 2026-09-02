@@ -15,6 +15,7 @@ import {
   BarChart3,
   KeyRound,
   ShieldCheck,
+  ShieldAlert,
   ScrollText,
   LogOut,
   Menu,
@@ -32,6 +33,8 @@ import { cn } from '@/lib/utils';
 import { ROLE_CONFIG, NAV_ITEMS, RoleName, NavItemConfig } from '@/lib/roles';
 import { Spinner } from './ui';
 import { NotificationBell } from './NotificationBell';
+import { CopilotDrawer } from './CopilotDrawer';
+import { WorkflowExceptionCenterModal } from './WorkflowExceptionCenterModal';
 
 const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
@@ -64,6 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [exceptionCenterOpen, setExceptionCenterOpen] = useState(false);
 
   if (loading) return <Spinner />;
   if (!user) return null;
@@ -303,6 +307,27 @@ export function AppShell({ children }: { children: ReactNode }) {
               )}
             </button>
 
+            {/* AI Workflow & Exception Center Button (For Staff) */}
+            {primaryRole !== 'CUSTOMER' && (
+              <button
+                type="button"
+                onClick={() => setExceptionCenterOpen(true)}
+                title="AI Workflow & Operational Exception Center"
+                className={cn(
+                  "flex h-8 items-center gap-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer",
+                  isDark
+                    ? "border-rose-900/50 bg-rose-950/40 text-rose-300 hover:bg-rose-900/40"
+                    : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                )}
+              >
+                <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />
+                <span className="hidden md:inline">Exceptions</span>
+              </button>
+            )}
+
+            {/* AI Copilot Gemini Assistant */}
+            <CopilotDrawer />
+
             {/* Live Interactive Notification Bell */}
             <NotificationBell />
 
@@ -356,6 +381,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </main>
       </div>
+
+      {/* AI Workflow & Exception Center Modal */}
+      {exceptionCenterOpen && (
+        <WorkflowExceptionCenterModal
+          isOpen={exceptionCenterOpen}
+          onClose={() => setExceptionCenterOpen(false)}
+        />
+      )}
     </div>
   );
 }

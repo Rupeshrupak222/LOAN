@@ -26,6 +26,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { CreditIntelligenceCard } from '@/components/CreditIntelligenceCard';
+import { UnderwritingIntelligenceCard } from '@/components/UnderwritingIntelligenceCard';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -327,8 +329,14 @@ export default function ApplicationDetailPage() {
           </Card>
         </div>
 
-        {/* Right Column: Rule Engine & Risk Model */}
+        {/* Right Column: AI Decision Support, Rule Engine & Risk Model */}
         <div className="space-y-6 lg:col-span-2">
+          {/* AI Underwriting Decision Support Briefing */}
+          <UnderwritingIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+          {/* AI Credit Intelligence & Decision Support Card */}
+          <CreditIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
           {/* 1. Rule-Based Eligibility Engine Card */}
           <Card className="space-y-4">
             <div className="flex items-center justify-between">

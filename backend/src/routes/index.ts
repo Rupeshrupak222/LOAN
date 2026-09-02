@@ -19,6 +19,7 @@ import settingRoutes from '../modules/settings/settings.routes';
 import notificationRoutes from '../modules/notifications/notification.routes';
 import auditRoutes from '../modules/audit/audit.routes';
 import financeRoutes from '../modules/finance/finance.routes';
+import aiRoutes from '../modules/ai/ai.routes';
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use('/settings', settingRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/audit', auditRoutes);
 router.use('/finance', financeRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;

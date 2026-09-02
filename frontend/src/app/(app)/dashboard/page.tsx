@@ -63,6 +63,7 @@ import { useTheme } from '@/lib/theme';
 import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
+import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -715,6 +716,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* AI Executive Decision Intelligence Card (For Staff & Managers) */}
+      {primaryRole !== 'CUSTOMER' && <DecisionIntelligenceCard />}
 
       {/* ========================================================================= */}
       {/* 2. ROLE-SPECIFIC DASHBOARD SECTIONS                                       */}

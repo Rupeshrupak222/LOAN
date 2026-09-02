@@ -53,5 +53,10 @@ export const env = {
     apiSecret: process.env.CLOUDINARY_API_SECRET ?? 'YPeOcsA_i8gKr8Gq0MP13s9Ba0I',
     url: process.env.CLOUDINARY_URL ?? 'cloudinary://571474773638931:YPeOcsA_i8gKr8Gq0MP13s9Ba0I@smsoui35',
   },
+
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY ?? '',
+    model: process.env.GEMINI_MODEL ?? 'gemma-4-31b-it',
+  },
 } as const;
 
