@@ -12,6 +12,17 @@ router.use(authenticate);
 
 router.get(
   '/',
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'BRANCH_MANAGER',
+    'LOAN_OFFICER',
+    'CREDIT_ANALYST',
+    'UNDERWRITER',
+    'FINANCE_OFFICER',
+    'COLLECTION_OFFICER',
+    'AUDITOR'
+  ),
   asyncHandler(async (_req, res) => {
     const branches = await listBranches();
     res.json(success(branches));

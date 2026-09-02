@@ -2,21 +2,39 @@ import { ApplicationStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
+import { sendNotification } from '../notifications/notification.service';
 import type { UnderwritingDecisionInput } from './underwriting.schema';
 
-export async function getUnderwritingQueue() {
+export async function getUnderwritingQueue(tab?: string) {
+  let where: any = {};
+  if (tab === 'PENDING') {
+    where = { status: 'UNDERWRITING' };
+  } else if (tab === 'APPROVED') {
+    where = { status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] } };
+  } else if (tab === 'REJECTED') {
+    where = { status: 'REJECTED' };
+  } else {
+    // Default: fetch all applications that have been forwarded to Underwriting or have Underwriting records
+    where = {
+      OR: [
+        { status: 'UNDERWRITING' },
+        { underwriting: { isNot: null } },
+        { status: { in: ['APPROVED', 'REJECTED'] } },
+      ],
+    };
+  }
+
   return prisma.loanApplication.findMany({
-    where: {
-      status: { in: ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'SUBMITTED', 'UNDER_REVIEW'] },
-    },
+    where,
     include: {
       customer: { select: { firstName: true, lastName: true, customerCode: true, monthlyIncome: true, kycStatus: true, riskCategory: true } },
       product: { select: { name: true, code: true, productType: true, interestRate: true } },
       eligibility: true,
       riskAssessment: true,
-      approvals: true,
+      approvals: { orderBy: { createdAt: 'desc' } },
+      underwriting: true,
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { updatedAt: 'desc' },
   });
 }
 
@@ -116,6 +134,15 @@ export async function submitUnderwritingDecision(
     previousValue: { status: app.status },
     newValue: { status: nextStatus, decision: input.decision, reason: input.reason },
   });
+
+  // Async non-blocking notification to applicant
+  void sendNotification({
+    customerId: app.customerId,
+    channel: 'IN_APP',
+    type: input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS' ? 'SUCCESS' : input.decision === 'REJECT' ? 'ALERT' : 'INFO',
+    title: `Loan Application #${app.applicationNo} Update: ${nextStatus}`,
+    message: `Your credit proposal has been updated to ${nextStatus}. Decision: ${input.decision}. ${input.reason ? `Remarks: ${input.reason}` : ''}`,
+  }).catch(() => {});
 
   return result;
 }

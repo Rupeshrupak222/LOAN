@@ -5,6 +5,7 @@ import { calculateEmi } from '../finance/emi';
 import { Money } from '../finance/money';
 import { generateNocNo, generatePaymentNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
+import { sendNotification } from '../notifications/notification.service';
 import type {
   ProposeRestructureInput,
   ProposeSettlementInput,
@@ -114,6 +115,15 @@ export async function restructureLoan(
     },
   });
 
+  // Async non-blocking notification
+  void sendNotification({
+    customerId: loan.customerId,
+    channel: 'IN_APP',
+    type: 'INFO',
+    title: `Loan #${loan.loanNo} Restructured`,
+    message: `Tenure adjusted to ${input.newTenureMonths} months @ ${input.newInterestRate}%. New EMI: ₹${newEmi}.`,
+  }).catch(() => {});
+
   return result;
 }
 
@@ -215,6 +225,15 @@ export async function executeSettlement(
     },
   });
 
+  // Async non-blocking notification
+  void sendNotification({
+    customerId: loan.customerId,
+    channel: 'IN_APP',
+    type: 'SUCCESS',
+    title: `One-Time Settlement Executed: Loan #${loan.loanNo}`,
+    message: `Settlement payoff of ₹${Number(input.settlementAmount).toLocaleString('en-IN')} approved. Outstanding balance cleared.`,
+  }).catch(() => {});
+
   return settlement;
 }
 
@@ -291,6 +310,15 @@ export async function closeLoanAndIssueNoc(
     entityId: closure.id,
     newValue: { nocNumber, closureType: input.closureType },
   });
+
+  // Async non-blocking notification
+  void sendNotification({
+    customerId: loan.customerId,
+    channel: 'IN_APP',
+    type: 'SUCCESS',
+    title: `Loan #${loan.loanNo} Fully Closed - NOC Issued`,
+    message: `Your loan account #${loan.loanNo} is closed with Zero outstanding dues. No Objection Certificate #${nocNumber} is generated.`,
+  }).catch(() => {});
 
   return closure;
 }

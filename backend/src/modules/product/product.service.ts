@@ -42,3 +42,12 @@ export async function updateProduct(id: string, input: Partial<CreateProductInpu
   await getProduct(id);
   return prisma.loanProduct.update({ where: { id }, data: toDbData(input) as never });
 }
+
+export async function deleteProduct(id: string) {
+  await getProduct(id);
+  const count = await prisma.loanApplication.count({ where: { productId: id } });
+  if (count > 0) {
+    return prisma.loanProduct.update({ where: { id }, data: { isActive: false } });
+  }
+  return prisma.loanProduct.delete({ where: { id } });
+}

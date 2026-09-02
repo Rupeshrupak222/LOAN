@@ -5,12 +5,14 @@ import { PageParams, buildPagination } from '../../common/pagination';
 import { Money } from '../finance/money';
 import { generatePaymentNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
+import { sendNotification } from '../notifications/notification.service';
 import type { RecordPaymentInput } from './payment.schema';
 
-export async function listPayments(params: PageParams, loanId?: string, customerId?: string) {
+export async function listPayments(params: PageParams, loanId?: string, customerId?: string, userId?: string) {
   const where: any = {};
   if (loanId) where.loanId = loanId;
   if (customerId) where.customerId = customerId;
+  if (userId) where.customer = { userId };
 
   if (params.search) {
     where.OR = [
@@ -51,6 +53,57 @@ export async function listPayments(params: PageParams, loanId?: string, customer
       allocations: p.allocations.map((a) => ({ bucket: a.bucket, amount: a.amount.toFixed(2) })),
       paidAt: p.paidAt,
       createdAt: p.createdAt,
+    })),
+    pagination: buildPagination(params.page, params.pageSize, total),
+  };
+}
+
+export async function listTransactions(params: PageParams, type?: string, loanId?: string) {
+  const where: any = {};
+  if (type) where.type = type;
+  if (loanId) where.loanId = loanId;
+  if (params.search) {
+    where.OR = [
+      { reference: { contains: params.search, mode: 'insensitive' } },
+      { description: { contains: params.search, mode: 'insensitive' } },
+      { loan: { loanNo: { contains: params.search, mode: 'insensitive' } } },
+      { loan: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
+      { loan: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+    ];
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.transaction.findMany({
+      where,
+      skip: params.skip,
+      take: params.take,
+      orderBy: { createdAt: params.sortDir },
+      include: {
+        loan: {
+          include: {
+            customer: true,
+            product: true,
+          },
+        },
+      },
+    }),
+    prisma.transaction.count({ where }),
+  ]);
+
+  return {
+    data: rows.map((t) => ({
+      id: t.id,
+      loanId: t.loanId,
+      loanNo: t.loan?.loanNo || '-',
+      customerName: t.loan?.customer ? `${t.loan.customer.firstName} ${t.loan.customer.lastName}` : 'N/A',
+      customerCode: t.loan?.customer?.customerCode || '-',
+      productName: t.loan?.product?.name || 'Loan',
+      type: t.type,
+      direction: t.direction,
+      amount: t.amount.toFixed(2),
+      reference: t.reference,
+      description: t.description,
+      createdAt: t.createdAt,
     })),
     pagination: buildPagination(params.page, params.pageSize, total),
   };
@@ -291,6 +344,15 @@ export async function processPayment(
       allocations: bucketTotals,
     },
   });
+
+  // Async non-blocking notification
+  void sendNotification({
+    customerId: loan.customerId,
+    channel: 'IN_APP',
+    type: 'SUCCESS',
+    title: `Payment Received: ₹${Number(input.amount).toLocaleString('en-IN')}`,
+    message: `Receipt #${paymentNo} recorded for Loan #${loan.loanNo}. Allocations: Principal ₹${bucketTotals.PRINCIPAL.toFixed(2)}, Interest ₹${bucketTotals.INTEREST.toFixed(2)}, Fees ₹${bucketTotals.FEES.toFixed(2)}.`,
+  }).catch(() => {});
 
   return result;
 }

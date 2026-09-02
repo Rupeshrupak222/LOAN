@@ -37,7 +37,18 @@ export async function evaluateApplicationRisk(
   const { customer, product } = app;
   const factors: RiskEvaluationResult['factors'] = [];
 
-  // 1. Employment Stability (Weight: 25%)
+  // Fetch dynamic weights from SystemSetting
+  const weightsSetting = await prisma.systemSetting.findUnique({
+    where: { key: 'risk_model_weights' },
+  });
+  const weights = (weightsSetting?.value as any) || {
+    employmentVintage: 25,
+    debtServiceCapacity: 30,
+    documentCompleteness: 20,
+    creditHistory: 25,
+  };
+
+  // 1. Employment Stability
   const expYears = customer.employmentDetails[0]?.workExperienceYears || 2;
   let empScore = 60;
   if (expYears >= 5) empScore = 95;
@@ -46,12 +57,12 @@ export async function evaluateApplicationRisk(
 
   factors.push({
     name: 'Employment Vintage & Stability',
-    weight: 25,
+    weight: Number(weights.employmentVintage ?? 25),
     score: empScore,
     remarks: `${expYears} years in ${customer.employmentType || 'current role'}`,
   });
 
-  // 2. Financial Buffer & DTI (Weight: 30%)
+  // 2. Financial Buffer & DTI
   const income = Number(customer.monthlyIncome || 0);
   const obligations = Number(customer.existingObligations || 0);
   const dti = income > 0 ? obligations / income : 1;
@@ -63,29 +74,29 @@ export async function evaluateApplicationRisk(
 
   factors.push({
     name: 'Debt Service Capacity & Cash Flow',
-    weight: 30,
+    weight: Number(weights.debtServiceCapacity ?? 30),
     score: dtiScore,
     remarks: `Fixed obligation ratio of ${(dti * 100).toFixed(0)}%`,
   });
 
-  // 3. Document Verification Completeness (Weight: 20%)
+  // 3. Document Verification Completeness
   const verifiedDocs = customer.documents.filter((d) => d.verified).length;
   let docScore = verifiedDocs >= 2 ? 90 : verifiedDocs === 1 ? 65 : 40;
 
   factors.push({
     name: 'KYC & Document Authenticity',
-    weight: 20,
+    weight: Number(weights.documentCompleteness ?? 20),
     score: docScore,
     remarks: `${verifiedDocs} verified compliance document(s) on record`,
   });
 
-  // 4. Repayment History & Bureau Performance (Weight: 25%)
+  // 4. Repayment History & Bureau Performance
   const overdueCount = customer.loans.filter((l) => l.status === 'OVERDUE').length;
   let historyScore = overdueCount === 0 ? 90 : 25;
 
   factors.push({
     name: 'Credit History & Default Risk',
-    weight: 25,
+    weight: Number(weights.creditHistory ?? 25),
     score: historyScore,
     remarks: overdueCount === 0 ? 'Flawless track record with no past default' : `${overdueCount} delinquent account(s)`,
   });

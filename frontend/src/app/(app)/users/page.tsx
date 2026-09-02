@@ -33,6 +33,16 @@ export default function UsersPage() {
   const [lastName, setLastName] = useState('');
   const [roleName, setRoleName] = useState('LOAN_OFFICER');
   const [employeeId, setEmployeeId] = useState('');
+  const [branchId, setBranchId] = useState('');
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches-list'],
+    queryFn: async () => {
+      const res = await api.get('/branches');
+      const rows = res.data?.data;
+      return (Array.isArray(rows) ? rows : []) as any[];
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', search],
@@ -51,6 +61,7 @@ export default function UsersPage() {
         lastName,
         roleName,
         employeeId: employeeId || undefined,
+        branchId: branchId || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -59,6 +70,7 @@ export default function UsersPage() {
       setFirstName('');
       setLastName('');
       setEmployeeId('');
+      setBranchId('');
     },
   });
 
@@ -173,6 +185,26 @@ export default function UsersPage() {
                   <option value="AUDITOR">Auditor (Compliance & Ledger)</option>
                   <option value="ADMIN">System Admin</option>
                   <option value="SUPER_ADMIN">Super Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Branch Assignment</label>
+                <select
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  className={cn(
+                    "w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none",
+                    isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
+                  )}
+                >
+                  <option value="">Headquarters / Corporate HQ (Default)</option>
+                  {Array.isArray(branchesData) &&
+                    branchesData.map((b: any) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code}) - {b.city || 'Regional'}
+                      </option>
+                    ))}
                 </select>
               </div>
 

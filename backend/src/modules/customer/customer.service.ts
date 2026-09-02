@@ -1,10 +1,12 @@
 import { Prisma } from '@prisma/client';
+import argon2 from 'argon2';
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { generateCustomerCode } from '../shared/codes';
 import { Money } from '../finance/money';
 import { logAudit } from '../audit/audit.service';
+import { sendNotification } from '../notifications/notification.service';
 import type {
   CreateCustomerInput,
   UpdateKycStatusInput,
@@ -129,15 +131,59 @@ export async function getCustomer(id: string) {
 
 export async function createCustomer(input: CreateCustomerInput, actorUserId?: string) {
   const customer = await prisma.$transaction(async (tx) => {
+    let customerUserId: string | undefined = undefined;
+
+    // If email is provided, create linked User account with CUSTOMER role and hashed password
+    if (input.email) {
+      const cleanEmail = input.email.toLowerCase().trim();
+      const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
+
+      const rawPassword =
+        input.password && input.password.trim().length >= 6
+          ? input.password.trim()
+          : 'Passw0rd!123';
+      const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
+
+      const user = await tx.user.upsert({
+        where: { email: cleanEmail },
+        update: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          passwordHash,
+          status: 'ACTIVE',
+          branchId: input.branchId,
+        },
+        create: {
+          email: cleanEmail,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          passwordHash,
+          status: 'ACTIVE',
+          branchId: input.branchId,
+        },
+      });
+
+      if (customerRole) {
+        await tx.userRole.upsert({
+          where: { userId_roleId: { userId: user.id, roleId: customerRole.id } },
+          update: {},
+          create: { userId: user.id, roleId: customerRole.id },
+        });
+      }
+
+      customerUserId = user.id;
+    }
+
     const cust = await tx.customer.create({
       data: {
+        userId: customerUserId,
         customerCode: generateCustomerCode(),
         firstName: input.firstName,
         lastName: input.lastName,
         dateOfBirth: input.dateOfBirth,
         gender: input.gender,
         mobile: input.mobile,
-        email: input.email?.toLowerCase(),
+        email: input.email?.toLowerCase().trim(),
         addressLine: input.addressLine,
         city: input.city,
         state: input.state,
@@ -216,13 +262,158 @@ export async function updateCustomer(
   actorUserId?: string
 ) {
   const existing = await getCustomer(id);
-  const data: Prisma.CustomerUpdateInput = { ...input };
-  if (input.monthlyIncome != null) data.monthlyIncome = Money.toDb(input.monthlyIncome);
-  if (input.existingObligations != null)
-    data.existingObligations = Money.toDb(input.existingObligations);
-  if (input.email) data.email = input.email.toLowerCase();
 
-  const updated = await prisma.customer.update({ where: { id }, data });
+  const updated = await prisma.$transaction(async (tx) => {
+    const data: Prisma.CustomerUpdateInput = {};
+    if (input.firstName !== undefined) data.firstName = input.firstName;
+    if (input.lastName !== undefined) data.lastName = input.lastName;
+    if (input.mobile !== undefined) data.mobile = input.mobile;
+    if (input.email !== undefined) data.email = input.email ? input.email.toLowerCase().trim() : null;
+    if (input.dateOfBirth !== undefined) data.dateOfBirth = input.dateOfBirth;
+    if (input.gender !== undefined) data.gender = input.gender;
+    if (input.addressLine !== undefined) data.addressLine = input.addressLine;
+    if (input.city !== undefined) data.city = input.city;
+    if (input.state !== undefined) data.state = input.state;
+    if (input.pincode !== undefined) data.pincode = input.pincode;
+    if (input.employmentType !== undefined) data.employmentType = input.employmentType;
+    if (input.employerName !== undefined) data.employerName = input.employerName;
+    if (input.monthlyIncome !== undefined) {
+      data.monthlyIncome = input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null;
+    }
+    if (input.existingObligations !== undefined) {
+      data.existingObligations = input.existingObligations != null ? Money.toDb(input.existingObligations) : null;
+    }
+    if (input.bankName !== undefined) data.bankName = input.bankName;
+    if (input.bankAccountNo !== undefined) data.bankAccountNo = input.bankAccountNo;
+    if (input.bankIfsc !== undefined) data.bankIfsc = input.bankIfsc;
+
+    // 1. If password or user details updated, sync with User table
+    if (existing.userId) {
+      const userUpdate: Prisma.UserUpdateInput = {};
+      if (input.firstName) userUpdate.firstName = input.firstName;
+      if (input.lastName) userUpdate.lastName = input.lastName;
+      if (input.email) userUpdate.email = input.email.toLowerCase().trim();
+      if (input.password && input.password.trim().length >= 6) {
+        userUpdate.passwordHash = await argon2.hash(input.password.trim(), { type: argon2.argon2id });
+      }
+      if (Object.keys(userUpdate).length > 0) {
+        await tx.user.update({ where: { id: existing.userId }, data: userUpdate });
+      }
+    } else if (input.email) {
+      // Create user if not linked previously
+      const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
+      const rawPassword = input.password && input.password.trim().length >= 6 ? input.password.trim() : 'Passw0rd!123';
+      const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
+      const newUser = await tx.user.upsert({
+        where: { email: input.email.toLowerCase().trim() },
+        update: {
+          firstName: input.firstName || existing.firstName,
+          lastName: input.lastName || existing.lastName,
+          passwordHash,
+          status: 'ACTIVE',
+        },
+        create: {
+          email: input.email.toLowerCase().trim(),
+          firstName: input.firstName || existing.firstName,
+          lastName: input.lastName || existing.lastName,
+          passwordHash,
+          status: 'ACTIVE',
+        },
+      });
+      if (customerRole) {
+        await tx.userRole.upsert({
+          where: { userId_roleId: { userId: newUser.id, roleId: customerRole.id } },
+          update: {},
+          create: { userId: newUser.id, roleId: customerRole.id },
+        });
+      }
+      data.user = { connect: { id: newUser.id } };
+    }
+
+    // 2. Sync Address table if address updated
+    if (input.addressLine || input.city) {
+      const primaryAddr = await tx.customerAddress.findFirst({ where: { customerId: id, isPrimary: true } });
+      if (primaryAddr) {
+        await tx.customerAddress.update({
+          where: { id: primaryAddr.id },
+          data: {
+            addressLine: input.addressLine ?? primaryAddr.addressLine,
+            city: input.city ?? primaryAddr.city,
+            state: input.state ?? primaryAddr.state,
+            pincode: input.pincode ?? primaryAddr.pincode,
+          },
+        });
+      } else if (input.addressLine && input.city) {
+        await tx.customerAddress.create({
+          data: {
+            customerId: id,
+            addressType: 'CURRENT',
+            addressLine: input.addressLine,
+            city: input.city,
+            state: input.state || '',
+            pincode: input.pincode || '',
+            isPrimary: true,
+          },
+        });
+      }
+    }
+
+    // 3. Sync Bank Account table if bank details updated
+    if (input.bankName || input.bankAccountNo) {
+      const primaryBank = await tx.customerBankAccount.findFirst({ where: { customerId: id, isPrimary: true } });
+      if (primaryBank) {
+        await tx.customerBankAccount.update({
+          where: { id: primaryBank.id },
+          data: {
+            bankName: input.bankName ?? primaryBank.bankName,
+            accountNumber: input.bankAccountNo ?? primaryBank.accountNumber,
+            ifscCode: input.bankIfsc ?? primaryBank.ifscCode,
+          },
+        });
+      } else if (input.bankName && input.bankAccountNo) {
+        await tx.customerBankAccount.create({
+          data: {
+            customerId: id,
+            bankName: input.bankName,
+            accountNumber: input.bankAccountNo,
+            ifscCode: input.bankIfsc || '',
+            accountHolderName: `${input.firstName || existing.firstName} ${input.lastName || existing.lastName}`,
+            accountType: 'SAVINGS',
+            isPrimary: true,
+          },
+        });
+      }
+    }
+
+    // 4. Sync Employment table if employment details updated
+    if (input.employerName || input.employmentType || input.monthlyIncome) {
+      const primaryEmp = await tx.customerEmployment.findFirst({ where: { customerId: id } });
+      if (primaryEmp) {
+        await tx.customerEmployment.update({
+          where: { id: primaryEmp.id },
+          data: {
+            employerName: input.employerName ?? primaryEmp.employerName,
+            employmentType: input.employmentType ?? primaryEmp.employmentType,
+            designation: input.designation ?? primaryEmp.designation,
+            monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : primaryEmp.monthlyIncome,
+          },
+        });
+      } else if (input.employerName) {
+        await tx.customerEmployment.create({
+          data: {
+            customerId: id,
+            employerName: input.employerName,
+            employmentType: input.employmentType || 'SALARIED',
+            designation: input.designation,
+            monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
+          },
+        });
+      }
+    }
+
+    // 4. Update customer record
+    return tx.customer.update({ where: { id }, data });
+  });
 
   await logAudit({
     userId: actorUserId,
@@ -230,7 +421,7 @@ export async function updateCustomer(
     entity: 'Customer',
     entityId: id,
     previousValue: { name: `${existing.firstName} ${existing.lastName}`, status: existing.status },
-    newValue: data,
+    newValue: input,
   });
 
   return updated;
@@ -266,6 +457,17 @@ export async function updateKycStatus(
     previousValue: { kycStatus: existing.kycStatus, status: existing.status },
     newValue: { kycStatus: input.kycStatus, status: newCustomerStatus, remarks: input.remarks },
   });
+
+  // Async non-blocking notification
+  void sendNotification({
+    customerId: id,
+    channel: 'IN_APP',
+    type: input.kycStatus === 'VERIFIED' ? 'SUCCESS' : input.kycStatus === 'REJECTED' ? 'ALERT' : 'INFO',
+    title: `KYC Compliance Status: ${input.kycStatus}`,
+    message: input.kycStatus === 'VERIFIED'
+      ? 'Your identity documents and KYC verification have been approved.'
+      : `Your KYC status was updated to ${input.kycStatus}. ${input.remarks ? `Remarks: ${input.remarks}` : ''}`,
+  }).catch(() => {});
 
   return updated;
 }
@@ -323,3 +525,89 @@ export async function addCustomerBankAccount(
 
   return account;
 }
+
+export async function deleteCustomer(id: string, actorUserId?: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id },
+    include: {
+      user: true,
+      loans: true,
+      applications: true,
+    },
+  });
+  if (!customer) throw new NotFoundError('Customer not found');
+
+  // Perform cascading deletion in transaction
+  await prisma.$transaction(async (tx) => {
+    // 1. Delete notifications
+    await tx.notification.deleteMany({ where: { customerId: id } });
+
+    // 2. Delete collection cases & activities
+    const caseIds = (await tx.collectionCase.findMany({ where: { customerId: id }, select: { id: true } })).map((c) => c.id);
+    if (caseIds.length > 0) {
+      await tx.collectionActivity.deleteMany({ where: { caseId: { in: caseIds } } });
+      await tx.promiseToPay.deleteMany({ where: { caseId: { in: caseIds } } });
+      await tx.collectionCase.deleteMany({ where: { id: { in: caseIds } } });
+    }
+
+    // 3. Delete payments & allocations
+    const paymentIds = (await tx.payment.findMany({ where: { customerId: id }, select: { id: true } })).map((p) => p.id);
+    if (paymentIds.length > 0) {
+      await tx.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
+      await tx.payment.deleteMany({ where: { id: { in: paymentIds } } });
+    }
+
+    // 4. Delete loans and related records
+    const loanIds = customer.loans.map((l) => l.id);
+    if (loanIds.length > 0) {
+      await tx.loanClosure.deleteMany({ where: { loanId: { in: loanIds } } });
+      await tx.settlement.deleteMany({ where: { loanId: { in: loanIds } } });
+      await tx.loanRestructure.deleteMany({ where: { loanId: { in: loanIds } } });
+      await tx.disbursement.deleteMany({ where: { loanId: { in: loanIds } } });
+      await tx.repaymentScheduleItem.deleteMany({ where: { loanId: { in: loanIds } } });
+      await tx.loan.deleteMany({ where: { id: { in: loanIds } } });
+    }
+
+    // 5. Delete loan applications and underwriting records
+    const appIds = customer.applications.map((a) => a.id);
+    if (appIds.length > 0) {
+      await tx.underwritingDecision.deleteMany({ where: { applicationId: { in: appIds } } });
+      await tx.riskAssessment.deleteMany({ where: { applicationId: { in: appIds } } });
+      await tx.eligibilityAssessment.deleteMany({ where: { applicationId: { in: appIds } } });
+      await tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: appIds } } });
+      await tx.loanApplication.deleteMany({ where: { id: { in: appIds } } });
+    }
+
+    // 6. Delete documents, addresses, bank accounts, employment
+    await tx.document.deleteMany({ where: { customerId: id } });
+    await tx.customerAddress.deleteMany({ where: { customerId: id } });
+    await tx.customerBankAccount.deleteMany({ where: { customerId: id } });
+    await tx.customerEmployment.deleteMany({ where: { customerId: id } });
+
+    // 7. Delete customer record
+    await tx.customer.delete({ where: { id } });
+
+    // 8. Delete linked User login account if exists
+    if (customer.userId) {
+      await tx.userRole.deleteMany({ where: { userId: customer.userId } });
+      await tx.notification.deleteMany({ where: { userId: customer.userId } });
+      await tx.refreshToken.deleteMany({ where: { userId: customer.userId } });
+      await tx.user.delete({ where: { id: customer.userId } }).catch(() => {});
+    }
+  });
+
+  await logAudit({
+    userId: actorUserId,
+    action: 'CUSTOMER_DELETED',
+    entity: 'Customer',
+    entityId: id,
+    previousValue: {
+      code: customer.customerCode,
+      name: `${customer.firstName} ${customer.lastName}`,
+      email: customer.email,
+    },
+  });
+
+  return { success: true, message: `Customer ${customer.customerCode} permanently deleted from database` };
+}
+

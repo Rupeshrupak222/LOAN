@@ -38,6 +38,24 @@ export async function evaluateApplicationEligibility(
   const monthlyIncome = customer.monthlyIncome ? Number(customer.monthlyIncome) : 0;
   const existingObligations = customer.existingObligations ? Number(customer.existingObligations) : 0;
 
+  // Fetch dynamic policy criteria from SystemSetting
+  const criteriaSetting = await prisma.systemSetting.findUnique({
+    where: { key: 'eligibility_criteria' },
+  });
+  const criteria = (criteriaSetting?.value as any) || {
+    minAge: 21,
+    maxAge: 60,
+    maxDtiRatio: 0.55,
+    warningDtiRatio: 0.45,
+    minSalariedIncome: 25000,
+    minBusinessIncome: 50000,
+  };
+
+  const minAge = Number(criteria.minAge ?? 21);
+  const maxAge = Number(criteria.maxAge ?? 60);
+  const maxAllowedDti = Number(criteria.maxDtiRatio ?? 0.55);
+  const warningDti = Number(criteria.warningDtiRatio ?? 0.45);
+
   // Calculate estimated EMI
   const emiCalc = calculateEmi(requestedAmount, interestRate, tenure);
   const estimatedEmiNum = Number(emiCalc.emi);
@@ -51,10 +69,10 @@ export async function evaluateApplicationEligibility(
     const age = Math.floor(
       (Date.now() - new Date(customer.dateOfBirth).getTime()) / (365.25 * 86400000)
     );
-    if (age >= 21 && age <= 60) {
-      factors.push({ factor: 'Age Requirement', status: 'PASS', detail: `Age is ${age} years (Policy: 21-60 years)` });
+    if (age >= minAge && age <= maxAge) {
+      factors.push({ factor: 'Age Requirement', status: 'PASS', detail: `Age is ${age} years (Policy: ${minAge}-${maxAge} years)` });
     } else {
-      factors.push({ factor: 'Age Requirement', status: 'FAIL', detail: `Age is ${age} years (Outside allowed 21-60 range)` });
+      factors.push({ factor: 'Age Requirement', status: 'FAIL', detail: `Age is ${age} years (Outside allowed ${minAge}-${maxAge} range)` });
       fails++;
     }
   } else {
@@ -63,7 +81,9 @@ export async function evaluateApplicationEligibility(
   }
 
   // 2. Minimum Income Factor
-  const minRequiredIncome = product.productType === 'BUSINESS' ? 50000 : 25000;
+  const minRequiredIncome = product.productType === 'BUSINESS'
+    ? Number(criteria.minBusinessIncome ?? 50000)
+    : Number(criteria.minSalariedIncome ?? 25000);
   if (monthlyIncome >= minRequiredIncome) {
     factors.push({
       factor: 'Minimum Monthly Income',
@@ -82,26 +102,25 @@ export async function evaluateApplicationEligibility(
   // 3. Debt-To-Income (DTI / FOIR) Ratio
   const totalMonthlyDebt = existingObligations + estimatedEmiNum;
   const dtiRatio = monthlyIncome > 0 ? totalMonthlyDebt / monthlyIncome : 1;
-  const maxAllowedDti = 0.55;
 
-  if (dtiRatio <= 0.45) {
+  if (dtiRatio <= warningDti) {
     factors.push({
       factor: 'Debt-To-Income (DTI) Ratio',
       status: 'PASS',
-      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Healthy capacity under 45%)`,
+      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Healthy capacity under ${(warningDti * 100).toFixed(0)}%)`,
     });
   } else if (dtiRatio <= maxAllowedDti) {
     factors.push({
       factor: 'Debt-To-Income (DTI) Ratio',
       status: 'WARNING',
-      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Approaching threshold limit 55%)`,
+      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Approaching threshold limit ${(maxAllowedDti * 100).toFixed(0)}%)`,
     });
     warnings++;
   } else {
     factors.push({
       factor: 'Debt-To-Income (DTI) Ratio',
       status: 'FAIL',
-      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Exceeds maximum allowable 55% threshold)`,
+      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Exceeds maximum allowable ${(maxAllowedDti * 100).toFixed(0)}% threshold)`,
     });
     fails++;
   }

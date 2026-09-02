@@ -13,8 +13,8 @@ router.use(authenticate);
 router.get(
   '/queue',
   authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const queue = await getUnderwritingQueue();
+  asyncHandler(async (req, res) => {
+    const queue = await getUnderwritingQueue((req.query as any)?.tab);
     res.json(success(queue));
   })
 );

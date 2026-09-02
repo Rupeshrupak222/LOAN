@@ -4,11 +4,12 @@ import { NotFoundError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { Money } from '../finance/money';
 
-export async function listLoans(params: PageParams, status?: string, branchId?: string, customerId?: string) {
+export async function listLoans(params: PageParams, status?: string, branchId?: string, customerId?: string, userId?: string) {
   const where: Prisma.LoanWhereInput = {};
   if (status) where.status = status as LoanStatus;
   if (branchId) where.branchId = branchId;
   if (customerId) where.customerId = customerId;
+  if (userId) where.customer = { userId };
 
   if (params.search) {
     where.OR = [

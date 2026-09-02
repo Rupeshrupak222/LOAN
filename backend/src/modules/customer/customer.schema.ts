@@ -7,6 +7,7 @@ export const createCustomerSchema = z.object({
   gender: z.string().optional(),
   mobile: z.string().min(6).max(20),
   email: z.string().email().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   addressLine: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),

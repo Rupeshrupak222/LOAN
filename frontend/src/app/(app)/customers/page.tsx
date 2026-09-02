@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { UserPlus, Search, ShieldCheck, Phone } from 'lucide-react';
-import { api } from '@/lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { UserPlus, Search, ShieldCheck, Phone, Trash2, CheckSquare, X, AlertTriangle } from 'lucide-react';
+import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { PageHeader } from '@/components/PageHeader';
-import { Badge, Button, Input } from '@/components/ui';
+import { Badge, Button, Input, Card } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, formatDateTime, cn } from '@/lib/utils';
 
 interface CustomerRow {
   id: string;
@@ -28,8 +28,13 @@ interface CustomerRow {
 
 export default function CustomersPage() {
   const { isDark } = useTheme();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', search, kycFilter],
@@ -45,7 +50,67 @@ export default function CustomersPage() {
     },
   });
 
+  const customersList = data || [];
+  const allIds = customersList.map((r) => r.id);
+  const isAllSelected = customersList.length > 0 && selectedIds.length === customersList.length;
+
+  function toggleSelectAll() {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds([...allIds]);
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await Promise.all(selectedIds.map((id) => api.delete(`/customers/${id}`)));
+      setSelectedIds([]);
+      setDeleteModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    } catch (err) {
+      setDeleteError(apiErrorMessage(err));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const columns: Column<CustomerRow>[] = [
+    {
+      key: 'select',
+      header: (
+        <div className="flex items-center gap-1.5 cursor-pointer" onClick={toggleSelectAll}>
+          <input
+            type="checkbox"
+            checked={isAllSelected}
+            onChange={toggleSelectAll}
+            aria-label="Select all customers"
+            className="h-4 w-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+          />
+        </div>
+      ),
+      className: 'w-10 text-center',
+      render: (r) => (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(r.id)}
+            onChange={() => toggleSelectOne(r.id)}
+            aria-label={`Select ${r.name}`}
+            className="h-4 w-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+          />
+        </div>
+      ),
+    },
     {
       key: 'customerCode',
       header: 'Customer ID',
@@ -99,7 +164,7 @@ export default function CustomersPage() {
     {
       key: 'createdAt',
       header: 'Onboarded',
-      render: (r) => formatDate(r.createdAt),
+      render: (r) => formatDateTime(r.createdAt),
     },
     {
       key: 'id',
@@ -130,6 +195,51 @@ export default function CustomersPage() {
         }
       />
 
+      {/* Floating Selection Toolbar when 1+ candidates are selected */}
+      {selectedIds.length > 0 && (
+        <div
+          className={cn(
+            'flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border shadow-lg animate-in fade-in-50 slide-in-from-top-2 duration-200',
+            isDark
+              ? 'border-blue-900/60 bg-[#16203D] text-white shadow-black/40'
+              : 'border-blue-200 bg-blue-50/90 text-blue-950 shadow-blue-100/50'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-600 text-white text-xs font-bold shadow-2xs">
+              {selectedIds.length}
+            </span>
+            <span className="text-xs font-bold">
+              {selectedIds.length === 1
+                ? '1 Candidate selected'
+                : `${selectedIds.length} Candidates selected`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => setDeleteModalOpen(true)}
+              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete Selected Candidate{selectedIds.length > 1 ? 's' : ''}</span>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setSelectedIds([])}
+              className="flex items-center gap-1 text-xs"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Clear Selection</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Filter and Search Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="max-w-sm flex-1">
           <Input
@@ -156,6 +266,7 @@ export default function CustomersPage() {
         </select>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         rows={data}
@@ -168,6 +279,50 @@ export default function CustomersPage() {
           </Link>
         }
       />
+
+      {/* Bulk Deletion Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <Card className="w-full max-w-md p-6 space-y-4 shadow-2xl border-rose-200 dark:border-rose-900/50">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Delete Selected Candidates</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Permanently erase {selectedIds.length} candidate(s) from database</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Are you sure you want to permanently delete the <strong>{selectedIds.length} selected customer(s)</strong>? This will permanently wipe their customer profiles, uploaded documents, bank details, and borrower portal logins from the database.
+            </p>
+
+            {deleteError && (
+              <p className="text-xs text-rose-600">{deleteError}</p>
+            )}
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : `Yes, Delete (${selectedIds.length}) Candidates`}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

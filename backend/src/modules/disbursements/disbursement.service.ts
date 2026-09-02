@@ -4,6 +4,7 @@ import { calculateEmi } from '../finance/emi';
 import { Money } from '../finance/money';
 import { generateLoanNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
+import { sendNotification } from '../notifications/notification.service';
 import type { ExecuteDisbursementInput } from './disbursement.schema';
 
 export async function getReadyForDisbursementQueue() {
@@ -25,6 +26,25 @@ export async function getReadyForDisbursementQueue() {
   });
 }
 
+export async function getDisbursementHistory() {
+  return prisma.disbursement.findMany({
+    include: {
+      loan: {
+        include: {
+          customer: {
+            include: {
+              bankAccounts: true,
+            },
+          },
+          product: true,
+          application: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 export async function executeDisbursement(
   input: ExecuteDisbursementInput,
   actor: { id: string; email: string; roles: string[] }
@@ -39,8 +59,26 @@ export async function executeDisbursement(
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
+  // Pre-Disbursement Mandatory Checklist
   if (!['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'].includes(app.status)) {
-    throw new BadRequestError(`Cannot disburse loan application in status ${app.status}`);
+    throw new BadRequestError(`Cannot disburse loan application in status ${app.status}. Must be APPROVED or READY_FOR_DISBURSEMENT.`);
+  }
+
+  if (app.customer.kycStatus !== 'VERIFIED') {
+    throw new BadRequestError(`Pre-disbursement check failed: Customer KYC status is ${app.customer.kycStatus}. Must be VERIFIED before fund release.`);
+  }
+
+  if (app.customer.status === 'BLOCKED' || app.customer.status === 'INACTIVE') {
+    throw new BadRequestError(`Pre-disbursement check failed: Customer account is ${app.customer.status}.`);
+  }
+
+  const hasBankAccount = (app.customer.bankAccounts && app.customer.bankAccounts.length > 0) || Boolean(app.customer.bankAccountNo);
+  if (!hasBankAccount) {
+    throw new BadRequestError(`Pre-disbursement check failed: No valid bank account on record for fund release.`);
+  }
+
+  if (app.product.isActive === false) {
+    throw new BadRequestError(`Pre-disbursement check failed: Loan product ${app.product.code} is inactive.`);
   }
 
   const principalNum = Number(app.requestedAmount);
@@ -159,6 +197,15 @@ export async function executeDisbursement(
       reference: input.referenceNumber,
     },
   });
+
+  // Async non-blocking notification
+  void sendNotification({
+    customerId: app.customerId,
+    channel: 'IN_APP',
+    type: 'SUCCESS',
+    title: `Loan #${loanNo} Disbursed Successfully`,
+    message: `Principal amount of ₹${principalNum.toLocaleString('en-IN')} has been transferred via ${input.disbursementMethod}. Ref: ${input.referenceNumber}. First EMI is scheduled for ${firstDueDate.toLocaleDateString()}.`,
+  }).catch(() => {});
 
   return loan;
 }

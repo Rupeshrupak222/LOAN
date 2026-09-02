@@ -122,6 +122,7 @@ async function main() {
   const custUser1 = await createUser('ravi.kumar@adyapan.dev', 'Ravi', 'Kumar', 'CUSTOMER');
   const custUser2 = await createUser('priya.sharma@adyapan.dev', 'Priya', 'Sharma', 'CUSTOMER');
   const custUser3 = await createUser('amit.patel@adyapan.dev', 'Amit', 'Patel', 'CUSTOMER');
+  const custUserDemo = await createUser('customer@adyapan.dev', 'Rahul', 'Sharma', 'CUSTOMER');
 
   // 4. Loan Products
   const products = [
@@ -849,6 +850,60 @@ async function main() {
     ],
     skipDuplicates: true,
   });
+
+  // 16. System Settings & Dynamic Business Rules
+  const settingsData = [
+    {
+      key: 'approval_limits',
+      category: 'underwriting',
+      value: [
+        { maxAmount: 200000, chain: ['LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: 1000000, chain: ['UNDERWRITER', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: 5000000, chain: ['BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: null, chain: ['ADMIN', 'SUPER_ADMIN'] },
+      ],
+    },
+    {
+      key: 'payment_allocation_order',
+      category: 'finance',
+      value: ['FEES', 'PENALTY', 'INTEREST', 'PRINCIPAL'],
+    },
+    {
+      key: 'eligibility_criteria',
+      category: 'policy',
+      value: {
+        minAge: 21,
+        maxAge: 60,
+        maxDtiRatio: 0.55,
+        warningDtiRatio: 0.45,
+        minSalariedIncome: 25000,
+        minBusinessIncome: 50000,
+      },
+    },
+    {
+      key: 'delinquency_buckets',
+      category: 'collections',
+      value: ['0-30', '31-60', '61-90', '91-180', '180+'],
+    },
+    {
+      key: 'risk_model_weights',
+      category: 'risk',
+      value: {
+        employmentVintage: 25,
+        debtServiceCapacity: 30,
+        documentCompleteness: 20,
+        creditHistory: 25,
+      },
+    },
+  ];
+
+  for (const s of settingsData) {
+    await prisma.systemSetting.upsert({
+      where: { key: s.key },
+      update: { value: s.value, category: s.category },
+      create: { key: s.key, value: s.value, category: s.category },
+    });
+  }
 
   console.log('✅ Enterprise Seed completed successfully.');
   console.log(`Demo password for all staff and customer users: ${DEMO_PASSWORD}`);

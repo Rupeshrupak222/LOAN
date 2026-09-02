@@ -23,18 +23,15 @@ import {
   Layers,
   Sun,
   Moon,
+  Wallet,
+  Calculator,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { ROLE_CONFIG, NAV_ITEMS, RoleName, NavItemConfig } from '@/lib/roles';
 import { Spinner } from './ui';
-
-interface NavItem {
-  key: string;
-  label: string;
-  href: string;
-  group: 'OVERVIEW' | 'CUSTOMERS' | 'LENDING' | 'SERVICING' | 'INSIGHTS' | 'ADMINISTRATION';
-}
+import { NotificationBell } from './NotificationBell';
 
 const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
@@ -44,10 +41,11 @@ const NAV_ICONS: Record<string, any> = {
   'loan-products': Building2,
   underwriting: FileCheck,
   loans: DollarSign,
-  disbursements: DollarSign,
+  disbursements: Wallet,
   payments: Receipt,
   collections: AlertCircle,
   reports: BarChart3,
+  'emi-calculator': Calculator,
   users: KeyRound,
   roles: KeyRound,
   settings: ShieldCheck,
@@ -57,89 +55,6 @@ const NAV_ICONS: Record<string, any> = {
 };
 
 const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS', 'ADMINISTRATION'] as const;
-
-const ROLE_CONFIG: Record<string, { label: string; navItems: NavItem[] }> = {
-  SUPER_ADMIN: {
-    label: 'Super Admin',
-    navItems: [
-      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'customers', label: 'Customers', href: '/customers', group: 'CUSTOMERS' },
-      { key: 'applications', label: 'Loan Applications', href: '/applications', group: 'LENDING' },
-      { key: 'loan-products', label: 'Loan Products', href: '/loan-products', group: 'LENDING' },
-      { key: 'underwriting', label: 'Underwriting Queue', href: '/underwriting', group: 'LENDING' },
-      { key: 'loans', label: 'Loan Accounts', href: '/loans', group: 'LENDING' },
-      { key: 'disbursements', label: 'Disbursements', href: '/disbursements', group: 'LENDING' },
-      { key: 'payments', label: 'Payments Ledger', href: '/payments', group: 'SERVICING' },
-      { key: 'collections', label: 'Collections & Delinquency', href: '/collections', group: 'SERVICING' },
-      { key: 'reports', label: 'Reports & Analytics', href: '/reports', group: 'INSIGHTS' },
-      { key: 'users', label: 'User Management', href: '/users', group: 'ADMINISTRATION' },
-      { key: 'settings', label: 'System Settings', href: '/settings', group: 'ADMINISTRATION' },
-      { key: 'audit-logs', label: 'Audit Logs', href: '/audit-logs', group: 'ADMINISTRATION' },
-    ],
-  },
-  ADMIN: {
-    label: 'Administrator',
-    navItems: [
-      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'customers', label: 'Customers', href: '/customers', group: 'CUSTOMERS' },
-      { key: 'applications', label: 'Loan Applications', href: '/applications', group: 'LENDING' },
-      { key: 'loan-products', label: 'Loan Products', href: '/loan-products', group: 'LENDING' },
-      { key: 'underwriting', label: 'Underwriting Queue', href: '/underwriting', group: 'LENDING' },
-      { key: 'loans', label: 'Loan Accounts', href: '/loans', group: 'LENDING' },
-      { key: 'disbursements', label: 'Disbursements', href: '/disbursements', group: 'LENDING' },
-      { key: 'payments', label: 'Payments Ledger', href: '/payments', group: 'SERVICING' },
-      { key: 'collections', label: 'Collections & Delinquency', href: '/collections', group: 'SERVICING' },
-      { key: 'reports', label: 'Reports & Analytics', href: '/reports', group: 'INSIGHTS' },
-      { key: 'users', label: 'User Management', href: '/users', group: 'ADMINISTRATION' },
-      { key: 'settings', label: 'System Settings', href: '/settings', group: 'ADMINISTRATION' },
-      { key: 'audit-logs', label: 'Audit Logs', href: '/audit-logs', group: 'ADMINISTRATION' },
-    ],
-  },
-  CREDIT_ANALYST: {
-    label: 'Credit Analyst',
-    navItems: [
-      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'customers', label: 'Customers', href: '/customers', group: 'CUSTOMERS' },
-      { key: 'applications', label: 'Loan Applications', href: '/applications', group: 'LENDING' },
-      { key: 'underwriting', label: 'Underwriting Queue', href: '/underwriting', group: 'LENDING' },
-    ],
-  },
-  UNDERWRITER: {
-    label: 'Underwriter',
-    navItems: [
-      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'customers', label: 'Customers', href: '/customers', group: 'CUSTOMERS' },
-      { key: 'applications', label: 'Loan Applications', href: '/applications', group: 'LENDING' },
-      { key: 'underwriting', label: 'Underwriting Queue', href: '/underwriting', group: 'LENDING' },
-      { key: 'loans', label: 'Loan Accounts', href: '/loans', group: 'LENDING' },
-    ],
-  },
-  DISBURSEMENT_OFFICER: {
-    label: 'Disbursement Officer',
-    navItems: [
-      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'disbursements', label: 'Disbursements', href: '/disbursements', group: 'LENDING' },
-      { key: 'loans', label: 'Loan Accounts', href: '/loans', group: 'LENDING' },
-    ],
-  },
-  COLLECTION_AGENT: {
-    label: 'Collection Agent',
-    navItems: [
-      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'collections', label: 'Collections & Delinquency', href: '/collections', group: 'SERVICING' },
-      { key: 'payments', label: 'Payments Ledger', href: '/payments', group: 'SERVICING' },
-    ],
-  },
-  BORROWER: {
-    label: 'Borrower',
-    navItems: [
-      { key: 'dashboard', label: 'My Dashboard', href: '/dashboard', group: 'OVERVIEW' },
-      { key: 'applications', label: 'My Applications', href: '/applications', group: 'LENDING' },
-      { key: 'loans', label: 'My Loans', href: '/loans', group: 'LENDING' },
-      { key: 'payments', label: 'My Payments', href: '/payments', group: 'SERVICING' },
-    ],
-  },
-};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -153,11 +68,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (loading) return <Spinner />;
   if (!user) return null;
 
-  const primaryRole = user.roles?.[0] || 'BORROWER';
-  const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.BORROWER;
-  const accessibleNav = roleCfg.navItems;
+  const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;
+  const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
+  const accessibleNav = roleCfg.nav.map((k) => NAV_ITEMS[k]).filter(Boolean);
 
-  const groupedNav: Record<string, NavItem[]> = {
+  const groupedNav: Record<string, NavItemConfig[]> = {
     OVERVIEW: [],
     CUSTOMERS: [],
     LENDING: [],
@@ -173,6 +88,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
 
   const currentItem = accessibleNav.find(
+    (item) => item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+  );
+  const isDashboard = pathname === '/dashboard';
+  const isAccessibleRoute = isDashboard || accessibleNav.some(
     (item) => item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href))
   );
   const currentLabel = currentItem?.label || 'Dashboard';
@@ -209,8 +128,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Layers className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white tracking-tight leading-none">ADYAPAN LMS</p>
-              <p className="text-[10px] font-medium text-slate-400 mt-0.5">Enterprise Lending</p>
+              <p className="text-sm font-bold text-white tracking-tight leading-none">
+                {primaryRole === 'CUSTOMER' ? 'ADYAPAN PORTAL' : primaryRole === 'AUDITOR' ? 'ADYAPAN AUDIT' : 'ADYAPAN LMS'}
+              </p>
+              <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                {primaryRole === 'CUSTOMER'
+                  ? 'Borrower Self-Service'
+                  : primaryRole === 'AUDITOR'
+                  ? 'Compliance & Audit'
+                  : roleCfg.label}
+              </p>
             </div>
           </Link>
         </div>
@@ -343,15 +270,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {/* Right Controls */}
           <div className="flex items-center gap-3.5">
-            {/* Core Banking Live Badge */}
+            {/* Role-Specific Status Badge */}
             <div className={cn(
               "hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-semibold shadow-2xs",
-              isDark
-                ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                : "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+              primaryRole === 'AUDITOR'
+                ? (isDark ? "border-slate-700 bg-slate-800/80 text-slate-300" : "border-slate-300 bg-slate-100 text-slate-700")
+                : (isDark ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]" : "border-emerald-200/70 bg-emerald-50 text-emerald-700")
             )}>
-              <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
-              Core Banking Live
+              <span className={cn(
+                "h-2 w-2 rounded-full",
+                primaryRole === 'AUDITOR' ? "bg-slate-400" : "bg-[#10B981] animate-pulse"
+              )} />
+              {primaryRole === 'CUSTOMER' ? 'Borrower Account Active' : primaryRole === 'AUDITOR' ? 'Read-Only Audit Mode' : 'Core Banking Live'}
             </div>
 
             {/* Dark Mode Toggle */}
@@ -373,26 +303,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               )}
             </button>
 
-            {/* Notification Bell */}
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              title="Notifications"
-              className={cn(
-                "relative flex h-8 w-8 items-center justify-center rounded-xl border transition-colors shadow-2xs",
-                isDark
-                  ? "border-[#1E2445] bg-[#1E2445] text-slate-300 hover:bg-[#1E2445]/80"
-                  : "border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50"
-              )}
-            >
-              <Bell className="h-4 w-4" />
-              <span className={cn(
-                "absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2",
-                isDark ? "ring-[#060F1B]" : "ring-white"
-              )}>
-                5
-              </span>
-            </button>
+            {/* Live Interactive Notification Bell */}
+            <NotificationBell />
 
             {/* User Profile Badge */}
             <div className={cn("flex items-center gap-2 pl-2 border-l", isDark ? "border-[#1E2445]" : "border-slate-200")}>
@@ -420,7 +332,28 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto animate-fade-in">
-          {children}
+          {!isAccessibleRoute ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 mb-4 border border-rose-500/20">
+                <AlertCircle className="h-8 w-8" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                403 — Workspace Access Restricted
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
+                Your current role <span className="font-semibold text-slate-700 dark:text-slate-200">({roleCfg.label})</span> does not have authorized permission to view or operate in the <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-xs font-mono text-rose-500">{pathname}</code> module.
+              </p>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] text-white text-xs font-bold shadow-md shadow-[#2563EB]/25 hover:bg-[#1D4ED8] transition-colors"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Return to My Dashboard
+              </Link>
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
     </div>

@@ -20,7 +20,7 @@ import {
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
-import { formatMoney, formatDate } from '@/lib/utils';
+import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 
 export default function LoanDetailPage() {
@@ -33,6 +33,11 @@ export default function LoanDetailPage() {
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('UPI');
   const [payReference, setPayReference] = useState('');
+  const [payMobile, setPayMobile] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const isCustomer = user?.roles?.includes('CUSTOMER');
 
   const [restructureModalOpen, setRestructureModalOpen] = useState(false);
   const [newTenure, setNewTenure] = useState(36);
@@ -50,7 +55,32 @@ export default function LoanDetailPage() {
     queryFn: async () => (await api.get(`/loans/${params.id}`)).data.data,
   });
 
-  // Make Payment Mutation
+  // Borrower Payment Submission Mutation
+  const submissionMutation = useMutation({
+    mutationFn: async () =>
+      api.post('/payments/submissions', {
+        loanId: params.id,
+        amount: Number(payAmount),
+        method: payMethod,
+        reference: payReference,
+        payerMobile: payMobile || (data?.customer?.mobile || undefined),
+        notes: payNotes,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      setSubmitSuccess(true);
+      setTimeout(() => {
+        setPayModalOpen(false);
+        setSubmitSuccess(false);
+        setPayAmount('');
+        setPayReference('');
+        setPayNotes('');
+      }, 1500);
+    },
+  });
+
+  // Staff Make Payment Mutation
   const paymentMutation = useMutation({
     mutationFn: async () =>
       api.post('/payments', {
@@ -140,22 +170,29 @@ export default function LoanDetailPage() {
             <Badge status={data.status} />
             {data.status !== 'CLOSED' && data.status !== 'SETTLED' && (
               <>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setPayAmount(String(data.emiAmount || ''));
-                    setPayModalOpen(true);
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1.5"
-                >
-                  <CreditCard className="h-3.5 w-3.5" /> Collect Repayment
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
-                  Restructure
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setSettleModalOpen(true)}>
-                  Settlement
-                </Button>
+                {!user?.roles?.includes('AUDITOR') && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setPayAmount(String(data.emiAmount || ''));
+                      setPayModalOpen(true);
+                    }}
+                    className={cn("flex items-center gap-1.5 text-white font-semibold shadow-sm", isCustomer ? "bg-[#2563EB] hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}
+                  >
+                    <CreditCard className="h-3.5 w-3.5" />
+                    {isCustomer ? 'Submit EMI Payment Proof' : 'Collect Repayment'}
+                  </Button>
+                )}
+                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
+                      Restructure
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setSettleModalOpen(true)}>
+                      Settlement
+                    </Button>
+                  </>
+                )}
               </>
             )}
             {data.status === 'CLOSED' && (
@@ -212,14 +249,19 @@ export default function LoanDetailPage() {
                       {customer.firstName} {customer.lastName}
                     </Link>
                   ) : (
-                    '-'
+                    'N/A'
                   )
                 }
               />
-              <Row label="Mobile" value={customer.mobile} />
+              <Row label="Product Type" value={product.name || 'Personal Loan'} />
+              <Row label="Branch" value={branch.name || 'Main Branch'} />
+              <Row label="Sanctioned Amount" value={formatMoney(data.principal || 0)} />
+              <Row label="Interest Rate" value={`${data.interestRate || 0}% p.a.`} />
+              <Row label="Tenure Period" value={`${data.tenureMonths || 0} Months`} />
+              <Row label="Monthly EMI" value={<span className="font-bold text-emerald-600">{formatMoney(data.emiAmount || 0)}</span>} />
               <Row label="Disbursed Date" value={data.disbursementDate ? formatDate(data.disbursementDate) : '-'} />
-              <Row label="Maturity Date" value={data.maturityDate ? formatDate(data.maturityDate) : '-'} />
-              <Row label="Branch Office" value={branch.name || 'Head Office'} />
+              <Row label="Next Due Date" value={data.nextDueDate ? formatDate(data.nextDueDate) : 'N/A'} />
+              <Row label="Account Status" value={<Badge status={data.status} />} />
             </dl>
           </Card>
 
@@ -235,55 +277,50 @@ export default function LoanDetailPage() {
           )}
         </div>
 
-        {/* Amortization Schedule Table */}
+        {/* Schedule & Breakdown Tabs */}
         <div className="space-y-6 lg:col-span-2">
-          <Card noPadding className="p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Amortization Repayment Schedule
-                </h3>
-                <p className="text-xs text-slate-500">Scheduled principal, reducing interest, and installment status</p>
+                <h3 className="text-sm font-bold text-slate-900">Repayment Amortization Schedule</h3>
+                <p className="text-xs text-slate-400">Total {schedule.length} installments scheduled across {data.tenureMonths} months</p>
               </div>
-              <Button size="sm" onClick={() => setPayModalOpen(true)}>
-                + Record Payment
-              </Button>
+              {isCustomer ? (
+                <Button size="sm" onClick={() => { setPayAmount(String(data.emiAmount || '')); setPayModalOpen(true); }} className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold gap-1 shadow-sm">
+                  <CreditCard className="w-3.5 h-3.5" /> Submit Payment Proof
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={() => { setPayAmount(String(data.emiAmount || '')); setPayModalOpen(true); }} className="text-xs">
+                  Collect EMI
+                </Button>
+              )}
             </div>
 
-            <div className="overflow-x-auto max-h-[460px] overflow-y-auto scrollbar-thin">
-              <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
                   <tr>
                     <th className="py-2.5 px-3">#</th>
                     <th className="py-2.5 px-3">Due Date</th>
                     <th className="py-2.5 px-3">Principal</th>
                     <th className="py-2.5 px-3">Interest</th>
-                    <th className="py-2.5 px-3">Total Due</th>
+                    <th className="py-2.5 px-3">Total EMI</th>
                     <th className="py-2.5 px-3">Paid Amount</th>
-                    <th className="py-2.5 px-3 text-right">Status</th>
+                    <th className="py-2.5 px-3">Outstanding</th>
+                    <th className="py-2.5 px-3">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {schedule.map((item: any) => (
-                    <tr
-                      key={item.id}
-                      className={`transition-colors ${
-                        item.status === 'PAID'
-                          ? 'bg-emerald-50/20'
-                          : item.status === 'OVERDUE'
-                          ? 'bg-rose-50/30'
-                          : 'hover:bg-slate-50/70'
-                      }`}
-                    >
-                      <td className="py-2.5 px-3 font-semibold text-slate-700">{item.emiNumber}</td>
-                      <td className="py-2.5 px-3 text-slate-600">{item.dueDate ? formatDate(item.dueDate) : '-'}</td>
-                      <td className="py-2.5 px-3 text-slate-800 font-medium">{formatMoney(item.principal)}</td>
-                      <td className="py-2.5 px-3 text-slate-800 font-medium">{formatMoney(item.interest)}</td>
-                      <td className="py-2.5 px-3 font-bold text-slate-900">{formatMoney(item.totalDue)}</td>
-                      <td className="py-2.5 px-3 font-semibold text-emerald-700">{formatMoney(item.paidAmount)}</td>
-                      <td className="py-2.5 px-3 text-right">
-                        <Badge status={item.status} />
-                      </td>
+                    <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-400">{item.emiNumber}</td>
+                      <td className="py-2.5 px-3">{item.dueDate ? formatDate(item.dueDate) : '-'}</td>
+                      <td className="py-2.5 px-3 font-mono">{formatMoney(item.principal)}</td>
+                      <td className="py-2.5 px-3 font-mono">{formatMoney(item.interest)}</td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{formatMoney(item.totalDue)}</td>
+                      <td className="py-2.5 px-3 font-mono text-emerald-600">{formatMoney(item.paidAmount || 0)}</td>
+                      <td className="py-2.5 px-3 font-mono">{formatMoney(item.outstanding)}</td>
+                      <td className="py-2.5 px-3"><Badge status={item.status} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -293,72 +330,128 @@ export default function LoanDetailPage() {
         </div>
       </div>
 
-      {/* Collect Payment Modal */}
+      {/* Collect / Submit Payment Modal */}
       {payModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-dropdown animate-fade-in space-y-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Record Repayment Collection</h3>
+              <h3 className="text-base font-bold text-slate-900">
+                {isCustomer ? 'Submit EMI Payment Details / Proof' : 'Record Repayment Collection'}
+              </h3>
               <p className="text-xs text-slate-500">
-                Waterfall allocation: <span className="font-semibold text-brand-700">Fees → Penalty → Interest → Principal</span>
+                {isCustomer
+                  ? 'Submit your transaction reference for verification by the finance & collections desk'
+                  : 'Waterfall allocation: Fees → Penalty → Interest → Principal'}
               </p>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Payment Amount (INR)</label>
-                <Input
-                  type="number"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Payment Channel / Mode</label>
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs focus:border-brand-600 focus:outline-none"
-                >
-                  <option value="UPI">UPI (Google Pay / PhonePe / BHIM)</option>
-                  <option value="BANK_TRANSFER">NEFT / RTGS Bank Transfer</option>
-                  <option value="IMPS">IMPS Immediate Transfer</option>
-                  <option value="CASH">Cash Collection (Branch Desk)</option>
-                  <option value="CHEQUE">Cheque / Demand Draft</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Transaction Reference / UTR Number</label>
-                <Input
-                  placeholder="e.g. UPI/60281904821 or CHEQUE#904812"
-                  value={payReference}
-                  onChange={(e) => setPayReference(e.target.value)}
-                  required
-                />
-              </div>
-
-              {paymentMutation.isError && (
-                <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">
-                  {apiErrorMessage(paymentMutation.error)}
+            {submitSuccess ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="p-3 bg-emerald-50 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-emerald-600">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
-              )}
-
-              <div className="flex gap-2.5 pt-2">
-                <Button
-                  disabled={!payAmount || !payReference.trim() || paymentMutation.isPending}
-                  onClick={() => paymentMutation.mutate()}
-                  className="flex-1"
-                >
-                  {paymentMutation.isPending ? 'Processing...' : 'Confirm Payment & Settle'}
-                </Button>
-                <Button variant="secondary" onClick={() => setPayModalOpen(false)}>
-                  Cancel
-                </Button>
+                <p className="text-sm font-bold text-slate-900">Payment Submitted Successfully!</p>
+                <p className="text-xs text-slate-500">Staff officers have been notified for verification and ledger settlement.</p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Payment Amount (INR) *</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Payment Channel / Mode *</label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 p-2.5 text-xs focus:border-brand-600 focus:outline-none"
+                  >
+                    <option value="UPI">UPI (Google Pay / PhonePe / Paytm / BHIM)</option>
+                    <option value="NEFT">NEFT Electronic Bank Transfer</option>
+                    <option value="IMPS">IMPS Immediate Transfer</option>
+                    <option value="NET_BANKING">Net Banking Core Transfer</option>
+                    <option value="CASH">Cash Collection (Branch Desk)</option>
+                    <option value="CHEQUE">Cheque / Demand Draft</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Transaction Reference / UTR Number *</label>
+                  <Input
+                    placeholder="e.g. UPI/60281904821 or CMS-NEFT-99281726"
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {isCustomer && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Payer Mobile / Contact</label>
+                    <Input
+                      placeholder="e.g. 9876543210"
+                      value={payMobile}
+                      onChange={(e) => setPayMobile(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Notes / Remarks</label>
+                  <Input
+                    placeholder="e.g. Paid Monthly EMI via PhonePe"
+                    value={payNotes}
+                    onChange={(e) => setPayNotes(e.target.value)}
+                  />
+                </div>
+
+                {(paymentMutation.isError || submissionMutation.isError) && (
+                  <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">
+                    {apiErrorMessage(paymentMutation.error || submissionMutation.error)}
+                  </div>
+                )}
+
+                <div className="flex gap-2.5 pt-2">
+                  <Button
+                    disabled={
+                      !payAmount ||
+                      !payReference.trim() ||
+                      paymentMutation.isPending ||
+                      submissionMutation.isPending
+                    }
+                    onClick={() => {
+                      if (isCustomer) {
+                        submissionMutation.mutate();
+                      } else {
+                        paymentMutation.mutate();
+                      }
+                    }}
+                    className={cn(
+                      "flex-1 text-white font-semibold",
+                      isCustomer ? "bg-[#2563EB] hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"
+                    )}
+                  >
+                    {isCustomer
+                      ? submissionMutation.isPending
+                        ? 'Submitting...'
+                        : 'Submit for Verification'
+                      : paymentMutation.isPending
+                      ? 'Processing...'
+                      : 'Confirm Payment & Settle'}
+                  </Button>
+                  <Button variant="secondary" onClick={() => setPayModalOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

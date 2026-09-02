@@ -46,4 +46,12 @@ export const env = {
     rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 900000),
     rateLimitMax: Number(process.env.RATE_LIMIT_MAX ?? 300),
   },
+
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? 'smsoui35',
+    apiKey: process.env.CLOUDINARY_API_KEY ?? '571474773638931',
+    apiSecret: process.env.CLOUDINARY_API_SECRET ?? 'YPeOcsA_i8gKr8Gq0MP13s9Ba0I',
+    url: process.env.CLOUDINARY_URL ?? 'cloudinary://571474773638931:YPeOcsA_i8gKr8Gq0MP13s9Ba0I@smsoui35',
+  },
 } as const;
+

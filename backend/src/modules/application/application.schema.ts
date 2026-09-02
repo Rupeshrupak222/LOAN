@@ -2,8 +2,10 @@ import { z } from 'zod';
 
 export const createApplicationSchema = z.object({
   customerId: z.string().uuid(),
-  productId: z.string().uuid(),
+  productId: z.string().uuid().optional(),
+  productName: z.string().optional(),
   requestedAmount: z.coerce.number().positive(),
+  interestRate: z.coerce.number().min(0.1).max(100).optional(),
   tenureMonths: z.coerce.number().int().positive(),
   purpose: z.string().optional(),
 });

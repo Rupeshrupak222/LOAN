@@ -25,13 +25,27 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
-  if (err instanceof AppError) {
-    if (err.statusCode >= 500) {
+  const anyErr = err as any;
+  if (err instanceof AppError || (anyErr && typeof anyErr.statusCode === 'number' && anyErr.code)) {
+    const statusCode = anyErr.statusCode || 500;
+    if (statusCode >= 500) {
       logger.error({ err, path: req.originalUrl }, 'Application error');
     }
-    res.status(err.statusCode).json({
+    res.status(statusCode).json({
       success: false,
-      error: { code: err.code, message: err.message, details: err.details },
+      error: { code: anyErr.code || 'APP_ERROR', message: anyErr.message, details: anyErr.details },
+    });
+    return;
+  }
+
+  // Multer Errors (e.g. file too large)
+  if (anyErr?.name === 'MulterError') {
+    res.status(400).json({
+      success: false,
+      error: {
+        code: 'FILE_UPLOAD_ERROR',
+        message: anyErr.message || 'File upload failed',
+      },
     });
     return;
   }
@@ -41,7 +55,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
-      message: 'An unexpected error occurred',
+      message: (err as Error)?.message || 'An unexpected error occurred',
       // Never expose stack traces in production
       ...(env.isProduction ? {} : { debug: (err as Error)?.message }),
     },

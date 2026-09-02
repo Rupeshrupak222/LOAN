@@ -51,6 +51,8 @@ async function runSecondaryAudit() {
   console.log('🔬 SECONDARY VERIFICATION: DATA PROPAGATION & STATE CONSISTENCY AUDIT');
   console.log('======================================================================\n');
 
+  await prisma.$connect();
+
   // Authenticate as Super Admin & Officers
   const adminLogin = await apiRequest('/auth/login', {
     method: 'POST',

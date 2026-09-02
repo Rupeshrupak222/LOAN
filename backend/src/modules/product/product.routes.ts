@@ -36,4 +36,13 @@ router.patch(
   asyncHandler(async (req, res) => ok(res, await service.updateProduct(req.params.id, req.body))),
 );
 
+router.delete(
+  '/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
+  asyncHandler(async (req, res) => {
+    await service.deleteProduct(req.params.id);
+    return ok(res, { message: 'Product deleted successfully' });
+  }),
+);
+
 export default router;

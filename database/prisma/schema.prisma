@@ -182,6 +182,7 @@ model Customer {
   loans               Loan[]
   documents           Document[]
   payments            Payment[]
+  paymentSubmissions  PaymentSubmission[]
   collectionCases     CollectionCase[]
   notifications       Notification[]
 
@@ -425,6 +426,7 @@ model Loan {
   schedule             RepaymentScheduleItem[]
   disbursements        Disbursement[]
   payments             Payment[]
+  paymentSubmissions   PaymentSubmission[]
   transactions         Transaction[]
   collectionCases      CollectionCase[]
   restructures         LoanRestructure[]
@@ -534,6 +536,40 @@ model PaymentAllocation {
   createdAt DateTime @default(now())
 
   @@index([paymentId])
+}
+
+enum SubmissionStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+model PaymentSubmission {
+  id               String           @id @default(uuid())
+  submissionNo     String           @unique
+  loanId           String
+  loan             Loan             @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  customerId       String
+  customer         Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount           Decimal          @db.Decimal(14, 2)
+  method           String           // UPI, NEFT, IMPS, NET_BANKING, CASH, CHEQUE
+  reference        String           // UTR / Transaction reference
+  payerMobile      String?
+  paidAt           DateTime         @default(now())
+  notes            String?
+  status           SubmissionStatus @default(PENDING_VERIFICATION)
+  verifiedByUserId String?
+  verifiedAt       DateTime?
+  rejectionReason  String?
+  paymentId        String?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([loanId])
+  @@index([customerId])
+  @@index([status])
+  @@index([reference])
 }
 
 model Transaction {
