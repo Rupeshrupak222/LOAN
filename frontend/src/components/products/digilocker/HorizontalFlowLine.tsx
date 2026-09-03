@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, CheckCircle2, ShieldCheck, Layers, Sparkles } from 'lucide-react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 interface Stage {
   number: string;
@@ -49,14 +55,37 @@ const STAGES: Stage[] = [
   },
 ];
 
+// STAGES definition remains above
+
 export const HorizontalFlowLine: React.FC = () => {
-  const [activeStageIndex, setActiveStageIndex] = useState(1); // Default to stage 2 (Consent)
+  const sectionRef = useRef<HTMLElement>(null);
+  const [activeStageIndex, setActiveStageIndex] = useState(0);
+
+  useEffect(() => {
+    if (!sectionRef.current) return;
+
+    const ctx = gsap.context(() => {
+      ScrollTrigger.create({
+        trigger: sectionRef.current,
+        start: 'top 70%',
+        end: 'bottom 40%',
+        scrub: 0.5,
+        onUpdate: (self) => {
+          const step = Math.min(4, Math.floor(self.progress * 5));
+          setActiveStageIndex(step);
+        },
+      });
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
 
   const activeStage = STAGES[activeStageIndex];
   const progressPercent = (activeStageIndex / (STAGES.length - 1)) * 100;
 
   return (
     <section
+      ref={sectionRef}
       id="section-flow"
       className="py-20 sm:py-24 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
     >
