@@ -309,9 +309,9 @@ export const MotionNavbar: React.FC = () => {
 
             {/* 2. Direct Editorial Links */}
             <Link
-              href="/#branches"
+              href="/about"
               className={`text-sm font-medium transition-colors py-1 ${
-                pathname === '/#branches' ? 'text-[#155EEF] font-semibold' : 'text-slate-700 hover:text-[#071A33]'
+                pathname === '/about' ? 'text-[#155EEF] font-semibold' : 'text-slate-700 hover:text-[#071A33]'
               }`}
             >
               About
@@ -534,7 +534,7 @@ export const MotionNavbar: React.FC = () => {
             {/* Direct Mobile Links */}
             <div className="grid grid-cols-3 gap-2 pt-2 text-center text-xs font-semibold text-slate-700">
               <Link
-                href="/#branches"
+                href="/about"
                 onClick={() => setMobileOpen(false)}
                 className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100"
               >
