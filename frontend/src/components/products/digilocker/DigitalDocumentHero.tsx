@@ -80,6 +80,7 @@ export const DigitalDocumentHero: React.FC = () => {
   return (
     <ScrollStage3D
       id="section-hero-digilocker"
+      isHero={true}
       pin={false}
       perspective={1500}
       className="min-h-[96vh] flex flex-col justify-between pt-24 sm:pt-28 pb-12 px-4 sm:px-8 lg:px-12 bg-[#FFFFFF] text-[#071A33] border-b border-slate-200 select-none relative overflow-hidden"

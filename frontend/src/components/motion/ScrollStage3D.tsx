@@ -12,6 +12,7 @@ export interface ScrollStage3DProps {
   children: React.ReactNode;
   className?: string;
   id?: string;
+  isHero?: boolean;
   pin?: boolean;
   pinSpacing?: boolean;
   perspective?: number;
@@ -25,6 +26,7 @@ export const ScrollStage3D: React.FC<ScrollStage3DProps> = ({
   children,
   className = '',
   id,
+  isHero = false,
   pin = false,
   pinSpacing = true,
   perspective = 1400,
@@ -82,85 +84,131 @@ export const ScrollStage3D: React.FC<ScrollStage3DProps> = ({
         };
       });
 
-      // Initialize all elements deep in 3D space
-      elementsData.forEach(({ el, targetZ, targetRotX, targetRotY, targetScale, targetY, targetBlur }) => {
-        el.style.transform = `translate3d(0, ${targetY}px, ${targetZ}px) rotateX(${targetRotX}deg) rotateY(${targetRotY}deg) scale(${targetScale})`;
-        el.style.opacity = '0';
-        el.style.filter = `blur(${targetBlur}px)`;
-        el.style.transformStyle = 'preserve-3d';
-        el.style.willChange = 'transform, opacity, filter';
-      });
+      if (isHero) {
+        // Hero elements start fully visible and settled at Z = 0
+        elementsData.forEach(({ el }) => {
+          el.style.transform = 'translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1)';
+          el.style.opacity = '1';
+          el.style.filter = 'none';
+          el.style.transformStyle = 'preserve-3d';
+          el.style.willChange = 'transform, opacity, filter';
+        });
 
-      // Create ScrollTrigger tied directly to scroll progress
-      ScrollTrigger.create({
-        trigger: triggerEl,
-        start: pin ? 'top top' : enterStart,
-        end: pin ? scrollLength : exitEnd,
-        pin: pin,
-        pinSpacing: pin ? pinSpacing : false,
-        scrub: scrub,
-        onUpdate: (self) => {
-          const p = self.progress;
+        // As user scrolls away from hero, hero moves backward into depth and disappears
+        ScrollTrigger.create({
+          trigger: triggerEl,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: scrub,
+          onUpdate: (self) => {
+            const p = self.progress;
 
-          elementsData.forEach(({ el, targetZ, targetRotX, targetRotY, targetScale, targetY, targetBlur, staggerDelay }) => {
-            // Apply stagger offset to progress window
-            const effectiveP = Math.min(1, Math.max(0, (p - staggerDelay * 0.15) / (1 - staggerDelay * 0.15)));
+            elementsData.forEach(({ el, staggerDelay }) => {
+              const effectiveP = Math.min(1, Math.max(0, (p - staggerDelay * 0.1) / (1 - staggerDelay * 0.1)));
 
-            // ── PHASE 1: ENTER FROM DEPTH (0.0 -> 0.45) ──
-            if (effectiveP < 0.45) {
-              const enterP = effectiveP / 0.45; // 0 to 1
-              // Smooth ease-out curve for entrance
-              const eased = 1 - Math.pow(1 - enterP, 2.5);
+              if (effectiveP < 0.2) {
+                el.style.transform = 'translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1)';
+                el.style.opacity = '1';
+                el.style.filter = 'none';
+                el.style.pointerEvents = 'auto';
+              } else {
+                const exitP = (effectiveP - 0.2) / 0.8;
+                const easedExit = Math.pow(exitP, 1.8);
 
-              const currentZ = targetZ * (1 - eased);
-              const currentRotX = targetRotX * (1 - eased);
-              const currentRotY = targetRotY * (1 - eased);
-              const currentScale = targetScale + (1 - targetScale) * eased;
-              const currentY = targetY * (1 - eased);
-              const currentBlur = targetBlur * (1 - eased);
-              const currentOpacity = Math.min(1, eased * 1.3);
+                const exitZ = -950 * easedExit * depthMultiplier;
+                const exitRotX = -24 * easedExit;
+                const exitScale = 1 - 0.25 * easedExit;
+                const exitY = -60 * easedExit;
+                const exitBlur = 8 * easedExit;
+                const exitOpacity = Math.max(0, 1 - easedExit * 1.3);
 
-              el.style.transform = `translate3d(0, ${currentY.toFixed(1)}px, ${currentZ.toFixed(
-                1
-              )}px) rotateX(${currentRotX.toFixed(2)}deg) rotateY(${currentRotY.toFixed(2)}deg) scale(${currentScale.toFixed(3)})`;
-              el.style.opacity = currentOpacity.toFixed(3);
-              el.style.filter = currentBlur > 0.5 ? `blur(${currentBlur.toFixed(1)}px)` : 'none';
-              el.style.pointerEvents = 'none';
-            }
-            // ── PHASE 2: ACTIVE & SETTLED (0.45 -> 0.72) ──
-            else if (effectiveP >= 0.45 && effectiveP <= 0.72) {
-              el.style.transform = 'translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1)';
-              el.style.opacity = '1';
-              el.style.filter = 'none';
-              el.style.pointerEvents = 'auto';
-            }
-            // ── PHASE 3: EXIT INTO DEPTH (0.72 -> 1.0) ──
-            else {
-              const exitP = (effectiveP - 0.72) / 0.28; // 0 to 1
-              const easedExit = Math.pow(exitP, 1.8);
+                el.style.transform = `translate3d(0, ${exitY.toFixed(1)}px, ${exitZ.toFixed(
+                  1
+                )}px) rotateX(${exitRotX.toFixed(2)}deg) rotateY(0deg) scale(${exitScale.toFixed(3)})`;
+                el.style.opacity = exitOpacity.toFixed(3);
+                el.style.filter = exitBlur > 0.5 ? `blur(${exitBlur.toFixed(1)}px)` : 'none';
+                el.style.pointerEvents = exitOpacity < 0.1 ? 'none' : 'auto';
+              }
+            });
+          },
+        });
+      } else {
+        // Standard sections: initialize deep in space, enter on scroll, settle, exit into depth
+        elementsData.forEach(({ el, targetZ, targetRotX, targetRotY, targetScale, targetY, targetBlur }) => {
+          el.style.transform = `translate3d(0, ${targetY}px, ${targetZ}px) rotateX(${targetRotX}deg) rotateY(${targetRotY}deg) scale(${targetScale})`;
+          el.style.opacity = '0';
+          el.style.filter = `blur(${targetBlur}px)`;
+          el.style.transformStyle = 'preserve-3d';
+          el.style.willChange = 'transform, opacity, filter';
+        });
 
-              // Elements retreat backwards into space
-              const exitZ = -950 * easedExit * depthMultiplier;
-              const exitRotX = -24 * easedExit;
-              const exitScale = 1 - 0.25 * easedExit;
-              const exitY = -60 * easedExit;
-              const exitBlur = 8 * easedExit;
-              const exitOpacity = Math.max(0, 1 - easedExit * 1.25);
+        ScrollTrigger.create({
+          trigger: triggerEl,
+          start: pin ? 'top top' : enterStart,
+          end: pin ? scrollLength : exitEnd,
+          pin: pin,
+          pinSpacing: pin ? pinSpacing : false,
+          scrub: scrub,
+          onUpdate: (self) => {
+            const p = self.progress;
 
-              el.style.transform = `translate3d(0, ${exitY.toFixed(1)}px, ${exitZ.toFixed(
-                1
-              )}px) rotateX(${exitRotX.toFixed(2)}deg) rotateY(0deg) scale(${exitScale.toFixed(3)})`;
-              el.style.opacity = exitOpacity.toFixed(3);
-              el.style.filter = exitBlur > 0.5 ? `blur(${exitBlur.toFixed(1)}px)` : 'none';
-              el.style.pointerEvents = 'none';
-            }
-          });
-        },
-      });
+            elementsData.forEach(({ el, targetZ, targetRotX, targetRotY, targetScale, targetY, targetBlur, staggerDelay }) => {
+              const effectiveP = Math.min(1, Math.max(0, (p - staggerDelay * 0.15) / (1 - staggerDelay * 0.15)));
+
+              // ── PHASE 1: ENTER FROM DEPTH (0.0 -> 0.45) ──
+              if (effectiveP < 0.45) {
+                const enterP = effectiveP / 0.45;
+                const eased = 1 - Math.pow(1 - enterP, 2.5);
+
+                const currentZ = targetZ * (1 - eased);
+                const currentRotX = targetRotX * (1 - eased);
+                const currentRotY = targetRotY * (1 - eased);
+                const currentScale = targetScale + (1 - targetScale) * eased;
+                const currentY = targetY * (1 - eased);
+                const currentBlur = targetBlur * (1 - eased);
+                const currentOpacity = Math.min(1, eased * 1.3);
+
+                el.style.transform = `translate3d(0, ${currentY.toFixed(1)}px, ${currentZ.toFixed(
+                  1
+                )}px) rotateX(${currentRotX.toFixed(2)}deg) rotateY(${currentRotY.toFixed(2)}deg) scale(${currentScale.toFixed(3)})`;
+                el.style.opacity = currentOpacity.toFixed(3);
+                el.style.filter = currentBlur > 0.5 ? `blur(${currentBlur.toFixed(1)}px)` : 'none';
+                el.style.pointerEvents = 'none';
+              }
+              // ── PHASE 2: ACTIVE & SETTLED (0.45 -> 0.72) ──
+              else if (effectiveP >= 0.45 && effectiveP <= 0.72) {
+                el.style.transform = 'translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1)';
+                el.style.opacity = '1';
+                el.style.filter = 'none';
+                el.style.pointerEvents = 'auto';
+              }
+              // ── PHASE 3: EXIT INTO DEPTH (0.72 -> 1.0) ──
+              else {
+                const exitP = (effectiveP - 0.72) / 0.28;
+                const easedExit = Math.pow(exitP, 1.8);
+
+                const exitZ = -950 * easedExit * depthMultiplier;
+                const exitRotX = -24 * easedExit;
+                const exitScale = 1 - 0.25 * easedExit;
+                const exitY = -60 * easedExit;
+                const exitBlur = 8 * easedExit;
+                const exitOpacity = Math.max(0, 1 - easedExit * 1.25);
+
+                el.style.transform = `translate3d(0, ${exitY.toFixed(1)}px, ${exitZ.toFixed(
+                  1
+                )}px) rotateX(${exitRotX.toFixed(2)}deg) rotateY(0deg) scale(${exitScale.toFixed(3)})`;
+                el.style.opacity = exitOpacity.toFixed(3);
+                el.style.filter = exitBlur > 0.5 ? `blur(${exitBlur.toFixed(1)}px)` : 'none';
+                el.style.pointerEvents = 'none';
+              }
+            });
+          },
+        });
+      }
     }, triggerEl);
 
     return () => ctx.revert();
-  }, [pin, pinSpacing, perspective, scrub, scrollLength, enterStart, exitEnd]);
+  }, [isHero, pin, pinSpacing, perspective, scrub, scrollLength, enterStart, exitEnd]);
 
   return (
     <div
