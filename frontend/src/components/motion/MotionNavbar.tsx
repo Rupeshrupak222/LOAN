@@ -152,11 +152,11 @@ const PRODUCTS_CATEGORIES: ProductCategory[] = [
         href: '/products/digilocker-ekyc',
       },
       {
-        name: 'AI Underwriting',
-        desc: 'Predictive behavioral risk scoring',
-        previewTag: 'AI UNDERWRITING',
-        previewText: '4-PILLAR PREDICTIVE MACHINE DECISIONING',
-        href: '/products/ai-underwriting',
+        name: 'AI Underwriting Scorecard',
+        desc: '4-pillar predictive risk engine',
+        previewTag: 'AI SCORECARD',
+        previewText: 'MULTI-DIMENSIONAL FINANCIAL PORTRAIT & RISK SCORING',
+        href: '/products/ai-underwriting-scorecard',
       },
       {
         name: 'Immutable Audit Trail',
