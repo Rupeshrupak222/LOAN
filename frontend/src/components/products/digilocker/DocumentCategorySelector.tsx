@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, ShieldCheck, Award, Car, CheckCircle2, Info } from 'lucide-react';
+import { FileText, ShieldCheck, Award, Car, Info } from 'lucide-react';
+import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
 
 interface CategoryDoc {
   id: string;
@@ -92,29 +93,72 @@ export const DocumentCategorySelector: React.FC = () => {
   const Icon = currentCategory.icon;
 
   return (
-    <section
+    <ScrollStage3D
       id="section-document-types"
-      className="py-20 sm:py-24 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
+      perspective={1500}
+      className="py-24 sm:py-32 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
     >
       <div className="max-w-[1400px] mx-auto space-y-12">
         {/* Header Block */}
         <div className="max-w-3xl space-y-4 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase">
-            <span>MULTI-DOCUMENT COVERAGE</span>
+          <div
+            data-depth-z="-450"
+            data-rotate-x="18"
+            data-offset-y="30"
+            data-scale="0.9"
+            data-blur="4"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase"
+          >
+            <span>STAGE 07 // MULTI-DOCUMENT COVERAGE</span>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
-            ONE DIGITAL WORKFLOW.{' '}
-            <span className="text-[#155EEF] block">MANY DOCUMENT TYPES.</span>
-          </h2>
+          <div
+            data-depth-z="-750"
+            data-rotate-x="30"
+            data-offset-y="60"
+            data-blur="8"
+            data-stagger="0.1"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
+              ONE DIGITAL WORKFLOW.
+            </h2>
+          </div>
 
-          <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
-            Access supported document categories from authorized digital issuers in the relevant ecosystem. Document availability depends on user consent and participating issuer integrations.
-          </p>
+          <div
+            data-depth-z="-1000"
+            data-rotate-x="38"
+            data-offset-y="90"
+            data-blur="12"
+            data-stagger="0.25"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight uppercase font-sans">
+              <span className="text-[#155EEF] block">MANY DOCUMENT TYPES.</span>
+            </h2>
+          </div>
+
+          <div
+            data-depth-z="-650"
+            data-rotate-y="-8"
+            data-offset-y="40"
+            data-blur="6"
+            data-stagger="0.4"
+          >
+            <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
+              Access supported document categories from authorized digital issuers in the relevant ecosystem. Document availability depends on user consent and participating issuer integrations.
+            </p>
+          </div>
         </div>
 
         {/* Clean Horizontal Category Selector Tabs */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-4">
+        <div
+          data-depth-z="-550"
+          data-rotate-x="12"
+          data-offset-y="30"
+          data-scale="0.88"
+          data-blur="5"
+          data-stagger="0.25"
+          className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-4"
+        >
           {CATEGORIES.map((cat) => {
             const isSelected = cat.id === selectedId;
             return (
@@ -142,9 +186,16 @@ export const DocumentCategorySelector: React.FC = () => {
           })}
         </div>
 
-        {/* Dynamic Category Document Preview Pane */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center p-8 rounded-2xl bg-slate-50 border border-slate-200/80 text-left">
-          {/* Left Details */}
+        {/* Dynamic Category Document Preview Pane (Emerges from Z: -1100px, rotX: 18deg) */}
+        <div
+          data-depth-z="-1100"
+          data-rotate-x="18"
+          data-scale="0.76"
+          data-offset-y="75"
+          data-blur="10"
+          data-stagger="0.45"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center p-8 rounded-2xl bg-slate-50 border border-slate-200/80 text-left"
+        >
           <div className="lg:col-span-7 space-y-5">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-blue-100 text-[#155EEF] flex items-center justify-center">
@@ -177,7 +228,6 @@ export const DocumentCategorySelector: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Demonstration Card */}
           <div className="lg:col-span-5 p-6 rounded-xl bg-white border border-slate-300 shadow-md space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <span className="text-xs font-mono font-bold text-[#071A33]">
@@ -209,6 +259,6 @@ export const DocumentCategorySelector: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </ScrollStage3D>
   );
 };

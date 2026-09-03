@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShieldCheck, CheckCircle2, RefreshCw, AlertCircle, FileCheck, ArrowRight } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
+import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
 
 type StepStatus = 'idle' | 'checking' | 'source_found' | 'doc_match' | 'complete';
 
@@ -26,27 +27,69 @@ export const SimulatedVerificationPanel: React.FC = () => {
   };
 
   return (
-    <section
+    <ScrollStage3D
       id="section-verification"
-      className="py-20 sm:py-24 px-4 sm:px-8 lg:px-12 bg-slate-50/70 border-b border-slate-200 text-[#071A33] select-none"
+      perspective={1500}
+      className="py-24 sm:py-32 px-4 sm:px-8 lg:px-12 bg-slate-50/70 border-b border-slate-200 text-[#071A33] select-none"
     >
       <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
         {/* Left Narrative */}
         <div className="lg:col-span-6 space-y-6 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase">
-            <span>AUTOMATED VALIDATION</span>
+          <div
+            data-depth-z="-450"
+            data-rotate-x="18"
+            data-offset-y="30"
+            data-scale="0.9"
+            data-blur="4"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase"
+          >
+            <span>STAGE 06 // AUTOMATED VALIDATION</span>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
-            VERIFY WHAT{' '}
-            <span className="text-[#155EEF] block">YOU RECEIVE.</span>
-          </h2>
+          <div
+            data-depth-z="-750"
+            data-rotate-x="30"
+            data-offset-y="60"
+            data-blur="8"
+            data-stagger="0.1"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
+              VERIFY WHAT
+            </h2>
+          </div>
 
-          <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
-            Digital documents are cryptographically signed by accredited issuing entities. Automated checks validate certificate signatures, revocation registries, and document hashes before records enter the loan decisioning pipeline.
-          </p>
+          <div
+            data-depth-z="-1000"
+            data-rotate-x="38"
+            data-offset-y="90"
+            data-blur="12"
+            data-stagger="0.25"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight uppercase font-sans">
+              <span className="text-[#155EEF] block">YOU RECEIVE.</span>
+            </h2>
+          </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2 font-mono text-xs">
+          <div
+            data-depth-z="-650"
+            data-rotate-y="-8"
+            data-offset-y="40"
+            data-blur="6"
+            data-stagger="0.4"
+          >
+            <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
+              Digital documents are cryptographically signed by accredited issuing entities. Automated checks validate certificate signatures, revocation registries, and document hashes before records enter the loan decisioning pipeline.
+            </p>
+          </div>
+
+          <div
+            data-depth-z="-500"
+            data-rotate-x="14"
+            data-offset-y="30"
+            data-blur="4"
+            data-stagger="0.55"
+            className="grid grid-cols-2 gap-3 pt-2 font-mono text-xs"
+          >
             <div className="p-3.5 rounded-xl bg-white border border-slate-200 text-left">
               <span className="text-slate-400 block text-[10px] uppercase">CHECKSUM ATTESTATION</span>
               <span className="font-bold text-[#071A33]">SHA-256 SIGNATURE</span>
@@ -58,10 +101,18 @@ export const SimulatedVerificationPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Clean Interactive Verification Terminal Simulation */}
+        {/* Right: Verification Terminal Console (Emerges from Z: -1150px, rotY: 12deg) */}
         <div className="lg:col-span-6 flex items-center justify-center">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-300 shadow-xl p-7 sm:p-9 space-y-6 text-left">
-            {/* Terminal Header */}
+          <div
+            data-depth-z="-1150"
+            data-rotate-x="16"
+            data-rotate-y="12"
+            data-scale="0.75"
+            data-offset-y="80"
+            data-blur="10"
+            data-stagger="0.3"
+            className="w-full max-w-lg rounded-2xl bg-white border border-slate-300 shadow-xl p-7 sm:p-9 space-y-6 text-left"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2 font-mono text-xs font-bold text-[#071A33]">
                 <ShieldCheck className="w-4 h-4 text-[#155EEF]" />
@@ -72,7 +123,6 @@ export const SimulatedVerificationPanel: React.FC = () => {
               </span>
             </div>
 
-            {/* Document Payload Summary */}
             <div className="grid grid-cols-2 gap-3 font-mono text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
                 <span className="text-[9px] text-slate-400 block uppercase">DOCUMENT</span>
@@ -98,7 +148,6 @@ export const SimulatedVerificationPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Sequential Steps Progress Bar */}
             <div className="space-y-2 pt-1 font-mono text-xs">
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>VERIFICATION MILESTONES:</span>
@@ -111,7 +160,6 @@ export const SimulatedVerificationPanel: React.FC = () => {
                 </span>
               </div>
 
-              {/* Progress Milestones Strip */}
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${status !== 'idle' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
@@ -134,7 +182,6 @@ export const SimulatedVerificationPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Actions */}
             {status === 'idle' && (
               <button
                 type="button"
@@ -179,6 +226,6 @@ export const SimulatedVerificationPanel: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </ScrollStage3D>
   );
 };

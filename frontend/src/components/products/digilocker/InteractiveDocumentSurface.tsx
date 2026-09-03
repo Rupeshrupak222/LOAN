@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { ShieldCheck, FileCheck, Lock, Move, Sparkles } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ShieldCheck, FileCheck, Move } from 'lucide-react';
+import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
 
 export const InteractiveDocumentSurface: React.FC = () => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
-  const currentRot = useRef({ rx: 0, ry: 0 });
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     setIsDragging(true);
@@ -22,11 +22,9 @@ export const InteractiveDocumentSurface: React.FC = () => {
     const deltaX = e.clientX - dragStart.current.x;
     const deltaY = e.clientY - dragStart.current.y;
 
-    // Bounded tilt (max 12 degrees)
     const targetRy = Math.max(-12, Math.min(12, deltaX * 0.1));
     const targetRx = Math.max(-12, Math.min(12, -deltaY * 0.1));
 
-    currentRot.current = { rx: targetRx, ry: targetRy };
     cardRef.current.style.transform = `perspective(1000px) rotateX(${targetRx}deg) rotateY(${targetRy}deg) scale(1.02)`;
   };
 
@@ -34,7 +32,6 @@ export const InteractiveDocumentSurface: React.FC = () => {
     setIsDragging(false);
     if (cardRef.current) {
       cardRef.current.releasePointerCapture(e.pointerId);
-      // Smooth spring back to neutral
       cardRef.current.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
       cardRef.current.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
       setTimeout(() => {
@@ -44,36 +41,85 @@ export const InteractiveDocumentSurface: React.FC = () => {
   };
 
   return (
-    <section
+    <ScrollStage3D
       id="section-document-surface"
-      className="py-20 sm:py-24 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
+      perspective={1500}
+      className="py-24 sm:py-32 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
     >
       <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
         {/* Left Editorial Narrative */}
         <div className="lg:col-span-6 space-y-6 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase">
-            <span>TACTILE DIGITAL SURFACE</span>
+          <div
+            data-depth-z="-450"
+            data-rotate-x="18"
+            data-offset-y="30"
+            data-scale="0.9"
+            data-blur="4"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase"
+          >
+            <span>STAGE 05 // TACTILE DIGITAL SURFACE</span>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
-            ACCESS THE DOCUMENT.{' '}
-            <span className="text-[#155EEF] block">NOT THE PAPERWORK.</span>
-          </h2>
+          <div
+            data-depth-z="-750"
+            data-rotate-x="30"
+            data-offset-y="60"
+            data-blur="8"
+            data-stagger="0.1"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
+              ACCESS THE DOCUMENT.
+            </h2>
+          </div>
 
-          <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
-            Authentic digital documents are received in machine-readable, structured schemas directly signed by accredited issuers. This eliminates degraded photocopies, expired proofs, and unreadable scans.
-          </p>
+          <div
+            data-depth-z="-1000"
+            data-rotate-x="38"
+            data-offset-y="90"
+            data-blur="12"
+            data-stagger="0.25"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight uppercase font-sans">
+              <span className="text-[#155EEF] block">NOT THE PAPERWORK.</span>
+            </h2>
+          </div>
 
-          <div className="pt-2 flex items-center gap-3 text-xs font-mono text-slate-500">
+          <div
+            data-depth-z="-650"
+            data-rotate-y="-8"
+            data-offset-y="40"
+            data-blur="6"
+            data-stagger="0.4"
+          >
+            <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
+              Authentic digital documents are received in machine-readable, structured schemas directly signed by accredited issuers. This eliminates degraded photocopies, expired proofs, and unreadable scans.
+            </p>
+          </div>
+
+          <div
+            data-depth-z="-450"
+            data-rotate-x="14"
+            data-offset-y="30"
+            data-blur="4"
+            data-stagger="0.55"
+            className="pt-2 flex items-center gap-3 text-xs font-mono text-slate-500"
+          >
             <Move className="w-4 h-4 text-[#155EEF]" />
             <span>Interactive demonstration: Drag or hover the document sheet to inspect depth.</span>
           </div>
         </div>
 
-        {/* Right Tactile 3D Document Sheet */}
+        {/* Right Tactile 3D Document Sheet (Emerges from Z: -1100px, rotY: -14deg) */}
         <div className="lg:col-span-6 flex items-center justify-center">
           <div
             ref={cardRef}
+            data-depth-z="-1100"
+            data-rotate-x="15"
+            data-rotate-y="-14"
+            data-scale="0.75"
+            data-offset-y="80"
+            data-blur="10"
+            data-stagger="0.3"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -86,7 +132,6 @@ export const InteractiveDocumentSurface: React.FC = () => {
                 : '0 20px 45px -12px rgba(15,23,42,0.12), 0 0 0 1px rgba(226,232,240,0.9)',
             }}
           >
-            {/* Sheet Ribbon Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center">
@@ -101,7 +146,6 @@ export const InteractiveDocumentSurface: React.FC = () => {
               </span>
             </div>
 
-            {/* Fictional Demonstration Record Fields */}
             <div className="grid grid-cols-2 gap-3 text-left">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                 <span className="text-[9px] font-mono uppercase text-slate-400 block">
@@ -140,7 +184,6 @@ export const InteractiveDocumentSurface: React.FC = () => {
               </div>
             </div>
 
-            {/* Security Barcode Simulation */}
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
               <div className="space-y-1 text-left">
                 <span className="text-[9px] font-mono text-slate-400 block">
@@ -159,6 +202,6 @@ export const InteractiveDocumentSurface: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </ScrollStage3D>
   );
 };

@@ -1,13 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, CheckCircle2, ShieldCheck, Layers, Sparkles } from 'lucide-react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
-}
+import React, { useState } from 'react';
+import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
 
 interface Stage {
   number: string;
@@ -15,6 +10,7 @@ interface Stage {
   label: string;
   summary: string;
   detail: string;
+  depthZ: number;
 }
 
 const STAGES: Stage[] = [
@@ -24,6 +20,7 @@ const STAGES: Stage[] = [
     label: 'INITIATION',
     summary: 'Organization creates a digital document verification request with specified document attributes.',
     detail: 'Verification parameters, document types, and requested fields are defined without demanding physical scans.',
+    depthZ: -750,
   },
   {
     number: '02',
@@ -31,6 +28,7 @@ const STAGES: Stage[] = [
     label: 'AUTHORIZATION',
     summary: 'Customer reviews the requester identity, requested documents, and explicit purpose.',
     detail: 'User explicitly accepts or declines access in a transparent, statutory consent-driven window.',
+    depthZ: -950,
   },
   {
     number: '03',
@@ -38,6 +36,7 @@ const STAGES: Stage[] = [
     label: 'RETRIEVAL',
     summary: 'Authentic digital document is securely accessed from the digital issuer ecosystem.',
     detail: 'Document is retrieved directly from government or certified digital issuers with cryptographic signatures.',
+    depthZ: -1150,
   },
   {
     number: '04',
@@ -45,6 +44,7 @@ const STAGES: Stage[] = [
     label: 'AUTHENTICATION',
     summary: 'Payload schema, digital signatures, and timestamp attestation are validated.',
     detail: 'Automated cryptographic check confirms the document has not been altered or tampered with.',
+    depthZ: -1350,
   },
   {
     number: '05',
@@ -52,72 +52,72 @@ const STAGES: Stage[] = [
     label: 'ONBOARDING',
     summary: 'Verified identity and document data stream directly into the lending onboarding workflow.',
     detail: 'Loan application advances immediately without back-office document re-entry delays.',
+    depthZ: -1550,
   },
 ];
 
-// STAGES definition remains above
-
 export const HorizontalFlowLine: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const [activeStageIndex, setActiveStageIndex] = useState(0);
-
-  useEffect(() => {
-    if (!sectionRef.current) return;
-
-    const ctx = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        start: 'top 70%',
-        end: 'bottom 40%',
-        scrub: 0.5,
-        onUpdate: (self) => {
-          const step = Math.min(4, Math.floor(self.progress * 5));
-          setActiveStageIndex(step);
-        },
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
+  const [activeStageIndex, setActiveStageIndex] = useState(1); // Default to stage 2 (Consent)
 
   const activeStage = STAGES[activeStageIndex];
   const progressPercent = (activeStageIndex / (STAGES.length - 1)) * 100;
 
   return (
-    <section
-      ref={sectionRef}
+    <ScrollStage3D
       id="section-flow"
-      className="py-20 sm:py-24 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
+      perspective={1600}
+      className="py-24 sm:py-32 px-4 sm:px-8 lg:px-12 bg-white border-b border-slate-200 text-[#071A33] select-none"
     >
       <div className="max-w-[1400px] mx-auto space-y-16">
         {/* Header Block */}
         <div className="max-w-3xl space-y-4 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase">
-            <span>THE 5-STAGE PIPELINE</span>
+          <div
+            data-depth-z="-450"
+            data-rotate-x="18"
+            data-offset-y="30"
+            data-scale="0.9"
+            data-blur="4"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 border border-blue-200 text-[#155EEF] text-xs font-mono font-bold tracking-wider uppercase"
+          >
+            <span>STAGE 03 // THE 5-STAGE PIPELINE</span>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
-            FROM REQUEST{' '}
-            <span className="text-[#155EEF] block">TO VERIFIED.</span>
-          </h2>
+          <div
+            data-depth-z="-850"
+            data-rotate-x="32"
+            data-offset-y="60"
+            data-blur="8"
+            data-stagger="0.1"
+          >
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-[#071A33] tracking-tight leading-tight uppercase font-sans">
+              FROM REQUEST{' '}
+              <span className="text-[#155EEF] block">TO VERIFIED.</span>
+            </h2>
+          </div>
 
-          <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
-            A single, connected digital flow replacing manual photocopying, courier transit, and branch verification with a transparent digital pipeline.
-          </p>
+          <div
+            data-depth-z="-600"
+            data-rotate-y="-8"
+            data-offset-y="40"
+            data-blur="6"
+            data-stagger="0.2"
+          >
+            <p className="text-base sm:text-lg text-slate-600 font-normal leading-relaxed font-sans">
+              A single, connected digital flow replacing manual photocopying, courier transit, and branch verification with a transparent digital pipeline.
+            </p>
+          </div>
         </div>
 
         {/* ── Single Continuous Horizontal Flow Line Container ── */}
         <div className="relative pt-6 pb-2">
-          {/* Base Horizontal Track Line */}
           <div className="absolute top-[38px] left-8 right-8 h-[3px] bg-slate-100 hidden md:block" />
 
-          {/* Active Filled Progress Line */}
           <div
             className="absolute top-[38px] left-8 h-[3px] bg-[#155EEF] transition-all duration-500 ease-out hidden md:block"
             style={{ width: `calc(${progressPercent}% * 0.9 + 20px)` }}
           />
 
-          {/* 5 Numbered Stages */}
+          {/* 5 Numbered Stages Emerging from Staggered 3D Depth */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 relative z-10">
             {STAGES.map((stage, idx) => {
               const isActive = activeStageIndex === idx;
@@ -127,6 +127,12 @@ export const HorizontalFlowLine: React.FC = () => {
                 <button
                   key={idx}
                   type="button"
+                  data-depth-z={stage.depthZ.toString()}
+                  data-rotate-x="18"
+                  data-scale="0.76"
+                  data-offset-y="70"
+                  data-blur="8"
+                  data-stagger={(idx * 0.15).toFixed(2)}
                   onClick={() => setActiveStageIndex(idx)}
                   className={`text-left p-5 rounded-2xl transition-all duration-300 cursor-pointer border ${
                     isActive
@@ -134,7 +140,6 @@ export const HorizontalFlowLine: React.FC = () => {
                       : 'bg-slate-50/70 border-slate-200/80 hover:bg-white hover:border-slate-300'
                   }`}
                 >
-                  {/* Number Circle indicator */}
                   <div className="flex items-center justify-between pb-3">
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-mono font-black text-xs transition-colors ${
@@ -157,7 +162,6 @@ export const HorizontalFlowLine: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Stage Title */}
                   <h3
                     className={`text-base font-black tracking-wide font-sans ${
                       isActive ? 'text-[#071A33]' : 'text-slate-700'
@@ -175,8 +179,15 @@ export const HorizontalFlowLine: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Active Stage Deep Inspection Surface ── */}
-        <div className="p-8 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0A2540] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-left">
+        {/* ── Active Stage Deep Inspection Surface (Z: -950px) ── */}
+        <div
+          data-depth-z="-950"
+          data-rotate-x="22"
+          data-offset-y="70"
+          data-blur="10"
+          data-stagger="0.4"
+          className="p-8 rounded-2xl bg-gradient-to-r from-slate-900 to-[#0A2540] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-left"
+        >
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-3 font-mono text-xs text-cyan-400 font-bold tracking-wider">
               <span>STAGE {activeStage.number} // {activeStage.name}</span>
@@ -200,6 +211,6 @@ export const HorizontalFlowLine: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </ScrollStage3D>
   );
 };
