@@ -116,7 +116,7 @@ export function CollectionsIntelligenceModal({ colCase, isOpen, onClose }: Props
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold">AI Predictive Collections & Recovery Briefing</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
                   Gemini Recovery Intelligence
                 </span>
               </div>
@@ -230,7 +230,7 @@ export function CollectionsIntelligenceModal({ colCase, isOpen, onClose }: Props
                           <span className="font-bold text-rose-900 dark:text-rose-200">{sig.signal}</span>
                           <span
                             className={cn(
-                              'text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase shrink-0',
+                              'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase shrink-0',
                               sig.severity === 'HIGH'
                                 ? 'bg-rose-600 text-white'
                                 : sig.severity === 'MEDIUM'

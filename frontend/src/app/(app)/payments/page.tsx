@@ -540,7 +540,7 @@ export default function PaymentsPage() {
           <FileCheck2 className="w-3.5 h-3.5" />
           {isCustomer ? 'My Submitted Payments' : 'Payment Submissions / Proofs'} ({submissions.length})
           {pendingSubmissionsCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold">
               {pendingSubmissionsCount}
             </span>
           )}

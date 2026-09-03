@@ -239,7 +239,7 @@ export function CopilotDrawer() {
                   <div>
                     <div className="flex items-center gap-1.5">
                       <h3 className="text-xs font-bold tracking-tight">Adyapan AI Copilot</h3>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded-full font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                         Gemini Live
                       </span>
                     </div>
@@ -438,7 +438,7 @@ export function CopilotDrawer() {
       >
         <Sparkles className={cn('h-3.5 w-3.5', isOpen ? 'text-amber-300' : 'text-blue-500 animate-pulse')} />
         <span className="hidden sm:inline">AI Copilot</span>
-        <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/20 font-mono hidden md:inline">Ctrl+J</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 font-mono hidden md:inline">Ctrl+J</span>
       </button>
 
       {/* Rendered Floating Portal */}

@@ -3,7 +3,7 @@ import { env } from '../config/env';
 
 export const globalLimiter = rateLimit({
   windowMs: env.security.rateLimitWindowMs,
-  max: env.security.rateLimitMax,
+  max: process.env.NODE_ENV === 'production' ? env.security.rateLimitMax : 10000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests' } },

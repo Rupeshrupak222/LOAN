@@ -13,6 +13,7 @@ import { generateCollectionIntelligence } from './collections-intelligence.servi
 import { generateCustomer360Intelligence } from './customer-360-intelligence.service';
 import { generateDecisionIntelligence } from './decision-intelligence.service';
 import { generateWorkflowExceptionIntelligence } from './workflow-exception.service';
+import { generateFraudIntelligence } from './fraud-intelligence.service';
 
 const router = Router();
 
@@ -231,6 +232,77 @@ router.post(
       email: req.user!.email,
       roles: req.user!.roles,
       branchId: (req.user as any)?.branchId,
+    });
+
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/ai/fraud/portfolio
+ * Aggregates enterprise and branch-level fraud, duplicate, and anomaly signals for staff.
+ */
+router.post(
+  '/fraud/portfolio',
+  asyncHandler(async (req, res) => {
+    const { forceRefresh } = req.body || {};
+    const result = await generateFraudIntelligence({
+      scope: 'PORTFOLIO',
+      forceRefresh: Boolean(forceRefresh),
+      actor: {
+        id: req.user!.id,
+        email: req.user!.email,
+        roles: req.user!.roles,
+        branchId: (req.user as any)?.branchId,
+      },
+    });
+
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/ai/fraud/applications/:id
+ * Evaluates fraud, duplicate attribute, and anomaly signals for a specific loan application.
+ */
+router.post(
+  '/fraud/applications/:id',
+  asyncHandler(async (req, res) => {
+    const { forceRefresh } = req.body || {};
+    const result = await generateFraudIntelligence({
+      scope: 'APPLICATION',
+      applicationId: req.params.id,
+      forceRefresh: Boolean(forceRefresh),
+      actor: {
+        id: req.user!.id,
+        email: req.user!.email,
+        roles: req.user!.roles,
+        branchId: (req.user as any)?.branchId,
+      },
+    });
+
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/ai/fraud/customers/:id
+ * Evaluates borrower identity, shared bank accounts, phone duplicates, and network clusters for a customer.
+ */
+router.post(
+  '/fraud/customers/:id',
+  asyncHandler(async (req, res) => {
+    const { forceRefresh } = req.body || {};
+    const result = await generateFraudIntelligence({
+      scope: 'CUSTOMER',
+      customerId: req.params.id,
+      forceRefresh: Boolean(forceRefresh),
+      actor: {
+        id: req.user!.id,
+        email: req.user!.email,
+        roles: req.user!.roles,
+        branchId: (req.user as any)?.branchId,
+      },
     });
 
     res.json(success(result));

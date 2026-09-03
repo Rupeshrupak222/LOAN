@@ -92,26 +92,26 @@ export function DecisionIntelligenceCard() {
   return (
     <div
       className={cn(
-        'rounded-2xl border p-4.5 transition-all shadow-sm',
+        'rounded-2xl border p-5 md:p-6 my-1 transition-all shadow-sm overflow-hidden',
         isDark
           ? 'bg-gradient-to-b from-[#111936] to-[#0A0E24] border-[#202B52] text-white'
           : 'bg-gradient-to-b from-blue-50/70 via-indigo-50/40 to-white border-blue-200/80 text-slate-900'
       )}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-blue-100 dark:border-[#202B52]">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm">
-            <Sparkles className="h-4 w-4" />
+      <div className="flex items-center justify-between flex-wrap gap-3 pb-3.5 border-b border-blue-100 dark:border-[#202B52]">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm shrink-0">
+            <Sparkles className="h-4.5 w-4.5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold tracking-tight">AI Executive Decision Intelligence</h3>
-              <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
                 Gemini Synthesized
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
               Transforming raw portfolio telemetry into explainable executive decision support
             </p>
           </div>
@@ -202,7 +202,7 @@ export function DecisionIntelligenceCard() {
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span className="font-bold text-slate-900 dark:text-white">{item.area}</span>
-                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-rose-600 text-white uppercase">
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase">
                           Priority #{item.priority}
                         </span>
                       </div>
@@ -234,7 +234,7 @@ export function DecisionIntelligenceCard() {
                         <span className="font-semibold text-slate-500 dark:text-slate-400 text-[11px]">{kpi.kpi}</span>
                         <span
                           className={cn(
-                            'text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase',
+                            'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase',
                             kpi.status === 'CRITICAL'
                               ? 'bg-rose-600 text-white'
                               : kpi.status === 'WATCH'
@@ -267,7 +267,7 @@ export function DecisionIntelligenceCard() {
                       <div key={idx} className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#151F42] space-y-0.5">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-900 dark:text-white">{b.stage}</span>
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500 text-white uppercase">
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500 text-white uppercase">
                             {b.severity}
                           </span>
                         </div>

@@ -90,7 +90,7 @@ export function CreditIntelligenceCard({ applicationId, applicationNo, initialDa
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">AI Credit Intelligence & Decision Support</h3>
-              <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 Gemini Synthesized
               </span>
             </div>
@@ -226,7 +226,7 @@ export function CreditIntelligenceCard({ applicationId, applicationNo, initialDa
                         <span className="font-bold text-rose-900 dark:text-rose-200">{rf.issue}</span>
                         <span
                           className={cn(
-                            'text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase shrink-0',
+                            'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase shrink-0',
                             rf.severity === 'HIGH'
                               ? 'bg-rose-600 text-white'
                               : rf.severity === 'MEDIUM'

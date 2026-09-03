@@ -117,7 +117,7 @@ export function UnderwritingIntelligenceCard({ applicationId, applicationNo, ini
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">AI Underwriting Decision Support Briefing</h3>
-              <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                 Gemini Underwriting Engine
               </span>
             </div>
@@ -217,7 +217,7 @@ export function UnderwritingIntelligenceCard({ applicationId, applicationNo, ini
                       <span className="font-bold text-rose-900 dark:text-rose-200">{flag.issue}</span>
                       <span
                         className={cn(
-                          'text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase shrink-0',
+                          'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase shrink-0',
                           flag.severity === 'HIGH'
                             ? 'bg-rose-600 text-white'
                             : flag.severity === 'MEDIUM'

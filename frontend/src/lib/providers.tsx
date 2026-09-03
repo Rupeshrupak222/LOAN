@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, ReactNode } from 'react';
 import { AuthProvider } from './auth';
 import { ThemeProvider } from './theme';
+import { BrandingProvider } from './branding';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -16,7 +17,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <ThemeProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <BrandingProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </BrandingProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

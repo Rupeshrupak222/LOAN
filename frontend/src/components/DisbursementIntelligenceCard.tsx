@@ -112,7 +112,7 @@ export function DisbursementIntelligenceCard({ applicationId, applicationNo, utr
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">AI Disbursement & Treasury Readiness</h3>
-              <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                 Gemini Treasury Layer
               </span>
             </div>

@@ -140,7 +140,7 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold">AI Customer 360 & Lifecycle Intelligence</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900">
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900">
                   Gemini Synthesized
                 </span>
               </div>
@@ -314,7 +314,7 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
                           <span className="font-bold text-rose-900 dark:text-rose-200">{att.issue}</span>
                           <span
                             className={cn(
-                              'text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase shrink-0',
+                              'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase shrink-0',
                               att.severity === 'HIGH'
                                 ? 'bg-rose-600 text-white'
                                 : att.severity === 'MEDIUM'
@@ -348,7 +348,7 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-900 dark:text-slate-100">{ev.event}</span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-[#1C2647] text-slate-500">
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#1C2647] text-slate-500">
                               {ev.category}
                             </span>
                           </div>

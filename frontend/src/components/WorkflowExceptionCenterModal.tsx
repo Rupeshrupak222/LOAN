@@ -118,7 +118,7 @@ export function WorkflowExceptionCenterModal({ isOpen, onClose }: Props) {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold">AI Workflow & Operational Exception Center</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
                   Real-Time Exception Center
                 </span>
               </div>
@@ -249,7 +249,7 @@ export function WorkflowExceptionCenterModal({ isOpen, onClose }: Props) {
                       >
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-bold text-slate-900 dark:text-white">{item.title}</span>
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-rose-600 text-white uppercase">
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-rose-600 text-white uppercase">
                             #{item.priority} Priority
                           </span>
                         </div>
@@ -304,7 +304,7 @@ export function WorkflowExceptionCenterModal({ isOpen, onClose }: Props) {
                         <div className="flex items-center gap-2">
                           <span
                             className={cn(
-                              'text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase',
+                              'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase',
                               ex.severity === 'CRITICAL'
                                 ? 'bg-rose-600 text-white'
                                 : ex.severity === 'HIGH'

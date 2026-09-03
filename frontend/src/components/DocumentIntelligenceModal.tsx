@@ -140,7 +140,7 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold">AI Document Intelligence & Mismatch Audit</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.2 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
                   Gemini Vision
                 </span>
               </div>
@@ -202,7 +202,7 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
                     <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">
                       {data.classification.detectedType.replace(/_/g, ' ')}
                     </span>
-                    <span className="text-[10px] px-2 py-0.2 rounded-full font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                       {data.classification.confidence} CONFIDENCE
                     </span>
                   </div>

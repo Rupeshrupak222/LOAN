@@ -12,6 +12,7 @@ import {
   DollarSign,
   Receipt,
   AlertCircle,
+  AlertTriangle,
   BarChart3,
   KeyRound,
   ShieldCheck,
@@ -26,9 +27,18 @@ import {
   Moon,
   Wallet,
   Calculator,
+  Cpu,
+  Scale,
+  Handshake,
+  Mail,
+  Sliders,
+  Palette,
+  Activity,
+  Workflow,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { useBranding } from '@/lib/branding';
 import { cn } from '@/lib/utils';
 import { ROLE_CONFIG, NAV_ITEMS, RoleName, NavItemConfig } from '@/lib/roles';
 import { Spinner } from './ui';
@@ -45,16 +55,30 @@ const NAV_ICONS: Record<string, any> = {
   underwriting: FileCheck,
   loans: DollarSign,
   disbursements: Wallet,
+  partners: Handshake,
   payments: Receipt,
   collections: AlertCircle,
+  reconciliation: Scale,
+  communications: Mail,
+  'command-center': Cpu,
+  operations: Activity,
+  compliance: ShieldCheck,
+  privacy: ShieldCheck,
   reports: BarChart3,
+  'fraud-intelligence': ShieldAlert,
+  'early-warnings': AlertTriangle,
   'emi-calculator': Calculator,
   users: KeyRound,
   roles: KeyRound,
+  workflows: Workflow,
   settings: ShieldCheck,
   permissions: ShieldCheck,
   branches: Building2,
+  tenants: Layers,
+  configuration: Sliders,
+  branding: Palette,
   'audit-logs': ScrollText,
+  integrations: Cpu,
 };
 
 const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS', 'ADMINISTRATION'] as const;
@@ -62,6 +86,7 @@ const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS'
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { branding } = useBranding();
   const isDark = theme === 'dark';
   const pathname = usePathname();
   const router = useRouter();
@@ -128,19 +153,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Brand Header */}
         <div className="flex h-16 flex-none items-center justify-between px-5 border-b border-[#1E2445]/80">
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2563EB] text-white font-bold shadow-sm shadow-[#2563EB]/25">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-bold shadow-sm"
+              style={{ backgroundColor: branding?.primaryColor || '#2563EB' }}
+            >
               <Layers className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white tracking-tight leading-none">
-                {primaryRole === 'CUSTOMER' ? 'ADYAPAN PORTAL' : primaryRole === 'AUDITOR' ? 'ADYAPAN AUDIT' : 'ADYAPAN LMS'}
+              <p className="text-sm font-bold text-white tracking-tight leading-none truncate max-w-[170px]">
+                {primaryRole === 'CUSTOMER'
+                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} PORTAL`
+                  : primaryRole === 'AUDITOR'
+                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} AUDIT`
+                  : (branding.portalTitle || branding.institutionName).toUpperCase()}
               </p>
-              <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+              <p className="text-[10px] font-medium text-slate-400 mt-0.5 truncate max-w-[170px]">
                 {primaryRole === 'CUSTOMER'
                   ? 'Borrower Self-Service'
                   : primaryRole === 'AUDITOR'
                   ? 'Compliance & Audit'
-                  : roleCfg.label}
+                  : branding.tagline || roleCfg.label}
               </p>
             </div>
           </Link>

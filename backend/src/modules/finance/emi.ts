@@ -98,3 +98,67 @@ function buildZeroInterest(principal: Decimal, emi: Decimal, tenureMonths: numbe
     schedule,
   };
 }
+
+export interface RepaymentAllocationInput {
+  repaymentAmount: number;
+  outstandingPrincipal: number;
+  accruedInterest: number;
+  feesDue?: number;
+  penaltiesDue?: number;
+}
+
+export interface RepaymentAllocationResult {
+  allocatedToPenalties: number;
+  allocatedToFees: number;
+  allocatedToInterest: number;
+  allocatedToPrincipal: number;
+  excessRefund: number;
+  remainingPrincipal: number;
+  remainingInterest: number;
+  remainingFees: number;
+  remainingPenalties: number;
+}
+
+/**
+ * Statutory repayment allocation order:
+ * PENALTIES -> FEES -> INTEREST -> PRINCIPAL -> EXCESS REFUND
+ */
+export function allocateRepayment(input: RepaymentAllocationInput): RepaymentAllocationResult {
+  let unallocated = new Decimal(input.repaymentAmount);
+
+  const penaltiesDue = new Decimal(input.penaltiesDue || 0);
+  const feesDue = new Decimal(input.feesDue || 0);
+  const interestDue = new Decimal(input.accruedInterest || 0);
+  const principalDue = new Decimal(input.outstandingPrincipal || 0);
+
+  // 1. Allocate Penalties
+  const allocatedToPenalties = Decimal.min(unallocated, penaltiesDue);
+  unallocated = unallocated.minus(allocatedToPenalties);
+
+  // 2. Allocate Fees
+  const allocatedToFees = Decimal.min(unallocated, feesDue);
+  unallocated = unallocated.minus(allocatedToFees);
+
+  // 3. Allocate Interest
+  const allocatedToInterest = Decimal.min(unallocated, interestDue);
+  unallocated = unallocated.minus(allocatedToInterest);
+
+  // 4. Allocate Principal
+  const allocatedToPrincipal = Decimal.min(unallocated, principalDue);
+  unallocated = unallocated.minus(allocatedToPrincipal);
+
+  // 5. Excess / Surplus Refund
+  const excessRefund = unallocated;
+
+  return {
+    allocatedToPenalties: allocatedToPenalties.toNumber(),
+    allocatedToFees: allocatedToFees.toNumber(),
+    allocatedToInterest: allocatedToInterest.toNumber(),
+    allocatedToPrincipal: allocatedToPrincipal.toNumber(),
+    excessRefund: excessRefund.toNumber(),
+    remainingPrincipal: principalDue.minus(allocatedToPrincipal).toNumber(),
+    remainingInterest: interestDue.minus(allocatedToInterest).toNumber(),
+    remainingFees: feesDue.minus(allocatedToFees).toNumber(),
+    remainingPenalties: penaltiesDue.minus(allocatedToPenalties).toNumber(),
+  };
+}

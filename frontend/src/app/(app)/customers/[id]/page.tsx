@@ -31,6 +31,8 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
@@ -39,6 +41,8 @@ import { formatMoney, formatDate, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { DocumentIntelligenceModal } from '@/components/DocumentIntelligenceModal';
 import { Customer360IntelligenceModal } from '@/components/Customer360IntelligenceModal';
+import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
+import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -54,7 +58,7 @@ export default function CustomerDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections'
+    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
   >('overview');
 
   // KYC modal state
@@ -302,6 +306,8 @@ export default function CustomerDetailPage() {
     { id: 'loans', label: `Loans (${loans.length})`, icon: Wallet },
     { id: 'payments', label: `Payments (${payments.length})`, icon: Receipt },
     { id: 'collections', label: `Collections (${collectionCases.length})`, icon: AlertCircle },
+    { id: 'bank_intelligence', label: 'Bank Statement Intelligence', icon: Building2 },
+    { id: 'fraud', label: 'Fraud & Anomaly', icon: ShieldAlert },
   ];
 
   return (
@@ -908,6 +914,16 @@ export default function CustomerDetailPage() {
             </p>
           )}
         </Card>
+      )}
+
+      {/* Tab 8: Bank Statement Intelligence */}
+      {activeTab === 'bank_intelligence' && (
+        <BankStatementIntelligenceCard customerId={params.id} />
+      )}
+
+      {/* Tab 9: Fraud & Anomaly Intelligence */}
+      {activeTab === 'fraud' && (
+        <FraudIntelligenceCard customerId={params.id} customerCode={data.customerCode} />
       )}
 
       {/* KYC Update Modal */}

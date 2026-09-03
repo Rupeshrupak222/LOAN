@@ -189,7 +189,7 @@ export default function UnderwritingQueuePage() {
             >
               <span>Awaiting Decision</span>
               {pendingItems.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">
                   {pendingItems.length}
                 </span>
               )}
