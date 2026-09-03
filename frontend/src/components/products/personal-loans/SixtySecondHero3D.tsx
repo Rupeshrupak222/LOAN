@@ -161,9 +161,42 @@ export const SixtySecondHero3D: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full min-h-[92vh] pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center text-center overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EFF6FF]"
     >
-      {/* Ambient background grid & lighting */}
-      <div className="absolute inset-0 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] [background-size:28px_28px] opacity-40 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[500px] bg-gradient-to-tr from-blue-400/20 via-indigo-500/15 to-teal-400/10 blur-[140px] rounded-full pointer-events-none" />
+      {/* ── UNIQUE 3D SUB-MINUTE SANCTION SPEED TUNNEL BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Volumetric 3D Speed Tunnel Grid */}
+        <div
+          className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-[1900px] h-[950px] opacity-35"
+          style={{
+            transform: 'perspective(750px) rotateX(68deg) translateZ(-50px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(21, 94, 239, 0.28) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(59, 130, 246, 0.25) 1px, transparent 1px)
+            `,
+            backgroundSize: '52px 52px',
+            maskImage: 'radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 80%)',
+          }}
+        />
+
+        {/* Speed Halo Flares */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[850px] h-[600px] bg-gradient-to-b from-blue-500/18 via-indigo-600/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-20 right-1/4 translate-x-1/2 w-[550px] h-[550px] bg-gradient-to-bl from-teal-400/15 to-transparent blur-[120px] rounded-full" />
+
+        {/* Floating 60-Second Sanction Status Badges */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-200 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '5s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>INSTANT_SANCTION // 60s ENGINE</span>
+        </div>
+
+        <div className="absolute top-44 right-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-indigo-200 backdrop-blur-md shadow-md text-[10px] font-mono text-indigo-700 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6.5s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          <span>ZERO_BRANCH_VISITS // 100% PAPERLESS</span>
+        </div>
+
+        {/* Floating Velocity Rings */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[680px] h-[680px] rounded-full border border-blue-400/20 animate-pulse pointer-events-none" style={{ animationDuration: '4s' }} />
+        <div className="absolute bottom-28 left-[12%] w-6 h-6 border-2 border-blue-400/40 rounded-full animate-ping" style={{ animationDuration: '5s' }} />
+      </div>
 
       {/* ── Top Narrative Eyebrow ── */}
       <div className="relative z-10 max-w-5xl mx-auto space-y-6 text-center animate-fade-in">

@@ -116,9 +116,46 @@ export const HeroCardMotion3D: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full min-h-[88vh] pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center text-center overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EFF6FF]"
     >
-      {/* Background ambient lighting */}
-      <div className="absolute inset-0 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] [background-size:28px_28px] opacity-40 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-gradient-to-tr from-blue-400/20 via-indigo-500/15 to-emerald-400/10 blur-[140px] rounded-full pointer-events-none" />
+      {/* ── UNIQUE 3D HOLOGRAPHIC CARD LAB BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Holographic Iridescent Perspective Grid */}
+        <div
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1800px] h-[900px] opacity-30"
+          style={{
+            transform: 'perspective(850px) rotateX(60deg) translateZ(-35px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(99, 102, 241, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(16, 185, 129, 0.2) 1px, transparent 1px)
+            `,
+            backgroundSize: '44px 44px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+          }}
+        />
+
+        {/* Concentric Contactless NFC Radar Waves */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] rounded-full border border-blue-300/30 animate-ping pointer-events-none" style={{ animationDuration: '8s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] rounded-full border border-dashed border-indigo-300/25 pointer-events-none" />
+
+        {/* Multi-tier Foil Glow Cones */}
+        <div className="absolute top-10 left-1/4 -translate-x-1/2 w-[600px] h-[500px] bg-gradient-to-tr from-indigo-500/18 via-purple-400/12 to-transparent blur-[130px] rounded-full" />
+        <div className="absolute top-10 right-1/4 translate-x-1/2 w-[600px] h-[500px] bg-gradient-to-bl from-teal-400/18 via-blue-500/12 to-transparent blur-[130px] rounded-full" />
+
+        {/* Floating 3D Card Security Badges */}
+        <div className="absolute top-32 left-[9%] px-3 py-1.5 rounded-lg bg-white/85 border border-indigo-200 backdrop-blur-md shadow-md text-[10px] font-mono text-indigo-700 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>EMV_3DS_v2.3 // ZERO_FRAUD</span>
+        </div>
+
+        <div className="absolute top-44 right-[9%] px-3 py-1.5 rounded-lg bg-white/85 border border-teal-200 backdrop-blur-md shadow-md text-[10px] font-mono text-teal-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          <span>APPLE_PAY_TOKEN // ACTIVE</span>
+        </div>
+
+        {/* Floating Chip Wireframe accents */}
+        <div className="absolute bottom-28 left-[14%] w-6 h-6 border-2 border-indigo-400/40 rounded-sm rotate-12 animate-pulse" />
+        <div className="absolute bottom-36 right-[16%] w-7 h-7 border border-teal-400/50 rounded-sm -rotate-12 animate-spin" style={{ animationDuration: '20s' }} />
+      </div>
 
       {/* ── Top Narrative Eyebrow ── */}
       <div className="relative z-10 max-w-4xl mx-auto space-y-6 text-center animate-fade-in">
