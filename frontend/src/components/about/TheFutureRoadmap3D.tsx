@@ -3,6 +3,7 @@
 import React from 'react';
 import { Compass, CheckCircle2, ArrowRight, Sparkles, Orbit } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
+import { SketchFutureHorizon } from './sketches/SketchFutureHorizon';
 
 export const TheFutureRoadmap3D: React.FC = () => {
   const horizons = [
@@ -119,6 +120,18 @@ export const TheFutureRoadmap3D: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* ── Sketch 08: The Horizon Envelope Blueprint ── */}
+        <div
+          data-depth-z="-950"
+          data-rotate-x="18"
+          data-scale="0.82"
+          data-offset-y="50"
+          data-blur="8"
+          data-stagger="0.4"
+        >
+          <SketchFutureHorizon />
         </div>
       </div>
     </ScrollStage3D>

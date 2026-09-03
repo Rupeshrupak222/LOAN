@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Landmark, Building2, CreditCard, ShieldCheck, ArrowRight } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
+import { SketchEcosystem } from './sketches/SketchEcosystem';
 
 export const EcosystemWhatWeBuild3D: React.FC = () => {
   const categories = [
@@ -164,6 +165,18 @@ export const EcosystemWhatWeBuild3D: React.FC = () => {
               </div>
             );
           })}
+        </div>
+
+        {/* ── Sketch 03: Architectural Ecosystem Blueprint ── */}
+        <div
+          data-depth-z="-950"
+          data-rotate-x="18"
+          data-scale="0.82"
+          data-offset-y="50"
+          data-blur="8"
+          data-stagger="0.4"
+        >
+          <SketchEcosystem />
         </div>
       </div>
     </ScrollStage3D>
