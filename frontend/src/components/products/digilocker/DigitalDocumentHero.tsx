@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   ArrowRight,
   ShieldCheck,
@@ -11,69 +11,33 @@ import {
   Sparkles,
   ChevronDown,
   Building2,
-  Eye,
+  Sliders,
+  Check,
 } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
 
 export const DigitalDocumentHero: React.FC = () => {
-  const docWrapperRef = useRef<HTMLDivElement>(null);
-  const layer1Ref = useRef<HTMLDivElement>(null);
-  const layer2Ref = useRef<HTMLDivElement>(null);
-  const layer3Ref = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [explosionFactor, setExplosionFactor] = useState(1); // Default to clearly exploded (1.0 = 100% exploded)
+  const [activeLayer, setActiveLayer] = useState<'all' | 'layer1' | 'layer2' | 'layer3'>('all');
 
-  const [isHovered, setIsHovered] = useState(false);
-  const [isExploded, setIsExploded] = useState(false);
-
-  // 3D gyroscopic tilt bounded to max 6–8 degrees
-  const gyro = useRef({
-    rx: 0,
-    ry: 0,
-    targetRx: 0,
-    targetRy: 0,
-    rafId: 0,
-  });
-
-  const updateTilt = useCallback(() => {
-    const g = gyro.current;
-    g.rx += (g.targetRx - g.rx) * 0.08;
-    g.ry += (g.targetRy - g.ry) * 0.08;
-
-    if (docWrapperRef.current) {
-      docWrapperRef.current.style.transform = `perspective(1200px) rotateX(${g.rx.toFixed(
-        2
-      )}deg) rotateY(${g.ry.toFixed(2)}deg)`;
-    }
-
-    if (Math.abs(g.rx - g.targetRx) > 0.02 || Math.abs(g.ry - g.targetRy) > 0.02) {
-      g.rafId = requestAnimationFrame(updateTilt);
-    } else {
-      g.rafId = 0;
-    }
-  }, []);
+  // Smooth 3D tilt
+  const [tilt, setTilt] = useState({ rx: 12, ry: -14 });
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!docWrapperRef.current) return;
-    const rect = docWrapperRef.current.getBoundingClientRect();
-    const normX = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
-    const normY = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+    if (!stageRef.current) return;
+    const rect = stageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
 
-    const g = gyro.current;
-    g.targetRy = Math.max(-8, Math.min(8, normX * 8));
-    g.targetRx = Math.max(-8, Math.min(8, -normY * 8));
-
-    if (!g.rafId) {
-      g.rafId = requestAnimationFrame(updateTilt);
-    }
+    setTilt({
+      rx: 12 - y * 10,
+      ry: -14 + x * 12,
+    });
   };
 
   const handlePointerLeave = () => {
-    setIsHovered(false);
-    const g = gyro.current;
-    g.targetRx = 0;
-    g.targetRy = 0;
-    if (!g.rafId) {
-      g.rafId = requestAnimationFrame(updateTilt);
-    }
+    setTilt({ rx: 12, ry: -14 });
   };
 
   const scrollToSection = (id: string) => {
@@ -81,13 +45,11 @@ export const DigitalDocumentHero: React.FC = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const showLayers = isHovered || isExploded;
-
   return (
     <ScrollStage3D
       id="section-hero-digilocker"
       pin={false}
-      perspective={1500}
+      perspective={1600}
       className="min-h-[96vh] flex flex-col justify-between pt-24 sm:pt-28 pb-12 px-4 sm:px-8 lg:px-12 bg-[#FFFFFF] text-[#071A33] border-b border-slate-200 select-none relative overflow-hidden"
     >
       {/* ── 3D Cryptographic Identity Atmosphere & Isometric Floor Grid ── */}
@@ -112,12 +74,12 @@ export const DigitalDocumentHero: React.FC = () => {
         <div className="absolute top-10 right-1/4 w-[600px] h-[500px] bg-gradient-to-bl from-blue-600/15 via-indigo-500/10 to-transparent blur-[130px] rounded-full" />
 
         {/* Floating 3D Telemetry Badges */}
-        <div className="hidden xl:flex items-center gap-2 absolute top-28 right-16 px-3.5 py-1.5 rounded-full bg-white/90 border border-emerald-200 shadow-md text-emerald-800 text-[10px] font-mono font-bold tracking-wider uppercase animate-pulse">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+        <div className="hidden xl:flex items-center gap-2 absolute top-28 right-16 px-3.5 py-1.5 rounded-full bg-white/95 border border-emerald-200 shadow-md text-emerald-800 text-[10px] font-mono font-bold tracking-wider uppercase">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>UIDAI_EKYC // 256-BIT_XML_VERIFIED</span>
         </div>
 
-        <div className="hidden xl:flex items-center gap-2 absolute bottom-24 left-16 px-3.5 py-1.5 rounded-full bg-white/90 border border-blue-200 shadow-md text-blue-800 text-[10px] font-mono font-bold tracking-wider uppercase">
+        <div className="hidden xl:flex items-center gap-2 absolute bottom-24 left-16 px-3.5 py-1.5 rounded-full bg-white/95 border border-blue-200 shadow-md text-blue-800 text-[10px] font-mono font-bold tracking-wider uppercase">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#155EEF]" />
@@ -126,10 +88,10 @@ export const DigitalDocumentHero: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Main Editorial Hero Split (58% Text / 42% 3D Document) ── */}
-      <div className="max-w-[1400px] mx-auto w-full relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center my-auto py-8">
+      {/* ── Main Editorial Hero Split (54% Text / 46% Clear 3D Exploded Visual) ── */}
+      <div className="max-w-[1400px] mx-auto w-full relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center my-auto py-6">
         {/* Left Column: 3D Layered Text Emergence */}
-        <div className="lg:col-span-7 space-y-6 text-left">
+        <div className="lg:col-span-6 space-y-6 text-left">
           {/* Layer 1: Eyebrow (Z: -500px) */}
           <div
             data-depth-z="-500"
@@ -158,7 +120,7 @@ export const DigitalDocumentHero: React.FC = () => {
             data-blur="8"
             data-stagger="0.15"
           >
-            <h1 className="text-4xl sm:text-6xl lg:text-[68px] font-black text-[#071A33] tracking-tight leading-[1.02] uppercase font-sans">
+            <h1 className="text-4xl sm:text-6xl lg:text-[66px] font-black text-[#071A33] tracking-tight leading-[1.02] uppercase font-sans">
               VERIFY IDENTITY.
             </h1>
           </div>
@@ -172,7 +134,7 @@ export const DigitalDocumentHero: React.FC = () => {
             data-blur="12"
             data-stagger="0.3"
           >
-            <h1 className="text-4xl sm:text-6xl lg:text-[68px] font-black tracking-tight leading-[1.02] uppercase font-sans">
+            <h1 className="text-4xl sm:text-6xl lg:text-[66px] font-black tracking-tight leading-[1.02] uppercase font-sans">
               <span className="bg-gradient-to-r from-[#155EEF] via-[#2563EB] to-[#0A2540] bg-clip-text text-transparent block mt-1">
                 WITHOUT THE PAPER TRAIL.
               </span>
@@ -193,7 +155,7 @@ export const DigitalDocumentHero: React.FC = () => {
             </p>
           </div>
 
-          {/* Layer 5: CTAs (Z: -450px) */}
+          {/* Layer 5: CTAs & Explode Slider (Z: -450px) */}
           <div
             data-depth-z="-450"
             data-rotate-x="15"
@@ -201,33 +163,57 @@ export const DigitalDocumentHero: React.FC = () => {
             data-scale="0.85"
             data-blur="4"
             data-stagger="0.6"
-            className="flex flex-wrap items-center gap-4 pt-2 font-sans"
+            className="space-y-4 pt-1 font-sans"
           >
-            <button
-              type="button"
-              onClick={() => scrollToSection('section-flow')}
-              className="px-7 py-3.5 rounded-xl bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-xs font-mono tracking-wider uppercase shadow-md shadow-[#155EEF]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2.5 cursor-pointer"
-            >
-              <span>EXPLORE VERIFICATION</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => scrollToSection('section-flow')}
+                className="px-7 py-3.5 rounded-xl bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-xs font-mono tracking-wider uppercase shadow-md shadow-[#155EEF]/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2.5 cursor-pointer"
+              >
+                <span>EXPLORE VERIFICATION</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setIsExploded((prev) => !prev)}
-              className={`px-6 py-3.5 rounded-xl font-bold text-xs font-mono tracking-wider uppercase transition-all shadow-xs flex items-center gap-2 cursor-pointer border ${
-                isExploded
-                  ? 'bg-blue-50 border-[#155EEF] text-[#155EEF]'
-                  : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-800'
-              }`}
-            >
-              <Layers className="w-4 h-4 text-[#155EEF]" />
-              <span>{isExploded ? 'COLLAPSE 3D LAYERS' : 'EXPLODE 3D LAYERS'}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setExplosionFactor((prev) => (prev > 0.5 ? 0 : 1))}
+                className={`px-6 py-3.5 rounded-xl font-bold text-xs font-mono tracking-wider uppercase transition-all shadow-xs flex items-center gap-2 cursor-pointer border ${
+                  explosionFactor > 0.5
+                    ? 'bg-blue-50 border-[#155EEF] text-[#155EEF]'
+                    : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-800'
+                }`}
+              >
+                <Layers className="w-4 h-4 text-[#155EEF]" />
+                <span>{explosionFactor > 0.5 ? 'COLLAPSE 3D STACK' : 'EXPLODE 3D STACK'}</span>
+              </button>
+            </div>
+
+            {/* Exploded Separation Controller */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 max-w-md space-y-2 text-left">
+              <div className="flex items-center justify-between text-[11px] font-mono font-bold text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-[#155EEF]" />
+                  <span>3D AXIAL DECOMPOSITION:</span>
+                </span>
+                <span className="text-[#155EEF]">
+                  {Math.round(explosionFactor * 100)}% SEPARATION
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={explosionFactor}
+                onChange={(e) => setExplosionFactor(parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#155EEF]"
+              />
+            </div>
           </div>
 
           {/* Attribution Note */}
-          <div className="pt-3 border-t border-slate-200/80 flex items-center gap-3 text-xs text-slate-500 font-sans">
+          <div className="pt-2 border-t border-slate-200/80 flex items-center gap-3 text-xs text-slate-500 font-sans">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>
               Supports consent-based digital document access via DigiLocker ecosystem standards under MeitY guidelines.
@@ -235,7 +221,7 @@ export const DigitalDocumentHero: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Right Column: 3D Digital Document with 3 Separating Physical Layers ── */}
+        {/* ── Right Column: CRYSTAL CLEAR 3D EXPLODED ARCHITECTURE STAGE ── */}
         <div
           data-depth-z="-900"
           data-rotate-x="18"
@@ -244,46 +230,139 @@ export const DigitalDocumentHero: React.FC = () => {
           data-offset-y="70"
           data-blur="10"
           data-stagger="0.35"
-          className="lg:col-span-5 flex items-center justify-center relative min-h-[500px]"
+          className="lg:col-span-6 flex items-center justify-center relative min-h-[620px] py-4"
         >
-          {/* Master 3D Perspective Frame */}
+          {/* Master 3D Perspective Stage Container with Gyroscopic Hover Response */}
           <div
-            ref={docWrapperRef}
+            ref={stageRef}
             onPointerMove={handlePointerMove}
-            onPointerEnter={() => setIsHovered(true)}
             onPointerLeave={handlePointerLeave}
-            className="relative w-full max-w-[430px] transition-transform duration-200 cursor-pointer"
+            className="relative w-full max-w-[480px] h-[580px] flex flex-col justify-between items-center transition-transform duration-300 select-none"
             style={{
+              perspective: '1500px',
               transformStyle: 'preserve-3d',
-              perspective: '1200px',
+              transform: `perspective(1500px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
             }}
           >
-            {/* ── LAYER 1 (BASE): DOCUMENT SHEET ── */}
+            {/* ── 3D Guide Connecting Line (Visual Axle) ── */}
+            {explosionFactor > 0.2 && (
+              <div
+                className="absolute left-8 top-12 bottom-12 w-0.5 border-l-2 border-dashed border-blue-400/40 pointer-events-none transition-opacity duration-300"
+                style={{
+                  transform: 'translateZ(40px)',
+                  opacity: explosionFactor * 0.8,
+                }}
+              />
+            )}
+
+            {/* ── LAYER 3 (TOP): VERIFICATION & CONSENT PROTOCOL ── */}
             <div
-              ref={layer1Ref}
-              className="relative rounded-2xl bg-white border border-slate-200/90 p-7 shadow-2xl transition-all duration-500"
+              onClick={() => setActiveLayer(activeLayer === 'layer3' ? 'all' : 'layer3')}
+              className={`w-full max-w-[440px] rounded-2xl bg-slate-900 text-white p-5 border transition-all duration-500 cursor-pointer text-left ${
+                activeLayer === 'layer3' || activeLayer === 'all'
+                  ? 'border-emerald-400 shadow-2xl shadow-emerald-500/20'
+                  : 'border-slate-800 opacity-60'
+              }`}
               style={{
                 transformStyle: 'preserve-3d',
-                transform: showLayers
-                  ? 'translateZ(0px) rotateX(4deg) scale(0.98)'
-                  : 'translateZ(0px) rotateX(0deg) scale(1)',
-                boxShadow: showLayers
-                  ? '0 35px 70px -15px rgba(7,26,51,0.22), 0 0 0 1px rgba(21,94,239,0.3)'
-                  : '0 20px 45px -10px rgba(7,26,51,0.12), 0 0 0 1px rgba(226,232,240,0.8)',
+                transform: `translate3d(${explosionFactor * 25}px, ${
+                  (1 - explosionFactor) * 160
+                }px, ${explosionFactor * 140}px)`,
+                zIndex: 30,
               }}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-[11px] font-mono">
+                <span className="flex items-center gap-2 font-black text-emerald-400 tracking-wider uppercase">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  LAYER 03: VERIFICATION
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-[10px]">
+                  CONSENT ACTIVE · 100% PASS
+                </span>
+              </div>
+
+              <div className="pt-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-white font-sans">
+                    Cryptographic Schema Validation
+                  </h4>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    AXIAL Z: +140mm
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                  Explicit customer consent token committed. SHA-256 certificate signature verified against statutory public keys.
+                </p>
+              </div>
+            </div>
+
+            {/* ── LAYER 2 (MIDDLE): ACCREDITED ISSUER & DIGITAL REPOSITORY ── */}
+            <div
+              onClick={() => setActiveLayer(activeLayer === 'layer2' ? 'all' : 'layer2')}
+              className={`w-full max-w-[440px] rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white p-5 border transition-all duration-500 cursor-pointer text-left ${
+                activeLayer === 'layer2' || activeLayer === 'all'
+                  ? 'border-cyan-300 shadow-2xl shadow-blue-600/30'
+                  : 'border-blue-900 opacity-60'
+              }`}
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: `translate3d(${explosionFactor * 12}px, ${
+                  (1 - explosionFactor) * 80
+                }px, ${explosionFactor * 70}px)`,
+                zIndex: 20,
+              }}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-blue-400/30 text-[11px] font-mono">
+                <span className="flex items-center gap-2 font-black text-cyan-200 tracking-wider uppercase">
+                  <Building2 className="w-4 h-4 text-cyan-300" />
+                  LAYER 02: SOURCE & ISSUER
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-cyan-100 font-bold text-[10px]">
+                  ACCREDITED REPOSITORY
+                </span>
+              </div>
+
+              <div className="pt-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-white font-sans">
+                    Digital Issuer Attestation
+                  </h4>
+                  <span className="text-[10px] font-mono text-cyan-200">
+                    AXIAL Z: +70mm
+                  </span>
+                </div>
+                <p className="text-xs text-blue-100 font-sans leading-relaxed">
+                  Direct XML payload retrieval from certified government and institutional issuers. Tamper-evident origin seal intact.
+                </p>
+              </div>
+            </div>
+
+            {/* ── LAYER 1 (BASE): THE STRUCTURED IDENTITY DOCUMENT SHEET ── */}
+            <div
+              onClick={() => setActiveLayer(activeLayer === 'layer1' ? 'all' : 'layer1')}
+              className={`w-full max-w-[440px] rounded-2xl bg-white text-[#071A33] p-6 border transition-all duration-500 cursor-pointer text-left shadow-2xl ${
+                activeLayer === 'layer1' || activeLayer === 'all'
+                  ? 'border-blue-300 ring-2 ring-blue-500/10'
+                  : 'border-slate-200 opacity-60'
+              }`}
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: `translate3d(0px, 0px, 0px)`,
+                zIndex: 10,
+              }}
+            >
+              {/* Card Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200/80 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center">
                     <FileText className="w-4 h-4 text-[#155EEF]" />
                   </div>
                   <div>
                     <span className="text-[11px] font-mono font-bold text-[#071A33] uppercase tracking-wider block">
-                      IDENTITY DOCUMENT
+                      LAYER 01: DOCUMENT BASE
                     </span>
                     <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
-                      DEMONSTRATION DATA
+                      STRUCTURED RECORD PAYLOAD
                     </span>
                   </div>
                 </div>
@@ -294,9 +373,9 @@ export const DigitalDocumentHero: React.FC = () => {
                 </div>
               </div>
 
-              {/* Document Body */}
-              <div className="py-5 space-y-4">
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1 text-left">
+              {/* Document Fields */}
+              <div className="py-4 space-y-3">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 space-y-0.5">
                   <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400">
                     SUBJECT NAME (FICTIONAL)
                   </span>
@@ -306,16 +385,16 @@ export const DigitalDocumentHero: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1 text-left">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-0.5">
                     <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400">
                       DOCUMENT TYPE
                     </span>
                     <p className="text-xs font-bold text-slate-800 font-sans">
-                      VERIFIED DOCUMENT
+                      VERIFIED XML
                     </p>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1 text-left">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-0.5">
                     <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400">
                       REFERENCE ID
                     </span>
@@ -326,86 +405,14 @@ export const DigitalDocumentHero: React.FC = () => {
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              {/* Card Footer */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   <span className="text-[11px] font-medium">Digital Issuer Signature Verified</span>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">256-BIT</span>
               </div>
-            </div>
-
-            {/* ── LAYER 2 (MIDDLE): SEPARATING SOURCE & ISSUER PLATE ── */}
-            <div
-              ref={layer2Ref}
-              className={`absolute inset-x-2 top-0 p-5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-xl pointer-events-none border border-blue-400/40 transition-all duration-500 ${
-                showLayers
-                  ? 'opacity-100'
-                  : 'opacity-0 translate-y-0 scale-95'
-              }`}
-              style={{
-                transformStyle: 'preserve-3d',
-                transform: showLayers
-                  ? 'translateZ(75px) translateY(-32px) rotateX(6deg)'
-                  : 'translateZ(0px) translateY(0px)',
-              }}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-blue-400/40 text-[10px] font-mono">
-                <span className="flex items-center gap-1.5 font-bold text-cyan-200">
-                  <Building2 className="w-3.5 h-3.5" />
-                  LAYER 02: SOURCE
-                </span>
-                <span className="text-blue-200">ACCREDITED ISSUER</span>
-              </div>
-              <div className="pt-3 text-left space-y-1">
-                <p className="text-xs font-bold font-sans">
-                  Digital Repository Attestation
-                </p>
-                <p className="text-[11px] text-blue-100 font-sans">
-                  Origin certificate verified against statutory public key infrastructure.
-                </p>
-              </div>
-            </div>
-
-            {/* ── LAYER 3 (TOP): SEPARATING VERIFICATION & CONSENT PLATE ── */}
-            <div
-              ref={layer3Ref}
-              className={`absolute inset-x-4 -top-3 p-5 rounded-2xl bg-slate-900 text-white shadow-2xl pointer-events-none border border-emerald-500/50 transition-all duration-500 ${
-                showLayers
-                  ? 'opacity-100'
-                  : 'opacity-0 translate-y-0 scale-95'
-              }`}
-              style={{
-                transformStyle: 'preserve-3d',
-                transform: showLayers
-                  ? 'translateZ(145px) translateY(-64px) rotateX(10deg)'
-                  : 'translateZ(0px) translateY(0px)',
-              }}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-[10px] font-mono">
-                <span className="flex items-center gap-1.5 font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  LAYER 03: VERIFICATION
-                </span>
-                <span className="text-slate-400">CONSENT ACTIVE</span>
-              </div>
-              <div className="pt-3 text-left space-y-1">
-                <p className="text-xs font-bold font-sans text-emerald-300">
-                  Verified Schema Integrity
-                </p>
-                <p className="text-[11px] text-slate-300 font-sans">
-                  Explicit consent confirmed · Instant loan onboarding compliance pass.
-                </p>
-              </div>
-            </div>
-
-            {/* Hover / Explode Status Pill */}
-            <div className="pt-3 text-center">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
-                <Eye className="w-3 h-3 text-[#155EEF]" />
-                {showLayers ? '3D MULTI-LAYER DECOMPOSITION EXPANDED' : 'HOVER OR CLICK "EXPLODE 3D LAYERS" TO INSPECT'}
-              </span>
             </div>
           </div>
         </div>
