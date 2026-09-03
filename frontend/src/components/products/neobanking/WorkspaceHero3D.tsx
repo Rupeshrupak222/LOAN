@@ -107,9 +107,46 @@ export const WorkspaceHero3D: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full min-h-[92vh] pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center text-center overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EFF6FF]"
     >
-      {/* Background ambient lighting and grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] [background-size:28px_28px] opacity-40 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[500px] bg-gradient-to-tr from-blue-400/20 via-indigo-500/15 to-teal-400/10 blur-[140px] rounded-full pointer-events-none" />
+      {/* ── UNIQUE 3D DIGITAL NEO-VAULT ATMOSPHERE BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric Neo-Vault Perspective Grid */}
+        <div
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1800px] h-[950px] opacity-35"
+          style={{
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(21, 94, 239, 0.22) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(16, 185, 129, 0.22) 1px, transparent 1px)
+            `,
+            backgroundSize: '48px 48px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 25%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 25%, transparent 80%)',
+          }}
+        />
+
+        {/* Ambient Neo-Vault Treasury Glow */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[600px] bg-gradient-to-br from-blue-500/18 via-teal-400/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-10 right-1/3 translate-x-1/2 w-[650px] h-[600px] bg-gradient-to-bl from-indigo-500/18 via-emerald-400/10 to-transparent blur-[130px] rounded-full" />
+
+        {/* Floating 3D Treasury Status Badges */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-200 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6.5s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>AUTO_SWEEP_YIELD // 7.2% APY</span>
+        </div>
+
+        <div className="absolute top-44 right-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-emerald-200 backdrop-blur-md shadow-md text-[10px] font-mono text-emerald-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7.5s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          <span>MULTI_ENTITY_ESCROW // SYNCED</span>
+        </div>
+
+        {/* Floating Currency Disc Beacons */}
+        <div className="absolute bottom-28 left-[14%] w-8 h-8 rounded-full border border-blue-400/50 flex items-center justify-center text-[10px] font-bold text-blue-600 animate-pulse">
+          ₹
+        </div>
+        <div className="absolute bottom-36 right-[15%] w-8 h-8 rounded-full border border-teal-400/50 flex items-center justify-center text-[10px] font-bold text-teal-600 animate-pulse" style={{ animationDuration: '3s' }}>
+          $
+        </div>
+      </div>
 
       {/* ── Top Narrative Eyebrow ── */}
       <div className="relative z-10 max-w-4xl mx-auto space-y-6 text-center animate-fade-in">
