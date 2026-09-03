@@ -12,9 +12,11 @@ import {
   DollarSign,
   Receipt,
   AlertCircle,
+  AlertTriangle,
   BarChart3,
   KeyRound,
   ShieldCheck,
+  ShieldAlert,
   ScrollText,
   LogOut,
   Menu,
@@ -25,13 +27,24 @@ import {
   Moon,
   Wallet,
   Calculator,
+  Cpu,
+  Scale,
+  Handshake,
+  Mail,
+  Sliders,
+  Palette,
+  Activity,
+  Workflow,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { useBranding } from '@/lib/branding';
 import { cn } from '@/lib/utils';
 import { ROLE_CONFIG, NAV_ITEMS, RoleName, NavItemConfig } from '@/lib/roles';
 import { Spinner } from './ui';
 import { NotificationBell } from './NotificationBell';
+import { CopilotDrawer } from './CopilotDrawer';
+import { WorkflowExceptionCenterModal } from './WorkflowExceptionCenterModal';
 
 const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
@@ -42,16 +55,30 @@ const NAV_ICONS: Record<string, any> = {
   underwriting: FileCheck,
   loans: DollarSign,
   disbursements: Wallet,
+  partners: Handshake,
   payments: Receipt,
   collections: AlertCircle,
+  reconciliation: Scale,
+  communications: Mail,
+  'command-center': Cpu,
+  operations: Activity,
+  compliance: ShieldCheck,
+  privacy: ShieldCheck,
   reports: BarChart3,
+  'fraud-intelligence': ShieldAlert,
+  'early-warnings': AlertTriangle,
   'emi-calculator': Calculator,
   users: KeyRound,
   roles: KeyRound,
+  workflows: Workflow,
   settings: ShieldCheck,
   permissions: ShieldCheck,
   branches: Building2,
+  tenants: Layers,
+  configuration: Sliders,
+  branding: Palette,
   'audit-logs': ScrollText,
+  integrations: Cpu,
 };
 
 const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS', 'ADMINISTRATION'] as const;
@@ -59,11 +86,13 @@ const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS'
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { branding } = useBranding();
   const isDark = theme === 'dark';
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [exceptionCenterOpen, setExceptionCenterOpen] = useState(false);
 
   if (loading) return <Spinner />;
   if (!user) return null;
@@ -124,19 +153,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Brand Header */}
         <div className="flex h-16 flex-none items-center justify-between px-5 border-b border-[#1E2445]/80">
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2563EB] text-white font-bold shadow-sm shadow-[#2563EB]/25">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-bold shadow-sm"
+              style={{ backgroundColor: branding?.primaryColor || '#2563EB' }}
+            >
               <Layers className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white tracking-tight leading-none">
-                {primaryRole === 'CUSTOMER' ? 'ADYAPAN PORTAL' : primaryRole === 'AUDITOR' ? 'ADYAPAN AUDIT' : 'ADYAPAN LMS'}
+              <p className="text-sm font-bold text-white tracking-tight leading-none truncate max-w-[170px]">
+                {primaryRole === 'CUSTOMER'
+                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} PORTAL`
+                  : primaryRole === 'AUDITOR'
+                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} AUDIT`
+                  : (branding.portalTitle || branding.institutionName).toUpperCase()}
               </p>
-              <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+              <p className="text-[10px] font-medium text-slate-400 mt-0.5 truncate max-w-[170px]">
                 {primaryRole === 'CUSTOMER'
                   ? 'Borrower Self-Service'
                   : primaryRole === 'AUDITOR'
                   ? 'Compliance & Audit'
-                  : roleCfg.label}
+                  : branding.tagline || roleCfg.label}
               </p>
             </div>
           </Link>
@@ -303,6 +339,27 @@ export function AppShell({ children }: { children: ReactNode }) {
               )}
             </button>
 
+            {/* AI Workflow & Exception Center Button (For Staff) */}
+            {primaryRole !== 'CUSTOMER' && (
+              <button
+                type="button"
+                onClick={() => setExceptionCenterOpen(true)}
+                title="AI Workflow & Operational Exception Center"
+                className={cn(
+                  "flex h-8 items-center gap-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer",
+                  isDark
+                    ? "border-rose-900/50 bg-rose-950/40 text-rose-300 hover:bg-rose-900/40"
+                    : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                )}
+              >
+                <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />
+                <span className="hidden md:inline">Exceptions</span>
+              </button>
+            )}
+
+            {/* AI Copilot Gemini Assistant */}
+            <CopilotDrawer />
+
             {/* Live Interactive Notification Bell */}
             <NotificationBell />
 
@@ -356,6 +413,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </main>
       </div>
+
+      {/* AI Workflow & Exception Center Modal */}
+      {exceptionCenterOpen && (
+        <WorkflowExceptionCenterModal
+          isOpen={exceptionCenterOpen}
+          onClose={() => setExceptionCenterOpen(false)}
+        />
+      )}
     </div>
   );
 }

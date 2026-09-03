@@ -120,7 +120,7 @@ export const InteractiveHeroVisual: React.FC<InteractiveHeroVisualProps> = ({ pr
                   <span className={tx.amount.startsWith('+') ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                     {tx.amount}
                   </span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     {tx.status}
                   </span>
                 </div>

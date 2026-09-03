@@ -3,6 +3,7 @@ import { NotFoundError } from '../../common/errors';
 import { calculateEmi } from '../finance/emi';
 import { Money } from '../finance/money';
 import { logAudit } from '../audit/audit.service';
+import { configurationService } from '../configuration/configuration.service';
 
 export interface EligibilityEvaluationResult {
   result: 'ELIGIBLE' | 'CONDITIONALLY_ELIGIBLE' | 'NOT_ELIGIBLE';
@@ -18,7 +19,8 @@ export interface EligibilityEvaluationResult {
 
 export async function evaluateApplicationEligibility(
   applicationId: string,
-  actorUserId?: string
+  actorUserId?: string,
+  tenantId: string = 'tenant-adyapan-default'
 ): Promise<EligibilityEvaluationResult> {
   const app = await prisma.loanApplication.findUnique({
     where: { id: applicationId },
@@ -38,23 +40,16 @@ export async function evaluateApplicationEligibility(
   const monthlyIncome = customer.monthlyIncome ? Number(customer.monthlyIncome) : 0;
   const existingObligations = customer.existingObligations ? Number(customer.existingObligations) : 0;
 
-  // Fetch dynamic policy criteria from SystemSetting
-  const criteriaSetting = await prisma.systemSetting.findUnique({
-    where: { key: 'eligibility_criteria' },
-  });
-  const criteria = (criteriaSetting?.value as any) || {
-    minAge: 21,
-    maxAge: 60,
-    maxDtiRatio: 0.55,
-    warningDtiRatio: 0.45,
-    minSalariedIncome: 25000,
-    minBusinessIncome: 50000,
-  };
+  // Fetch tenant-specific policy parameters from configurationService with strict precedence
+  const tenantFoirConfig = configurationService.getTenantConfig<any>(tenantId, 'FOIR_DTI');
+  const tenantEligibilityConfig = configurationService.getTenantConfig<any>(tenantId, 'ELIGIBILITY');
 
-  const minAge = Number(criteria.minAge ?? 21);
-  const maxAge = Number(criteria.maxAge ?? 60);
-  const maxAllowedDti = Number(criteria.maxDtiRatio ?? 0.55);
-  const warningDti = Number(criteria.warningDtiRatio ?? 0.45);
+  const minAge = Number(tenantEligibilityConfig.minAge ?? 21);
+  const maxAge = Number(tenantEligibilityConfig.maxAge ?? 60);
+  const maxAllowedDti = Number(tenantFoirConfig.maxDtiRatio ?? 0.55);
+  const warningDti = Number(tenantFoirConfig.warningDtiRatio ?? 0.45);
+  const minSalaried = Number(tenantEligibilityConfig.minSalariedIncome ?? 25000);
+  const minBusiness = Number(tenantEligibilityConfig.minBusinessIncome ?? 50000);
 
   // Calculate estimated EMI
   const emiCalc = calculateEmi(requestedAmount, interestRate, tenure);
@@ -81,9 +76,7 @@ export async function evaluateApplicationEligibility(
   }
 
   // 2. Minimum Income Factor
-  const minRequiredIncome = product.productType === 'BUSINESS'
-    ? Number(criteria.minBusinessIncome ?? 50000)
-    : Number(criteria.minSalariedIncome ?? 25000);
+  const minRequiredIncome = product.productType === 'BUSINESS' ? minBusiness : minSalaried;
   if (monthlyIncome >= minRequiredIncome) {
     factors.push({
       factor: 'Minimum Monthly Income',

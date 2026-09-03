@@ -30,12 +30,19 @@ import {
   Pencil,
   Eye,
   EyeOff,
+  Sparkles,
+  ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDate, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { DocumentIntelligenceModal } from '@/components/DocumentIntelligenceModal';
+import { Customer360IntelligenceModal } from '@/components/Customer360IntelligenceModal';
+import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
+import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -51,7 +58,7 @@ export default function CustomerDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections'
+    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
   >('overview');
 
   // KYC modal state
@@ -84,6 +91,8 @@ export default function CustomerDetailPage() {
   const [accountTypeInput, setAccountTypeInput] = useState<'SAVINGS' | 'CURRENT' | 'SALARY'>('SAVINGS');
   const [isPrimaryBankInput, setIsPrimaryBankInput] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [aiDocSelected, setAiDocSelected] = useState<any | null>(null);
+  const [customer360Open, setCustomer360Open] = useState(false);
 
   // Edit Customer Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -297,6 +306,8 @@ export default function CustomerDetailPage() {
     { id: 'loans', label: `Loans (${loans.length})`, icon: Wallet },
     { id: 'payments', label: `Payments (${payments.length})`, icon: Receipt },
     { id: 'collections', label: `Collections (${collectionCases.length})`, icon: AlertCircle },
+    { id: 'bank_intelligence', label: 'Bank Statement Intelligence', icon: Building2 },
+    { id: 'fraud', label: 'Fraud & Anomaly', icon: ShieldAlert },
   ];
 
   return (
@@ -311,6 +322,13 @@ export default function CustomerDetailPage() {
             <Badge status={data.status} />
             <Badge status={data.kycStatus} />
             {data.riskCategory && <Badge status={data.riskCategory} />}
+            <Button
+              size="sm"
+              onClick={() => setCustomer360Open(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold shadow-md cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
+            </Button>
             {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
@@ -556,6 +574,14 @@ export default function CustomerDetailPage() {
                               <ExternalLink className="h-3 w-3" /> Open
                             </a>
                           )}
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="text-xs h-7 px-2.5 gap-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            onClick={() => setAiDocSelected(doc)}
+                          >
+                            <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
+                          </Button>
                           <Button
                             size="sm"
                             variant="secondary"
@@ -888,6 +914,16 @@ export default function CustomerDetailPage() {
             </p>
           )}
         </Card>
+      )}
+
+      {/* Tab 8: Bank Statement Intelligence */}
+      {activeTab === 'bank_intelligence' && (
+        <BankStatementIntelligenceCard customerId={params.id} />
+      )}
+
+      {/* Tab 9: Fraud & Anomaly Intelligence */}
+      {activeTab === 'fraud' && (
+        <FraudIntelligenceCard customerId={params.id} customerCode={data.customerCode} />
       )}
 
       {/* KYC Update Modal */}
@@ -1685,6 +1721,26 @@ export default function CustomerDetailPage() {
             </form>
           </Card>
         </div>
+      )}
+
+      {/* Document Intelligence Modal */}
+      {aiDocSelected && (
+        <DocumentIntelligenceModal
+          document={aiDocSelected}
+          isOpen={!!aiDocSelected}
+          onClose={() => setAiDocSelected(null)}
+        />
+      )}
+
+      {/* Customer 360 Intelligence Modal */}
+      {customer360Open && (
+        <Customer360IntelligenceModal
+          customerId={params.id}
+          customerCode={data.customerCode}
+          customerName={`${data.firstName} ${data.lastName}`}
+          isOpen={customer360Open}
+          onClose={() => setCustomer360Open(false)}
+        />
       )}
     </div>
   );

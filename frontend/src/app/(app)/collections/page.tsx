@@ -12,18 +12,21 @@ import {
   CheckCircle2,
   Users,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { CollectionsIntelligenceModal } from '@/components/CollectionsIntelligenceModal';
 
 export default function CollectionsPage() {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [selectedBucket, setSelectedBucket] = useState('');
   const [selectedCase, setSelectedCase] = useState<any | null>(null);
+  const [aiCaseSelected, setAiCaseSelected] = useState<any | null>(null);
 
   // Modals
   const [activityModalOpen, setActivityModalOpen] = useState(false);
@@ -224,6 +227,14 @@ export default function CollectionsPage() {
                         <Button
                           size="sm"
                           variant="secondary"
+                          onClick={() => setAiCaseSelected(c)}
+                          className="text-xs py-1 gap-1 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/60 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                        >
+                          <Sparkles className="h-3 w-3 text-amber-500" /> AI Brief
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={() => {
                             setSelectedCase(c);
                             setActivityModalOpen(true);
@@ -412,6 +423,15 @@ export default function CollectionsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Collections Intelligence Modal */}
+      {aiCaseSelected && (
+        <CollectionsIntelligenceModal
+          colCase={aiCaseSelected}
+          isOpen={!!aiCaseSelected}
+          onClose={() => setAiCaseSelected(null)}
+        />
       )}
     </div>
   );

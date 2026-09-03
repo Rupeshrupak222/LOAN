@@ -63,6 +63,7 @@ import { useTheme } from '@/lib/theme';
 import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
+import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -716,6 +717,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* AI Executive Decision Intelligence Card (For Staff & Managers) */}
+      {primaryRole !== 'CUSTOMER' && <DecisionIntelligenceCard />}
+
       {/* ========================================================================= */}
       {/* 2. ROLE-SPECIFIC DASHBOARD SECTIONS                                       */}
       {/* ========================================================================= */}
@@ -1185,7 +1189,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-900 dark:text-white">{c.customerName || 'Borrower'}</span>
                             <span className="font-mono text-[10px] text-slate-400">Loan #{c.loanNo}</span>
-                            <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
                               {c.dpd} DPD ({c.agingBucket})
                             </span>
                           </div>
