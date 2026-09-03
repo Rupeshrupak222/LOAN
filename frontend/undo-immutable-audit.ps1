@@ -1,9 +1,9 @@
-# Undo script for Immutable Audit Trail redesign (The Record That Cannot Be Rewritten)
-# Baseline commit: db22da895a6ec89f280a969b76dbb4249a5b6f3b
+# Undo script for Immutable Audit Trail redesign (The Unbreakable Chain of Truth)
+# Baseline commit: e7d87d402aafe8e32906ecaa6f387f3942007011
 
-Write-Host "Reverting Immutable Audit Trail changes..." -ForegroundColor Yellow
+Write-Host "Reverting Immutable Audit Trail changes to Unbreakable Chain of Truth baseline..." -ForegroundColor Yellow
 
-$targetCommit = "db22da895a6ec89f280a969b76dbb4249a5b6f3b"
+$targetCommit = "e7d87d402aafe8e32906ecaa6f387f3942007011"
 
 # Restore modified page
 git checkout $targetCommit -- src/app/products/immutable-audit-trail/page.tsx

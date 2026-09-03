@@ -7,103 +7,63 @@ import { GsapProvider } from '@/components/motion/GsapProvider';
 import { MotionNavbar } from '@/components/motion/MotionNavbar';
 import { FintechFooter } from '@/components/fintech/FintechFooter';
 
-// The Record That Cannot Be Rewritten Signature Scenes
-import { AuditRoomHero } from '@/components/products/immutable-audit-trail/AuditRoomHero';
-import { TamperDetectionStatement } from '@/components/products/immutable-audit-trail/TamperDetectionStatement';
-import { AppendOnlyLedgerStrip } from '@/components/products/immutable-audit-trail/AppendOnlyLedgerStrip';
-import { RecordAnatomyDocument } from '@/components/products/immutable-audit-trail/RecordAnatomyDocument';
-import { LiveChronologyClock } from '@/components/products/immutable-audit-trail/LiveChronologyClock';
-import { LiveAuditFeedStream } from '@/components/products/immutable-audit-trail/LiveAuditFeedStream';
-import { InteractiveIntegrityVerifier } from '@/components/products/immutable-audit-trail/InteractiveIntegrityVerifier';
-import { TamperSimulationSandbox } from '@/components/products/immutable-audit-trail/TamperSimulationSandbox';
-import { ForensicCaseHistory } from '@/components/products/immutable-audit-trail/ForensicCaseHistory';
-import { ArchiveFilterTabs } from '@/components/products/immutable-audit-trail/ArchiveFilterTabs';
-import { ArchiveSearchConsole } from '@/components/products/immutable-audit-trail/ArchiveSearchConsole';
-import { ComplianceContextMatrix } from '@/components/products/immutable-audit-trail/ComplianceContextMatrix';
-import { AuditInfrastructureSchematic } from '@/components/products/immutable-audit-trail/AuditInfrastructureSchematic';
-import { OperationalVolumeCounter } from '@/components/products/immutable-audit-trail/OperationalVolumeCounter';
-import { ForensicAuditConsole } from '@/components/products/immutable-audit-trail/ForensicAuditConsole';
-import { StackedVersionSheets } from '@/components/products/immutable-audit-trail/StackedVersionSheets';
-import { FinalArchiveWallCTA } from '@/components/products/immutable-audit-trail/FinalArchiveWallCTA';
+// M2P Fintech-Inspired High-Density Infrastructure Suite
+import { M2PStyleAuditHero } from '@/components/products/immutable-audit-trail/M2PStyleAuditHero';
+import { OperationalMetricsRibbon } from '@/components/products/immutable-audit-trail/OperationalMetricsRibbon';
+import { CoreAuditStackSuite } from '@/components/products/immutable-audit-trail/CoreAuditStackSuite';
+import { BuiltForScaleGrid } from '@/components/products/immutable-audit-trail/BuiltForScaleGrid';
+import { LiveAuditExplorerConsole } from '@/components/products/immutable-audit-trail/LiveAuditExplorerConsole';
+import { RegulatoryComplianceMatrix } from '@/components/products/immutable-audit-trail/RegulatoryComplianceMatrix';
+import { EnterpriseClosingCTA } from '@/components/products/immutable-audit-trail/EnterpriseClosingCTA';
 
-export default function ImmutableAuditTrailSignaturePage() {
+export default function ImmutableAuditTrailPage() {
   return (
     <GsapProvider>
-      <div className="min-h-screen bg-[#F8FAFC] text-[#071A33] selection:bg-slate-900 selection:text-white relative overflow-x-hidden font-sans">
+      <div className="min-h-screen bg-white text-[#071A33] selection:bg-[#155EEF] selection:text-white relative overflow-x-hidden font-sans">
         {/* ── Global Navigation Bar ── */}
         <MotionNavbar />
 
         {/* ── Top Context Breadcrumb & Back Link ── */}
-        <div className="pt-28 sm:pt-32 pb-4 border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+        <div className="pt-24 sm:pt-28 pb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-40">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 flex items-center justify-between">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-xs font-mono font-bold text-slate-700 hover:text-black transition-colors py-1 px-3 border border-slate-300 shadow-xs uppercase tracking-wider"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 hover:text-[#155EEF] transition-colors py-1 px-3 border border-slate-200 rounded-md bg-slate-50 hover:bg-white shadow-xs"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>← Back to Financial Architecture</span>
+              <span>Back to Products</span>
             </Link>
 
-            <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 uppercase">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-medium">
               <span>Adyapan</span>
               <span>/</span>
-              <span className="text-slate-700 font-bold">Compliance & Governance</span>
+              <span>Compliance &amp; Infrastructure</span>
               <span>/</span>
               <span className="text-[#155EEF] font-bold">Immutable Audit Trail</span>
             </div>
           </div>
         </div>
 
-        {/* ── SCENE 1: Full-Screen Audit Room & Massive Digital Record Hero ── */}
-        <AuditRoomHero />
+        {/* ── SECTION 1: High-Density Split Hero Console ── */}
+        <M2PStyleAuditHero />
 
-        {/* ── SCENE 2: The Past Should Stay The Past (Tamper Detection) ── */}
-        <TamperDetectionStatement />
+        {/* ── SECTION 2: Full-Width 6-Metric Scale Ribbon ── */}
+        <OperationalMetricsRibbon />
 
-        {/* ── SCENE 3: Continuous Append-Only Ledger Strip ── */}
-        <AppendOnlyLedgerStrip />
+        {/* ── SECTION 3: 6 Numbered Capability Deep-Dives with AI & System Agents ── */}
+        <CoreAuditStackSuite />
 
-        {/* ── SCENE 4: Record Anatomy 10-Field Document ── */}
-        <RecordAnatomyDocument />
+        {/* ── SECTION 4: Built for Speed, Scale & Intelligence 4-Quadrant Grid ── */}
+        <BuiltForScaleGrid />
 
-        {/* ── SCENE 5: Live Chronology Clock & Synchronized Timestamps ── */}
-        <LiveChronologyClock />
+        {/* ── SECTION 5: Live Operational Audit Explorer & Query Console ── */}
+        <LiveAuditExplorerConsole />
 
-        {/* ── SCENE 6: Streaming Operational Audit Feed ── */}
-        <LiveAuditFeedStream />
+        {/* ── SECTION 6: Statutory Regulatory Compliance & Evidence Matrix ── */}
+        <RegulatoryComplianceMatrix />
 
-        {/* ── SCENE 7: Interactive Integrity Verification Bench ── */}
-        <InteractiveIntegrityVerifier />
-
-        {/* ── SCENE 8: Interactive Tamper Simulation Sandbox ── */}
-        <TamperSimulationSandbox />
-
-        {/* ── SCENE 9: Forensic Case Lifecycle Dossier ── */}
-        <ForensicCaseHistory />
-
-        {/* ── SCENE 10: Editorial Archive Filter Tabs ── */}
-        <ArchiveFilterTabs />
-
-        {/* ── SCENE 11: Forensic Query Search Console ── */}
-        <ArchiveSearchConsole />
-
-        {/* ── SCENE 12: Compliance Context Matrix ── */}
-        <ComplianceContextMatrix />
-
-        {/* ── SCENE 13: Audit Infrastructure Layer Schematic ── */}
-        <AuditInfrastructureSchematic />
-
-        {/* ── SCENE 14: Operational Volume Throughput Counter ── */}
-        <OperationalVolumeCounter />
-
-        {/* ── SCENE 15: Forensic Audit Operations Console ── */}
-        <ForensicAuditConsole />
-
-        {/* ── SCENE 16: Stacked Version Revision Sheets ── */}
-        <StackedVersionSheets />
-
-        {/* ── SCENE 17: Canonical Record Re-anchor & Closing CTAs ── */}
-        <FinalArchiveWallCTA />
+        {/* ── SECTION 7: High-Impact Enterprise Closing Call-to-Action ── */}
+        <EnterpriseClosingCTA />
 
         {/* ── Global Footer ── */}
         <FintechFooter />
