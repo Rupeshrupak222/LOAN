@@ -46,15 +46,43 @@ export const FinancialXRayHero: React.FC = () => {
       className="relative min-h-[95vh] flex flex-col justify-between py-16 sm:py-24 px-4 sm:px-8 lg:px-12 bg-[#F8FAFC] text-[#071A33] overflow-hidden border-b border-slate-200 select-none"
       style={{ contain: 'paint layout' }}
     >
-      {/* ── Precision Technical Blueprint Grid ── */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.035]">
+      {/* ── UNIQUE 3D FINANCIAL X-RAY VOLUMETRIC FIELD BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric Diagnostic X-Ray Floor Grid */}
         <div
-          className="w-full h-full"
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1850px] h-[920px] opacity-35"
           style={{
-            backgroundImage: `linear-gradient(to right, #071A33 1px, transparent 1px), linear-gradient(to bottom, #071A33 1px, transparent 1px)`,
-            backgroundSize: '40px 40px',
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(6, 182, 212, 0.28) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(21, 94, 239, 0.22) 1px, transparent 1px)
+            `,
+            backgroundSize: '46px 46px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
           }}
         />
+
+        {/* Volumetric Diagnostic X-Ray Glows */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[550px] bg-gradient-to-br from-cyan-400/18 via-blue-600/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-10 right-1/3 translate-x-1/2 w-[650px] h-[550px] bg-gradient-to-bl from-slate-900/15 via-cyan-500/10 to-transparent blur-[130px] rounded-full" />
+
+        {/* Floating 3D Diagnostic Telemetry Badges */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-cyan-300 backdrop-blur-md shadow-md text-[10px] font-mono text-cyan-900 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+          <span>BUREAU_DATA_APERTURE // REALTIME_V3</span>
+        </div>
+
+        <div className="absolute top-44 right-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-300 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+          <span>MAX_OBLIGATION_RATIO // &lt;40%_CAP</span>
+        </div>
+
+        {/* Floating X-Ray reticle crosshairs */}
+        <div className="absolute bottom-28 left-[14%] w-8 h-8 border border-cyan-500/40 rounded-full flex items-center justify-center text-[10px] font-mono text-cyan-600 animate-pulse">
+          +
+        </div>
+        <div className="absolute bottom-36 right-[15%] w-7 h-7 border border-blue-500/40 rotate-45 animate-spin" style={{ animationDuration: '24s' }} />
       </div>
 
       {/* Top Editorial Header Bar */}

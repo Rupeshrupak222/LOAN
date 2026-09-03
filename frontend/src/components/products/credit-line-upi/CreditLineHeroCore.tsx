@@ -54,16 +54,41 @@ export const CreditLineHeroCore: React.FC = () => {
       className="relative min-h-[92vh] flex items-center justify-center py-20 sm:py-28 px-4 sm:px-8 bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EEF4FB] text-[#071A33] overflow-hidden border-b border-slate-200 select-none"
       style={{ contain: 'paint layout' }}
     >
-      {/* ── Background Architectural Grids & Radial Energy Glow ── */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-500/8 rounded-full blur-[200px]" />
+      {/* ── UNIQUE 3D NPCI REVOLVING CREDIT AURA BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric Revolving Grid */}
         <div
-          className="absolute inset-0 opacity-[0.035]"
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1850px] h-[920px] opacity-35"
           style={{
-            backgroundImage: `radial-gradient(#071A33 1px, transparent 1px)`,
-            backgroundSize: '32px 32px',
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(0, 210, 255, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(21, 94, 239, 0.25) 1px, transparent 1px)
+            `,
+            backgroundSize: '46px 46px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
           }}
         />
+
+        {/* Volumetric UPI Energy Glows */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[550px] bg-gradient-to-br from-cyan-400/18 via-blue-600/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-10 right-1/3 translate-x-1/2 w-[650px] h-[550px] bg-gradient-to-bl from-indigo-500/16 via-teal-400/10 to-transparent blur-[130px] rounded-full" />
+
+        {/* Floating 3D UPI Credit Line Telemetry */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-cyan-200 backdrop-blur-md shadow-md text-[10px] font-mono text-cyan-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+          <span>NPCI_CREDIT_LINE // LINKED_TO_VPA</span>
+        </div>
+
+        <div className="absolute top-44 right-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-200 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+          <span>DRAWDOWN_SETTLEMENT // SUB_500MS</span>
+        </div>
+
+        {/* Floating UPI revolving credit halo rings */}
+        <div className="absolute bottom-28 left-[14%] w-8 h-8 rounded-full border-2 border-cyan-400/50 rotate-45 animate-pulse" />
+        <div className="absolute bottom-36 right-[15%] w-7 h-7 rounded border border-blue-400/50 rotate-12 animate-spin" style={{ animationDuration: '20s' }} />
       </div>
 
       <div className="max-w-7xl mx-auto w-full relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">

@@ -45,7 +45,44 @@ export const M2PStyleAuditHero: React.FC = () => {
       className="relative py-16 sm:py-20 lg:py-24 px-4 sm:px-8 lg:px-12 bg-white text-[#071A33] overflow-hidden border-b border-slate-200"
       style={{ contain: 'paint layout' }}
     >
-      <div className="max-w-[1400px] mx-auto">
+      {/* ── UNIQUE 3D WORM CRYPTOGRAPHIC BLOCK STRATUM BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric Cryptographic Block Grid */}
+        <div
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1850px] h-[920px] opacity-35"
+          style={{
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(16, 185, 129, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(21, 94, 239, 0.25) 1px, transparent 1px)
+            `,
+            backgroundSize: '46px 46px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+          }}
+        />
+
+        {/* Volumetric Cryptographic Security Flares */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[550px] bg-gradient-to-br from-emerald-500/18 via-teal-400/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-10 right-1/3 translate-x-1/2 w-[650px] h-[550px] bg-gradient-to-bl from-blue-600/18 via-indigo-500/12 to-transparent blur-[130px] rounded-full" />
+
+        {/* Floating 3D Cryptographic Telemetry Badges */}
+        <div className="absolute top-28 left-[6%] px-3 py-1.5 rounded-lg bg-white/85 border border-emerald-200 backdrop-blur-md shadow-md text-[10px] font-mono text-emerald-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>WORM_APPEND_ONLY // 7_YR_REGULATORY_SEAL</span>
+        </div>
+
+        <div className="absolute top-40 right-[6%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-200 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          <span>MERKLE_TREE_ROOT // ZERO_TAMPER_DRIFT</span>
+        </div>
+
+        {/* Floating Cryptographic Cube Wireframes */}
+        <div className="absolute bottom-24 left-[12%] w-8 h-8 border-2 border-emerald-400/50 rotate-45 animate-pulse" />
+        <div className="absolute bottom-32 right-[14%] w-7 h-7 border border-blue-400/50 rotate-12 animate-spin" style={{ animationDuration: '20s' }} />
+      </div>
+
+      <div className="max-w-[1400px] mx-auto relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           {/* ── LEFT COLUMN (55%): HIGH-IMPACT HEADLINE & INFRASTRUCTURE NARRATIVE ── */}
           <div className="lg:col-span-7 space-y-6 text-left">

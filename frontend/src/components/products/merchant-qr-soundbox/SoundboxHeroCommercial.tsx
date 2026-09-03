@@ -156,25 +156,45 @@ export const SoundboxHeroCommercial: React.FC = () => {
       className="relative min-h-[95vh] flex flex-col items-center justify-between pt-10 pb-20 px-4 sm:px-8 overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EEF4FB] text-[#071A33] select-none border-b border-slate-200"
       style={{ contain: 'paint layout' }}
     >
-      {/* ── Architectural Studio Lighting & Surface Refinement ── */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* Overhead Soft Keylight */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-blue-500/5 rounded-full blur-3xl" />
-        {/* Soft Directional Rim Light */}
-        <div className="absolute bottom-1/3 right-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-3xl" />
-        {/* Subtle Architectural Counter Surface Grid in Perspective */}
+      {/* ── UNIQUE 3D ACOUSTIC WAVEFORM CHAMBER BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric Acoustic Floor Grid */}
         <div
-          className="absolute inset-x-0 bottom-0 h-96 opacity-25"
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1850px] h-[920px] opacity-35"
           style={{
-            backgroundImage:
-              'linear-gradient(to right, rgba(15,23,42,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.06) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            transform: 'perspective(700px) rotateX(65deg) translateY(60px)',
-            transformOrigin: '50% 100%',
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(245, 158, 11, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(21, 94, 239, 0.25) 1px, transparent 1px)
+            `,
+            backgroundSize: '46px 46px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
           }}
         />
-        {/* Thin Perspective Axis Lines */}
-        <div className="absolute inset-x-0 bottom-24 h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
+
+        {/* Acoustic Chamber Flares */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[550px] bg-gradient-to-br from-amber-400/18 via-orange-500/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-10 right-1/3 translate-x-1/2 w-[650px] h-[550px] bg-gradient-to-bl from-blue-600/18 via-indigo-500/12 to-transparent blur-[130px] rounded-full" />
+
+        {/* Concentric Acoustic Soundwave Radiations */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[580px] h-[580px] rounded-full border border-amber-300/30 animate-ping pointer-events-none" style={{ animationDuration: '7s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[780px] h-[780px] rounded-full border border-dashed border-blue-300/25 pointer-events-none" />
+
+        {/* Floating 3D Audio Telemetry Badges */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-amber-200 backdrop-blur-md shadow-md text-[10px] font-mono text-amber-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span>4G_VoLTE_CHIME // DUAL_SPEAKER_120dB</span>
+        </div>
+
+        <div className="absolute top-44 right-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-200 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+          <span>INSTANT_AUDIO_BROADCAST // SUB_300MS</span>
+        </div>
+
+        {/* Floating Acoustic Waveform rings */}
+        <div className="absolute bottom-28 left-[14%] w-8 h-8 rounded-full border-2 border-amber-400/50 rotate-45 animate-pulse" />
+        <div className="absolute bottom-36 right-[15%] w-7 h-7 border border-blue-400/50 rotate-12 animate-spin" style={{ animationDuration: '16s' }} />
       </div>
 
       {/* ── TOP PRODUCT IDENTITY & EDITORIAL HEADLINE ── */}
