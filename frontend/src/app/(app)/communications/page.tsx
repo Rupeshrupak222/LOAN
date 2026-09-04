@@ -28,10 +28,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 export default function CommunicationsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<'LOGS' | 'TEMPLATES' | 'COMPLIANCE'>('LOGS');
   const [channelFilter, setChannelFilter] = useState<string>('ALL');
@@ -68,7 +70,8 @@ export default function CommunicationsPage() {
       const params = new URLSearchParams();
       if (channelFilter !== 'ALL') params.set('channel', channelFilter);
       if (statusFilter !== 'ALL') params.set('status', statusFilter);
-      return (await api.get(`/communications/logs?${params.toString()}`)).data.data;
+      const res = await api.get(`/communications/logs?${params.toString()}`);
+      return res.data?.data || [];
     },
   });
 
@@ -115,10 +118,10 @@ export default function CommunicationsPage() {
       setShowSendModal(false);
       queryClient.invalidateQueries({ queryKey: ['communications-logs'] });
       queryClient.invalidateQueries({ queryKey: ['communications-stats'] });
-      alert(`Communication record #${data.id} dispatched via ${data.channel} (Status: ${data.deliveryStatus}).`);
+      toast.success('Communication Dispatched', `Record #${data.id} dispatched via ${data.channel} (Status: ${data.deliveryStatus}).`);
     },
     onError: (err: any) => {
-      alert(`Dispatch failed: ${apiErrorMessage(err)}`);
+      toast.error('Dispatch Failed', apiErrorMessage(err));
     },
   });
 

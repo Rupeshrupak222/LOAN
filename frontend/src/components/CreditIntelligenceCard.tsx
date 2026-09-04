@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
 
@@ -60,6 +61,7 @@ interface Props {
 
 export function CreditIntelligenceCard({ applicationId, applicationNo, initialData }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<CreditIntelligenceData | null>(initialData || null);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -70,9 +72,10 @@ export function CreditIntelligenceCard({ applicationId, applicationNo, initialDa
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Credit Intelligence analysis generated successfully.');
     },
     onError: (err: any) => {
-      alert(`Credit Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Credit Intelligence Notice' });
     },
   });
 

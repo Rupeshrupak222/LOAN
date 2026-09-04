@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Card, Button, Badge, Spinner } from './ui';
 
@@ -41,6 +42,7 @@ export function AdvancedDecisionIntelligenceCard({
   applicationNo,
 }: AdvancedDecisionIntelligenceCardProps) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'SUMMARY' | 'FACTORS' | 'CONFLICTS' | 'QUESTIONS' | 'CHANGES'>('SUMMARY');
   const [factorFilter, setFactorFilter] = useState<'ALL' | 'POSITIVE' | 'ATTENTION' | 'HIGH_RISK' | 'BLOCKING'>('ALL');
@@ -60,10 +62,11 @@ export function AdvancedDecisionIntelligenceCard({
       return res.data?.data;
     },
     onSuccess: () => {
+      toast.success('Decision Intelligence refreshed.');
       refetch();
     },
     onError: (err: any) => {
-      alert(`Decision intelligence refresh failed: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Decision Intelligence Notice' });
     },
   });
 

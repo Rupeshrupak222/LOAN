@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge } from '@/components/ui';
@@ -40,6 +41,7 @@ import {
 
 export default function FraudIntelligencePage() {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<FraudIntelligenceData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('ALL');
@@ -53,9 +55,10 @@ export default function FraudIntelligencePage() {
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Portfolio Scan Complete', 'AI Fraud Intelligence evaluated portfolio risk.');
     },
     onError: (err: any) => {
-      alert(`Portfolio Fraud Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error('Fraud Intelligence Error', apiErrorMessage(err));
     },
   });
 
@@ -186,7 +189,7 @@ export default function FraudIntelligencePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               title="Investigation Priority"
-              value={data.investigationPriority}
+              value={data.investigationPriority || 'Routine'}
               hint="Overall AI Risk Posture"
               icon={ShieldAlert}
               trend={data.investigationPriority === 'Critical' ? 'Urgent Action' : 'Monitored'}
@@ -194,13 +197,13 @@ export default function FraudIntelligencePage() {
             />
             <KpiCard
               title="Critical Red Flags"
-              value={String(data.criticalCount)}
+              value={String(data.criticalCount ?? 0)}
               hint="Multi-borrower accounts & contact pools"
               icon={AlertTriangle}
             />
             <KpiCard
               title="High Priority Signals"
-              value={String(data.highCount)}
+              value={String(data.highCount ?? 0)}
               hint="Velocity spikes & recycled documents"
               icon={Activity}
             />
@@ -222,9 +225,9 @@ export default function FraudIntelligencePage() {
                 </h3>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <span>Model: {data.model}</span>
+                <span>Model: {data.model || 'Gemini 2.5'}</span>
                 <span>•</span>
-                <span>Data As Of: {new Date(data.dataAsOf).toLocaleTimeString()}</span>
+                <span>Data As Of: {data.dataAsOf ? new Date(data.dataAsOf).toLocaleTimeString() : 'Current Session'}</span>
                 {data.isCached && (
                   <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[10px]">
                     CACHED
@@ -234,7 +237,7 @@ export default function FraudIntelligencePage() {
             </div>
 
             <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
-              {data.summary}
+              {data.summary || data.executiveSummary}
             </p>
 
             {/* Recommended Human Actions & Gaps */}
@@ -244,7 +247,7 @@ export default function FraudIntelligencePage() {
                   Recommended Human Verification Steps:
                 </p>
                 <ul className="space-y-1.5">
-                  {data.recommendedInvestigations.map((rec, i) => (
+                  {(data.recommendedInvestigations || []).map((rec, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-none mt-0.5" />
                       <span>{rec}</span>
@@ -258,7 +261,7 @@ export default function FraudIntelligencePage() {
                   Information Gaps Requiring Investigation:
                 </p>
                 <ul className="space-y-1.5">
-                  {data.dataGaps.map((gap, i) => (
+                  {(data.dataGaps || []).map((gap: string, i: number) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
                       <HelpCircle className="h-3.5 w-3.5 text-amber-500 flex-none mt-0.5" />
                       <span>{gap}</span>
@@ -515,7 +518,7 @@ export default function FraudIntelligencePage() {
                                 Hypotheses (Potential Explanations):
                               </p>
                               <ul className="list-disc list-inside space-y-1 text-amber-900 dark:text-amber-200 text-[11px]">
-                                {signal.possibleExplanations.map((exp, idx) => (
+                                {(signal.possibleExplanations || []).map((exp, idx) => (
                                   <li key={idx}>{exp}</li>
                                 ))}
                               </ul>
@@ -526,7 +529,7 @@ export default function FraudIntelligencePage() {
                                 Recommended Action by Officer:
                               </p>
                               <ul className="list-disc list-inside space-y-1 text-emerald-900 dark:text-emerald-200 text-[11px]">
-                                {signal.recommendedInvestigation.map((act, idx) => (
+                                {(signal.recommendedInvestigation || []).map((act, idx) => (
                                   <li key={idx}>{act}</li>
                                 ))}
                               </ul>

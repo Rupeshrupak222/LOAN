@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner } from '@/components/ui';
@@ -46,7 +47,7 @@ interface ComplianceException {
   ruleName: string;
   category: string;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  status: 'OPEN' | 'ACKNOWLEDGED' | 'UNDER_REVIEW' | 'REMEDIATION_REQUIRED' | 'RESOLVED' | 'CLOSED';
+  status: 'OPEN' | 'UNDER_REVIEW' | 'REMEDIATED' | 'ACCEPTED_RISK' | 'ESCALATED';
   entityType: string;
   entityId: string;
   finding: string;
@@ -75,6 +76,7 @@ interface ComplianceOverview {
 export default function CompliancePage() {
   const queryClient = useQueryClient();
   const { isDark } = useTheme();
+  const toast = useToast();
 
   // State
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'EXCEPTIONS' | 'RULES' | 'SANDBOX'>('OVERVIEW');
@@ -138,9 +140,10 @@ export default function CompliancePage() {
       queryClient.invalidateQueries({ queryKey: ['compliance-overview'] });
       setSelectedException(null);
       setRemediationNotes('');
+      toast.success('Exception Transitioned', 'Compliance exception status updated.');
     },
     onError: (err: any) => {
-      alert(`Transition failed: ${apiErrorMessage(err)}`);
+      toast.error('Transition Failed', apiErrorMessage(err));
     },
   });
 
@@ -164,9 +167,10 @@ export default function CompliancePage() {
       setSandboxResult(data);
       queryClient.invalidateQueries({ queryKey: ['compliance-exceptions'] });
       queryClient.invalidateQueries({ queryKey: ['compliance-overview'] });
+      toast.success('Evaluation Complete', 'Regulatory rule audit passed.');
     },
     onError: (err: any) => {
-      alert(`Evaluation failed: ${apiErrorMessage(err)}`);
+      toast.error('Evaluation Failed', apiErrorMessage(err));
     },
   });
 
@@ -394,7 +398,7 @@ export default function CompliancePage() {
                     key={exc.id}
                     className={cn(
                       'flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border text-xs transition-all',
-                      exc.status === 'RESOLVED' || exc.status === 'CLOSED'
+                      exc.status === 'REMEDIATED' || exc.status === 'ACCEPTED_RISK'
                         ? 'bg-slate-50/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800 opacity-60'
                         : exc.severity === 'CRITICAL'
                         ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'

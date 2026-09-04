@@ -22,10 +22,12 @@ import { Card, Button, Input, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useBranding } from '@/lib/branding';
+import { useToast } from '@/lib/toast';
 
 export default function BrandingPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
   const { branding: globalBranding, switchTenantBrand, previewBranding, resetPreview } = useBranding();
 
   const [selectedTenantId, setSelectedTenantId] = useState<string>('tenant-adyapan-default');
@@ -62,41 +64,42 @@ export default function BrandingPage() {
   const contrastScore = calculateContrast(formData.primaryColor);
   const isWcagSafe = contrastScore >= 4.5;
 
-  // Fetch Branding for Selected Tenant
-  const { data: tenantBranding, isLoading, refetch } = useQuery({
+  // 1. Fetch Branding for Selected Tenant
+  const { data: brandingData, isLoading: brandingLoading } = useQuery({
     queryKey: ['branding-detail', selectedTenantId],
     queryFn: async () => (await api.get(`/branding/${selectedTenantId}`)).data.data,
   });
 
+  // Populate form
   useEffect(() => {
-    if (tenantBranding) {
+    if (brandingData) {
       setFormData({
-        institutionName: tenantBranding.institutionName || 'Adyapan Prime Lending',
-        tagline: tenantBranding.tagline || 'Enterprise Credit Intelligence Platform',
-        portalTitle: tenantBranding.portalTitle || 'Adyapan Enterprise LMS',
-        primaryColor: tenantBranding.primaryColor || '#2563EB',
-        secondaryColor: tenantBranding.secondaryColor || '#1D4ED8',
-        accentColor: tenantBranding.accentColor || '#10B981',
-        surfaceColor: tenantBranding.surfaceColor || '#F8FAFC',
-        emailSignature: tenantBranding.emailSignature || 'Adyapan Operations <ops@adyapan.dev>',
+        institutionName: brandingData.institutionName || '',
+        tagline: brandingData.tagline || '',
+        portalTitle: brandingData.portalTitle || '',
+        primaryColor: brandingData.primaryColor || '#2563EB',
+        secondaryColor: brandingData.secondaryColor || '#1D4ED8',
+        accentColor: brandingData.accentColor || '#10B981',
+        surfaceColor: brandingData.surfaceColor || '#F8FAFC',
+        emailSignature: brandingData.emailSignature || '',
       });
     }
-  }, [tenantBranding]);
+  }, [brandingData]);
 
-  // Update Branding Mutation
+  // Update Mutation
   const updateMutation = useMutation({
-    mutationFn: async (dto: any) => {
-      const res = await api.put(`/branding/${selectedTenantId}`, dto);
+    mutationFn: async () => {
+      const res = await api.put(`/branding/${selectedTenantId}`, formData);
       return res.data?.data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['branding-detail', selectedTenantId] });
       queryClient.invalidateQueries({ queryKey: ['branding-active'] });
       resetPreview();
-      alert(`Institutional branding for '${data.institutionName}' successfully published.`);
+      toast.success('Branding Published', `Institutional branding for '${data.institutionName}' successfully published.`);
     },
     onError: (err: any) => {
-      alert(`Update branding failed: ${apiErrorMessage(err)}`);
+      toast.error('Update Branding Failed', apiErrorMessage(err));
     },
   });
 
@@ -189,7 +192,7 @@ export default function BrandingPage() {
               </div>
             </div>
 
-            {isLoading ? (
+            {brandingLoading ? (
               <div className="p-8 text-center space-y-2">
                 <Spinner />
                 <p className="text-xs text-slate-400">Loading brand profile...</p>
@@ -343,7 +346,7 @@ export default function BrandingPage() {
                     variant="primary"
                     size="sm"
                     disabled={updateMutation.isPending}
-                    onClick={() => updateMutation.mutate(formData)}
+                    onClick={() => updateMutation.mutate()}
                     className="text-xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <Save className="h-3.5 w-3.5" />

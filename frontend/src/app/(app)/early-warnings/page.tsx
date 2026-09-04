@@ -31,10 +31,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatDateTime, cn } from '@/lib/utils';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 
 export default function EarlyWarningsPage() {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [domainFilter, setDomainFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('OPEN');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,12 +70,12 @@ export default function EarlyWarningsPage() {
   const scanMutation = useMutation({
     mutationFn: async () => (await api.post('/early-warnings/scan')).data.data,
     onSuccess: (data) => {
-      alert(`System scan complete: ${data.scannedEntities} entities evaluated, ${data.alertsCreated} new early warnings identified.`);
+      toast.success('System Scan Complete', `${data.scannedEntities} entities evaluated, ${data.alertsCreated} new early warnings identified.`);
       queryClient.invalidateQueries({ queryKey: ['early-warnings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['early-warnings-list'] });
     },
     onError: (err: any) => {
-      alert(`System scan failed: ${apiErrorMessage(err)}`);
+      toast.error('System Scan Failed', apiErrorMessage(err));
     },
   });
 
@@ -83,9 +85,10 @@ export default function EarlyWarningsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['early-warnings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['early-warnings-list'] });
+      toast.success('Alert Acknowledged', 'Early warning marked as under review.');
     },
     onError: (err: any) => {
-      alert(`Acknowledge failed: ${apiErrorMessage(err)}`);
+      toast.error('Acknowledge Failed', apiErrorMessage(err));
     },
   });
 
@@ -98,9 +101,10 @@ export default function EarlyWarningsPage() {
       setResolutionNotes('');
       queryClient.invalidateQueries({ queryKey: ['early-warnings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['early-warnings-list'] });
+      toast.success('Alert Resolved', 'Early warning marked as resolved with mitigation notes.');
     },
     onError: (err: any) => {
-      alert(`Resolution failed: ${apiErrorMessage(err)}`);
+      toast.error('Resolution Failed', apiErrorMessage(err));
     },
   });
 
@@ -113,9 +117,10 @@ export default function EarlyWarningsPage() {
       setDismissalReason('');
       queryClient.invalidateQueries({ queryKey: ['early-warnings-stats'] });
       queryClient.invalidateQueries({ queryKey: ['early-warnings-list'] });
+      toast.info('Alert Dismissed', 'Early warning dismissed.');
     },
     onError: (err: any) => {
-      alert(`Dismissal failed: ${apiErrorMessage(err)}`);
+      toast.error('Dismissal Failed', apiErrorMessage(err));
     },
   });
 

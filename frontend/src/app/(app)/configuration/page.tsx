@@ -25,6 +25,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, Button, Input, Spinner } from '@/components/ui';
 import { formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 type ConfigArea =
   | 'FOIR_DTI'
@@ -52,6 +53,7 @@ const AREAS: AreaConfig[] = [
 export default function ConfigurationPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [selectedArea, setSelectedArea] = useState<ConfigArea>('FOIR_DTI');
   const [changelog, setChangelog] = useState('');
@@ -98,10 +100,10 @@ export default function ConfigurationPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['configuration-versions', selectedArea] });
-      alert(`Draft configuration Version ${data.version} saved. You can now review and publish.`);
+      toast.success('Draft Saved', `Draft configuration Version ${data.version} saved. You can now review and publish.`);
     },
     onError: (err: any) => {
-      alert(`Save draft failed: ${apiErrorMessage(err)}`);
+      toast.error('Save draft failed', apiErrorMessage(err));
     },
   });
 
@@ -114,10 +116,10 @@ export default function ConfigurationPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['configuration-active', selectedArea] });
       queryClient.invalidateQueries({ queryKey: ['configuration-versions', selectedArea] });
-      alert(`Configuration Version ${data.version} is now active and enforced in core lending engines.`);
+      toast.success('Policy Published', `Configuration Version ${data.version} is now active and enforced in core lending engines.`);
     },
     onError: (err: any) => {
-      alert(`Publish failed: ${apiErrorMessage(err)}`);
+      toast.error('Publish failed', apiErrorMessage(err));
     },
   });
 
@@ -137,10 +139,10 @@ export default function ConfigurationPage() {
       setRollbackReason('');
       queryClient.invalidateQueries({ queryKey: ['configuration-active', selectedArea] });
       queryClient.invalidateQueries({ queryKey: ['configuration-versions', selectedArea] });
-      alert(`Policy rolled back to Version ${data.version}. Active policy parameters updated.`);
+      toast.success('Rollback Complete', `Policy rolled back to Version ${data.version}. Active policy parameters updated.`);
     },
     onError: (err: any) => {
-      alert(`Rollback failed: ${apiErrorMessage(err)}`);
+      toast.error('Rollback failed', apiErrorMessage(err));
     },
   });
 

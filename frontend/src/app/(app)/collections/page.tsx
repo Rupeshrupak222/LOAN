@@ -16,14 +16,17 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { CollectionsIntelligenceModal } from '@/components/CollectionsIntelligenceModal';
 
 export default function CollectionsPage() {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [selectedBucket, setSelectedBucket] = useState('');
   const [selectedCase, setSelectedCase] = useState<any | null>(null);
   const [aiCaseSelected, setAiCaseSelected] = useState<any | null>(null);
@@ -69,12 +72,16 @@ export default function CollectionsPage() {
         nextFollowUpDate: nextFollowUpDate || undefined,
       }),
     onSuccess: () => {
+      toast.success('Collection follow-up activity logged.');
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       setActivityModalOpen(false);
       setNotes('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Activity Logging Notice' });
     },
   });
 
@@ -88,6 +95,7 @@ export default function CollectionsPage() {
         paymentMode: ptpMode,
       }),
     onSuccess: () => {
+      toast.success('Promise-To-Pay (PTP) commitment recorded.');
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
@@ -95,9 +103,12 @@ export default function CollectionsPage() {
       setPtpModalOpen(false);
       setPtpAmount('');
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'PTP Commitment Notice' });
+    },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <TableSkeleton rows={6} cols={6} />;
 
   const agingBuckets = Array.isArray(dashboardData?.agingBuckets) ? dashboardData.agingBuckets : [];
   const cases = Array.isArray(casesData) ? casesData : [];

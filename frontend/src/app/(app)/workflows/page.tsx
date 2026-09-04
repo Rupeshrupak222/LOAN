@@ -26,6 +26,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 interface StageGateCriteria {
   field: string;
@@ -75,6 +76,7 @@ interface WorkflowDefinition {
 export default function WorkflowStudioPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [selectedType, setSelectedType] = useState<'LOAN_ORIGINATION' | 'HARDSHIP_RESTRUCTURING'>('LOAN_ORIGINATION');
   const [selectedStage, setSelectedStage] = useState<WorkflowStage | null>(null);
@@ -117,9 +119,10 @@ export default function WorkflowStudioPage() {
     },
     onSuccess: (data) => {
       setEvaluationResult(data);
+      toast.success('Simulation Completed', 'Transition evaluation finished successfully.');
     },
     onError: (err: any) => {
-      alert(`Simulation failed: ${apiErrorMessage(err)}`);
+      toast.error('Simulation Failed', apiErrorMessage(err));
     },
   });
 

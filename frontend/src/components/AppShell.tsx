@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -21,7 +21,6 @@ import {
   LogOut,
   Menu,
   Search,
-  Bell,
   Layers,
   Sun,
   Moon,
@@ -35,6 +34,7 @@ import {
   Palette,
   Activity,
   Workflow,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -45,6 +45,7 @@ import { Spinner } from './ui';
 import { NotificationBell } from './NotificationBell';
 import { CopilotDrawer } from './CopilotDrawer';
 import { WorkflowExceptionCenterModal } from './WorkflowExceptionCenterModal';
+import { NavigationProgressBar } from './NavigationProgressBar';
 
 const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
@@ -94,8 +95,37 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [globalSearch, setGlobalSearch] = useState('');
   const [exceptionCenterOpen, setExceptionCenterOpen] = useState(false);
 
-  if (loading) return <Spinner />;
-  if (!user) return null;
+  // Automatic redirect if unauthenticated without blank screen hang
+  useEffect(() => {
+    if (!loading && !user && pathname && !pathname.startsWith('/login')) {
+      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+    }
+  }, [loading, user, pathname, router]);
+
+  if (loading) {
+    return (
+      <div className={cn("flex h-screen w-full items-center justify-center transition-colors", isDark ? "bg-[#060F1B] text-slate-100" : "bg-[#f8fafc] text-slate-900")}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Loading Workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className={cn("flex h-screen w-full items-center justify-center transition-colors", isDark ? "bg-[#060F1B] text-slate-100" : "bg-[#f8fafc] text-slate-900")}>
+        <div className="flex flex-col items-center gap-3 text-center px-4">
+          <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+            <Lock className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Authenticating Session</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Redirecting to login portal...</p>
+        </div>
+      </div>
+    );
+  }
 
   const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;
   const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
@@ -143,6 +173,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={cn("flex h-screen w-full overflow-hidden transition-colors duration-200", isDark ? "dark bg-[#060F1B] text-slate-100" : "bg-[#f8fafc] text-slate-900")}>
+      {/* Instant Navigation Route Progress Bar */}
+      <NavigationProgressBar />
+
       {/* Sidebar - Always Sleek Dark Navy */}
       <aside
         className={cn(
@@ -377,7 +410,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={logout}
                 title="Logout"
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                  "flex h-8 w-8 items-center justify-center rounded-lg transition-colors cursor-pointer",
                   isDark ? "text-slate-400 hover:text-rose-400 hover:bg-rose-950/30" : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                 )}
               >

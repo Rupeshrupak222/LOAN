@@ -29,6 +29,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner, Input } from '@/components/ui';
 import { formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 interface TenantOperationsOverview {
   totalTenants: number;
@@ -52,6 +53,7 @@ interface TenantOperationsOverview {
 export default function TenantsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   // Wizard State
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -134,13 +136,13 @@ export default function TenantsPage() {
         },
         policyTemplate: formData.policyTemplate,
         loanProductTemplates: formData.loanProductTemplates,
-        primaryBranch: {
-          branchCode: formData.branchCode,
-          branchName: formData.branchName,
+        defaultBranch: {
+          code: formData.branchCode,
+          name: formData.branchName,
           city: formData.city,
           state: formData.state,
         },
-        integrationProviders: {
+        integrations: {
           creditBureau: formData.creditBureau,
           paymentGateway: formData.paymentGateway,
           disbursementPayout: formData.disbursementPayout,
@@ -160,10 +162,10 @@ export default function TenantsPage() {
       setWizardOpen(false);
       setWizardStep(1);
       queryClient.invalidateQueries({ queryKey: ['tenant-operations-overview'] });
-      alert(`Institution '${data.name}' (${data.tenantCode}) successfully provisioned and activated!`);
+      toast.success('Tenant Provisioned', `Institution '${data.name}' (${data.tenantCode}) successfully provisioned and activated!`);
     },
     onError: (err: any) => {
-      alert(`Provisioning failed: ${apiErrorMessage(err)}`);
+      toast.error('Provisioning Failed', apiErrorMessage(err));
     },
   });
 
@@ -175,10 +177,10 @@ export default function TenantsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tenant-operations-overview'] });
-      alert(`Tenant '${data.name}' suspended.`);
+      toast.info('Tenant Suspended', `Tenant '${data.name}' suspended.`);
     },
     onError: (err: any) => {
-      alert(`Suspension failed: ${apiErrorMessage(err)}`);
+      toast.error('Suspension Failed', apiErrorMessage(err));
     },
   });
 
@@ -190,10 +192,10 @@ export default function TenantsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tenant-operations-overview'] });
-      alert(`Tenant '${data.name}' reactivated.`);
+      toast.success('Tenant Reactivated', `Tenant '${data.name}' reactivated.`);
     },
     onError: (err: any) => {
-      alert(`Reactivation failed: ${apiErrorMessage(err)}`);
+      toast.error('Reactivation Failed', apiErrorMessage(err));
     },
   });
 
@@ -203,7 +205,7 @@ export default function TenantsPage() {
       const res = await api.get(`/tenants/${tenantId}/setup-certificate`);
       setCertificateModal(res.data?.data);
     } catch (err: any) {
-      alert(`Failed to fetch certificate: ${apiErrorMessage(err)}`);
+      toast.error('Certificate Fetch Failed', apiErrorMessage(err));
     }
   };
 

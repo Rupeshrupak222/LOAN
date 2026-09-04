@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn, formatMoney } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
 
@@ -82,6 +83,7 @@ interface Props {
 
 export function CollectionsIntelligenceModal({ colCase, isOpen, onClose }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<CollectionIntelligenceData | null>(null);
 
   const mutation = useMutation({
@@ -91,9 +93,10 @@ export function CollectionsIntelligenceModal({ colCase, isOpen, onClose }: Props
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Collections Intelligence generated successfully.');
     },
     onError: (err: any) => {
-      alert(`Collections Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Collections Intelligence Notice' });
     },
   });
 

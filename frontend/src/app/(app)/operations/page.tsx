@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner } from '@/components/ui';
@@ -72,6 +73,7 @@ interface AlertItem {
 export default function OperationsCenterPage() {
   const queryClient = useQueryClient();
   const { isDark } = useTheme();
+  const toast = useToast();
   const [showPrometheusModal, setShowPrometheusModal] = useState(false);
   const [prometheusText, setPrometheusText] = useState<string>('');
 
@@ -109,9 +111,10 @@ export default function OperationsCenterPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['observability-alerts'] });
       queryClient.invalidateQueries({ queryKey: ['observability-overview'] });
+      toast.success('Alert Acknowledged', 'Operational alert marked as resolved.');
     },
     onError: (err: any) => {
-      alert(`Acknowledgment failed: ${apiErrorMessage(err)}`);
+      toast.error('Acknowledgment Failed', apiErrorMessage(err));
     },
   });
 

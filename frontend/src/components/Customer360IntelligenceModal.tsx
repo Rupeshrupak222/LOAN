@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn, formatMoney } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
 
@@ -35,9 +36,17 @@ export interface Customer360IntelligenceData {
   generatedAt: string;
   dataAsOf: string;
   model: string;
+  confidence?: string | number;
   lifecycleStage: string;
   customerSummary: string;
   lifecycleSummary: string;
+  positiveSignals?: string[];
+  attentionRequired?: Array<{
+    issue: string;
+    severity: string;
+    recommendedReview: string;
+  }>;
+  recommendedActions?: string[];
   portfolioSummary: {
     totalLoans: number;
     activeLoans: number;
@@ -84,16 +93,33 @@ export interface Customer360IntelligenceData {
     currentState: string;
     whyItMatters: string;
   }[];
-  positiveSignals: string[];
-  attentionRequired: {
-    category: string;
-    issue: string;
-    severity: 'HIGH' | 'MEDIUM' | 'LOW';
-    evidence: string;
-    recommendedReview: string;
+  relationshipTier: 'VIP' | 'PRIME' | 'STANDARD' | 'RESTRICTED' | 'WATCHLIST';
+  creditWorthinessAssessment: string;
+  customerLifetimeValue: {
+    estimatedClv: number;
+    valueCategory: 'HIGH_VALUE' | 'MEDIUM_VALUE' | 'GROWTH_POTENTIAL' | 'DORMANT';
+    basis: string;
+  };
+  productCrossSellRecommendations: {
+    recommendedProduct: string;
+    productType: string;
+    fitScore: number;
+    rationale: string;
+    suggestedCreditLimit: number;
+    suitability: 'STRONG_MATCH' | 'MODERATE_MATCH' | 'HIGH_RISK_MISMATCH';
   }[];
-  recommendedActions: string[];
-  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  retentionRiskScore: number;
+  retentionRiskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  retentionRiskSignals: string[];
+  retentionMitigationActions: string[];
+  borrowerBehaviorProfile: {
+    repaymentDiscipline: string;
+    engagementFrequency: string;
+    communicationResponsiveness: string;
+    riskTrend: string;
+  };
+  crossSellActionPlan: string[];
+  relationshipManagerGuidance: string;
 }
 
 interface Props {
@@ -106,6 +132,7 @@ interface Props {
 
 export function Customer360IntelligenceModal({ customerId, customerCode, customerName, isOpen, onClose }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<Customer360IntelligenceData | null>(null);
 
   const mutation = useMutation({
@@ -115,9 +142,10 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Customer 360 intelligence generated successfully.');
     },
     onError: (err: any) => {
-      alert(`Customer 360 Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Customer 360 Intelligence Notice' });
     },
   });
 
@@ -289,10 +317,10 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
                 <div className="p-3.5 rounded-xl border border-emerald-200/80 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-900/40 space-y-2">
                   <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-bold text-xs">
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>Verified Positive Signals ({data.positiveSignals.length})</span>
+                    <span>Verified Positive Signals ({(data.positiveSignals || []).length})</span>
                   </div>
                   <ul className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                    {data.positiveSignals.map((sig, idx) => (
+                    {(data.positiveSignals || []).map((sig, idx) => (
                       <li key={idx} className="flex items-start gap-1.5">
                         <span className="text-emerald-500 font-bold mt-0.5">✓</span>
                         <span>{sig}</span>
@@ -305,10 +333,10 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
                 <div className="p-3.5 rounded-xl border border-rose-200/80 bg-rose-50/40 dark:bg-rose-950/20 dark:border-rose-900/40 space-y-2">
                   <div className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400 font-bold text-xs">
                     <ShieldAlert className="h-4 w-4" />
-                    <span>Attention Required ({data.attentionRequired.length})</span>
+                    <span>Attention Required ({(data.attentionRequired || []).length})</span>
                   </div>
                   <div className="space-y-1.5 text-xs">
-                    {data.attentionRequired.map((att, idx) => (
+                    {(data.attentionRequired || []).map((att, idx) => (
                       <div key={idx} className="space-y-0.5 border-b border-rose-100 dark:border-rose-950/60 pb-1.5 last:border-0 last:pb-0">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-bold text-rose-900 dark:text-rose-200">{att.issue}</span>
@@ -335,7 +363,7 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
               </div>
 
               {/* Chronological Customer Timeline */}
-              {data.timeline.length > 0 && (
+              {(data.timeline || []).length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
                     <Clock className="h-4 w-4 text-blue-500" />
@@ -364,14 +392,14 @@ export function Customer360IntelligenceModal({ customerId, customerCode, custome
               )}
 
               {/* Recommended Next Best Actions */}
-              {data.recommendedActions.length > 0 && (
+              {(data.recommendedActions || []).length > 0 && (
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-[#1E2445] bg-slate-50/50 dark:bg-[#121B33] space-y-2">
                   <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
                     <TrendingUp className="h-4 w-4 text-emerald-500" />
                     <span>Recommended Next Best Actions</span>
                   </h4>
                   <ol className="list-decimal list-inside space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                    {data.recommendedActions.map((action, idx) => (
+                    {data.recommendedActions!.map((action, idx) => (
                       <li key={idx} className="leading-relaxed">
                         {action}
                       </li>

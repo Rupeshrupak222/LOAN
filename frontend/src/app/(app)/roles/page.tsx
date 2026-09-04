@@ -27,6 +27,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner, Input } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 interface CustomRole {
   id: string;
@@ -64,6 +65,7 @@ interface SodRule {
 export default function RolesStudioPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<'ROLES_MATRIX' | 'PERMISSION_CATALOG' | 'SOD_RULES' | 'MY_PERMISSIONS'>('ROLES_MATRIX');
   const [searchTerm, setSearchTerm] = useState('');
@@ -151,10 +153,10 @@ export default function RolesStudioPage() {
         overrideJustification: '',
       });
       queryClient.invalidateQueries({ queryKey: ['roles-list'] });
-      alert(`Custom role '${data.name}' (${data.code}) created successfully with ${data.permissions.length} permissions.`);
+      toast.success('Custom Role Created', `Role '${data.name}' (${data.code}) created successfully with ${data.permissions.length} permissions.`);
     },
     onError: (err: any) => {
-      alert(`Role creation failed: ${apiErrorMessage(err)}`);
+      toast.error('Role Creation Failed', apiErrorMessage(err));
     },
   });
 

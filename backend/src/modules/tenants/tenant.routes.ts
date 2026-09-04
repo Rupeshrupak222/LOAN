@@ -1,8 +1,9 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { authenticate, authorize } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenant-context';
 import { tenantService } from './tenant.service';
 import { tenantProvisioningService } from './tenant-provisioning.service';
+import { asyncHandler } from '../../common/asyncHandler';
 
 const router = Router();
 
@@ -17,17 +18,13 @@ router.use(tenantContext);
 router.get(
   '/operations-overview',
   authorize('SUPER_ADMIN', 'ADMIN'),
-  (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const overview = tenantProvisioningService.getOperationsOverview(req.user as any);
-      res.json({
-        success: true,
-        data: overview,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const overview = tenantProvisioningService.getOperationsOverview(req.user as any);
+    res.json({
+      success: true,
+      data: overview,
+    });
+  })
 );
 
 /**
@@ -37,84 +34,76 @@ router.get(
 router.post(
   '/onboard-wizard',
   authorize('SUPER_ADMIN'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const summary = await tenantProvisioningService.onboardTenant(req.body, req.user as any);
-      res.status(201).json({
-        success: true,
-        message: `Institution '${summary.name}' successfully provisioned and activated.`,
-        data: summary,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const summary = await tenantProvisioningService.onboardTenant(req.body, req.user as any);
+    res.status(201).json({
+      success: true,
+      message: `Institution '${summary.name}' successfully provisioned and activated.`,
+      data: summary,
+    });
+  })
 );
 
 /**
  * GET /api/v1/tenants
  * List accessible tenants (Super Admin: all; Staff: assigned tenant).
  */
-router.get('/', (req: Request, res: Response, next: NextFunction) => {
-  try {
+router.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
     const tenants = tenantService.listTenants(req.user!);
     res.json({
       success: true,
       data: tenants,
       total: tenants.length,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
 /**
  * GET /api/v1/tenants/current
  * Returns active tenant context for the authenticated session.
  */
-router.get('/current', (req: Request, res: Response, next: NextFunction) => {
-  try {
+router.get(
+  '/current',
+  asyncHandler(async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: req.tenant,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
 /**
  * GET /api/v1/tenants/:id/setup-certificate
  * Generates institutional setup certificate.
  */
-router.get('/:id/setup-certificate', (req: Request, res: Response, next: NextFunction) => {
-  try {
+router.get(
+  '/:id/setup-certificate',
+  asyncHandler(async (req: Request, res: Response) => {
     const cert = tenantProvisioningService.generateSetupCertificate(req.params.id, req.user as any);
     res.json({
       success: true,
       data: cert,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
 /**
  * GET /api/v1/tenants/:id
  * Get detailed tenant profile within authorized tenant boundary.
  */
-router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
-  try {
+router.get(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response) => {
     const scopedTenantId = tenantService.resolveTenantScope(req.user!, req.params.id);
     const tenant = tenantService.getTenantById(scopedTenantId);
     res.json({
       success: true,
       data: tenant,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
 /**
  * POST /api/v1/tenants
@@ -123,18 +112,14 @@ router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
 router.post(
   '/',
   authorize('SUPER_ADMIN'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const tenant = await tenantService.createTenant(req.body, req.user!);
-      res.status(201).json({
-        success: true,
-        message: `Tenant '${tenant.name}' successfully onboarded.`,
-        data: tenant,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenant = await tenantService.createTenant(req.body, req.user!);
+    res.status(201).json({
+      success: true,
+      message: `Tenant '${tenant.name}' successfully onboarded.`,
+      data: tenant,
+    });
+  })
 );
 
 /**
@@ -144,19 +129,15 @@ router.post(
 router.post(
   '/:id/suspend',
   authorize('SUPER_ADMIN'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { reason } = req.body;
-      const tenant = await tenantProvisioningService.suspendTenant(req.params.id, reason, req.user as any);
-      res.json({
-        success: true,
-        message: `Tenant '${tenant.name}' suspended.`,
-        data: tenant,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const { reason } = req.body;
+    const tenant = await tenantProvisioningService.suspendTenant(req.params.id, reason, req.user as any);
+    res.json({
+      success: true,
+      message: `Tenant '${tenant.name}' suspended.`,
+      data: tenant,
+    });
+  })
 );
 
 /**
@@ -166,18 +147,14 @@ router.post(
 router.post(
   '/:id/reactivate',
   authorize('SUPER_ADMIN'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const tenant = await tenantProvisioningService.reactivateTenant(req.params.id, req.user as any);
-      res.json({
-        success: true,
-        message: `Tenant '${tenant.name}' reactivated.`,
-        data: tenant,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenant = await tenantProvisioningService.reactivateTenant(req.params.id, req.user as any);
+    res.json({
+      success: true,
+      message: `Tenant '${tenant.name}' reactivated.`,
+      data: tenant,
+    });
+  })
 );
 
 /**
@@ -187,23 +164,19 @@ router.post(
 router.patch(
   '/:id/status',
   authorize('SUPER_ADMIN'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const tenant = await tenantService.updateTenantStatus(
-        req.params.id,
-        req.body.status,
-        req.user!,
-        req.body.reason
-      );
-      res.json({
-        success: true,
-        message: `Tenant '${tenant.name}' status updated to '${tenant.status}'.`,
-        data: tenant,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenant = await tenantService.updateTenantStatus(
+      req.params.id,
+      req.body.status,
+      req.user!,
+      req.body.reason
+    );
+    res.json({
+      success: true,
+      message: `Tenant '${tenant.name}' status updated to '${tenant.status}'.`,
+      data: tenant,
+    });
+  })
 );
 
 export const tenantRoutes = router;

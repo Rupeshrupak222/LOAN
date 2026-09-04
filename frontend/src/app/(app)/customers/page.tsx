@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Search, ShieldCheck, Phone, Trash2, CheckSquare, X, AlertTriangle } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Input, Card } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
@@ -28,6 +29,7 @@ interface CustomerRow {
 
 export default function CustomersPage() {
   const { isDark } = useTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
@@ -74,11 +76,15 @@ export default function CustomersPage() {
     setDeleteError(null);
     try {
       await Promise.all(selectedIds.map((id) => api.delete(`/customers/${id}`)));
+      const count = selectedIds.length;
       setSelectedIds([]);
       setDeleteModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Customers Deleted', `${count} customer profile(s) deleted successfully.`);
     } catch (err) {
-      setDeleteError(apiErrorMessage(err));
+      const msg = apiErrorMessage(err);
+      setDeleteError(msg);
+      toast.error('Bulk Delete Failed', msg);
     } finally {
       setIsDeleting(false);
     }

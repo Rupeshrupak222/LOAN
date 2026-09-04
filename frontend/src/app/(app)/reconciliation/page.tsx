@@ -31,9 +31,12 @@ import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 
+import { useToast } from '@/lib/toast';
+
 export default function ReconciliationPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<'EXCEPTIONS' | 'ADJUSTMENTS' | 'PILLARS'>('EXCEPTIONS');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -80,12 +83,12 @@ export default function ReconciliationPage() {
   const runMutation = useMutation({
     mutationFn: async () => (await api.post('/reconciliation/run')).data.data,
     onSuccess: (data) => {
-      alert(`Reconciliation complete: ${data.scannedCount} ledger items scanned, ${data.exceptionsFound} exceptions identified.`);
+      toast.success('Reconciliation Engine Completed', `Scanned ${data.scannedCount} items, found ${data.exceptionsFound} exceptions.`);
       queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['reconciliation-exceptions'] });
     },
     onError: (err: any) => {
-      alert(`Reconciliation run failed: ${apiErrorMessage(err)}`);
+      toast.error('Reconciliation Run Failed', apiErrorMessage(err));
     },
   });
 
@@ -110,13 +113,13 @@ export default function ReconciliationPage() {
       queryClient.invalidateQueries({ queryKey: ['reconciliation-exceptions'] });
       queryClient.invalidateQueries({ queryKey: ['reconciliation-adjustments'] });
       if (data.requiresApproval) {
-        alert('Adjustment submitted to Maker-Checker queue (requires approval by Finance Officer or Admin).');
+        toast.info('Submitted to Maker-Checker Queue', 'Requires dual-approval by Finance Officer or Admin.');
       } else {
-        alert('Adjustment under threshold auto-approved and applied to ledger.');
+        toast.success('Adjustment Approved', 'Adjustment under threshold auto-approved and applied to ledger.');
       }
     },
     onError: (err: any) => {
-      alert(`Propose adjustment failed: ${apiErrorMessage(err)}`);
+      toast.error('Propose Adjustment Failed', apiErrorMessage(err));
     },
   });
 
@@ -127,10 +130,10 @@ export default function ReconciliationPage() {
       queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['reconciliation-exceptions'] });
       queryClient.invalidateQueries({ queryKey: ['reconciliation-adjustments'] });
-      alert('Adjustment approved and ledger records reconciled.');
+      toast.success('Adjustment Approved', 'Ledger records reconciled.');
     },
     onError: (err: any) => {
-      alert(`Approval failed: ${apiErrorMessage(err)}`);
+      toast.error('Approval Failed', apiErrorMessage(err));
     },
   });
 
@@ -143,10 +146,10 @@ export default function ReconciliationPage() {
       setRejectionReason('');
       queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['reconciliation-adjustments'] });
-      alert('Adjustment rejected.');
+      toast.info('Adjustment Rejected', 'The proposed ledger adjustment was rejected.');
     },
     onError: (err: any) => {
-      alert(`Rejection failed: ${apiErrorMessage(err)}`);
+      toast.error('Rejection Failed', apiErrorMessage(err));
     },
   });
 
