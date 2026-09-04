@@ -15,13 +15,16 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { api, apiErrorMessage } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { Card, Button, Badge, Spinner } from './ui';
+import { Card, Button, Badge } from './ui';
+import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 
 interface EarlyWarningWidgetProps {
   applicationId?: string;
   customerId?: string;
   loanId?: string;
+  compact?: boolean;
   className?: string;
 }
 
@@ -29,22 +32,24 @@ export function EarlyWarningWidget({
   applicationId,
   customerId,
   loanId,
+  compact = false,
   className,
 }: EarlyWarningWidgetProps) {
+  const { isDark } = useTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [resolveModalAlert, setResolveModalAlert] = useState<any | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
 
-  const queryParams = new URLSearchParams();
-  if (applicationId) queryParams.set('applicationId', applicationId);
-  if (customerId) queryParams.set('customerId', customerId);
-  if (loanId) queryParams.set('loanId', loanId);
-  queryParams.set('status', 'OPEN');
-
   const { data: alerts = [], isLoading } = useQuery({
-    queryKey: ['early-warnings', applicationId, customerId, loanId],
+    queryKey: ['early-warnings', { applicationId, customerId, loanId }],
     queryFn: async () => {
-      const res = await api.get(`/early-warnings?${queryParams.toString()}`);
+      const params = new URLSearchParams();
+      if (applicationId) params.append('applicationId', applicationId);
+      if (customerId) params.append('customerId', customerId);
+      if (loanId) params.append('loanId', loanId);
+
+      const res = await api.get(`/early-warnings?${params.toString()}`);
       return res.data?.data || [];
     },
     enabled: Boolean(applicationId || customerId || loanId),
@@ -56,10 +61,11 @@ export function EarlyWarningWidget({
       return res.data?.data;
     },
     onSuccess: () => {
+      toast.success('Early warning acknowledged.');
       queryClient.invalidateQueries({ queryKey: ['early-warnings'] });
     },
     onError: (err: any) => {
-      alert(`Acknowledge failed: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Acknowledge Notice' });
     },
   });
 
@@ -71,10 +77,11 @@ export function EarlyWarningWidget({
     onSuccess: () => {
       setResolveModalAlert(null);
       setResolutionNotes('');
+      toast.success('Early warning resolved.');
       queryClient.invalidateQueries({ queryKey: ['early-warnings'] });
     },
     onError: (err: any) => {
-      alert(`Resolve failed: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Resolve Warning Notice' });
     },
   });
 

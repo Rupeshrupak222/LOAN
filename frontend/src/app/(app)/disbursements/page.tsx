@@ -9,13 +9,16 @@ import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { useToast } from '@/lib/toast';
 import { DisbursementIntelligenceCard } from '@/components/DisbursementIntelligenceCard';
 
 export default function DisbursementsPage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'HISTORY'>('QUEUE');
   const [selectedApp, setSelectedApp] = useState<any | null>(null);
   const [method, setMethod] = useState('NEFT_BANK_TRANSFER');
@@ -51,6 +54,7 @@ export default function DisbursementsPage() {
         referenceNumber: reference,
       }),
     onSuccess: () => {
+      toast.success('Loan disbursed successfully and active loan account initialized.');
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-history'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
@@ -65,9 +69,12 @@ export default function DisbursementsPage() {
       setReference('');
       setActiveTab('HISTORY');
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Disbursement Release Notice' });
+    },
   });
 
-  if (queueLoading || historyLoading) return <Spinner />;
+  if (queueLoading || historyLoading) return <TableSkeleton rows={6} cols={5} />;
 
   const queue = Array.isArray(queueData) ? queueData : [];
   const history = Array.isArray(historyData) ? historyData : [];

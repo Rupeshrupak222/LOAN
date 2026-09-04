@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTable, Column } from '@/components/DataTable';
 import { Badge, Input, Card, Button, Spinner } from '@/components/ui';
@@ -61,6 +62,7 @@ interface EvidencePackage {
 }
 
 export default function AuditLogsPage() {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
 
@@ -97,9 +99,10 @@ export default function AuditLogsPage() {
     onSuccess: (pkg) => {
       setEvidencePackage(pkg);
       setShowEvidenceModal(true);
+      toast.success('Evidence Package Compiled', 'Cryptographic evidence audit trail generated.');
     },
     onError: (err: any) => {
-      alert(`Evidence generation failed: ${apiErrorMessage(err)}`);
+      toast.error('Evidence Generation Failed', apiErrorMessage(err));
     },
   });
 
@@ -111,9 +114,10 @@ export default function AuditLogsPage() {
     },
     onSuccess: (data) => {
       setExportedData(data.data);
+      toast.success('Audit Log Exported', 'Export file ready for download.');
     },
     onError: (err: any) => {
-      alert(`Export failed: ${apiErrorMessage(err)}`);
+      toast.error('Export Failed', apiErrorMessage(err));
     },
   });
 

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner, Input } from '@/components/ui';
@@ -113,6 +114,7 @@ interface FailoverTestResult {
 export default function IntegrationHubPage() {
   const queryClient = useQueryClient();
   const { isDark } = useTheme();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<'CERTIFICATION' | 'ROUTING' | 'PLATFORM'>('CERTIFICATION');
   const [configModalCategory, setConfigModalCategory] = useState<string | null>(null);
@@ -174,10 +176,10 @@ export default function IntegrationHubPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['integration-certification-overview'] });
-      alert(`Live health check completed for ${data.length} connectors. All systems healthy.`);
+      toast.success('Health Check Complete', `Live health check completed for ${data.length} connectors.`);
     },
     onError: (err: any) => {
-      alert(`Health audit failed: ${apiErrorMessage(err)}`);
+      toast.error('Health Audit Failed', apiErrorMessage(err));
     },
   });
 
@@ -191,9 +193,10 @@ export default function IntegrationHubPage() {
       setFailoverResult(data);
       setShowFailoverModal(true);
       queryClient.invalidateQueries({ queryKey: ['integration-certification-overview'] });
+      toast.success('Failover Test Passed', 'Automated fallback executed with zero transaction duplication.');
     },
     onError: (err: any) => {
-      alert(`Failover test failed: ${apiErrorMessage(err)}`);
+      toast.error('Failover Test Failed', apiErrorMessage(err));
     },
   });
 
@@ -206,10 +209,10 @@ export default function IntegrationHubPage() {
     onSuccess: (data) => {
       setConfigModalCategory(null);
       queryClient.invalidateQueries({ queryKey: ['tenant-routings'] });
-      alert(`Integration routing for '${data.category}' successfully configured.`);
+      toast.success('Routing Saved', `Integration routing for '${data.category}' successfully configured.`);
     },
     onError: (err: any) => {
-      alert(`Configuration failed: ${apiErrorMessage(err)}`);
+      toast.error('Configuration Failed', apiErrorMessage(err));
     },
   });
 

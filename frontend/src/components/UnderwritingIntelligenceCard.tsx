@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
 
@@ -31,6 +32,9 @@ export interface UnderwritingIntelligenceData {
   model: string;
   executiveSummary: string;
   creditSummary: string;
+  recommendedReviewPosition?: 'SUITABLE_FOR_SANCTION_CONSIDERATION' | 'PROCEED_WITH_STIPULATED_CONDITIONS' | 'ADDITIONAL_VERIFICATION_REQUIRED' | 'UNFAVORABLE_HIGH_RISK' | string;
+  recommendationRationale?: string;
+  approvalAuthorityNotice?: string;
   financialAssessment: {
     incomeVsObligations: string;
     netSurplusCashflow: string;
@@ -70,13 +74,10 @@ export interface UnderwritingIntelligenceData {
     condition: string;
     rationale: string;
   }[];
-  recommendedReviewPosition:
-    | 'SUITABLE_FOR_SANCTION_CONSIDERATION'
-    | 'PROCEED_WITH_STIPULATED_CONDITIONS'
-    | 'ADDITIONAL_VERIFICATION_REQUIRED'
-    | 'HIGH_RISK_RECONSIDERATION';
-  recommendationRationale: string;
-  approvalAuthorityNotice: string;
+  stipulations: string[];
+  conditionsPrecedent: string[];
+  conditionsSubsequent: string[];
+  governanceSignoffRecommendation: string;
 }
 
 interface Props {
@@ -87,6 +88,7 @@ interface Props {
 
 export function UnderwritingIntelligenceCard({ applicationId, applicationNo, initialData }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<UnderwritingIntelligenceData | null>(initialData || null);
   const [showDeepBreakdown, setShowDeepBreakdown] = useState(false);
 
@@ -97,9 +99,10 @@ export function UnderwritingIntelligenceCard({ applicationId, applicationNo, ini
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Underwriting intelligence generated successfully.');
     },
     onError: (err: any) => {
-      alert(`Underwriting Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Underwriting Intelligence Notice' });
     },
   });
 
@@ -177,7 +180,7 @@ export function UnderwritingIntelligenceCard({ applicationId, applicationNo, ini
                     : 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300'
                 )}
               >
-                {data.recommendedReviewPosition.replace(/_/g, ' ')}
+                {data.recommendedReviewPosition ? data.recommendedReviewPosition.replace(/_/g, ' ') : 'UNDER REVIEW'}
               </span>
             </div>
 

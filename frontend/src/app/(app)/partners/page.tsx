@@ -30,10 +30,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 export default function PartnersPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<'PARTNERS' | 'SOURCING' | 'COMMISSIONS' | 'COMPLIANCE'>('PARTNERS');
   const [partnerTypeFilter, setPartnerTypeFilter] = useState<string>('ALL');
@@ -110,10 +112,10 @@ export default function PartnersPage() {
       setRegPhone('');
       setRegPan('');
       queryClient.invalidateQueries({ queryKey: ['partners-list'] });
-      alert(`Partner ${data.name} (${data.code}) successfully registered and active.`);
+      toast.success('Registration Success', `Partner ${data.name} (${data.code}) successfully registered and active.`);
     },
     onError: (err: any) => {
-      alert(`Registration failed: ${apiErrorMessage(err)}`);
+      toast.error('Registration Failed', apiErrorMessage(err));
     },
   });
 
@@ -136,10 +138,10 @@ export default function PartnersPage() {
       setLeadCustPhone('');
       setLeadConsentRef('');
       queryClient.invalidateQueries({ queryKey: ['partners-sourced-leads'] });
-      alert(`Lead ${data.customerName} (${data.applicationNo}) sourced successfully with verified consent.`);
+      toast.success('Lead Sourced', `Lead ${data.customerName} (${data.applicationNo}) sourced successfully with verified consent.`);
     },
     onError: (err: any) => {
-      alert(`Lead submission failed: ${apiErrorMessage(err)}`);
+      toast.error('Lead Submission Failed', apiErrorMessage(err));
     },
   });
 
@@ -151,9 +153,10 @@ export default function PartnersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['partners-list'] });
+      toast.success('Status Updated', 'Partner status updated successfully.');
     },
     onError: (err: any) => {
-      alert(`Status update failed: ${apiErrorMessage(err)}`);
+      toast.error('Status Update Failed', apiErrorMessage(err));
     },
   });
 
@@ -165,10 +168,10 @@ export default function PartnersPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['partners-commissions'] });
-      alert(`Payout batch #${data.batchId} processed for ₹${data.paidAmount.toLocaleString('en-IN')} across ${data.recordsCount} items.`);
+      toast.success('Payout Batch Processed', `Payout batch #${data.batchId} processed for ₹${data.paidAmount.toLocaleString('en-IN')} across ${data.recordsCount} items.`);
     },
     onError: (err: any) => {
-      alert(`Payout batch failed: ${apiErrorMessage(err)}`);
+      toast.error('Payout Batch Failed', apiErrorMessage(err));
     },
   });
 

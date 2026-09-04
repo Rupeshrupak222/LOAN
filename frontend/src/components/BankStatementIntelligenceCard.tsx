@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Card, Button, Badge, Spinner } from './ui';
 
@@ -43,6 +44,7 @@ export function BankStatementIntelligenceCard({
   readOnly = false,
 }: BankStatementIntelligenceCardProps) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'INCOME' | 'CASH_FLOW' | 'OBLIGATIONS' | 'ANOMALIES' | 'AI_INSIGHTS'>('OVERVIEW');
   const [showIngestModal, setShowIngestModal] = useState(false);
@@ -62,10 +64,11 @@ export function BankStatementIntelligenceCard({
       return res.data?.data;
     },
     onSuccess: () => {
+      toast.success('Bank statement analysis updated.');
       refetch();
     },
     onError: (err: any) => {
-      alert(`Bank Statement analysis error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Bank Statement Analysis Notice' });
     },
   });
 
@@ -147,10 +150,11 @@ export function BankStatementIntelligenceCard({
     },
     onSuccess: () => {
       setShowIngestModal(false);
+      toast.success('Sample bank statements ingested.');
       refetch();
     },
     onError: (err: any) => {
-      alert(`Statement ingestion error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Statement Ingestion Notice' });
     },
   });
 

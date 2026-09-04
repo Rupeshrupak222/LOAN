@@ -31,10 +31,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 export default function CommandCenterPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   // NLQ State
   const [nlqInput, setNlqInput] = useState('');
@@ -68,7 +70,7 @@ export default function CommandCenterPage() {
       setNlqResult(data);
     },
     onError: (err: any) => {
-      alert(`Query failed: ${apiErrorMessage(err)}`);
+      toast.error('Query Failed', apiErrorMessage(err));
     },
   });
 
@@ -80,10 +82,10 @@ export default function CommandCenterPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['command-center-anomalies'] });
-      alert('Autonomous operational policy anomaly scan completed successfully.');
+      toast.success('Scan Completed', 'Autonomous operational policy anomaly scan completed successfully.');
     },
     onError: (err: any) => {
-      alert(`Scan failed: ${apiErrorMessage(err)}`);
+      toast.error('Scan Failed', apiErrorMessage(err));
     },
   });
 
@@ -101,10 +103,10 @@ export default function CommandCenterPage() {
       setActionModalAnomaly(null);
       setActionNote('');
       queryClient.invalidateQueries({ queryKey: ['command-center-anomalies'] });
-      alert(`Anomaly #${data.id} updated to '${data.status}' with recorded human oversight rationale.`);
+      toast.success('Anomaly Action Recorded', `Anomaly #${data.id} updated to '${data.status}' with recorded human oversight.`);
     },
     onError: (err: any) => {
-      alert(`Action failed: ${apiErrorMessage(err)}`);
+      toast.error('Action Failed', apiErrorMessage(err));
     },
   });
 

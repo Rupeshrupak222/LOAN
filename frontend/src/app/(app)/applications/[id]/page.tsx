@@ -22,8 +22,10 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
+import { DetailPageSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { CreditIntelligenceCard } from '@/components/CreditIntelligenceCard';
@@ -38,6 +40,7 @@ export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
   const { isDark } = useTheme();
 
@@ -63,9 +66,13 @@ export default function ApplicationDetailPage() {
   const eligibilityMutation = useMutation({
     mutationFn: async () => api.post(`/eligibility/evaluate/${params.id}`),
     onSuccess: () => {
+      toast.success('Eligibility check evaluated successfully.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Eligibility Check Notice' });
     },
   });
 
@@ -73,9 +80,13 @@ export default function ApplicationDetailPage() {
   const riskMutation = useMutation({
     mutationFn: async () => api.post(`/risk/evaluate/${params.id}`),
     onSuccess: () => {
+      toast.success('4-Pillar Risk Engine evaluated successfully.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Risk Evaluation Notice' });
     },
   });
 
@@ -87,6 +98,7 @@ export default function ApplicationDetailPage() {
         reason: forwardReason.trim() || 'Forwarded to Underwriting by Credit Analyst',
       }),
     onSuccess: () => {
+      toast.success('Application forwarded to Underwriting queue.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -95,7 +107,7 @@ export default function ApplicationDetailPage() {
       setForwardModalOpen(false);
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error(apiErrorMessage(err), { title: 'Forward Transition Notice' });
     },
   });
 
@@ -107,6 +119,7 @@ export default function ApplicationDetailPage() {
         reason: rejectReason.trim() || 'Application rejected by Credit Analyst',
       }),
     onSuccess: () => {
+      toast.warning('Application marked as REJECTED.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -115,7 +128,7 @@ export default function ApplicationDetailPage() {
       setRejectModalOpen(false);
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error(apiErrorMessage(err), { title: 'Reject Transition Notice' });
     },
   });
 
@@ -128,6 +141,7 @@ export default function ApplicationDetailPage() {
         conditions: conditions || undefined,
       }),
     onSuccess: () => {
+      toast.success(`Underwriting decision '${decision}' recorded successfully.`);
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -138,9 +152,12 @@ export default function ApplicationDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       setDecisionModalOpen(false);
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Underwriting Decision Notice' });
+    },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
       <div className="py-12 text-center space-y-3">

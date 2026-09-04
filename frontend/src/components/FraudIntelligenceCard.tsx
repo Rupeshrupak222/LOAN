@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
 
@@ -43,18 +44,18 @@ export interface FraudSignalItem {
   entityType: string;
   entityId: string;
   evidence: string[];
-  relatedEntities: {
+  relatedEntities?: {
     entityType: string;
     entityId: string;
     label: string;
     relationship: string;
   }[];
   impact: string;
-  possibleExplanations: string[];
-  recommendedInvestigation: string[];
-  confidence: number;
-  detectedAt: string;
-  dataAsOf: string;
+  possibleExplanations?: string[];
+  recommendedInvestigation?: string[];
+  confidence?: number;
+  detectedAt?: string;
+  dataAsOf?: string;
 }
 
 export interface NetworkClusterItem {
@@ -70,27 +71,36 @@ export interface NetworkClusterItem {
 
 export interface FraudIntelligenceData {
   signals: FraudSignalItem[];
-  summary: string;
-  investigationPriority: 'Critical' | 'High' | 'Medium' | 'Low' | 'Review Required';
-  criticalCount: number;
-  highCount: number;
-  mediumCount: number;
-  lowCount: number;
-  relationshipSignals: FraudSignalItem[];
-  behavioralSignals: FraudSignalItem[];
-  documentSignals: FraudSignalItem[];
-  bankSignals: FraudSignalItem[];
-  disbursementSignals: FraudSignalItem[];
-  repaymentSignals: FraudSignalItem[];
-  employeeBranchSignals: FraudSignalItem[];
-  networkClusters: NetworkClusterItem[];
-  recommendedInvestigations: string[];
-  dataGaps: string[];
-  confidence: number;
+  summary?: string;
+  executiveSummary?: string;
+  investigationPriority?: 'Critical' | 'High' | 'Medium' | 'Low' | 'Review Required' | 'Routine';
+  criticalCount?: number;
+  highCount?: number;
+  mediumCount?: number;
+  lowCount?: number;
+  relationshipSignals?: FraudSignalItem[];
+  behavioralSignals?: FraudSignalItem[];
+  documentSignals?: FraudSignalItem[];
+  bankSignals?: FraudSignalItem[];
+  disbursementSignals?: FraudSignalItem[];
+  repaymentSignals?: FraudSignalItem[];
+  employeeBranchSignals?: FraudSignalItem[];
+  networkClusters?: NetworkClusterItem[];
+  assessmentId?: string;
+  scope?: 'APPLICATION' | 'CUSTOMER' | 'PORTFOLIO';
+  targetId?: string;
+  targetRef?: string;
+  compositeFraudScore?: number;
+  riskCategory?: 'CLEARED' | 'SUSPICIOUS' | 'HIGH_RISK_FRAUD' | 'CONFIRMED_FRAUD';
+  generatedAt?: string;
+  model?: string;
+  syntheticIdentity?: any;
+  networkCollusion?: any;
+  investigationSteps?: string[];
+  recommendedInvestigations?: string[];
+  dataGaps?: string[];
   isCached?: boolean;
-  generatedAt: string;
-  dataAsOf: string;
-  model: string;
+  dataAsOf?: string;
 }
 
 interface Props {
@@ -101,17 +111,13 @@ interface Props {
   initialData?: FraudIntelligenceData | null;
 }
 
-export function FraudIntelligenceCard({
-  applicationId,
-  customerId,
-  applicationNo,
-  customerCode,
-  initialData,
-}: Props) {
+export function FraudIntelligenceCard({ applicationId, customerId, applicationNo, customerCode, initialData }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<FraudIntelligenceData | null>(initialData || null);
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [expandedSignalId, setExpandedSignalId] = useState<string | null>(null);
+  const [showFullAssessment, setShowFullAssessment] = useState(false);
 
   const mutation = useMutation({
     mutationFn: async (forceRefresh: boolean = false) => {
@@ -124,9 +130,10 @@ export function FraudIntelligenceCard({
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Fraud Intelligence Complete', 'Scan evaluated portfolio fraud risk.');
     },
     onError: (err: any) => {
-      alert(`Fraud Intelligence Analysis Error: ${apiErrorMessage(err)}`);
+      toast.error('Fraud Intelligence Notice', apiErrorMessage(err));
     },
   });
 
@@ -267,13 +274,13 @@ export function FraudIntelligenceCard({
             </p>
 
             {/* Recommended Human Investigations */}
-            {data.recommendedInvestigations.length > 0 && (
+            {data.recommendedInvestigations && data.recommendedInvestigations.length > 0 && (
               <div className="pt-2 border-t border-slate-200/80 dark:border-[#1E2445]">
                 <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Recommended Human Verification Checklist:
                 </p>
                 <ul className="space-y-1">
-                  {data.recommendedInvestigations.map((rec, i) => (
+                  {data.recommendedInvestigations.map((rec: string, i: number) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-none mt-0.5" />
                       <span>{rec}</span>
@@ -299,36 +306,35 @@ export function FraudIntelligenceCard({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {data.networkClusters.map((cluster) => (
                   <div
                     key={cluster.clusterId}
-                    className="p-2.5 rounded-lg border border-slate-200 dark:border-[#1E2445] bg-white dark:bg-[#060F1B]/60 text-xs space-y-1.5"
+                    className="p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-[#0A1226] text-xs space-y-1"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                        {cluster.pivotType.replace('_', ' ')}: {cluster.pivotValue}
+                      <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                        {cluster.pivotType}: {cluster.pivotValue}
                       </span>
                       <span
                         className={cn(
-                          'text-[10px] font-bold px-1.5 py-0.5 rounded',
+                          'text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase',
                           cluster.severity === 'Critical'
-                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
                         )}
                       >
                         {cluster.severity}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300">
                       {cluster.description}
                     </p>
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                      <span className="text-[10px] text-slate-400">Linked:</span>
+                    <div className="flex flex-wrap gap-1 pt-1">
                       {cluster.customerNames.map((name, idx) => (
                         <span
                           key={idx}
-                          className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
+                          className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                         >
                           {name}
                         </span>
@@ -343,13 +349,13 @@ export function FraudIntelligenceCard({
           {/* Categorized Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-[#1E2445]">
             {[
-              { id: 'ALL', label: `All (${data.signals.length})` },
-              { id: 'CRITICAL_HIGH', label: `Critical & High (${data.criticalCount + data.highCount})` },
-              { id: 'RELATIONSHIP', label: `Network (${data.relationshipSignals.length})` },
-              { id: 'DOCUMENT', label: `Documents (${data.documentSignals.length})` },
-              { id: 'BANK', label: `Bank / Payout (${data.bankSignals.length})` },
-              { id: 'BEHAVIORAL', label: `Behavioral (${data.behavioralSignals.length})` },
-              { id: 'EMPLOYEE', label: `Operational (${data.employeeBranchSignals.length})` },
+              { id: 'ALL', label: `All (${(data.signals || []).length})` },
+              { id: 'CRITICAL_HIGH', label: `Critical & High (${(data.criticalCount || 0) + (data.highCount || 0)})` },
+              { id: 'RELATIONSHIP', label: `Network (${(data.relationshipSignals || []).length})` },
+              { id: 'DOCUMENT', label: `Documents (${(data.documentSignals || []).length})` },
+              { id: 'BANK', label: `Bank / Payout (${(data.bankSignals || []).length})` },
+              { id: 'BEHAVIORAL', label: `Behavioral (${(data.behavioralSignals || []).length})` },
+              { id: 'EMPLOYEE', label: `Operational (${(data.employeeBranchSignals || []).length})` },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -431,7 +437,7 @@ export function FraudIntelligenceCard({
                             Factual Authoritative Evidence:
                           </p>
                           <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-300 mt-1">
-                            {signal.evidence.map((ev, idx) => (
+                            {(signal.evidence || []).map((ev, idx) => (
                               <li key={idx} className="font-mono text-[11px]">
                                 {ev}
                               </li>
@@ -440,7 +446,7 @@ export function FraudIntelligenceCard({
                         </div>
 
                         {/* Hypotheses / Possible Explanations */}
-                        {signal.possibleExplanations.length > 0 && (
+                        {signal.possibleExplanations && signal.possibleExplanations.length > 0 && (
                           <div className="p-2 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
                               Investigative Hypotheses (Potential Explanations):
@@ -454,7 +460,7 @@ export function FraudIntelligenceCard({
                         )}
 
                         {/* Recommended Actions */}
-                        {signal.recommendedInvestigation.length > 0 && (
+                        {signal.recommendedInvestigation && signal.recommendedInvestigation.length > 0 && (
                           <div className="p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/30">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
                               Action Required by Human Officer:
@@ -477,9 +483,9 @@ export function FraudIntelligenceCard({
           {/* Card Footer: Metadata & Safe Governance Notice */}
           <div className="pt-2 border-t border-slate-200 dark:border-[#1E2445] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-slate-400">
             <div className="flex items-center gap-3">
-              <span>Model: {data.model}</span>
+              <span>Model: {data.model || 'Gemini 2.5'}</span>
               <span>•</span>
-              <span>Data As Of: {new Date(data.dataAsOf).toLocaleTimeString()}</span>
+              <span>Data As Of: {data.dataAsOf ? new Date(data.dataAsOf).toLocaleTimeString() : 'Current Session'}</span>
             </div>
             <p className="italic">
               Human In The Loop: AI outputs are advisory hypotheses and never alter financial or loan status records.

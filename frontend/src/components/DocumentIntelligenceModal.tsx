@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
@@ -30,6 +31,9 @@ export interface DocumentIntelligenceData {
   uploadedAt: string;
   analyzedAt: string;
   model: string;
+  recommendedReview?: string;
+  documentSummary?: string;
+  reviewRationale?: string;
 
   classification: {
     detectedType: string;
@@ -84,21 +88,21 @@ export interface DocumentIntelligenceData {
     completenessStatus: 'COMPLETE' | 'PARTIALLY_COMPLETE' | 'INCOMPLETE';
   };
 
-  documentSummary: string;
-  recommendedReview:
-    | 'NO_OBVIOUS_ISSUE_DETECTED'
-    | 'MANUAL_REVIEW_RECOMMENDED'
-    | 'POTENTIAL_MISMATCH_FLAGGED'
-    | 'DOCUMENT_UNREADABLE';
-  reviewRationale: string;
+  forgeryIndicators: string[];
+  crossCheckSummary: string;
+  ocrConfidence: number;
+  recommendedReviewAction: 'ACCEPT' | 'RE_UPLOAD_REQUEST' | 'MANUAL_VERIFICATION_REQUIRED' | 'FRAUD_ESCALATION';
+  summary: string;
 }
 
 interface Props {
   document: {
     id: string;
+    type: string;
     fileName: string;
-    category: string;
-    storageKey?: string;
+    fileUrl?: string;
+    customerName?: string;
+    category?: string;
   };
   isOpen: boolean;
   onClose: () => void;
@@ -106,6 +110,7 @@ interface Props {
 
 export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<DocumentIntelligenceData | null>(null);
 
   const mutation = useMutation({
@@ -115,9 +120,10 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Document analysis completed.');
     },
     onError: (err: any) => {
-      alert(`Document Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Document Intelligence Notice' });
     },
   });
 
@@ -218,7 +224,7 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
                         : 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300'
                     )}
                   >
-                    {data.recommendedReview.replace(/_/g, ' ')}
+                    {data.recommendedReview ? data.recommendedReview.replace(/_/g, ' ') : 'PENDING REVIEW'}
                   </span>
                 </div>
 

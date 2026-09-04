@@ -21,6 +21,7 @@ import {
   Building,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 import { useTheme } from '@/lib/theme';
 import { cn, formatMoney } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
@@ -32,6 +33,7 @@ export interface DisbursementIntelligenceData {
   model: string;
   readinessStatus: 'READY' | 'NEEDS_REVIEW' | 'NOT_READY' | 'BLOCKED';
   executiveSummary: string;
+  recommendedActions?: string[];
   completedChecks: {
     name: string;
     status: 'PASSED' | 'FAILED' | 'WARNING';
@@ -61,15 +63,29 @@ export interface DisbursementIntelligenceData {
     duplicateDetected?: boolean;
     observations?: string;
   };
-  exceptions: {
+  exceptions?: {
     exception: string;
     impact: string;
-    evidence: string;
-    recommendedAction: string;
-    escalationRole?: string;
+    actionRequired: string;
   }[];
-  recommendedActions: string[];
-  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  conditionsPrecedentAudit?: {
+    condition: string;
+    status: 'VERIFIED' | 'PENDING' | 'WAIVED' | 'BLOCKED';
+    evidence: string;
+    blockingSeverity: 'CRITICAL' | 'MEDIUM' | 'NONE';
+  }[];
+  bankAccountValidation: {
+    accountHolderMatch: string;
+    pennyDropStatus: 'VERIFIED' | 'UNVERIFIED' | 'FAILED';
+    riskFlag: string;
+  };
+  complianceChecklist: {
+    check: string;
+    passed: boolean;
+    details: string;
+  }[];
+  liquidityImpactSummary: string;
+  disbursementChecklist: string[];
 }
 
 interface Props {
@@ -80,6 +96,7 @@ interface Props {
 
 export function DisbursementIntelligenceCard({ applicationId, applicationNo, utrReference }: Props) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<DisbursementIntelligenceData | null>(null);
   const [showDeepBreakdown, setShowDeepBreakdown] = useState(false);
 
@@ -92,9 +109,10 @@ export function DisbursementIntelligenceCard({ applicationId, applicationNo, utr
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Disbursement Intelligence verified.');
     },
     onError: (err: any) => {
-      alert(`Disbursement Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Disbursement Intelligence Notice' });
     },
   });
 
@@ -287,7 +305,7 @@ export function DisbursementIntelligenceCard({ applicationId, applicationNo, utr
                 <span>Recommended Finance Officer Actions</span>
               </h4>
               <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-700 dark:text-slate-300">
-                {data.recommendedActions.length > 0 ? (
+                {data.recommendedActions && data.recommendedActions.length > 0 ? (
                   data.recommendedActions.map((action, idx) => (
                     <li key={idx} className="leading-relaxed">
                       {action}

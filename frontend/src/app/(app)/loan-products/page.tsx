@@ -31,6 +31,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Badge, Button, Input, Spinner } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 interface FeeSchedule {
   processingFeePct: number;
@@ -75,6 +76,7 @@ export default function LoanProductsPage() {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedProductForSim, setSelectedProductForSim] = useState<DynamicLoanProduct | null>(null);
@@ -141,9 +143,10 @@ export default function LoanProductsPage() {
     },
     onSuccess: (data) => {
       setSimulationResult(data);
+      toast.success('Simulation Completed', 'Pricing and amortization calculated.');
     },
     onError: (err: any) => {
-      alert(`Simulation error: ${apiErrorMessage(err)}`);
+      toast.error('Simulation Failed', apiErrorMessage(err));
     },
   });
 
@@ -181,9 +184,10 @@ export default function LoanProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loan-products-catalog'] });
       setIsCreateModalOpen(false);
+      toast.success('Product Created', 'New loan product published to product catalog.');
     },
     onError: (err: any) => {
-      alert(`Failed to create product: ${apiErrorMessage(err)}`);
+      toast.error('Product Creation Failed', apiErrorMessage(err));
     },
   });
 

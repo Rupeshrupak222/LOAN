@@ -18,70 +18,79 @@ import {
   Scale,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
-import { Card, Button, Badge, Spinner, Input } from './ui';
-import { formatMoney, cn } from '@/lib/utils';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
+import { cn, formatMoney } from '@/lib/utils';
+import { Button, Card, Badge, Spinner, Input } from './ui';
 
-interface DecisionSimulatorCardProps {
+export interface DecisionSimulatorCardProps {
   applicationId: string;
-  applicationNo: string;
+  applicationNo?: string;
+  applicantName?: string;
   baseAmount: number;
   baseTenure: number;
   baseRate: number;
-  baseIncome: number;
-  baseObligations: number;
+  baseIncome?: number;
+  baseObligations?: number;
+  baseBureauScore?: number;
+  readOnly?: boolean;
 }
 
 export function DecisionSimulatorCard({
   applicationId,
   applicationNo,
+  applicantName,
   baseAmount,
   baseTenure,
   baseRate,
-  baseIncome,
-  baseObligations,
+  baseIncome = 85000,
+  baseObligations = 22000,
+  baseBureauScore = 740,
+  readOnly = false,
 }: DecisionSimulatorCardProps) {
   const { isDark } = useTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
 
-  // Hypothetical Inputs state
-  const [hypAmount, setHypAmount] = useState<number>(baseAmount || 100000);
-  const [hypTenure, setHypTenure] = useState<number>(baseTenure || 12);
-  const [hypRate, setHypRate] = useState<number>(baseRate || 14.5);
-  const [hypIncome, setHypIncome] = useState<number>(baseIncome || 50000);
-  const [hypObligations, setHypObligations] = useState<number>(baseObligations || 0);
+  const [hypAmount, setHypAmount] = useState<number>(baseAmount);
+  const [hypTenure, setHypTenure] = useState<number>(baseTenure);
+  const [hypRate, setHypRate] = useState<number>(baseRate);
+  const [hypIncome, setHypIncome] = useState<number>(baseIncome);
+  const [hypObligations, setHypObligations] = useState<number>(baseObligations);
 
-  // Snapshot modal
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [scenarioName, setScenarioName] = useState('');
 
-  // Fetch Saved Snapshots
-  const { data: savedSnapshots = [] } = useQuery({
+  // Fetch saved scenario snapshots
+  const { data: savedSnapshots = [] } = useQuery<any[]>({
     queryKey: ['saved-simulations', applicationId],
     queryFn: async () => {
-      const res = await api.get(`/decision-simulator/applications/${applicationId}`);
-      return res.data?.data || [];
+      try {
+        const res = await api.get(`/decision-simulator/saved/${applicationId}`);
+        return res.data?.data || [];
+      } catch {
+        return [];
+      }
     },
   });
 
-  // Run Simulation Mutation
   const simMutation = useMutation({
     mutationFn: async () => {
       const res = await api.post('/decision-simulator/simulate', {
         applicationId,
-        hypotheticalInputs: {
-          requestedAmount: Number(hypAmount),
-          tenureMonths: Number(hypTenure),
-          interestRatePct: Number(hypRate),
-          monthlyIncome: Number(hypIncome),
-          existingObligations: Number(hypObligations),
-        },
+        hypotheticalAmount: hypAmount,
+        hypotheticalTenureMonths: hypTenure,
+        hypotheticalInterestRate: hypRate,
+        hypotheticalMonthlyIncome: hypIncome,
+        hypotheticalMonthlyObligations: hypObligations,
       });
       return res.data?.data;
     },
+    onError: (err: any) => {
+      toast.error('Simulation Error', apiErrorMessage(err));
+    },
   });
 
-  // Save Snapshot Mutation
   const saveMutation = useMutation({
     mutationFn: async ({ simulationId, name }: { simulationId: string; name: string }) => {
       const res = await api.post('/decision-simulator/save', { simulationId, name });
@@ -91,10 +100,10 @@ export function DecisionSimulatorCard({
       setShowSaveModal(false);
       setScenarioName('');
       queryClient.invalidateQueries({ queryKey: ['saved-simulations', applicationId] });
-      alert('Hypothetical simulation scenario snapshot saved successfully.');
+      toast.success('Simulation Saved', 'Simulation scenario snapshot saved successfully.');
     },
     onError: (err: any) => {
-      alert(`Save failed: ${apiErrorMessage(err)}`);
+      toast.error('Save Simulation Notice', apiErrorMessage(err));
     },
   });
 
@@ -111,11 +120,11 @@ export function DecisionSimulatorCard({
 
   const handleLoadSnapshot = (snap: any) => {
     if (snap.assumptions) {
-      if (snap.assumptions.requestedAmount) setHypAmount(snap.assumptions.requestedAmount);
-      if (snap.assumptions.tenureMonths) setHypTenure(snap.assumptions.tenureMonths);
-      if (snap.assumptions.interestRatePct) setHypRate(snap.assumptions.interestRatePct);
-      if (snap.assumptions.monthlyIncome) setHypIncome(snap.assumptions.monthlyIncome);
-      if (snap.assumptions.existingObligations) setHypObligations(snap.assumptions.existingObligations);
+      if (snap.assumptions.requestedAmount) setHypAmount(Number(snap.assumptions.requestedAmount));
+      if (snap.assumptions.tenureMonths) setHypTenure(Number(snap.assumptions.tenureMonths));
+      if (snap.assumptions.interestRate) setHypRate(Number(snap.assumptions.interestRate));
+      if (snap.assumptions.monthlyIncome) setHypIncome(Number(snap.assumptions.monthlyIncome));
+      if (snap.assumptions.monthlyObligations) setHypObligations(Number(snap.assumptions.monthlyObligations));
     }
   };
 

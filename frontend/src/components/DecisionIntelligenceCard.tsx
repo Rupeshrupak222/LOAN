@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Button, Card, Badge } from './ui';
 
@@ -73,6 +74,7 @@ export interface DecisionIntelligenceData {
 
 export function DecisionIntelligenceCard() {
   const { isDark } = useTheme();
+  const toast = useToast();
   const [data, setData] = useState<DecisionIntelligenceData | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -83,9 +85,10 @@ export function DecisionIntelligenceCard() {
     },
     onSuccess: (result) => {
       setData(result);
+      toast.success('Executive Decision Intelligence refreshed.');
     },
     onError: (err: any) => {
-      alert(`Decision Intelligence Error: ${apiErrorMessage(err)}`);
+      toast.error(apiErrorMessage(err), { title: 'Decision Intelligence Notice' });
     },
   });
 

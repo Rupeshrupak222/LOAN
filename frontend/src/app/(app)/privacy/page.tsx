@@ -23,6 +23,7 @@ import {
 import { api, apiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, KpiCard, Button, Badge, Spinner } from '@/components/ui';
@@ -78,6 +79,7 @@ export default function PrivacyConsentPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isDark } = useTheme();
+  const toast = useToast();
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'PURPOSES' | 'CONSENTS' | 'PREFERENCES' | 'AI_MINIMIZATION'>('PURPOSES');
@@ -152,9 +154,10 @@ export default function PrivacyConsentPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['privacy-consents'] });
       queryClient.invalidateQueries({ queryKey: ['privacy-overview'] });
+      toast.success('Consent Granted', 'Purpose-bound consent successfully recorded.');
     },
     onError: (err: any) => {
-      alert(`Grant failed: ${apiErrorMessage(err)}`);
+      toast.error('Grant Failed', apiErrorMessage(err));
     },
   });
 
@@ -169,9 +172,10 @@ export default function PrivacyConsentPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['privacy-consents'] });
       queryClient.invalidateQueries({ queryKey: ['privacy-overview'] });
+      toast.info('Consent Withdrawn', 'Consent record updated to WITHDRAWN.');
     },
     onError: (err: any) => {
-      alert(`Withdrawal failed: ${apiErrorMessage(err)}`);
+      toast.error('Withdrawal Failed', apiErrorMessage(err));
     },
   });
 
@@ -186,9 +190,10 @@ export default function PrivacyConsentPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['privacy-preferences'] });
+      toast.success('Preferences Saved', 'Privacy preferences updated successfully.');
     },
     onError: (err: any) => {
-      alert(`Update failed: ${apiErrorMessage(err)}`);
+      toast.error('Update Failed', apiErrorMessage(err));
     },
   });
 
@@ -203,9 +208,10 @@ export default function PrivacyConsentPage() {
     },
     onSuccess: (data) => {
       setEnforceResult(data);
+      toast.success('Enforcement Checked', data.allowed ? 'Access ALLOWED under active consent.' : 'Access BLOCKED: consent missing.');
     },
     onError: (err: any) => {
-      alert(`Enforce check failed: ${apiErrorMessage(err)}`);
+      toast.error('Enforce Check Failed', apiErrorMessage(err));
     },
   });
 
@@ -226,9 +232,10 @@ export default function PrivacyConsentPage() {
     },
     onSuccess: (data) => {
       setSanitizedOutput(data);
+      toast.success('Sanitization Complete', 'PII tokens masked and minimized.');
     },
     onError: (err: any) => {
-      alert(`Sanitize failed: ${apiErrorMessage(err)}`);
+      toast.error('Sanitization Failed', apiErrorMessage(err));
     },
   });
 
