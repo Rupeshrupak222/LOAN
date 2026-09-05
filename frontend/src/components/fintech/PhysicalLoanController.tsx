@@ -275,7 +275,7 @@ export const PhysicalLoanController: React.FC<Props> = ({ selectedGoal }) => {
             {/* Direct CTA */}
             <div className="mt-8">
               <Link
-                href={`/applications?amount=${amount}&tenure=${effectiveTenure}&purpose=${selectedGoal}`}
+                href={`/applications/new?amount=${amount}&tenure=${effectiveTenure}&purpose=${selectedGoal}`}
                 className="w-full inline-flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-sm text-white bg-[#155EEF] hover:bg-[#104ec8] transition-all shadow-md shadow-[#155EEF]/20"
               >
                 Lock this Path for {selectedGoal.toUpperCase()}

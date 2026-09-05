@@ -5,7 +5,7 @@ import { AppError, BadRequestError } from '../../common/errors';
 
 let genAIClient: GoogleGenAI | null = null;
 
-const DEFAULT_GEMINI_TIMEOUT_MS = 25_000;
+const DEFAULT_GEMINI_TIMEOUT_MS = 45_000;
 
 /**
  * Returns a singleton instance of the GoogleGenAI client.

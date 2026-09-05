@@ -30,7 +30,7 @@ export const FintechLaunchpad: React.FC<Props> = ({ selectedGoal }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`/applications?purpose=${selectedGoal}&amount=250000`);
+    router.push(`/applications/new?purpose=${selectedGoal}&amount=250000`);
   };
 
   useEffect(() => {

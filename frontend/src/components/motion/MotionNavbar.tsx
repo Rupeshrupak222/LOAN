@@ -266,13 +266,17 @@ export const MotionNavbar: React.FC = () => {
             </Link>
 
             {/* Systems-Grade LMS Status Indicator */}
-            <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono font-bold text-slate-600 uppercase tracking-wider pl-4 border-l border-slate-200">
+            <Link
+              href="/dashboard"
+              title="LMS Disbursal Active — Inspect Operations Dashboard"
+              className="hidden xl:flex items-center gap-2 text-[11px] font-mono font-bold text-slate-600 hover:text-blue-600 uppercase tracking-wider pl-4 border-l border-slate-200 transition-colors cursor-pointer"
+            >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
               <span>LMS DISBURSAL ACTIVE</span>
-            </div>
+            </Link>
           </div>
 
           {/* ── CENTER CLUSTER: EDITORIAL NAVIGATION TABS ── */}
@@ -349,7 +353,7 @@ export const MotionNavbar: React.FC = () => {
 
             {/* Premium Compact Check Eligibility CTA (Stationary rounded rectangle) */}
             <Link
-              href="/products/personal-loans#journey-sim"
+              href="/#calculator"
               className="px-5 py-2.5 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white font-semibold text-xs tracking-wider uppercase transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
             >
               <span>Check Eligibility</span>
@@ -481,10 +485,14 @@ export const MotionNavbar: React.FC = () => {
             </div>
 
             {/* Mobile Status Readout */}
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-600 uppercase">
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 text-xs font-mono font-bold text-slate-600 hover:text-blue-600 uppercase transition-colors"
+            >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>LMS Disbursal Active // Production Rails</span>
-            </div>
+            </Link>
 
             {/* Mobile Products Accordion */}
             <div className="space-y-2">

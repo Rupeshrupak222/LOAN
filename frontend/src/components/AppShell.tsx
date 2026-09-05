@@ -2,7 +2,7 @@
 
 import { ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
@@ -90,6 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { branding } = useBranding();
   const isDark = theme === 'dark';
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -98,9 +99,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Automatic redirect if unauthenticated without blank screen hang
   useEffect(() => {
     if (!loading && !user && pathname && !pathname.startsWith('/login')) {
-      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+      const qs = searchParams?.toString();
+      const fullPath = qs ? `${pathname}?${qs}` : pathname;
+      router.push(`/login?redirect=${encodeURIComponent(fullPath)}`);
     }
-  }, [loading, user, pathname, router]);
+  }, [loading, user, pathname, searchParams, router]);
 
   if (loading) {
     return (

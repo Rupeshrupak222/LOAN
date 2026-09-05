@@ -310,7 +310,7 @@ export const DirectionSimulator: React.FC<Props> = ({ activeDirection }) => {
             {/* Direct CTA */}
             <div className="mt-8">
               <Link
-                href={`/applications?amount=${amount}&tenure=${effectiveTenure}&purpose=${activeDirection}`}
+                href={`/applications/new?amount=${amount}&tenure=${effectiveTenure}&purpose=${activeDirection}`}
                 className="w-full inline-flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-bold text-sm text-white transition-all duration-300 hover:brightness-105 active:scale-95 shadow-lg"
                 style={{
                   backgroundColor: current.accentHex,

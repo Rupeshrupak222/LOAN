@@ -7,6 +7,48 @@ import { asyncHandler } from '../../common/asyncHandler';
 
 const router = Router();
 
+/**
+ * POST /api/v1/support/inquiry
+ * Public inquiry submission from website contact form.
+ */
+router.post(
+  '/inquiry',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { fullName, workEmail, orgName, volumeBand, projectScope } = req.body;
+    if (!workEmail) {
+      throw new BadRequestError('Work email is required.');
+    }
+
+    const ticket = slaSupportService.createTicket(
+      {
+        title: `Enterprise Lead: ${orgName || fullName || 'Institutional Client'}`,
+        description: `Contact: ${fullName || 'Anonymous'}\nWork Email: ${workEmail}\nOrganization: ${orgName || 'N/A'}\nDisbursement Volume: ${volumeBand || 'N/A'}\nProject Scope: ${projectScope || 'N/A'}`,
+        category: 'GENERAL_INQUIRY',
+        severity: 'P3_MEDIUM',
+        customerEmail: workEmail,
+      },
+      {
+        id: 'public-lead-guest',
+        email: workEmail,
+        name: fullName || 'Enterprise Lead',
+        roles: ['CUSTOMER'],
+      } as any
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Enterprise inquiry successfully received and assigned to solutions architecture desk.',
+      data: {
+        id: ticket.id,
+        reference: ticket.id,
+        email: workEmail,
+        desk: 'CORE LENDING & INFRASTRUCTURE',
+        slaMinutes: 15,
+      },
+    });
+  })
+);
+
 router.use(authenticate);
 router.use(tenantContext);
 

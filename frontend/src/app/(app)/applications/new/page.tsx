@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -22,19 +22,26 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button, Card, Input } from '@/components/ui';
 import { cn, formatMoney } from '@/lib/utils';
 
-export default function NewApplicationPage() {
+function NewApplicationForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
+
+  const paramAmount = searchParams?.get('amount');
+  const paramTenure = searchParams?.get('tenure');
+  const paramPurpose = searchParams?.get('purpose');
 
   // Form State
   const [customerId, setCustomerId] = useState('');
   const [loanMode, setLoanMode] = useState<'CUSTOM' | 'PRESET'>('CUSTOM');
   const [productId, setProductId] = useState('');
-  const [customLoanName, setCustomLoanName] = useState('Personal Loan');
-  const [requestedAmount, setRequestedAmount] = useState<number | string>(100000);
+  const [customLoanName, setCustomLoanName] = useState(
+    paramPurpose ? `${paramPurpose.charAt(0).toUpperCase() + paramPurpose.slice(1)} Loan` : 'Personal Loan'
+  );
+  const [requestedAmount, setRequestedAmount] = useState<number | string>(paramAmount ? Number(paramAmount) : 100000);
   const [customInterestRate, setCustomInterestRate] = useState<number | string>(12.5);
-  const [tenureMonths, setTenureMonths] = useState<number | string>(24);
-  const [purpose, setPurpose] = useState('');
+  const [tenureMonths, setTenureMonths] = useState<number | string>(paramTenure ? Number(paramTenure) : 24);
+  const [purpose, setPurpose] = useState(paramPurpose ? paramPurpose.toUpperCase() : '');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -584,5 +591,19 @@ export default function NewApplicationPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function NewApplicationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        </div>
+      }
+    >
+      <NewApplicationForm />
+    </Suspense>
   );
 }
