@@ -397,8 +397,8 @@ describe('Step 12: Production-Grade Integration Hub', () => {
     expect(maskSecret(null)).toBe('NOT_SET');
 
     const sanitized = sanitizeErrorDetails({
-      apiKey: 'secret_123456789',
-      nested: { password: 'my-super-secret' },
+      apiKey: 'test-sample-provider-api-key',
+      nested: { password: 'test-sample-password' },
       safeField: 'Adyapan LMS',
     });
     expect(sanitized.apiKey).toBe('[REDACTED]');

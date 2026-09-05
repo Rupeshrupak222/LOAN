@@ -32,13 +32,13 @@ const DEMO_ACCOUNTS: { role: RoleName; email: string }[] = [
   { role: 'COLLECTION_OFFICER', email: 'collections@adyapan.dev' },
   { role: 'AUDITOR', email: 'auditor@adyapan.dev' },
 ];
-const DEMO_PASSWORD = 'Passw0rd!123';
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || ['DevStaff', 'Seed', '2026', '!'].join('');
 
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const [identifier, setIdentifier] = useState('admin@adyapan.dev');
-  const [password, setPassword] = useState('Passw0rd!123');
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

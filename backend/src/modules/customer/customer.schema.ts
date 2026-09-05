@@ -5,13 +5,22 @@ export const createCustomerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   dateOfBirth: z.coerce.date().optional(),
   gender: z.string().optional(),
-  mobile: z.string().min(6).max(20),
+  mobile: z.string().min(6).max(20).optional(),
+  phone: z.string().optional(),
   email: z.string().email().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   addressLine: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   pincode: z.string().optional(),
+  address: z
+    .object({
+      addressLine: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      pincode: z.string().optional(),
+    })
+    .optional(),
   employmentType: z.string().optional(),
   employerName: z.string().optional(),
   designation: z.string().optional(),
@@ -20,6 +29,15 @@ export const createCustomerSchema = z.object({
   bankName: z.string().optional(),
   bankAccountNo: z.string().optional(),
   bankIfsc: z.string().optional(),
+  bankAccount: z
+    .object({
+      bankName: z.string().optional(),
+      accountNumber: z.string().optional(),
+      bankAccountNo: z.string().optional(),
+      ifscCode: z.string().optional(),
+      bankIfsc: z.string().optional(),
+    })
+    .optional(),
   branchId: z.string().uuid().optional(),
 });
 

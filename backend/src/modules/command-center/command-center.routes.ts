@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
 import { BadRequestError } from '../../common/errors';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { commandCenterService } from './command-center.service';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(authorize('SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'BRANCH_MANAGER'));
 
 /**
  * GET /api/v1/command-center/health
@@ -64,6 +65,7 @@ router.get(
  */
 router.post(
   '/anomalies/:id/action',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await commandCenterService.handleHumanOversightAction(
       req.params.id,
@@ -84,6 +86,7 @@ router.post(
  */
 router.post(
   '/scan',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const results = await commandCenterService.runAutonomousScan({
       roles: req.user!.roles,

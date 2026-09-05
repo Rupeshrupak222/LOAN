@@ -128,6 +128,10 @@ export async function processPayment(
   input: RecordPaymentInput,
   actorUserId?: string
 ) {
+  if (Number(input.amount) <= 0) {
+    throw new BadRequestError('Payment amount must be greater than 0');
+  }
+
   // 1. Idempotency Check
   if (input.idempotencyKey) {
     const existing = await prisma.payment.findUnique({
@@ -329,7 +333,7 @@ export async function processPayment(
     }
 
     return createdPayment;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actorUserId,

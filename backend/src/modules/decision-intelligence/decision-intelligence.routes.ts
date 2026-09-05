@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { decisionIntelligenceService } from './decision-intelligence.service';
 
 const router = Router();
 
-// Require authentication for all decision intelligence routes
+// Require authentication and authorized roles for all decision intelligence routes
 router.use(authenticate);
+router.use(authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'));
 
 /**
  * GET /api/v1/decision-intelligence/applications/:applicationId

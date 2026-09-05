@@ -5,7 +5,7 @@ import { AppError, BadRequestError } from '../../common/errors';
 
 let genAIClient: GoogleGenAI | null = null;
 
-const DEFAULT_GEMINI_TIMEOUT_MS = 25_000;
+const DEFAULT_GEMINI_TIMEOUT_MS = 38_000;
 
 /**
  * Returns a singleton instance of the GoogleGenAI client.
@@ -48,7 +48,7 @@ export interface GeminiResponse {
 
 /**
  * Centralized server-side execution function for Google Gemini API.
- * Enforces strict bounded timeouts (Promise.race), client initialization,
+ * Enforces bounded timeouts (Promise.race), client initialization,
  * error sanitization, and structured output.
  */
 export async function generateGeminiContent(
@@ -62,6 +62,8 @@ export async function generateGeminiContent(
 
   const client = getGeminiClient();
   const selectedModel = options.model || env.gemini.model || 'gemma-4-31b-it';
+
+  let timerHandle: NodeJS.Timeout | null = null;
 
   try {
     const config: any = {};
@@ -100,7 +102,7 @@ export async function generateGeminiContent(
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => {
+      timerHandle = setTimeout(() => {
         reject(
           new AppError(
             504,
@@ -110,12 +112,16 @@ export async function generateGeminiContent(
         );
       }, timeoutMs);
 
-      if (typeof timer.unref === 'function') {
-        timer.unref();
+      if (typeof timerHandle.unref === 'function') {
+        timerHandle.unref();
       }
     });
 
     const response = await Promise.race([generatePromise, timeoutPromise]);
+    if (timerHandle) {
+      clearTimeout(timerHandle);
+      timerHandle = null;
+    }
 
     const text = response.text || '';
     const candidate = response.candidates?.[0];

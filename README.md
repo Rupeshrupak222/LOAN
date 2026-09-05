@@ -56,12 +56,12 @@ LOAN/
 
 ## Demo users (after seed)
 
-| Role         | Email                       | Password      |
-|--------------|-----------------------------|---------------|
-| Super Admin  | superadmin@adyapan.dev      | Passw0rd!123  |
-| Admin        | admin@adyapan.dev           | Passw0rd!123  |
-| Loan Officer | officer@adyapan.dev         | Passw0rd!123  |
-| Customer     | customer@adyapan.dev        | Passw0rd!123  |
+| Role         | Email                       | Password            |
+|--------------|-----------------------------|---------------------|
+| Super Admin  | superadmin@adyapan.dev      | DevStaffSeed2026!   |
+| Admin        | admin@adyapan.dev           | DevStaffSeed2026!   |
+| Loan Officer | officer@adyapan.dev         | DevStaffSeed2026!   |
+| Customer     | customer@adyapan.dev        | DevStaffSeed2026!   |
 
 ## Money & correctness
 

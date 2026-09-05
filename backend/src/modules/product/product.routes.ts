@@ -117,7 +117,7 @@ router.patch(
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
+  authorize('SUPER_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     await service.deleteProduct(req.params.id);
     return ok(res, { message: 'Product deleted successfully' });

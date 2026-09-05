@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { communicationService } from './communication.service';
 import { TEMPLATE_REGISTRY } from './template.registry';
 
@@ -15,6 +15,7 @@ router.use(authenticate);
  */
 router.post(
   '/send',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'COLLECTION_OFFICER', 'UNDERWRITER', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const record = await communicationService.sendMessage(req.body, {
       id: req.user!.id,
@@ -31,6 +32,7 @@ router.post(
  */
 router.post(
   '/preview',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'COLLECTION_OFFICER', 'UNDERWRITER', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const { templateCode, variables, channel } = req.body;
     const preview = communicationService.previewTemplate(templateCode, variables || {}, channel || 'EMAIL');
@@ -44,6 +46,7 @@ router.post(
  */
 router.get(
   '/templates',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'COLLECTION_OFFICER', 'UNDERWRITER', 'FINANCE_OFFICER', 'AUDITOR'),
   asyncHandler(async (_req, res) => {
     const templates = Object.values(TEMPLATE_REGISTRY);
     res.json(success(templates));
@@ -56,6 +59,7 @@ router.get(
  */
 router.get(
   '/logs',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'COLLECTION_OFFICER', 'UNDERWRITER', 'FINANCE_OFFICER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { channel, status, category, recipient, customerId } = req.query;
 
@@ -84,6 +88,7 @@ router.get(
  */
 router.get(
   '/stats',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const stats = communicationService.getStats({
       id: req.user!.id,

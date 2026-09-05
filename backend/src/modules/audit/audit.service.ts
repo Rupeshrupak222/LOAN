@@ -29,7 +29,26 @@ export async function logAudit(input: RecordAuditInput) {
         correlationId: input.correlationId,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === 'P2003' && input.userId) {
+      try {
+        return await prisma.auditLog.create({
+          data: {
+            userId: undefined,
+            role: input.role,
+            action: input.action,
+            entity: input.entity,
+            entityId: input.entityId,
+            previousValue: input.previousValue ?? Prisma.DbNull,
+            newValue: input.newValue ?? Prisma.DbNull,
+            ipAddress: input.ipAddress,
+            correlationId: input.correlationId,
+          },
+        });
+      } catch {
+        return null;
+      }
+    }
     // Non-blocking fallback so business flow is not interrupted if logging fails
     console.error('Audit logging failed:', err);
     return null;

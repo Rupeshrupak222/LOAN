@@ -141,7 +141,7 @@ export default function UsersPage() {
           )}>
             <div>
               <h3 className={cn("text-base font-bold", isDark ? "text-white" : "text-slate-900")}>Add New Staff Member</h3>
-              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>Initial default login password: <code>Passw0rd!123</code></p>
+              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>Initial default login password: <code>DevStaffSeed2026!</code></p>
             </div>
 
             <div className="space-y-3">

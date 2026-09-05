@@ -110,7 +110,7 @@ router.post(
 
 router.patch(
   '/:id/verify',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
   validate(verifyDocumentSchema),
   asyncHandler(async (req, res) => {
     const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id);

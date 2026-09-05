@@ -348,50 +348,87 @@ You synthesize cross-module operational exceptions, identify workflow bottleneck
 }
 `;
 
-  // 4. Generate content via Central Gemini Service
-  const geminiResult = await generateGeminiContent({
-    prompt: `Synthesize the Workflow & Exception Center briefing for the following operational exception candidates:\n\n${contextPrompt}`,
-    systemInstruction,
-    temperature: 0.1,
-  });
+  const criticalCount = rawExceptions.filter((e) => e.severity === 'CRITICAL').length;
+  const highCount = rawExceptions.filter((e) => e.severity === 'HIGH').length;
+  const mediumCount = rawExceptions.filter((e) => e.severity === 'MEDIUM').length;
+  const lowCount = rawExceptions.filter((e) => e.severity === 'LOW' || e.severity === 'INFORMATIONAL').length;
 
-  // 5. Safe JSON Parsing
-  let parsed: any;
+  let result: WorkflowExceptionCenterResult;
+
   try {
+    // 4. Generate content via Central Gemini Service
+    const geminiResult = await generateGeminiContent({
+      prompt: `Synthesize the Workflow & Exception Center briefing for the following operational exception candidates:\n\n${contextPrompt}`,
+      systemInstruction,
+      temperature: 0.1,
+    });
+
+    // 5. Safe JSON Parsing
     const rawText = geminiResult.text.trim();
     const cleanJson = rawText
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    parsed = JSON.parse(cleanJson);
-  } catch (err: any) {
-    throw new BadRequestError(`Failed to parse AI Workflow Exception response: ${err.message}`);
+    const parsed = JSON.parse(cleanJson);
+
+    result = {
+      generatedAt: new Date().toISOString(),
+      dataAsOf: new Date().toISOString(),
+      model: geminiResult.model,
+      summary: parsed.summary || `${rawExceptions.length} operational exceptions identified across the lending lifecycle.`,
+      criticalCount,
+      highCount,
+      mediumCount,
+      lowCount,
+      exceptions: rawExceptions,
+      topPriorityExceptions: Array.isArray(parsed.topPriorityExceptions) ? parsed.topPriorityExceptions : [],
+      crossModuleChains: Array.isArray(parsed.crossModuleChains) ? parsed.crossModuleChains : [],
+      confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
+    };
+  } catch {
+    // Deterministic Rule-Based Fallback
+    const sorted = [...rawExceptions].sort((a, b) => {
+      const rank: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1, INFORMATIONAL: 0 };
+      return (rank[b.severity] || 0) - (rank[a.severity] || 0);
+    });
+
+    const topPriorityExceptions = sorted.slice(0, 5).map((e, idx) => ({
+      priority: idx + 1,
+      title: e.title,
+      whyItMatters: e.impact,
+      recommendedAction: e.recommendedAction,
+      targetRole: e.suggestedOwner,
+    }));
+
+    result = {
+      generatedAt: new Date().toISOString(),
+      dataAsOf: new Date().toISOString(),
+      model: 'deterministic-rules-engine',
+      summary: `${rawExceptions.length} operational exception(s) actively tracked across KYC, Underwriting, Servicing, and Collections. (Deterministic LMS synthesis).`,
+      criticalCount,
+      highCount,
+      mediumCount,
+      lowCount,
+      exceptions: rawExceptions,
+      topPriorityExceptions,
+      crossModuleChains: rawExceptions.some((e) => e.category === 'KYC' || e.category === 'DISBURSEMENT')
+        ? [
+            {
+              rootCause: 'Pending KYC or Bank Account Verification',
+              affectedDownstreamWorkflows: ['Underwriting Approval', 'Disbursement Authorization', 'eNACH Activation'],
+              explanation: 'Unverified KYC or bank accounts prevent loan application forward progression to disbursement.',
+            },
+          ]
+        : [],
+      confidence: 'HIGH',
+    };
   }
-
-  const criticalCount = rawExceptions.filter((e) => e.severity === 'CRITICAL').length;
-  const highCount = rawExceptions.filter((e) => e.severity === 'HIGH').length;
-  const mediumCount = rawExceptions.filter((e) => e.severity === 'MEDIUM').length;
-  const lowCount = rawExceptions.filter((e) => e.severity === 'LOW' || e.severity === 'INFORMATIONAL').length;
-
-  const result: WorkflowExceptionCenterResult = {
-    generatedAt: new Date().toISOString(),
-    dataAsOf: new Date().toISOString(),
-    model: geminiResult.model,
-    summary: parsed.summary || `${rawExceptions.length} operational exceptions identified across the lending lifecycle.`,
-    criticalCount,
-    highCount,
-    mediumCount,
-    lowCount,
-    exceptions: rawExceptions,
-    topPriorityExceptions: Array.isArray(parsed.topPriorityExceptions) ? parsed.topPriorityExceptions : [],
-    crossModuleChains: Array.isArray(parsed.crossModuleChains) ? parsed.crossModuleChains : [],
-    confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
-  };
 
   // 6. Audit Trail
   await logAudit({
     userId: actor.id,
+    role: actor.roles[0] || 'BRANCH_MANAGER',
     action: 'EXCEPTION_CENTER_INTELLIGENCE_GENERATED',
     entity: 'WorkflowExceptionCenter',
     entityId: 'SYSTEM_WIDE',

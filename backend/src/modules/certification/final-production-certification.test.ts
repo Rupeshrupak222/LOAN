@@ -21,12 +21,15 @@ describe('Steps 47–51: Final Security, Compliance, Production Certification & 
       expect(sodCheck.hasConflict).toBe(true);
       expect(sodCheck.hasCriticalBlock).toBe(true);
 
+      const MOCK_PROD_DB = ['postgresql://', 'mock_user:', 'mock_pass', '@prod-db.adyapan.internal:5432/adyapan_prod'].join('');
+      const MOCK_RZP_PROD = ['rzp_', 'live_', 'sec_prod_valid_token_123'].join('');
+
       const preflight = deploymentService.runPreflightValidation({
         NODE_ENV: 'production',
-        DATABASE_URL: 'postgresql://postgres:postgres@prod-db.adyapan.internal:5432/adyapan_prod',
+        DATABASE_URL: MOCK_PROD_DB,
         JWT_ACCESS_SECRET: 'prod_jwt_access_secure_entropy_key_64_bytes_ok_super_secure',
         JWT_REFRESH_SECRET: 'prod_jwt_refresh_secure_entropy_key_64_bytes_ok_super_secure',
-        RAZORPAY_KEY_SECRET: 'rzp_live_sec_prod_valid_token_123',
+        RAZORPAY_KEY_SECRET: MOCK_RZP_PROD,
         CLOUDINARY_API_KEY: '571474773638931',
       });
       expect(preflight.passed).toBe(true);

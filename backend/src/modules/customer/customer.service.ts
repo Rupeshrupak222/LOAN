@@ -101,7 +101,7 @@ export async function getCustomer(id: string) {
   });
   if (!customer) throw new NotFoundError('Customer not found');
 
-  const totalOutstanding = customer.loans.reduce(
+    const totalOutstanding = customer.loans.reduce(
     (acc, l) => Money.add(acc, l.outstandingPrincipal),
     Money.of(0)
   );
@@ -116,8 +116,43 @@ export async function getCustomer(id: string) {
     Money.of(0)
   );
 
+  // If structured addresses array is empty but customer record has address data, ensure it is populated
+  let addresses = customer.addresses || [];
+  if (addresses.length === 0 && (customer.addressLine || customer.city || customer.state || customer.pincode)) {
+    const fallbackLine = customer.addressLine || (customer.city ? `${customer.city}, ${customer.state || ''}`.trim() : 'Primary Address');
+    try {
+      const autoCreated = await prisma.customerAddress.create({
+        data: {
+          customerId: customer.id,
+          addressType: 'CURRENT',
+          addressLine: fallbackLine,
+          city: customer.city || '',
+          state: customer.state || '',
+          pincode: customer.pincode || '',
+          isPrimary: true,
+        },
+      });
+      addresses = [autoCreated];
+    } catch {
+      addresses = [
+        {
+          id: `addr-legacy-${customer.id.slice(0, 8)}`,
+          customerId: customer.id,
+          addressType: 'CURRENT',
+          addressLine: fallbackLine,
+          city: customer.city || '',
+          state: customer.state || '',
+          pincode: customer.pincode || '',
+          isPrimary: true,
+          createdAt: customer.createdAt,
+        } as any,
+      ];
+    }
+  }
+
   return {
     ...customer,
+    addresses,
     summary: {
       totalBorrowed: Money.toDb(totalBorrowed),
       totalRepaid: Money.toDb(totalRepaid),
@@ -129,7 +164,20 @@ export async function getCustomer(id: string) {
   };
 }
 
-export async function createCustomer(input: CreateCustomerInput, actorUserId?: string) {
+export async function createCustomer(
+  input: CreateCustomerInput & { phone?: string; address?: any; bankAccount?: any },
+  actorUserId?: string
+) {
+  const mobile = input.mobile || input.phone || '';
+  const addressLine = input.addressLine || input.address?.addressLine || null;
+  const city = input.city || input.address?.city || null;
+  const state = input.state || input.address?.state || null;
+  const pincode = input.pincode || input.address?.pincode || null;
+
+  const bankName = input.bankName || input.bankAccount?.bankName || null;
+  const bankAccountNo = input.bankAccountNo || input.bankAccount?.accountNumber || input.bankAccount?.bankAccountNo || null;
+  const bankIfsc = input.bankIfsc || input.bankAccount?.ifscCode || input.bankAccount?.bankIfsc || null;
+
   const customer = await prisma.$transaction(async (tx) => {
     let customerUserId: string | undefined = undefined;
 
@@ -182,48 +230,48 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
         lastName: input.lastName,
         dateOfBirth: input.dateOfBirth,
         gender: input.gender,
-        mobile: input.mobile,
+        mobile,
         email: input.email?.toLowerCase().trim(),
-        addressLine: input.addressLine,
-        city: input.city,
-        state: input.state,
-        pincode: input.pincode,
+        addressLine,
+        city,
+        state,
+        pincode,
         employmentType: input.employmentType,
         employerName: input.employerName,
         monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
         existingObligations:
           input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
-        bankName: input.bankName,
-        bankAccountNo: input.bankAccountNo,
-        bankIfsc: input.bankIfsc,
+        bankName,
+        bankAccountNo,
+        bankIfsc,
         branchId: input.branchId,
         kycStatus: 'NOT_STARTED',
         status: 'DRAFT',
       },
     });
 
-    if (input.addressLine && input.city) {
+    if (addressLine || city || state || pincode) {
       await tx.customerAddress.create({
         data: {
           customerId: cust.id,
           addressType: 'CURRENT',
-          addressLine: input.addressLine,
-          city: input.city,
-          state: input.state || '',
-          pincode: input.pincode || '',
+          addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
+          city: city || '',
+          state: state || '',
+          pincode: pincode || '',
           isPrimary: true,
         },
       });
     }
 
-    if (input.bankAccountNo && input.bankName) {
+    if (bankAccountNo && bankName) {
       await tx.customerBankAccount.create({
         data: {
           customerId: cust.id,
           accountHolderName: `${input.firstName} ${input.lastName}`,
-          bankName: input.bankName,
-          accountNumber: input.bankAccountNo,
-          ifscCode: input.bankIfsc || '',
+          bankName,
+          accountNumber: bankAccountNo,
+          ifscCode: bankIfsc || '',
           accountType: 'SAVINGS',
           isPrimary: true,
         },
@@ -258,23 +306,33 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
 
 export async function updateCustomer(
   id: string,
-  input: Partial<CreateCustomerInput>,
+  input: Partial<CreateCustomerInput> & { phone?: string; address?: any; bankAccount?: any },
   actorUserId?: string
 ) {
   const existing = await getCustomer(id);
+
+  const mobile = input.mobile !== undefined ? input.mobile : input.phone;
+  const addressLine = input.addressLine !== undefined ? input.addressLine : input.address?.addressLine;
+  const city = input.city !== undefined ? input.city : input.address?.city;
+  const state = input.state !== undefined ? input.state : input.address?.state;
+  const pincode = input.pincode !== undefined ? input.pincode : input.address?.pincode;
+
+  const bankName = input.bankName !== undefined ? input.bankName : input.bankAccount?.bankName;
+  const bankAccountNo = input.bankAccountNo !== undefined ? input.bankAccountNo : (input.bankAccount?.accountNumber || input.bankAccount?.bankAccountNo);
+  const bankIfsc = input.bankIfsc !== undefined ? input.bankIfsc : (input.bankAccount?.ifscCode || input.bankAccount?.bankIfsc);
 
   const updated = await prisma.$transaction(async (tx) => {
     const data: Prisma.CustomerUpdateInput = {};
     if (input.firstName !== undefined) data.firstName = input.firstName;
     if (input.lastName !== undefined) data.lastName = input.lastName;
-    if (input.mobile !== undefined) data.mobile = input.mobile;
+    if (mobile !== undefined) data.mobile = mobile;
     if (input.email !== undefined) data.email = input.email ? input.email.toLowerCase().trim() : null;
     if (input.dateOfBirth !== undefined) data.dateOfBirth = input.dateOfBirth;
     if (input.gender !== undefined) data.gender = input.gender;
-    if (input.addressLine !== undefined) data.addressLine = input.addressLine;
-    if (input.city !== undefined) data.city = input.city;
-    if (input.state !== undefined) data.state = input.state;
-    if (input.pincode !== undefined) data.pincode = input.pincode;
+    if (addressLine !== undefined) data.addressLine = addressLine;
+    if (city !== undefined) data.city = city;
+    if (state !== undefined) data.state = state;
+    if (pincode !== undefined) data.pincode = pincode;
     if (input.employmentType !== undefined) data.employmentType = input.employmentType;
     if (input.employerName !== undefined) data.employerName = input.employerName;
     if (input.monthlyIncome !== undefined) {
@@ -283,9 +341,9 @@ export async function updateCustomer(
     if (input.existingObligations !== undefined) {
       data.existingObligations = input.existingObligations != null ? Money.toDb(input.existingObligations) : null;
     }
-    if (input.bankName !== undefined) data.bankName = input.bankName;
-    if (input.bankAccountNo !== undefined) data.bankAccountNo = input.bankAccountNo;
-    if (input.bankIfsc !== undefined) data.bankIfsc = input.bankIfsc;
+    if (bankName !== undefined) data.bankName = bankName;
+    if (bankAccountNo !== undefined) data.bankAccountNo = bankAccountNo;
+    if (bankIfsc !== undefined) data.bankIfsc = bankIfsc;
 
     // 1. If password or user details updated, sync with User table
     if (existing.userId) {
@@ -331,27 +389,27 @@ export async function updateCustomer(
     }
 
     // 2. Sync Address table if address updated
-    if (input.addressLine || input.city) {
+    if (addressLine !== undefined || city !== undefined || state !== undefined || pincode !== undefined) {
       const primaryAddr = await tx.customerAddress.findFirst({ where: { customerId: id, isPrimary: true } });
       if (primaryAddr) {
         await tx.customerAddress.update({
           where: { id: primaryAddr.id },
           data: {
-            addressLine: input.addressLine ?? primaryAddr.addressLine,
-            city: input.city ?? primaryAddr.city,
-            state: input.state ?? primaryAddr.state,
-            pincode: input.pincode ?? primaryAddr.pincode,
+            addressLine: addressLine !== undefined ? (addressLine || primaryAddr.addressLine) : primaryAddr.addressLine,
+            city: city !== undefined ? (city || primaryAddr.city) : primaryAddr.city,
+            state: state !== undefined ? (state || primaryAddr.state) : primaryAddr.state,
+            pincode: pincode !== undefined ? (pincode || primaryAddr.pincode) : primaryAddr.pincode,
           },
         });
-      } else if (input.addressLine && input.city) {
+      } else if (addressLine || city || state || pincode) {
         await tx.customerAddress.create({
           data: {
             customerId: id,
             addressType: 'CURRENT',
-            addressLine: input.addressLine,
-            city: input.city,
-            state: input.state || '',
-            pincode: input.pincode || '',
+            addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
+            city: city || '',
+            state: state || '',
+            pincode: pincode || '',
             isPrimary: true,
           },
         });
@@ -359,24 +417,24 @@ export async function updateCustomer(
     }
 
     // 3. Sync Bank Account table if bank details updated
-    if (input.bankName || input.bankAccountNo) {
+    if (bankName || bankAccountNo) {
       const primaryBank = await tx.customerBankAccount.findFirst({ where: { customerId: id, isPrimary: true } });
       if (primaryBank) {
         await tx.customerBankAccount.update({
           where: { id: primaryBank.id },
           data: {
-            bankName: input.bankName ?? primaryBank.bankName,
-            accountNumber: input.bankAccountNo ?? primaryBank.accountNumber,
-            ifscCode: input.bankIfsc ?? primaryBank.ifscCode,
+            bankName: bankName ?? primaryBank.bankName,
+            accountNumber: bankAccountNo ?? primaryBank.accountNumber,
+            ifscCode: bankIfsc ?? primaryBank.ifscCode,
           },
         });
-      } else if (input.bankName && input.bankAccountNo) {
+      } else if (bankName && bankAccountNo) {
         await tx.customerBankAccount.create({
           data: {
             customerId: id,
-            bankName: input.bankName,
-            accountNumber: input.bankAccountNo,
-            ifscCode: input.bankIfsc || '',
+            bankName,
+            accountNumber: bankAccountNo,
+            ifscCode: bankIfsc || '',
             accountHolderName: `${input.firstName || existing.firstName} ${input.lastName || existing.lastName}`,
             accountType: 'SAVINGS',
             isPrimary: true,
@@ -411,7 +469,7 @@ export async function updateCustomer(
       }
     }
 
-    // 4. Update customer record
+    // 5. Update customer record
     return tx.customer.update({ where: { id }, data });
   });
 

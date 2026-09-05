@@ -273,7 +273,7 @@ export class DeploymentService {
           stepNumber: 2,
           action: 'Verify database read-after-write compatibility under version contract',
           responsibleRole: 'FINANCE_CONTROLLER',
-          verificationCommand: 'npx tsx src/scripts/verify-step37-e2e.ts',
+          verificationCommand: 'npm run db:validate',
           rollbackTimeoutMinutes: 10,
         },
         {

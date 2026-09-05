@@ -93,6 +93,16 @@ export default function CustomerDetailPage() {
   const [accountHolderInput, setAccountHolderInput] = useState('');
   const [accountTypeInput, setAccountTypeInput] = useState<'SAVINGS' | 'CURRENT' | 'SALARY'>('SAVINGS');
   const [isPrimaryBankInput, setIsPrimaryBankInput] = useState(true);
+
+  // Address Modal State
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [addressTypeInput, setAddressTypeInput] = useState<'CURRENT' | 'PERMANENT' | 'OFFICE'>('CURRENT');
+  const [addressLineInput, setAddressLineInput] = useState('');
+  const [cityInput, setCityInput] = useState('');
+  const [stateInput, setStateInput] = useState('');
+  const [pincodeInput, setPincodeInput] = useState('');
+  const [isPrimaryAddressInput, setIsPrimaryAddressInput] = useState(true);
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [aiDocSelected, setAiDocSelected] = useState<any | null>(null);
   const [customer360Open, setCustomer360Open] = useState(false);
@@ -127,26 +137,35 @@ export default function CustomerDetailPage() {
 
   const openEditModal = () => {
     if (!data) return;
-    const primaryAddr = data.addresses?.[0] || {};
-    const primaryBank = data.bankAccounts?.[0] || {};
+    const primaryAddr = data.addresses?.[0] || {
+      addressLine: data.addressLine,
+      city: data.city,
+      state: data.state,
+      pincode: data.pincode,
+    };
+    const primaryBank = data.bankAccounts?.[0] || {
+      bankName: data.bankName,
+      accountNumber: data.bankAccountNo,
+      ifscCode: data.bankIfsc,
+    };
     setEditForm({
       firstName: data.firstName || '',
       lastName: data.lastName || '',
-      mobile: data.phone || data.mobile || '',
+      mobile: data.mobile || data.phone || '',
       email: data.email || '',
       dateOfBirth: data.dateOfBirth ? String(data.dateOfBirth).split('T')[0] : '',
       gender: data.gender || 'MALE',
       password: '',
-      addressLine: primaryAddr.addressLine || primaryAddr.addressLine1 || '',
-      city: primaryAddr.city || '',
-      state: primaryAddr.state || '',
-      pincode: primaryAddr.pincode || primaryAddr.postalCode || '',
+      addressLine: primaryAddr.addressLine || primaryAddr.addressLine1 || data.addressLine || '',
+      city: primaryAddr.city || data.city || '',
+      state: primaryAddr.state || data.state || '',
+      pincode: primaryAddr.pincode || primaryAddr.postalCode || data.pincode || '',
       employmentType: data.employmentType || 'SALARIED',
       employerName: data.employerName || '',
       monthlyIncome: data.monthlyIncome ? String(data.monthlyIncome) : '',
-      bankName: primaryBank.bankName || '',
-      bankAccountNo: primaryBank.accountNumber || primaryBank.bankAccountNo || '',
-      bankIfsc: primaryBank.ifscCode || primaryBank.bankIfsc || '',
+      bankName: primaryBank.bankName || data.bankName || '',
+      bankAccountNo: primaryBank.accountNumber || primaryBank.bankAccountNo || data.bankAccountNo || '',
+      bankIfsc: primaryBank.ifscCode || primaryBank.bankIfsc || data.bankIfsc || '',
     });
     setEditModalOpen(true);
   };
@@ -157,18 +176,26 @@ export default function CustomerDetailPage() {
         firstName: editForm.firstName || undefined,
         lastName: editForm.lastName || undefined,
         email: editForm.email || undefined,
+        mobile: editForm.mobile || undefined,
         phone: editForm.mobile || undefined,
         dateOfBirth: editForm.dateOfBirth ? new Date(editForm.dateOfBirth).toISOString() : undefined,
         gender: editForm.gender || undefined,
         monthlyIncome: editForm.monthlyIncome ? Number(editForm.monthlyIncome) : undefined,
         employmentType: editForm.employmentType || undefined,
         employerName: editForm.employerName || undefined,
+        addressLine: editForm.addressLine || undefined,
+        city: editForm.city || undefined,
+        state: editForm.state || undefined,
+        pincode: editForm.pincode || undefined,
         address: editForm.addressLine ? {
           addressLine: editForm.addressLine,
           city: editForm.city,
           state: editForm.state,
           pincode: editForm.pincode,
         } : undefined,
+        bankName: editForm.bankName || undefined,
+        bankAccountNo: editForm.bankAccountNo || undefined,
+        bankIfsc: editForm.bankIfsc || undefined,
         bankAccount: editForm.bankAccountNo ? {
           bankName: editForm.bankName,
           accountNumber: editForm.bankAccountNo,
@@ -185,6 +212,32 @@ export default function CustomerDetailPage() {
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err), { title: 'Update Notice' });
+    },
+  });
+
+  const addressMutation = useMutation({
+    mutationFn: async () => {
+      return api.post(`/customers/${params.id}/addresses`, {
+        addressType: addressTypeInput,
+        addressLine: addressLineInput.trim(),
+        city: cityInput.trim(),
+        state: stateInput.trim(),
+        pincode: pincodeInput.trim(),
+        isPrimary: isPrimaryAddressInput,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Address record added.');
+      queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setAddressModalOpen(false);
+      setAddressLineInput('');
+      setCityInput('');
+      setStateInput('');
+      setPincodeInput('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Address Registration Notice' });
     },
   });
 
@@ -372,7 +425,7 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
@@ -491,9 +544,23 @@ export default function CustomerDetailPage() {
           </Card>
 
           <Card className="p-5 space-y-4">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Addresses on Record
-            </h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Addresses on Record
+                </h3>
+                <p className="text-xs text-slate-500">Verified residential and permanent addresses</p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs flex items-center gap-1 cursor-pointer"
+                onClick={() => setAddressModalOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Address
+              </Button>
+            </div>
+
             {addresses.length > 0 ? (
               <div className="space-y-3">
                 {addresses.map((addr: any) => (
@@ -516,7 +583,17 @@ export default function CustomerDetailPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 py-4">No structured address records found.</p>
+              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center space-y-2">
+                <p className="text-xs font-semibold text-slate-700">No structured address records found.</p>
+                <p className="text-[11px] text-slate-400">Add an address to keep customer residence and correspondence records updated.</p>
+                <Button
+                  size="sm"
+                  className="text-xs text-white mt-1 cursor-pointer"
+                  onClick={() => setAddressModalOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Address
+                </Button>
+              </div>
             )}
           </Card>
         </div>
@@ -536,9 +613,11 @@ export default function CustomerDetailPage() {
               <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
                 + Upload Document
               </Button>
-              <Button size="sm" onClick={() => setKycModalOpen(true)}>
-                Update KYC Status
-              </Button>
+              {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+                <Button size="sm" onClick={() => setKycModalOpen(true)}>
+                  Update KYC Status
+                </Button>
+              )}
             </div>
           </div>
 
@@ -625,21 +704,23 @@ export default function CustomerDetailPage() {
                           >
                             <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="text-xs h-7 px-2.5"
-                            onClick={() => {
-                              setSelectedDoc(doc);
-                              const initialStatus = doc.status === 'REJECTED' ? 'REJECTED' : 'VERIFIED';
-                              setDocDecisionStatus(initialStatus);
-                              setDocRejectionReason(doc.rejectionReason || '');
-                              setDocVerifyRemarks(doc.rejectionReason || '');
-                              setVerifyModalOpen(true);
-                            }}
-                          >
-                            {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
-                          </Button>
+                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="text-xs h-7 px-2.5"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                const initialStatus = doc.status === 'REJECTED' ? 'REJECTED' : 'VERIFIED';
+                                setDocDecisionStatus(initialStatus);
+                                setDocRejectionReason(doc.rejectionReason || '');
+                                setDocVerifyRemarks(doc.rejectionReason || '');
+                                setVerifyModalOpen(true);
+                              }}
+                            >
+                              {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
+                            </Button>
+                          )}
                           <button
                             type="button"
                             title="Delete Document"
@@ -1475,6 +1556,126 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
+      {/* Add Customer Address Modal */}
+      {addressModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2445] p-6 shadow-dropdown animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">
+                  <Building className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Add Customer Address</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Record residence or permanent address</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Address Type *
+                </label>
+                <select
+                  value={addressTypeInput}
+                  onChange={(e) => setAddressTypeInput(e.target.value as any)}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-[#151932] p-2.5 text-xs text-slate-900 dark:text-white focus:border-brand-600 focus:outline-none"
+                >
+                  <option value="CURRENT">Current / Residential Address</option>
+                  <option value="PERMANENT">Permanent Address</option>
+                  <option value="OFFICE">Office / Work Address</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Street Address / House No. / Locality *
+                </label>
+                <Input
+                  placeholder="e.g. Flat 402, Green Valley Apartments, MG Road"
+                  value={addressLineInput}
+                  onChange={(e) => setAddressLineInput(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    City *
+                  </label>
+                  <Input
+                    placeholder="e.g. Pune"
+                    value={cityInput}
+                    onChange={(e) => setCityInput(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    State *
+                  </label>
+                  <Input
+                    placeholder="e.g. Maharashtra"
+                    value={stateInput}
+                    onChange={(e) => setStateInput(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Pincode *
+                </label>
+                <Input
+                  placeholder="e.g. 411001"
+                  value={pincodeInput}
+                  onChange={(e) => setPincodeInput(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="flex items-center pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={isPrimaryAddressInput}
+                    onChange={(e) => setIsPrimaryAddressInput(e.target.checked)}
+                    className="rounded text-brand-600 h-4 w-4"
+                  />
+                  <span>Set as Primary Address</span>
+                </label>
+              </div>
+
+              {addressMutation.isError && (
+                <p className="text-xs text-rose-600">{apiErrorMessage(addressMutation.error)}</p>
+              )}
+
+              <div className="flex gap-2.5 pt-2">
+                <Button
+                  onClick={() => addressMutation.mutate()}
+                  disabled={
+                    !addressLineInput.trim() ||
+                    !cityInput.trim() ||
+                    !stateInput.trim() ||
+                    !pincodeInput.trim() ||
+                    addressMutation.isPending
+                  }
+                  className="flex-1 text-white"
+                >
+                  {addressMutation.isPending ? 'Saving...' : 'Save Address'}
+                </Button>
+                <Button variant="secondary" onClick={() => setAddressModalOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Customer Confirmation Modal */}
       {deleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -1791,9 +1992,9 @@ export default function CustomerDetailPage() {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2">
-      <dt className="text-slate-500 font-medium">{label}</dt>
-      <dd className="text-right font-medium text-slate-900">{value ?? '-'}</dd>
+    <div className="flex justify-between gap-3 py-2 min-w-0">
+      <dt className="text-slate-500 font-medium shrink-0">{label}</dt>
+      <dd className="text-right font-medium text-slate-900 dark:text-slate-200 min-w-0 break-words">{value ?? '-'}</dd>
     </div>
   );
 }

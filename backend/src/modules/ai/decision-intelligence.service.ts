@@ -307,54 +307,150 @@ You transform dashboard reports into actionable decision-support insights for ex
 }
 `;
 
-  // 4. Generate content via Central Gemini Service
-  const geminiResult = await generateGeminiContent({
-    prompt: `Analyze the following LMS dashboard metrics and generate the Decision Intelligence JSON briefing:\n\n${contextPrompt}`,
-    systemInstruction,
-    temperature: 0.1,
-  });
+  let result: DecisionIntelligenceResult;
 
-  // 5. Safe JSON Parsing
-  let parsed: any;
   try {
+    // 4. Generate content via Central Gemini Service
+    const geminiResult = await generateGeminiContent({
+      prompt: `Analyze the following LMS dashboard metrics and generate the Decision Intelligence JSON briefing:\n\n${contextPrompt}`,
+      systemInstruction,
+      temperature: 0.1,
+    });
+
+    // 5. Safe JSON Parsing
     const rawText = geminiResult.text.trim();
     const cleanJson = rawText
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    parsed = JSON.parse(cleanJson);
-  } catch (err: any) {
-    throw new BadRequestError(`Failed to parse AI Decision Intelligence response: ${err.message}`);
-  }
+    const parsed = JSON.parse(cleanJson);
 
-  const result: DecisionIntelligenceResult = {
-    generatedAt: new Date().toISOString(),
-    dataAsOf: new Date().toISOString(),
-    model: geminiResult.model,
-    roleScope: actor.roles.join(', '),
-    executiveSummary: parsed.executiveSummary || 'Portfolio performance briefing synthesized from active LMS accounts.',
-    kpisInterpretation: Array.isArray(parsed.kpisInterpretation) ? parsed.kpisInterpretation : [
-      { kpi: 'Disbursed Volume', currentValue: `₹${totalDisbursed.toLocaleString('en-IN')}`, status: 'HEALTHY', interpretation: 'Active fund deployment.' },
-      { kpi: 'PAR Ratio', currentValue: `${parRatio}%`, status: Number(parRatio) > 5 ? 'CRITICAL' : 'HEALTHY', interpretation: 'Portfolio at risk.' }
-    ],
-    keyChanges: Array.isArray(parsed.keyChanges) ? parsed.keyChanges : [],
-    bottlenecks: Array.isArray(parsed.bottlenecks) ? parsed.bottlenecks : [],
-    branchInsights: Array.isArray(parsed.branchInsights) ? parsed.branchInsights : branchSummaries.map((b) => ({ branchName: b.branchName, status: 'STABLE', observations: `${b.totalLoans} loans managed.` })),
-    collectionInsights: {
-      totalOverdue,
-      parRatio,
-      delinquencyTrajectory: parsed.collectionInsights?.delinquencyTrajectory || (totalOverdue > 0 ? 'DETERIORATING' : 'STABLE'),
-      observations: parsed.collectionInsights?.observations || 'Delinquency evaluated across active collection cases.',
-    },
-    whatShouldILookAt: Array.isArray(parsed.whatShouldILookAt) ? parsed.whatShouldILookAt : [],
-    recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Review pipeline throughput and collection follow-ups.'],
-    confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
-  };
+    result = {
+      generatedAt: new Date().toISOString(),
+      dataAsOf: new Date().toISOString(),
+      model: geminiResult.model,
+      roleScope: actor.roles.join(', '),
+      executiveSummary: parsed.executiveSummary || `Portfolio overview: ₹${totalDisbursed.toLocaleString('en-IN')} disbursed across ${activeLoansCount} active loans with a PAR ratio of ${parRatio}%.`,
+      kpisInterpretation: Array.isArray(parsed.kpisInterpretation) ? parsed.kpisInterpretation : [
+        { kpi: 'Disbursed Volume', currentValue: `₹${totalDisbursed.toLocaleString('en-IN')}`, status: 'HEALTHY', interpretation: 'Active fund deployment.' },
+        { kpi: 'PAR Ratio', currentValue: `${parRatio}%`, status: Number(parRatio) > 5 ? 'CRITICAL' : 'HEALTHY', interpretation: 'Portfolio at risk.' },
+      ],
+      keyChanges: Array.isArray(parsed.keyChanges) ? parsed.keyChanges : [],
+      bottlenecks: Array.isArray(parsed.bottlenecks) ? parsed.bottlenecks : [],
+      branchInsights: Array.isArray(parsed.branchInsights) ? parsed.branchInsights : branchSummaries.map((b) => ({ branchName: b.branchName, status: 'STABLE', observations: `${b.totalLoans} loans managed.` })),
+      collectionInsights: {
+        totalOverdue,
+        parRatio,
+        delinquencyTrajectory: parsed.collectionInsights?.delinquencyTrajectory || (totalOverdue > 0 ? 'DETERIORATING' : 'STABLE'),
+        observations: parsed.collectionInsights?.observations || 'Delinquency evaluated across active collection cases.',
+      },
+      whatShouldILookAt: Array.isArray(parsed.whatShouldILookAt) ? parsed.whatShouldILookAt : [],
+      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Review pipeline throughput and collection follow-ups.'],
+      confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
+    };
+  } catch {
+    // Deterministic Rule-Based Fallback when Gemini is slow or temporarily unavailable
+    const isParHigh = Number(parRatio) > 5;
+    const isUnderwritingBottleneck = pendingUnderwriting > 5;
+
+    const bottlenecks: DecisionIntelligenceResult['bottlenecks'] = [];
+    if (isUnderwritingBottleneck) {
+      bottlenecks.push({
+        stage: 'Underwriting Queue',
+        severity: pendingUnderwriting > 15 ? 'HIGH' : 'MEDIUM',
+        evidence: `${pendingUnderwriting} applications pending underwriting review`,
+        impact: 'Increased origination turnaround time',
+        suggestedInvestigation: 'Reallocate credit analyst capacity or review pending verification documents.',
+      });
+    }
+    if (totalOverdue > 0) {
+      bottlenecks.push({
+        stage: 'Delinquency & Collections',
+        severity: isParHigh ? 'HIGH' : 'MEDIUM',
+        evidence: `₹${totalOverdue.toLocaleString('en-IN')} total overdue across portfolio`,
+        impact: 'Elevated portfolio risk and provisioning requirements',
+        suggestedInvestigation: 'Audit active Promise-to-Pay commitments in Collections workbench.',
+      });
+    }
+
+    const whatShouldILookAt: DecisionIntelligenceResult['whatShouldILookAt'] = [];
+    if (totalOverdue > 0) {
+      whatShouldILookAt.push({
+        priority: 1,
+        area: 'Overdue Loan Accounts',
+        reason: `PAR ratio is currently ${parRatio}% with ₹${totalOverdue.toLocaleString('en-IN')} in overdue balances.`,
+        recommendedAction: 'Engage with collection officers on high-DPD accounts.',
+      });
+    }
+    if (pendingUnderwriting > 0) {
+      whatShouldILookAt.push({
+        priority: 2,
+        area: 'Origination Pipeline',
+        reason: `${pendingUnderwriting} applications awaiting underwriting decision.`,
+        recommendedAction: 'Process prioritized applications in the Underwriting workbench.',
+      });
+    }
+
+    result = {
+      generatedAt: new Date().toISOString(),
+      dataAsOf: new Date().toISOString(),
+      model: 'deterministic-rules-engine',
+      roleScope: actor.roles.join(', '),
+      executiveSummary: `Portfolio overview: ₹${totalDisbursed.toLocaleString('en-IN')} disbursed across ${activeLoansCount} active loans with ₹${totalOutstanding.toLocaleString('en-IN')} outstanding. Current PAR ratio is ${parRatio}% and approval rate is ${approvalRate}%. (Deterministic LMS synthesis).`,
+      kpisInterpretation: [
+        {
+          kpi: 'Disbursement Volume',
+          currentValue: `₹${totalDisbursed.toLocaleString('en-IN')}`,
+          status: 'HEALTHY',
+          interpretation: `Cumulative capital disbursed across ${activeLoansCount} active accounts.`,
+        },
+        {
+          kpi: 'PAR Ratio',
+          currentValue: `${parRatio}%`,
+          status: isParHigh ? 'CRITICAL' : Number(parRatio) > 2 ? 'WATCH' : 'HEALTHY',
+          interpretation: isParHigh ? 'Elevated delinquency requiring immediate recovery outreach.' : 'Delinquency is within institutional risk tolerances.',
+        },
+        {
+          kpi: 'Origination Approval Rate',
+          currentValue: `${approvalRate}%`,
+          status: 'HEALTHY',
+          interpretation: `${approvedApps} approvals out of ${approvedApps + rejectedApps + pendingUnderwriting} evaluated applications.`,
+        },
+      ],
+      keyChanges: [
+        {
+          metric: 'Delinquent Overdue',
+          trend: totalOverdue > 0 ? 'UP' : 'STABLE',
+          observation: `₹${totalOverdue.toLocaleString('en-IN')} in active overdue debt.`,
+          possibleDriver: 'Delinquency aging progression across active loan accounts.',
+        },
+      ],
+      bottlenecks,
+      branchInsights: branchSummaries.map((b) => ({
+        branchName: b.branchName,
+        status: Number(b.overdueAmount) > 50000 ? 'NEEDS_ATTENTION' : 'STABLE',
+        observations: `${b.totalLoans} loan(s) and ${b.totalApplications} application(s) managed. Overdue: ₹${Number(b.overdueAmount).toLocaleString('en-IN')}.`,
+      })),
+      collectionInsights: {
+        totalOverdue,
+        parRatio,
+        delinquencyTrajectory: totalOverdue > 0 ? 'DETERIORATING' : 'STABLE',
+        observations: `Delinquency rate stands at ${parRatio}% with ₹${totalOverdue.toLocaleString('en-IN')} total overdue.`,
+      },
+      whatShouldILookAt,
+      recommendedActions: [
+        'Review underwriting queue to clear pending origination backlogs.',
+        'Follow up on active collection cases with broken PTP commitments.',
+      ],
+      confidence: 'HIGH',
+    };
+  }
 
   // 6. Audit Trail
   await logAudit({
     userId: actor.id,
+    role: actor.roles[0] || 'BRANCH_MANAGER',
     action: 'DECISION_INTELLIGENCE_GENERATED',
     entity: 'Dashboard',
     entityId: 'PORTFOLIO_OVERVIEW',

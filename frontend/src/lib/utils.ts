@@ -8,12 +8,15 @@ export function cn(...inputs: ClassValue[]) {
 const inr = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
+  minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
 
 export function formatMoney(value: string | number | null | undefined): string {
   if (value == null || value === '') return '-';
-  return inr.format(Number(value));
+  const num = Number(value);
+  if (Number.isNaN(num)) return '-';
+  return inr.format(num);
 }
 
 export function formatDate(value: string | Date | null | undefined): string {

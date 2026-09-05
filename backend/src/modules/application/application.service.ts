@@ -86,7 +86,7 @@ export async function createApplication(input: CreateApplicationInput) {
   if (input.interestRate != null || !product) {
     const rate = input.interestRate != null ? Number(input.interestRate) : (product ? Number(product.interestRate) : 14.5);
     const prodName = input.productName || (product ? product.name : `Custom Loan (${rate}% p.a.)`);
-    const prodCode = `CUST-${rate.toString().replace('.', '_')}-${Date.now().toString().slice(-4)}`;
+    const prodCode = `CUST-${rate.toString().replace('.', '_')}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
     product = await prisma.loanProduct.create({
       data: {
