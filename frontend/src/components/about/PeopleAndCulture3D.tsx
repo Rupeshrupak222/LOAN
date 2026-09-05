@@ -3,7 +3,6 @@
 import React from 'react';
 import { Search, Crosshair, Users2, Heart, Hammer, ArrowRight } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
-import { SketchPeople } from './sketches/SketchPeople';
 
 export const PeopleAndCulture3D: React.FC = () => {
   const principles = [
@@ -144,18 +143,6 @@ export const PeopleAndCulture3D: React.FC = () => {
               </div>
             );
           })}
-        </div>
-
-        {/* ── Sketch 04: The Human Factor Conceptual Sketches ── */}
-        <div
-          data-depth-z="-950"
-          data-rotate-x="18"
-          data-scale="0.82"
-          data-offset-y="50"
-          data-blur="8"
-          data-stagger="0.4"
-        >
-          <SketchPeople />
         </div>
       </div>
     </ScrollStage3D>

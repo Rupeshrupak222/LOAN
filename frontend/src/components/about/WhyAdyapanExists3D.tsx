@@ -3,7 +3,6 @@
 import React from 'react';
 import { Users, HeartHandshake, Landmark, Cpu, ArrowRight } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
-import { SketchBeginning } from './sketches/SketchBeginning';
 
 export const WhyAdyapanExists3D: React.FC = () => {
   const layers = [
@@ -147,18 +146,6 @@ export const WhyAdyapanExists3D: React.FC = () => {
           })}
         </div>
 
-        {/* ── Sketch 01: The Beginning Architectural Blueprint ── */}
-        <div
-          data-depth-z="-950"
-          data-rotate-x="20"
-          data-scale="0.82"
-          data-offset-y="50"
-          data-blur="8"
-          data-stagger="0.35"
-        >
-          <SketchBeginning />
-        </div>
-
         {/* Final Alignment Message */}
         <div
           data-depth-z="-750"
@@ -166,7 +153,7 @@ export const WhyAdyapanExists3D: React.FC = () => {
           data-scale="0.85"
           data-offset-y="40"
           data-blur="6"
-          data-stagger="0.45"
+          data-stagger="0.4"
           className="p-7 rounded-2xl bg-white border border-slate-200/90 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-sans text-slate-600"
         >
           <div className="space-y-1">

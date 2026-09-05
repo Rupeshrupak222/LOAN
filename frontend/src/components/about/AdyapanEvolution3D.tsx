@@ -3,7 +3,6 @@
 import React from 'react';
 import { Lightbulb, Wrench, Network, Compass, ArrowRight } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
-import { SketchJourneyLine } from './sketches/SketchJourneyLine';
 
 export const AdyapanEvolution3D: React.FC = () => {
   const evolutionSteps = [
@@ -140,18 +139,6 @@ export const AdyapanEvolution3D: React.FC = () => {
               </div>
             );
           })}
-        </div>
-
-        {/* ── Sketch 02: Continuous Hand-Drawn Journey Line ── */}
-        <div
-          data-depth-z="-950"
-          data-rotate-x="18"
-          data-scale="0.82"
-          data-offset-y="50"
-          data-blur="8"
-          data-stagger="0.4"
-        >
-          <SketchJourneyLine />
         </div>
       </div>
     </ScrollStage3D>

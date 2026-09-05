@@ -3,7 +3,6 @@
 import React from 'react';
 import { Layers, ArrowRight, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 import { ScrollStage3D } from '@/components/motion/ScrollStage3D';
-import { SketchComplexitySimplicity } from './sketches/SketchComplexitySimplicity';
 
 export const CustomerCenteredCompression3D: React.FC = () => {
   return (
@@ -149,18 +148,6 @@ export const CustomerCenteredCompression3D: React.FC = () => {
               ZERO-FRICTION · SYNCHRONIZED CLARITY
             </div>
           </div>
-        </div>
-
-        {/* ── Sketch 07: Transformation Kinetics Blueprint ── */}
-        <div
-          data-depth-z="-950"
-          data-rotate-x="18"
-          data-scale="0.82"
-          data-offset-y="50"
-          data-blur="8"
-          data-stagger="0.4"
-        >
-          <SketchComplexitySimplicity />
         </div>
       </div>
     </ScrollStage3D>
