@@ -3,18 +3,22 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, CheckCircle2, Building, ShieldCheck, ArrowRight, Wallet, CheckSquare, X, History, Clock, FileText } from 'lucide-react';
+import { Send, CheckCircle2, Building, ShieldCheck, ArrowRight, Wallet, CheckSquare, X, History, Clock, FileText, Sparkles } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { useToast } from '@/lib/toast';
+import { DisbursementIntelligenceCard } from '@/components/DisbursementIntelligenceCard';
 
 export default function DisbursementsPage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'HISTORY'>('QUEUE');
   const [selectedApp, setSelectedApp] = useState<any | null>(null);
   const [method, setMethod] = useState('NEFT_BANK_TRANSFER');
@@ -50,6 +54,7 @@ export default function DisbursementsPage() {
         referenceNumber: reference,
       }),
     onSuccess: () => {
+      toast.success('Loan disbursed successfully and active loan account initialized.');
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-history'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
@@ -64,9 +69,12 @@ export default function DisbursementsPage() {
       setReference('');
       setActiveTab('HISTORY');
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Disbursement Release Notice' });
+    },
   });
 
-  if (queueLoading || historyLoading) return <Spinner />;
+  if (queueLoading || historyLoading) return <TableSkeleton rows={6} cols={5} />;
 
   const queue = Array.isArray(queueData) ? queueData : [];
   const history = Array.isArray(historyData) ? historyData : [];
@@ -336,12 +344,12 @@ export default function DisbursementsPage() {
         </Card>
       )}
 
-      {/* DIRECT DISBURSEMENT EXECUTION MODAL (Matching Image 2) */}
+      {/* DIRECT DISBURSEMENT EXECUTION MODAL */}
       {selectedApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
           <div
             className={cn(
-              "w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-4 transition-all",
+              "w-full max-w-2xl rounded-2xl border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto transition-all",
               isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
             )}
           >
@@ -361,6 +369,13 @@ export default function DisbursementsPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* AI Disbursement & Treasury Readiness Card */}
+            <DisbursementIntelligenceCard
+              applicationId={selectedApp.id}
+              applicationNo={selectedApp.applicationNo}
+              utrReference={reference}
+            />
 
             {/* Proposal Summary */}
             <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#1E2445] text-xs space-y-1.5 border border-slate-200/60 dark:border-[#2B3566]">
@@ -390,19 +405,6 @@ export default function DisbursementsPage() {
                   ({selectedApp.customer?.bankAccounts?.[0]?.ifscCode || selectedApp.customer?.bankIfsc || 'IFSC'})
                 </span>
               </div>
-            </div>
-
-            {/* Pre-Disbursement Checklist */}
-            <div
-              className={cn(
-                "rounded-xl border p-3 space-y-1 text-xs",
-                isDark ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]" : "border-emerald-200 bg-emerald-50 text-emerald-900"
-              )}
-            >
-              <p className="font-bold">✓ Pre-Disbursement Verification Complete:</p>
-              <p>• Underwriting sanction authorized</p>
-              <p>• Borrower KYC verification status: {selectedApp.customer?.kycStatus || 'VERIFIED'}</p>
-              <p>• Destination bank beneficiary validated</p>
             </div>
 
             <div className="space-y-3">

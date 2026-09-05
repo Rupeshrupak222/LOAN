@@ -12,6 +12,9 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import apiRoutes from './routes';
 import healthRoutes from './routes/health.routes';
 import { openApiDocument } from './docs/openapi';
+import { tracingMiddleware } from './middleware/tracing';
+import { requestTimeout } from './middleware/timeout';
+import { observabilityService } from './modules/observability/observability.service';
 
 export function createApp() {
   const app = express();
@@ -27,11 +30,20 @@ export function createApp() {
     }),
   );
   app.use(compression());
+  app.use(requestTimeout());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
   app.use(pinoHttp({ logger }));
+  app.use(tracingMiddleware);
   app.use(globalLimiter);
+
+  // Prometheus Metrics Scrape Endpoint
+  app.get('/metrics', (_req, res) => {
+    const metrics = observabilityService.formatPrometheusMetrics();
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+    res.send(metrics);
+  });
 
   // Health checks
   app.use(healthRoutes);

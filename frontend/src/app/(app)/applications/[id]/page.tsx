@@ -22,15 +22,25 @@ import {
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
+import { DetailPageSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { CreditIntelligenceCard } from '@/components/CreditIntelligenceCard';
+import { UnderwritingIntelligenceCard } from '@/components/UnderwritingIntelligenceCard';
+import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
+import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
+import { AdvancedDecisionIntelligenceCard } from '@/components/AdvancedDecisionIntelligenceCard';
+import { EarlyWarningWidget } from '@/components/EarlyWarningWidget';
+import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
   const { isDark } = useTheme();
 
@@ -56,9 +66,13 @@ export default function ApplicationDetailPage() {
   const eligibilityMutation = useMutation({
     mutationFn: async () => api.post(`/eligibility/evaluate/${params.id}`),
     onSuccess: () => {
+      toast.success('Eligibility check evaluated successfully.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Eligibility Check Notice' });
     },
   });
 
@@ -66,9 +80,13 @@ export default function ApplicationDetailPage() {
   const riskMutation = useMutation({
     mutationFn: async () => api.post(`/risk/evaluate/${params.id}`),
     onSuccess: () => {
+      toast.success('4-Pillar Risk Engine evaluated successfully.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Risk Evaluation Notice' });
     },
   });
 
@@ -80,6 +98,7 @@ export default function ApplicationDetailPage() {
         reason: forwardReason.trim() || 'Forwarded to Underwriting by Credit Analyst',
       }),
     onSuccess: () => {
+      toast.success('Application forwarded to Underwriting queue.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -88,7 +107,7 @@ export default function ApplicationDetailPage() {
       setForwardModalOpen(false);
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error(apiErrorMessage(err), { title: 'Forward Transition Notice' });
     },
   });
 
@@ -100,6 +119,7 @@ export default function ApplicationDetailPage() {
         reason: rejectReason.trim() || 'Application rejected by Credit Analyst',
       }),
     onSuccess: () => {
+      toast.warning('Application marked as REJECTED.');
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -108,7 +128,7 @@ export default function ApplicationDetailPage() {
       setRejectModalOpen(false);
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error(apiErrorMessage(err), { title: 'Reject Transition Notice' });
     },
   });
 
@@ -121,6 +141,7 @@ export default function ApplicationDetailPage() {
         conditions: conditions || undefined,
       }),
     onSuccess: () => {
+      toast.success(`Underwriting decision '${decision}' recorded successfully.`);
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -131,9 +152,12 @@ export default function ApplicationDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       setDecisionModalOpen(false);
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Underwriting Decision Notice' });
+    },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
       <div className="py-12 text-center space-y-3">
@@ -327,8 +351,41 @@ export default function ApplicationDetailPage() {
           </Card>
         </div>
 
-        {/* Right Column: Rule Engine & Risk Model */}
+        {/* Right Column: AI Decision Support, Rule Engine & Risk Model */}
         <div className="space-y-6 lg:col-span-2">
+          {/* Active Early Warning Surveillance Banner */}
+          <EarlyWarningWidget applicationId={params.id} customerId={data?.customerId} />
+
+          {/* Advanced Decision Intelligence Cockpit */}
+          <AdvancedDecisionIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+          {/* Decision Simulator & What-If Credit Modeler */}
+          {product && (
+            <DecisionSimulatorCard
+              applicationId={params.id}
+              applicationNo={data.applicationNo}
+              baseAmount={Number(data.requestedAmount)}
+              baseTenure={data.tenureMonths}
+              baseRate={Number(product.interestRate)}
+              baseIncome={Number(data.customer?.monthlyIncome || 0)}
+              baseObligations={Number(data.customer?.existingObligations || 0)}
+            />
+          )}
+
+          {/* AI Fraud & Anomaly Intelligence Card */}
+          <FraudIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+          {/* AI Bank Statement Intelligence Card */}
+          {data?.customerId && (
+            <BankStatementIntelligenceCard customerId={data.customerId} applicationId={params.id} />
+          )}
+
+          {/* AI Underwriting Decision Support Briefing */}
+          <UnderwritingIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+          {/* AI Credit Intelligence & Decision Support Card */}
+          <CreditIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
           {/* 1. Rule-Based Eligibility Engine Card */}
           <Card className="space-y-4">
             <div className="flex items-center justify-between">

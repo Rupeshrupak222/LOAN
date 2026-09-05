@@ -30,12 +30,21 @@ import {
   Pencil,
   Eye,
   EyeOff,
+  Sparkles,
+  ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
+import { DetailPageSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { DocumentIntelligenceModal } from '@/components/DocumentIntelligenceModal';
+import { Customer360IntelligenceModal } from '@/components/Customer360IntelligenceModal';
+import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
+import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -49,9 +58,10 @@ export default function CustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections'
+    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
   >('overview');
 
   // KYC modal state
@@ -84,6 +94,8 @@ export default function CustomerDetailPage() {
   const [accountTypeInput, setAccountTypeInput] = useState<'SAVINGS' | 'CURRENT' | 'SALARY'>('SAVINGS');
   const [isPrimaryBankInput, setIsPrimaryBankInput] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [aiDocSelected, setAiDocSelected] = useState<any | null>(null);
+  const [customer360Open, setCustomer360Open] = useState(false);
 
   // Edit Customer Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -93,9 +105,9 @@ export default function CustomerDetailPage() {
     lastName: '',
     mobile: '',
     email: '',
-    password: '',
     dateOfBirth: '',
     gender: 'MALE',
+    password: '',
     addressLine: '',
     city: '',
     state: '',
@@ -113,50 +125,66 @@ export default function CustomerDetailPage() {
     queryFn: async () => (await api.get(`/customers/${params.id}`)).data.data,
   });
 
-  function openEditModal() {
+  const openEditModal = () => {
     if (!data) return;
-    const primaryAddr = data.addresses?.find((a: any) => a.isPrimary) || data.addresses?.[0];
-    const primaryBank = data.bankAccounts?.find((b: any) => b.isPrimary) || data.bankAccounts?.[0];
-    const primaryEmp = data.employmentDetails?.[0];
-
+    const primaryAddr = data.addresses?.[0] || {};
+    const primaryBank = data.bankAccounts?.[0] || {};
     setEditForm({
       firstName: data.firstName || '',
       lastName: data.lastName || '',
-      mobile: data.mobile || '',
+      mobile: data.phone || data.mobile || '',
       email: data.email || '',
-      password: '',
-      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
+      dateOfBirth: data.dateOfBirth ? String(data.dateOfBirth).split('T')[0] : '',
       gender: data.gender || 'MALE',
-      addressLine: data.addressLine || primaryAddr?.addressLine || '',
-      city: data.city || primaryAddr?.city || '',
-      state: data.state || primaryAddr?.state || '',
-      pincode: data.pincode || primaryAddr?.pincode || '',
-      employmentType: data.employmentType || primaryEmp?.employmentType || 'SALARIED',
-      employerName: data.employerName || primaryEmp?.employerName || '',
-      monthlyIncome: data.monthlyIncome ? String(data.monthlyIncome) : primaryEmp?.monthlyIncome ? String(primaryEmp.monthlyIncome) : '',
-      bankName: data.bankName || primaryBank?.bankName || '',
-      bankAccountNo: data.bankAccountNo || primaryBank?.accountNumber || '',
-      bankIfsc: data.bankIfsc || primaryBank?.ifscCode || '',
+      password: '',
+      addressLine: primaryAddr.addressLine || primaryAddr.addressLine1 || '',
+      city: primaryAddr.city || '',
+      state: primaryAddr.state || '',
+      pincode: primaryAddr.pincode || primaryAddr.postalCode || '',
+      employmentType: data.employmentType || 'SALARIED',
+      employerName: data.employerName || '',
+      monthlyIncome: data.monthlyIncome ? String(data.monthlyIncome) : '',
+      bankName: primaryBank.bankName || '',
+      bankAccountNo: primaryBank.accountNumber || primaryBank.bankAccountNo || '',
+      bankIfsc: primaryBank.ifscCode || primaryBank.bankIfsc || '',
     });
     setEditModalOpen(true);
-  }
+  };
 
   const updateCustomerMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        ...editForm,
+        firstName: editForm.firstName || undefined,
+        lastName: editForm.lastName || undefined,
         email: editForm.email || undefined,
-        password: editForm.password && editForm.password.trim().length >= 6 ? editForm.password.trim() : undefined,
-        dateOfBirth: editForm.dateOfBirth ? editForm.dateOfBirth : undefined,
+        phone: editForm.mobile || undefined,
+        dateOfBirth: editForm.dateOfBirth ? new Date(editForm.dateOfBirth).toISOString() : undefined,
         gender: editForm.gender || undefined,
         monthlyIncome: editForm.monthlyIncome ? Number(editForm.monthlyIncome) : undefined,
+        employmentType: editForm.employmentType || undefined,
+        employerName: editForm.employerName || undefined,
+        address: editForm.addressLine ? {
+          addressLine: editForm.addressLine,
+          city: editForm.city,
+          state: editForm.state,
+          pincode: editForm.pincode,
+        } : undefined,
+        bankAccount: editForm.bankAccountNo ? {
+          bankName: editForm.bankName,
+          accountNumber: editForm.bankAccountNo,
+          ifscCode: editForm.bankIfsc,
+        } : undefined,
       };
       return api.patch(`/customers/${params.id}`, payload);
     },
     onSuccess: () => {
+      toast.success('Customer profile updated.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setEditModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Update Notice' });
     },
   });
 
@@ -172,6 +200,7 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success('Bank account registered.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setBankModalOpen(false);
@@ -179,6 +208,9 @@ export default function CustomerDetailPage() {
       setAccountNumberInput('');
       setIfscCodeInput('');
       setAccountHolderInput('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Bank Registration Notice' });
     },
   });
 
@@ -191,11 +223,15 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success(`KYC status updated to ${kycStatusInput}.`);
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       setKycModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'KYC Update Notice' });
     },
   });
 
@@ -217,12 +253,16 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success('Document uploaded to cloud storage.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setDocModalOpen(false);
       setSelectedFile(null);
       setFilePreview(null);
       setDocExpiry('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Upload Notice' });
     },
   });
 
@@ -231,8 +271,12 @@ export default function CustomerDetailPage() {
       return api.delete(`/customers/${params.id}`);
     },
     onSuccess: () => {
+      toast.success('Customer record removed.');
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       router.push('/customers');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Delete Customer Notice' });
     },
   });
 
@@ -248,12 +292,16 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success(`Document marked as ${docDecisionStatus}.`);
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setVerifyModalOpen(false);
       setSelectedDoc(null);
       setDocRejectionReason('');
       setDocVerifyRemarks('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Verification Notice' });
     },
   });
 
@@ -262,12 +310,16 @@ export default function CustomerDetailPage() {
       return api.delete(`/documents/${docId}`);
     },
     onSuccess: () => {
+      toast.success('Document removed.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Delete Notice' });
+    },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
       <div className="py-12 text-center space-y-3">
@@ -297,6 +349,8 @@ export default function CustomerDetailPage() {
     { id: 'loans', label: `Loans (${loans.length})`, icon: Wallet },
     { id: 'payments', label: `Payments (${payments.length})`, icon: Receipt },
     { id: 'collections', label: `Collections (${collectionCases.length})`, icon: AlertCircle },
+    { id: 'bank_intelligence', label: 'Bank Statement Intelligence', icon: Building2 },
+    { id: 'fraud', label: 'Fraud & Anomaly', icon: ShieldAlert },
   ];
 
   return (
@@ -311,6 +365,13 @@ export default function CustomerDetailPage() {
             <Badge status={data.status} />
             <Badge status={data.kycStatus} />
             {data.riskCategory && <Badge status={data.riskCategory} />}
+            <Button
+              size="sm"
+              onClick={() => setCustomer360Open(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold shadow-md cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
+            </Button>
             {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
@@ -556,6 +617,14 @@ export default function CustomerDetailPage() {
                               <ExternalLink className="h-3 w-3" /> Open
                             </a>
                           )}
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="text-xs h-7 px-2.5 gap-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            onClick={() => setAiDocSelected(doc)}
+                          >
+                            <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
+                          </Button>
                           <Button
                             size="sm"
                             variant="secondary"
@@ -888,6 +957,16 @@ export default function CustomerDetailPage() {
             </p>
           )}
         </Card>
+      )}
+
+      {/* Tab 8: Bank Statement Intelligence */}
+      {activeTab === 'bank_intelligence' && (
+        <BankStatementIntelligenceCard customerId={params.id} />
+      )}
+
+      {/* Tab 9: Fraud & Anomaly Intelligence */}
+      {activeTab === 'fraud' && (
+        <FraudIntelligenceCard customerId={params.id} customerCode={data.customerCode} />
       )}
 
       {/* KYC Update Modal */}
@@ -1685,6 +1764,26 @@ export default function CustomerDetailPage() {
             </form>
           </Card>
         </div>
+      )}
+
+      {/* Document Intelligence Modal */}
+      {aiDocSelected && (
+        <DocumentIntelligenceModal
+          document={aiDocSelected}
+          isOpen={!!aiDocSelected}
+          onClose={() => setAiDocSelected(null)}
+        />
+      )}
+
+      {/* Customer 360 Intelligence Modal */}
+      {customer360Open && (
+        <Customer360IntelligenceModal
+          customerId={params.id}
+          customerCode={data.customerCode}
+          customerName={`${data.firstName} ${data.lastName}`}
+          isOpen={customer360Open}
+          onClose={() => setCustomer360Open(false)}
+        />
       )}
     </div>
   );

@@ -20,12 +20,15 @@ import {
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
+import { DetailPageSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 export default function LoanDetailPage() {
   const params = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
 
   // Modals
@@ -69,6 +72,7 @@ export default function LoanDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('Repayment submission initiated successfully.');
       setSubmitSuccess(true);
       setTimeout(() => {
         setPayModalOpen(false);
@@ -77,6 +81,9 @@ export default function LoanDetailPage() {
         setPayReference('');
         setPayNotes('');
       }, 1500);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Repayment Submission Notice' });
     },
   });
 
@@ -90,6 +97,7 @@ export default function LoanDetailPage() {
         reference: payReference,
       }),
     onSuccess: () => {
+      toast.success('Repayment recorded and waterfall ledger applied.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -101,6 +109,9 @@ export default function LoanDetailPage() {
       setPayModalOpen(false);
       setPayAmount('');
       setPayReference('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Payment Processing Notice' });
     },
   });
 
@@ -114,11 +125,15 @@ export default function LoanDetailPage() {
         reason: restructureReason,
       }),
     onSuccess: () => {
+      toast.success('Loan restructuring applied successfully.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       setRestructureModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Restructuring Notice' });
     },
   });
 
@@ -131,15 +146,19 @@ export default function LoanDetailPage() {
         reason: settleReason,
       }),
     onSuccess: () => {
+      toast.success('One-Time Settlement (OTS) terms saved.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       setSettleModalOpen(false);
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Settlement Notice' });
+    },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
       <div className="py-12 text-center space-y-3">

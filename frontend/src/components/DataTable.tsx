@@ -1,7 +1,8 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Card, EmptyState, Spinner } from './ui';
+import { Card, EmptyState } from './ui';
+import { Skeleton } from './LoadingSkeletons';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -39,7 +40,54 @@ export function DataTable<T extends { id: string }>({
       )}
     >
       {loading ? (
-        <Spinner />
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className={cn(
+              "border-b text-[11px] font-bold uppercase tracking-wider",
+              isDark
+                ? "border-[#2B3566] bg-[#16203D] text-slate-400"
+                : "border-slate-200 bg-slate-50/80 text-slate-500"
+            )}>
+              <tr>
+                {columns.map((c) => (
+                  <th
+                    key={c.key}
+                    className={cn(
+                      'px-4 py-3.5',
+                      c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
+                      c.className ?? ''
+                    )}
+                  >
+                    {c.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className={cn(
+              "divide-y",
+              isDark
+                ? "divide-[#2B3566] text-slate-200"
+                : "divide-slate-100 text-slate-700"
+            )}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`skeleton-row-${i}`} className="animate-pulse">
+                  {columns.map((c, colIndex) => (
+                    <td
+                      key={`skeleton-cell-${i}-${c.key}`}
+                      className={cn(
+                        'px-4 py-3.5',
+                        c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
+                        c.className ?? ''
+                      )}
+                    >
+                      <Skeleton className={cn("h-4", colIndex === 0 ? "w-28" : colIndex === columns.length - 1 ? "w-16" : "w-20")} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : !rows || rows.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
       ) : (

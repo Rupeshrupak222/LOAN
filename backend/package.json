@@ -21,6 +21,7 @@
     "schema": "../database/prisma/schema.prisma"
   },
   "dependencies": {
+    "@google/genai": "^2.20.0",
     "@prisma/client": "^5.22.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",

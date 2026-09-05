@@ -24,7 +24,9 @@ import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { useToast } from '@/lib/toast';
 
 type TabKey = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -32,6 +34,7 @@ export default function UnderwritingQueuePage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<TabKey>('ALL');
@@ -46,7 +49,7 @@ export default function UnderwritingQueuePage() {
     queryKey: ['underwriting-queue'],
     queryFn: async () => {
       const res = await api.get('/underwriting/queue');
-      const rows = res.data?.data;
+      const rows = res.data?.data?.items ?? res.data?.data ?? [];
       return (Array.isArray(rows) ? rows : []) as any[];
     },
   });
@@ -62,6 +65,7 @@ export default function UnderwritingQueuePage() {
       });
     },
     onSuccess: () => {
+      toast.success(`Decision '${decision}' recorded successfully.`);
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
@@ -74,11 +78,11 @@ export default function UnderwritingQueuePage() {
       setConditions('');
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error(apiErrorMessage(err), { title: 'Underwriting Decision Notice' });
     },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <TableSkeleton rows={6} cols={6} />;
 
   const allItems = Array.isArray(data) ? data : [];
 
@@ -189,7 +193,7 @@ export default function UnderwritingQueuePage() {
             >
               <span>Awaiting Decision</span>
               {pendingItems.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">
                   {pendingItems.length}
                 </span>
               )}

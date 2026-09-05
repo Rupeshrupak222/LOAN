@@ -24,6 +24,7 @@ import {
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Input, Card, Spinner } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
@@ -33,6 +34,7 @@ export default function PaymentsPage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const isCustomer = user?.roles?.includes('CUSTOMER');
   const isStaff = user?.roles?.some((r: string) =>
@@ -119,6 +121,7 @@ export default function PaymentsPage() {
         notes: subNotes,
       }),
     onSuccess: () => {
+      toast.success('Repayment submission sent for verification.');
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setSubmitModalOpen(false);
@@ -128,18 +131,25 @@ export default function PaymentsPage() {
       setSubNotes('');
       setActiveTab('SUBMISSIONS');
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Submission Notice' });
+    },
   });
 
   // Mutation: Verify Submission
   const verifyMutation = useMutation({
     mutationFn: async (id: string) => api.post(`/payments/submissions/${id}/verify`),
     onSuccess: () => {
+      toast.success('Payment submission verified and applied to ledger.');
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Verification Notice' });
     },
   });
 
@@ -148,10 +158,14 @@ export default function PaymentsPage() {
     mutationFn: async ({ id, reason }: { id: string; reason: string }) =>
       api.post(`/payments/submissions/${id}/reject`, { reason }),
     onSuccess: () => {
+      toast.warning('Payment submission rejected.');
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setRejectModalId(null);
       setRejectReason('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Rejection Notice' });
     },
   });
 
@@ -540,7 +554,7 @@ export default function PaymentsPage() {
           <FileCheck2 className="w-3.5 h-3.5" />
           {isCustomer ? 'My Submitted Payments' : 'Payment Submissions / Proofs'} ({submissions.length})
           {pendingSubmissionsCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold">
               {pendingSubmissionsCount}
             </span>
           )}

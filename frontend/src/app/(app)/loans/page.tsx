@@ -7,14 +7,17 @@ import { Wallet, Search, CheckCircle2, ArrowRight, Send, X, Layers, Clock, FileT
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Input, Card } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 
 export default function LoansPage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -65,9 +68,10 @@ export default function LoansPage() {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setSelectedDisbursementApp(null);
       setReference('');
+      toast.success('Disbursement Executed', 'Loan funds disbursed and repayment schedule activated.');
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error('Disbursement Failed', apiErrorMessage(err));
     },
   });
 
