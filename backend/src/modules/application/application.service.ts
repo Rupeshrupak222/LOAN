@@ -61,7 +61,19 @@ export async function listApplications(params: PageParams, status?: string, user
   };
 }
 
+const appCache = new Map<string, { data: any; expiresAt: number }>();
+
+export function invalidateAppCache(id?: string) {
+  if (id) appCache.delete(id);
+  else appCache.clear();
+}
+
 export async function getApplication(id: string) {
+  const cached = appCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
   const app = await prisma.loanApplication.findUnique({
     where: { id },
     include: {
@@ -74,6 +86,8 @@ export async function getApplication(id: string) {
     },
   });
   if (!app) throw new NotFoundError('Application not found');
+
+  appCache.set(id, { data: app, expiresAt: Date.now() + 30_000 }); // 30s cache
   return app;
 }
 
@@ -142,6 +156,8 @@ export async function transition(
     });
     return updated;
   });
+
+  invalidateAppCache(id);
 
   // Async non-blocking notification to applicant
   void sendNotification({

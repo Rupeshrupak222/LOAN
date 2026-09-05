@@ -172,15 +172,28 @@ export async function changePassword(userId: string, currentPassword: string, ne
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   // Revoke all refresh tokens on password change.
   await prisma.refreshToken.updateMany({ where: { userId }, data: { revoked: true } });
+  profileCache.delete(userId);
+}
+
+const profileCache = new Map<string, { data: any; expiresAt: number }>();
+
+export function invalidateProfileCache(userId?: string) {
+  if (userId) profileCache.delete(userId);
+  else profileCache.clear();
 }
 
 export async function getProfile(userId: string) {
+  const cached = profileCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { roles: { include: { role: true } } },
   });
   if (!user) throw new UnauthorizedError();
-  return {
+  const profile = {
     id: user.id,
     email: user.email,
     firstName: user.firstName,
@@ -189,4 +202,7 @@ export async function getProfile(userId: string) {
     roles: user.roles.map((r) => r.role.name),
     branchId: user.branchId,
   };
+
+  profileCache.set(userId, { data: profile, expiresAt: Date.now() + 60_000 }); // 60s cache
+  return profile;
 }

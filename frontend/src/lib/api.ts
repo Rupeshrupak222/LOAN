@@ -123,7 +123,7 @@ api.interceptors.response.use(
     const startTime = (response.config as any)?.__startTime;
     if (startTime) {
       const duration = Date.now() - startTime;
-      if (duration > 2000 && process.env.NODE_ENV !== 'production') {
+      if (duration > 4000 && process.env.NODE_ENV !== 'production') {
         console.warn(`[Slow API Request] ${response.config.method?.toUpperCase()} ${response.config.url} took ${duration}ms`);
       }
     }
