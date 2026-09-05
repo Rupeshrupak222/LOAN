@@ -33,3 +33,7 @@ Thumbs.db
 
 # Uploads (local dev document storage)
 uploads/
+
+# Scratch & temporary scripts
+scratch/
+
