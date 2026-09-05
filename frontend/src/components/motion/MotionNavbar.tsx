@@ -318,9 +318,9 @@ export const MotionNavbar: React.FC = () => {
             </Link>
 
             <Link
-              href="/#simulator"
+              href="/resources"
               className={`text-sm font-medium transition-colors py-1 ${
-                pathname === '/#simulator' ? 'text-[#155EEF] font-semibold' : 'text-slate-700 hover:text-[#071A33]'
+                pathname.startsWith('/resources') ? 'text-[#155EEF] font-semibold' : 'text-slate-700 hover:text-[#071A33]'
               }`}
             >
               Resources
@@ -541,9 +541,13 @@ export const MotionNavbar: React.FC = () => {
                 About
               </Link>
               <Link
-                href="/#simulator"
+                href="/resources"
                 onClick={() => setMobileOpen(false)}
-                className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                className={`p-2.5 rounded-lg border transition-colors ${
+                  pathname.startsWith('/resources')
+                    ? 'bg-blue-50/80 border-blue-200 text-[#155EEF] font-semibold'
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
+                }`}
               >
                 Resources
               </Link>
