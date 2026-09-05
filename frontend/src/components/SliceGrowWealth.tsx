@@ -128,7 +128,7 @@ export function SliceGrowWealth() {
               </div>
 
               <div className="mt-8">
-                <Link href="/login" className="block w-full">
+                <Link href="/apply?purpose=Wealth+Account" className="block w-full">
                   <Button className="w-full py-4 text-base font-extrabold bg-gradient-to-r from-purple-500 via-pink-500 to-amber-400 text-white shadow-glow hover:brightness-110">
                     Open Your Wealth Account in 90s <ArrowRight className="h-5 w-5" />
                   </Button>

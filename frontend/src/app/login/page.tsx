@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ShieldCheck,
   TrendingUp,
@@ -37,6 +38,8 @@ const DEMO_PASSWORD = 'Passw0rd!123';
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams?.get('redirect') || '/dashboard';
   const [identifier, setIdentifier] = useState('admin@adyapan.dev');
   const [password, setPassword] = useState('Passw0rd!123');
   const [showPassword, setShowPassword] = useState(false);
@@ -49,7 +52,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(identifier, password);
-      router.push('/dashboard');
+      router.push(redirectUrl);
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -156,9 +159,24 @@ export default function LoginPage() {
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-7 sm:p-8 shadow-card space-y-5">
+            {/* Quick Link to Sign Up / Apply for new borrowers */}
+            <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-[#071A33]">New borrower looking to apply?</p>
+                <p className="text-[11px] text-slate-500">No account required — verify mobile and get funds in 90s.</p>
+              </div>
+              <Link
+                href="/apply"
+                className="px-3.5 py-1.5 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Sign Up & Apply</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
             <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
-              <p className="mt-0.5 text-xs text-slate-500">Sign in to your Adyapan LMS account</p>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Staff & Borrower Sign In</h1>
+              <p className="mt-0.5 text-xs text-slate-500">Sign in to your Adyapan LMS workspace or customer account</p>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">
@@ -217,6 +235,13 @@ export default function LoginPage() {
                 {loading ? 'Authenticating...' : 'Sign In to Workspace'}
               </Button>
             </form>
+
+            <div className="text-center text-xs text-slate-500 pt-1">
+              Don&apos;t have an account?{' '}
+              <Link href="/apply" className="font-bold text-[#155EEF] hover:underline">
+                Sign Up & Apply for a Loan →
+              </Link>
+            </div>
 
             <div className="border-t border-slate-100 pt-4">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">

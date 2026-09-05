@@ -144,7 +144,7 @@ export const CinematicHero: React.FC = () => {
               }`}
             >
               <MagneticButton
-                href="#selector"
+                href="/apply"
                 variant="primary"
                 className="w-full sm:w-auto px-8 py-4 text-base font-bold"
               >

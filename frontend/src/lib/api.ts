@@ -157,7 +157,11 @@ api.interceptors.response.use(
         return api(original);
       } else {
         // Refresh failed: session is expired
-        notifyAuthInvalidated();
+        if (getAccessToken()) {
+          notifyAuthInvalidated();
+        } else {
+          setAccessToken(null);
+        }
       }
     }
 

@@ -456,7 +456,7 @@ export const MotionHero: React.FC = () => {
               </div>
 
               <MagneticButton
-                href="#launchpad"
+                href="/apply"
                 variant="primary"
                 className="px-8 py-3.5 text-sm font-bold shadow-md shadow-[#155EEF]/20 whitespace-nowrap"
               >

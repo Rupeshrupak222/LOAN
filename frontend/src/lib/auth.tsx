@@ -21,6 +21,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const PUBLIC_PREFIXES = [
+  '/',
+  '/apply',
+  '/login',
+  '/about',
+  '/contact',
+  '/products',
+  '/resources',
+  '/forgot-password',
+];
+
+function isPublicRoute(path?: string | null): boolean {
+  if (!path || path === '/') return true;
+  return PUBLIC_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setLoading(false);
         // Only redirect if inside an authenticated app route
-        if (pathname && !pathname.startsWith('/login') && pathname !== '/') {
+        if (pathname && !isPublicRoute(pathname)) {
           router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
       }

@@ -82,7 +82,7 @@ export function FintechNav() {
             Sign In
           </Link>
           <MagneticButton
-            href="#launchpad"
+            href="/apply"
             variant="primary"
             className="px-5 py-2.5 text-xs font-black"
           >
@@ -138,14 +138,14 @@ export function FintechNav() {
             </Link>
           </div>
 
-          <a
-            href="#launchpad"
+          <Link
+            href="/apply"
             onClick={() => setMobileOpen(false)}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#155EEF] text-white text-sm font-bold shadow-md"
+            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#155EEF] text-white text-sm font-bold shadow-md cursor-pointer"
           >
             <span>Check Eligibility</span>
             <ArrowRight className="w-4 h-4" />
-          </a>
+          </Link>
         </div>
       )}
     </header>

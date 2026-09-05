@@ -25,7 +25,7 @@ export const LaunchpadCTA: React.FC<Props> = ({ activeDirection }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`/applications/new?purpose=${activeDirection}&amount=${current.defaultAmount}`);
+    router.push(`/apply?mobile=${encodeURIComponent(mobile)}&purpose=${encodeURIComponent(activeDirection)}&amount=${current.defaultAmount}`);
   };
 
   return (

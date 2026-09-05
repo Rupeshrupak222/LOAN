@@ -203,7 +203,7 @@ export function PersonaCreditSwitcher() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap items-center gap-4">
-                  <Link href="/login">
+                  <Link href={`/apply?purpose=${encodeURIComponent(current.label)}`}>
                     <Button className="px-8 py-4 text-base font-extrabold shadow-glow">
                       Apply as {current.label} <ArrowRight className="h-5 w-5" />
                     </Button>

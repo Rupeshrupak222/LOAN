@@ -133,7 +133,7 @@ export function SliceStoryDeck() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link href="/login">
+              <Link href="/apply">
                 <Button className="px-8 py-4 text-base font-extrabold shadow-glow bg-white text-slate-950 hover:bg-slate-100">
                   Claim Your Line <ArrowRight className="h-5 w-5" />
                 </Button>

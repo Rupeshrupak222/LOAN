@@ -15,7 +15,7 @@ import { Logo } from './Logo';
 import { cn } from '@/lib/utils';
 
 export function LandingNav({
-  primaryCta = '#launchpad',
+  primaryCta = '/apply',
   primaryLabel = 'Check Offer in 60s',
 }: {
   primaryCta?: string;

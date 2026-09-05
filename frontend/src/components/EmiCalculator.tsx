@@ -278,7 +278,7 @@ export function EmiCalculator() {
 
                 {/* Instant Action CTA */}
                 <div className="mt-6">
-                  <Link href="/login" className="block w-full">
+                  <Link href={`/apply?amount=${amount}&tenure=${tenureMonths}`} className="block w-full">
                     <Button className="w-full py-4 text-base font-extrabold shadow-glow hover:scale-105 active:scale-95 transition-transform">
                       Get Cash in 90 Seconds <ArrowRight className="h-5 w-5" />
                     </Button>

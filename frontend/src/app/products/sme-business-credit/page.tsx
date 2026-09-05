@@ -234,10 +234,10 @@ export default function SmeBusinessCreditSignaturePage() {
 
               <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
                 <Link
-                  href="/login"
+                  href="/apply?purpose=Business+Expansion"
                   className="px-8 py-4 rounded-full bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-sm shadow-xl shadow-[#155EEF]/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
                 >
-                  <span>Apply via LMS Workspace</span>
+                  <span>Apply for Business Credit</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link

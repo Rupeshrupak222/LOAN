@@ -184,10 +184,10 @@ export const ProductDetailShell: React.FC<ProductDetailShellProps> = ({ product 
                 {/* Quick Action CTAs */}
                 <div className="flex flex-wrap items-center gap-3 pt-4">
                   <Link
-                    href="/login"
-                    className="px-6 py-3 rounded-xl bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-xs shadow-lg shadow-[#155EEF]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                    href={`/apply?purpose=${encodeURIComponent(product.name)}`}
+                    className="px-6 py-3 rounded-xl bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-xs shadow-lg shadow-[#155EEF]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
                   >
-                    <span>Launch in LMS Workspace</span>
+                    <span>Check Eligibility & Apply</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                   <a
