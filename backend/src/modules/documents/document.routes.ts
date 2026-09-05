@@ -59,15 +59,35 @@ router.post(
       throw new BadRequestError('Please provide a file to upload in the "file" field');
     }
 
-    const customerId = req.body.customerId;
-    if (!customerId) {
-      throw new BadRequestError('customerId is required for document upload');
-    }
-
+    let customerId = req.body.customerId;
     const isStaff = req.user?.roles.some((r) =>
       ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
-    if (!isStaff) {
+
+    if (!customerId) {
+      if (!isStaff && req.user?.id) {
+        let cust = await prisma.customer.findFirst({ where: { userId: req.user.id } });
+        if (!cust) {
+          const userRec = await prisma.user.findUnique({ where: { id: req.user.id } });
+          const count = await prisma.customer.count();
+          const code = `CUST-${String(count + 1).padStart(4, '0')}`;
+          cust = await prisma.customer.create({
+            data: {
+              userId: req.user.id,
+              customerCode: code,
+              firstName: userRec?.firstName || 'Borrower',
+              lastName: userRec?.lastName || 'User',
+              email: req.user.email,
+              mobile: '9876543210',
+              kycStatus: 'PENDING',
+            },
+          });
+        }
+        customerId = cust.id;
+      } else {
+        throw new BadRequestError('customerId is required for document upload');
+      }
+    } else if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: customerId } });
       if (!cust || cust.userId !== req.user?.id) {
         throw new ForbiddenError('Access forbidden: You can only upload documents for your own account');

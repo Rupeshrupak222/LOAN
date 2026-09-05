@@ -314,6 +314,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Self-service borrower portal for active loans, repayments, and NOC certificates',
     nav: [
       'dashboard',
+      'applications',
       'loans',
       'payments',
       'emi-calculator',
