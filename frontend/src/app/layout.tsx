@@ -14,6 +14,7 @@ const syne = Syne({
   weight: ['700', '800'],
   variable: '--font-syne',
   display: 'swap',
+  preload: false,
 });
 
 const unbounded = Unbounded({
@@ -21,6 +22,7 @@ const unbounded = Unbounded({
   weight: ['800', '900'],
   variable: '--font-unbounded',
   display: 'swap',
+  preload: false,
 });
 
 const bebas = Bebas_Neue({
@@ -28,6 +30,7 @@ const bebas = Bebas_Neue({
   weight: ['400'],
   variable: '--font-bebas',
   display: 'swap',
+  preload: false,
 });
 
 export const metadata: Metadata = {
