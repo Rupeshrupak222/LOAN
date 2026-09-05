@@ -40,38 +40,6 @@ router.get(
 );
 
 /**
- * GET /api/v1/partners/:id
- * Retrieves a single partner profile.
- */
-router.get(
-  '/:id',
-  asyncHandler(async (req, res) => {
-    const partner = partnerService.getPartner(req.params.id, {
-      id: req.user!.id,
-      roles: req.user!.roles,
-    });
-    res.json(success(partner));
-  })
-);
-
-/**
- * PATCH /api/v1/partners/:id/status
- * Updates partner governance status (ACTIVE, SUSPENDED, TERMINATED).
- */
-router.patch(
-  '/:id/status',
-  asyncHandler(async (req, res) => {
-    const { status } = req.body;
-    const partner = await partnerService.updatePartnerStatus(req.params.id, status, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    res.json(success(partner));
-  })
-);
-
-/**
  * POST /api/v1/partners/leads
  * Submits a new sourced lead with verified borrower consent.
  */
@@ -146,6 +114,23 @@ router.get(
 );
 
 /**
+ * PATCH /api/v1/partners/:id/status
+ * Updates partner governance status (ACTIVE, SUSPENDED, TERMINATED).
+ */
+router.patch(
+  '/:id/status',
+  asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    const partner = await partnerService.updatePartnerStatus(req.params.id, status, {
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+    });
+    res.json(success(partner));
+  })
+);
+
+/**
  * GET /api/v1/partners/:id/payout-summary
  * Fetches partner payout summary and net payable balances.
  */
@@ -173,6 +158,21 @@ router.post(
       roles: req.user!.roles,
     });
     res.json(success(result));
+  })
+);
+
+/**
+ * GET /api/v1/partners/:id
+ * Retrieves a single partner profile. (Parameterized route placed after specific subroutes)
+ */
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const partner = partnerService.getPartner(req.params.id, {
+      id: req.user!.id,
+      roles: req.user!.roles,
+    });
+    res.json(success(partner));
   })
 );
 
