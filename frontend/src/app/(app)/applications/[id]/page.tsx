@@ -179,6 +179,10 @@ export default function ApplicationDetailPage() {
     ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'LOAN_OFFICER'].includes(r)
   );
 
+  const canAssessCredit = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
+  );
+
   const canForwardToUnderwriting =
     isStaff &&
     ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(data.status);
@@ -393,14 +397,21 @@ export default function ApplicationDetailPage() {
                 <h3 className="text-sm font-bold">Rule-Based Eligibility Engine</h3>
                 <p className="text-xs text-slate-400">Automated policy checks: Age, DTI, Income threshold, and Bureau history</p>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={eligibilityMutation.isPending}
-                onClick={() => eligibilityMutation.mutate()}
-              >
-                {eligibilityMutation.isPending ? 'Evaluating...' : eligibility ? 'Re-Run Eligibility' : 'Run Eligibility Check'}
-              </Button>
+              {canAssessCredit ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={eligibilityMutation.isPending}
+                  onClick={() => eligibilityMutation.mutate()}
+                  className="cursor-pointer text-xs"
+                >
+                  {eligibilityMutation.isPending ? 'Evaluating...' : eligibility ? 'Re-Run Eligibility' : 'Run Eligibility Check'}
+                </Button>
+              ) : (
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1E2445] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                  Credit Analyst Desk
+                </span>
+              )}
             </div>
 
             {eligibility ? (
@@ -437,7 +448,9 @@ export default function ApplicationDetailPage() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-[#2B3566]">
-                Click &quot;Run Eligibility Check&quot; to execute automated policy criteria against borrower attributes.
+                {canAssessCredit
+                  ? 'Click "Run Eligibility Check" to execute automated policy criteria against borrower attributes.'
+                  : 'Automated policy eligibility check is performed by the Credit Analyst team upon proposal review.'}
               </div>
             )}
           </Card>
@@ -449,14 +462,21 @@ export default function ApplicationDetailPage() {
                 <h3 className="text-sm font-bold">4-Pillar Credit Risk Scoring Model</h3>
                 <p className="text-xs text-slate-400">Vintage (25%), DTI Capacity (30%), Document KYC (20%), and Bureau Performance (25%)</p>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={riskMutation.isPending}
-                onClick={() => riskMutation.mutate()}
-              >
-                {riskMutation.isPending ? 'Calculating...' : riskAssessment ? 'Re-Score Risk' : 'Calculate Risk Score'}
-              </Button>
+              {canAssessCredit ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={riskMutation.isPending}
+                  onClick={() => riskMutation.mutate()}
+                  className="cursor-pointer text-xs"
+                >
+                  {riskMutation.isPending ? 'Calculating...' : riskAssessment ? 'Re-Score Risk' : 'Calculate Risk Score'}
+                </Button>
+              ) : (
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1E2445] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                  Credit Risk Model
+                </span>
+              )}
             </div>
 
             {riskAssessment ? (
@@ -484,7 +504,9 @@ export default function ApplicationDetailPage() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-[#2B3566]">
-                Click &quot;Calculate Risk Score&quot; to generate automated score and risk tier categorization.
+                {canAssessCredit
+                  ? 'Click "Calculate Risk Score" to generate automated score and risk tier categorization.'
+                  : 'Credit Risk Scoring and Bureau evaluation is calculated by Credit Analysts during underwriting review.'}
               </div>
             )}
           </Card>
@@ -754,9 +776,9 @@ export default function ApplicationDetailPage() {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2">
-      <dt className="text-slate-500 font-medium">{label}</dt>
-      <dd className="text-right font-medium text-slate-900 dark:text-slate-200">{value ?? '-'}</dd>
+    <div className="flex justify-between gap-3 py-2 min-w-0">
+      <dt className="text-slate-500 font-medium shrink-0">{label}</dt>
+      <dd className="text-right font-medium text-slate-900 dark:text-slate-200 min-w-0 break-words">{value ?? '-'}</dd>
     </div>
   );
 }

@@ -138,25 +138,25 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
         )}
       >
         {/* Header Bar */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-[#1E2445] shrink-0 bg-slate-50/50 dark:bg-[#131E36]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-100 dark:border-[#1E2445] shrink-0 bg-slate-50/50 dark:bg-[#131E36] gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm shrink-0">
               <Sparkles className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold">AI Document Intelligence & Mismatch Audit</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold truncate">AI Document Intelligence</h3>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900 shrink-0">
                   Gemini Vision
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-md">
+              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">
                 {document.fileName} · Category: <span className="font-semibold text-slate-300">{document.category}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
             <Button
               size="sm"
               disabled={mutation.isPending}
@@ -166,7 +166,7 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
               {mutation.isPending ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  <span>Analyzing Document...</span>
+                  <span>Analyzing...</span>
                 </>
               ) : data ? (
                 <>
@@ -176,7 +176,7 @@ export function DocumentIntelligenceModal({ document, isOpen, onClose }: Props) 
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                  <span>Run AI Document Analysis</span>
+                  <span>Run Analysis</span>
                 </>
               )}
             </Button>

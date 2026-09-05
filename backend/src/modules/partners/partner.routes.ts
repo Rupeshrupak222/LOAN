@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { partnerService } from './partner.service';
 
 const router = Router();
@@ -14,6 +14,7 @@ router.use(authenticate);
  */
 router.post(
   '/',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const partner = await partnerService.registerPartner(req.body, {
       id: req.user!.id,
@@ -30,6 +31,7 @@ router.post(
  */
 router.get(
   '/',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const partners = partnerService.listPartners({
       id: req.user!.id,
@@ -45,6 +47,7 @@ router.get(
  */
 router.get(
   '/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const partner = partnerService.getPartner(req.params.id, {
       id: req.user!.id,
@@ -60,6 +63,7 @@ router.get(
  */
 router.patch(
   '/:id/status',
+  authorize('SUPER_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const { status } = req.body;
     const partner = await partnerService.updatePartnerStatus(req.params.id, status, {
@@ -77,6 +81,7 @@ router.patch(
  */
 router.post(
   '/leads',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER'),
   asyncHandler(async (req, res) => {
     const lead = await partnerService.submitLead(req.body, {
       id: req.user!.id,
@@ -93,6 +98,7 @@ router.post(
  */
 router.get(
   '/leads',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { partnerId } = req.query;
     const leads = partnerService.listSourcedApplications(partnerId as string, {
@@ -110,6 +116,7 @@ router.get(
  */
 router.get(
   '/leads/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const lead = partnerService.getSourcedApplication(req.params.id, {
       id: req.user!.id,
@@ -126,6 +133,7 @@ router.get(
  */
 router.post(
   '/commissions/calculate-disbursement',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const records = partnerService.calculateCommissionOnDisbursement(req.body);
     res.json(success(records));
@@ -138,6 +146,7 @@ router.post(
  */
 router.get(
   '/commissions',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { partnerId } = req.query;
     const records = partnerService.listCommissions(partnerId as string);
@@ -151,6 +160,7 @@ router.get(
  */
 router.get(
   '/:id/payout-summary',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const summary = partnerService.getPayoutSummary(req.params.id, {
       id: req.user!.id,
@@ -166,6 +176,7 @@ router.get(
  */
 router.post(
   '/:id/payouts/batch',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const result = await partnerService.processPayoutBatch(req.params.id, {
       id: req.user!.id,

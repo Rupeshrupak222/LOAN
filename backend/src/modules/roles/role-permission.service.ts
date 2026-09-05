@@ -171,6 +171,39 @@ export class RolePermissionService {
         payoutLimit: 50000000,
       },
       {
+        code: 'BRANCH_MANAGER',
+        name: 'Branch Manager',
+        description: 'Branch-level operational oversight, staff management, and pipeline orchestration',
+        permissions: [
+          'APPLICATIONS_CREATE',
+          'APPLICATIONS_VIEW',
+          'APPLICATIONS_ASSIGN',
+          'APPLICATIONS_REVIEW',
+          'CONFIGURATION_VIEW_POLICIES',
+          'CONFIGURATION_DRAFT_POLICY',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+          'TENANT_VIEW_OPERATIONS_CENTER',
+        ],
+        scope: 'BRANCH',
+        sanctionLimit: 2500000,
+        payoutLimit: 2500000,
+      },
+      {
+        code: 'CREDIT_ANALYST',
+        name: 'Credit & Risk Analyst',
+        description: 'Financial statement analysis, bureau review, and initial risk assessment',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'APPLICATIONS_REVIEW',
+          'UNDERWRITING_VIEW_BUREAU',
+          'UNDERWRITING_RUN_AI_ASSIST',
+          'CONFIGURATION_VIEW_POLICIES',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+        ],
+        scope: 'BRANCH',
+        sanctionLimit: 1000000,
+      },
+      {
         code: 'UNDERWRITER',
         name: 'Credit Underwriter',
         description: 'Credit assessment, bureau analysis, and loan application sanctioning',
@@ -188,6 +221,19 @@ export class RolePermissionService {
         ],
         scope: 'BRANCH',
         sanctionLimit: 5000000, // ₹50 Lakh single officer sanction limit
+      },
+      {
+        code: 'FINANCE_OFFICER',
+        name: 'Finance & Accounts Officer',
+        description: 'Payment batch processing, disbursements, reconciliation, and accounting',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'DISBURSEMENTS_INITIATE_PAYOUT',
+          'DISBURSEMENTS_RECONCILE',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+        ],
+        scope: 'BRANCH',
+        payoutLimit: 10000000,
       },
       {
         code: 'DISBURSEMENT_OFFICER',
@@ -214,6 +260,19 @@ export class RolePermissionService {
         ],
         scope: 'TENANT',
         payoutLimit: 50000000,
+      },
+      {
+        code: 'COLLECTION_OFFICER',
+        name: 'Collections Officer',
+        description: 'Branch collections portfolio oversight, delinquent borrower engagement, and PTP logging',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'COLLECTIONS_VIEW_DPD',
+          'COLLECTIONS_RECORD_PTP',
+          'COLLECTIONS_INITIATE_RECOVERY',
+          'COLLECTIONS_WAIVE_PENALTY',
+        ],
+        scope: 'BRANCH',
       },
       {
         code: 'COLLECTION_AGENT',
@@ -417,8 +476,8 @@ export class RolePermissionService {
       timestamp: now,
     });
 
-    await logAudit({
-      userId: actor.id?.startsWith('usr-') ? actor.id : undefined,
+    logAudit({
+      userId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.id) ? actor.id : undefined,
       role: actor.roles[0],
       action: 'CUSTOM_ROLE_CREATED',
       entity: 'CustomRole',

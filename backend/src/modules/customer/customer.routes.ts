@@ -86,7 +86,7 @@ router.patch(
 
 router.patch(
   '/:id/kyc',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
   validate(updateKycStatusSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateKycStatus(req.params.id, req.body, req.user?.id);
@@ -116,7 +116,7 @@ router.post(
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomer(req.params.id, req.user?.id);
     res.json(success(result));

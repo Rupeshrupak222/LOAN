@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { BadRequestError } from '../../common/errors';
-import { authenticate } from '../../middleware/auth';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
+import { authenticate, authorize } from '../../middleware/auth';
 import { verifyGeminiConnection, generateGeminiContent } from './gemini.service';
 import { handleCopilotChat } from './copilot.service';
 import { generateCreditIntelligence } from './credit-intelligence.service';
@@ -22,10 +23,11 @@ router.use(authenticate);
 
 /**
  * GET /api/v1/ai/test
- * Test endpoint to verify Google Gemini API connectivity.
+ * Test endpoint to verify Google Gemini API connectivity (Admin only).
  */
 router.get(
   '/test',
+  authorize('SUPER_ADMIN', 'ADMIN'),
   asyncHandler(async (_req, res) => {
     const result = await verifyGeminiConnection();
     res.json(
@@ -41,10 +43,11 @@ router.get(
 
 /**
  * POST /api/v1/ai/test
- * Allows sending a test prompt to verify dynamic response generation.
+ * Allows sending a test prompt to verify dynamic response generation (Admin only).
  */
 router.post(
   '/test',
+  authorize('SUPER_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const prompt = req.body.prompt || 'Respond with exactly: Gemini connection successful.';
     const systemInstruction = req.body.systemInstruction;
@@ -101,6 +104,7 @@ router.post(
  */
 router.post(
   '/applications/:id/credit-intelligence',
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const result = await generateCreditIntelligence(req.params.id, {
       id: req.user!.id,
@@ -118,6 +122,7 @@ router.post(
  */
 router.post(
   '/applications/:id/underwriting-intelligence',
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const result = await generateUnderwritingIntelligence(req.params.id, {
       id: req.user!.id,
@@ -136,6 +141,20 @@ router.post(
 router.post(
   '/documents/:id/analyze',
   asyncHandler(async (req, res) => {
+    const isStaff = req.user?.roles.some((r) =>
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+
+    if (!isStaff) {
+      const doc = await prisma.document.findUnique({
+        where: { id: req.params.id },
+        include: { customer: true },
+      });
+      if (!doc || doc.customer?.userId !== req.user?.id) {
+        throw new ForbiddenError('Access forbidden: You cannot analyze another borrower document');
+      }
+    }
+
     const result = await analyzeDocumentIntelligence(req.params.id, {
       id: req.user!.id,
       email: req.user!.email,
@@ -152,6 +171,7 @@ router.post(
  */
 router.post(
   '/applications/:id/disbursement-intelligence',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER', 'UNDERWRITER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { utrReference } = req.body || {};
     const result = await generateDisbursementIntelligence(
@@ -174,6 +194,7 @@ router.post(
  */
 router.post(
   '/collections/:id/intelligence',
+  authorize('SUPER_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const result = await generateCollectionIntelligence(req.params.id, {
       id: req.user!.id,
@@ -192,6 +213,19 @@ router.post(
 router.post(
   '/customers/:id/customer-360',
   asyncHandler(async (req, res) => {
+    const isStaff = req.user?.roles.some((r) =>
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+
+    if (!isStaff) {
+      const cust = await prisma.customer.findUnique({
+        where: { id: req.params.id },
+      });
+      if (!cust || cust.userId !== req.user?.id) {
+        throw new ForbiddenError('Access forbidden: You cannot view another borrower customer intelligence');
+      }
+    }
+
     const result = await generateCustomer360Intelligence(req.params.id, {
       id: req.user!.id,
       email: req.user!.email,
@@ -208,6 +242,7 @@ router.post(
  */
 router.post(
   '/dashboard/decision-intelligence',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'UNDERWRITER', 'CREDIT_ANALYST', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const result = await generateDecisionIntelligence({
       id: req.user!.id,
@@ -226,6 +261,7 @@ router.post(
  */
 router.post(
   '/exceptions/center',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'UNDERWRITER', 'AUDITOR', 'FINANCE_OFFICER', 'COLLECTION_OFFICER'),
   asyncHandler(async (req, res) => {
     const result = await generateWorkflowExceptionIntelligence({
       id: req.user!.id,
@@ -244,6 +280,7 @@ router.post(
  */
 router.post(
   '/fraud/portfolio',
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { forceRefresh } = req.body || {};
     const result = await generateFraudIntelligence({
@@ -267,6 +304,7 @@ router.post(
  */
 router.post(
   '/fraud/applications/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { forceRefresh } = req.body || {};
     const result = await generateFraudIntelligence({
@@ -291,6 +329,7 @@ router.post(
  */
 router.post(
   '/fraud/customers/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { forceRefresh } = req.body || {};
     const result = await generateFraudIntelligence({

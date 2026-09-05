@@ -35,7 +35,7 @@ router.post(
     })
   ),
   asyncHandler(async (req, res) => {
-    const user = await createUser(req.body);
+    const user = await createUser(req.body, req.user as any);
     res.status(201).json(success(user));
   })
 );

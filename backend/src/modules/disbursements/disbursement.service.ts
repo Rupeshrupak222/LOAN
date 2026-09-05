@@ -142,12 +142,15 @@ export async function executeDisbursement(
     await tx.repaymentScheduleItem.createMany({ data: scheduleData });
 
     // 3. Create Disbursement Record
+    const disbMethod = input.disbursementMethod || 'IMPS';
+    const disbRef = input.referenceNumber || (input as any).reference || `DISB-TXN-${Date.now()}`;
+
     await tx.disbursement.create({
       data: {
         loanId: createdLoan.id,
         amount: Money.toDb(principalNum),
-        method: input.disbursementMethod,
-        reference: input.referenceNumber,
+        method: disbMethod,
+        reference: disbRef,
         status: 'COMPLETED',
         disbursedBy: actor.email,
       },
@@ -160,8 +163,8 @@ export async function executeDisbursement(
         type: 'DISBURSEMENT',
         direction: 'DEBIT',
         amount: Money.toDb(principalNum),
-        reference: input.referenceNumber,
-        description: `Disbursement of principal via ${input.disbursementMethod}. Ref: ${input.referenceNumber}`,
+        reference: disbRef,
+        description: `Disbursement of principal via ${disbMethod}. Ref: ${disbRef}`,
       },
     });
 
@@ -182,7 +185,7 @@ export async function executeDisbursement(
     });
 
     return createdLoan;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,

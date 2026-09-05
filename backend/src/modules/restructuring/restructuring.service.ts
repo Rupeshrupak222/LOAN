@@ -100,7 +100,7 @@ export async function restructureLoan(
     });
 
     return record;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,
@@ -134,6 +134,10 @@ export async function executeSettlement(
   const loan = await prisma.loan.findUnique({ where: { id: input.loanId } });
   if (!loan) throw new NotFoundError('Loan account not found');
 
+  if (loan.status === 'SETTLED' || loan.status === 'CLOSED') {
+    throw new BadRequestError('Loan account is already settled or closed');
+  }
+
   const totalOutstanding = new Decimal(loan.outstandingPrincipal)
     .plus(loan.outstandingInterest)
     .plus(loan.outstandingFees);
@@ -146,6 +150,25 @@ export async function executeSettlement(
   const waivedAmount = totalOutstanding.minus(settlementNum);
 
   const settlement = await prisma.$transaction(async (tx) => {
+    // Atomically claim and lock loan to SETTLED status
+    const lockUpdate = await tx.loan.updateMany({
+      where: {
+        id: input.loanId,
+        status: { notIn: ['SETTLED', 'CLOSED'] },
+      },
+      data: {
+        outstandingPrincipal: '0.00',
+        outstandingInterest: '0.00',
+        outstandingFees: '0.00',
+        status: 'SETTLED',
+        closedAt: new Date(),
+      },
+    });
+
+    if (lockUpdate.count === 0) {
+      throw new BadRequestError('Loan account is already settled or closed');
+    }
+
     const rec = await tx.settlement.create({
       data: {
         loanId: loan.id,
@@ -199,20 +222,8 @@ export async function executeSettlement(
       data: { status: 'WAIVED', outstanding: '0.00' },
     });
 
-    // Mark loan settled
-    await tx.loan.update({
-      where: { id: loan.id },
-      data: {
-        outstandingPrincipal: '0.00',
-        outstandingInterest: '0.00',
-        outstandingFees: '0.00',
-        status: 'SETTLED',
-        closedAt: new Date(),
-      },
-    });
-
     return rec;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,
@@ -301,7 +312,7 @@ export async function closeLoanAndIssueNoc(
     });
 
     return cl;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,

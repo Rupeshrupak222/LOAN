@@ -10,7 +10,7 @@ router.use(authenticate);
 
 router.post(
   '/evaluate/:applicationId',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await evaluateApplicationRisk(req.params.applicationId, req.user?.id);
     res.json(success(result));

@@ -22,14 +22,15 @@ prisma.$use(async (params, next) => {
         err?.code === 'P2028' ||
         err?.message?.includes("Can't reach database server") ||
         err?.message?.includes('closed') ||
-        err?.message?.includes('connection');
+        err?.message?.includes('connection') ||
+        err?.message?.includes('EMAXCONNSESSION') ||
+        err?.message?.includes('max clients reached');
 
       if (isConnError && attempt < maxRetries) {
         logger.warn(
           { attempt, maxRetries, model: params.model, action: params.action, err: err.message },
-          'Prisma query auto-retrying on transient connection drop...'
+          'Prisma query auto-retrying on transient connection/pooler drop...'
         );
-        await prisma.$connect().catch(() => {});
         await new Promise((r) => setTimeout(r, 400 * attempt));
         continue;
       }

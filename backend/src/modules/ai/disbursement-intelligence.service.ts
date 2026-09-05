@@ -313,87 +313,134 @@ You assist the Finance Officer by analyzing loan proposals ready for payout, ver
 }
 `;
 
-  // 4. Generate content via Central Gemini Service
-  const geminiResult = await generateGeminiContent({
-    prompt: `Analyze the following disbursement proposal and generate the structured Disbursement Intelligence JSON assessment:\n\n${contextPrompt}`,
-    systemInstruction,
-    temperature: 0.1,
-  });
+  let result: DisbursementIntelligenceResult;
 
-  // 5. Safe JSON Parsing
-  let parsed: any;
   try {
+    // 4. Generate content via Central Gemini Service
+    const geminiResult = await generateGeminiContent({
+      prompt: `Analyze the following disbursement proposal and generate the structured Disbursement Intelligence JSON assessment:\n\n${contextPrompt}`,
+      systemInstruction,
+      temperature: 0.1,
+    });
+
+    // 5. Safe JSON Parsing
     const rawText = geminiResult.text.trim();
     const cleanJson = rawText
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    parsed = JSON.parse(cleanJson);
-  } catch (err: any) {
-    throw new BadRequestError(`Failed to parse AI Disbursement Intelligence response: ${err.message}`);
-  }
+    const parsed = JSON.parse(cleanJson);
 
-  const result: DisbursementIntelligenceResult = {
-    applicationId: app.id,
-    applicationNo: app.applicationNo,
-    generatedAt: new Date().toISOString(),
-    model: geminiResult.model,
-    readinessStatus: ['READY', 'NEEDS_REVIEW', 'NOT_READY', 'BLOCKED'].includes(parsed.readinessStatus)
-      ? parsed.readinessStatus
-      : checks.some((c) => c.status === 'FAILED')
-      ? 'BLOCKED'
-      : checks.some((c) => c.status === 'WARNING')
-      ? 'NEEDS_REVIEW'
-      : 'READY',
-    executiveSummary: parsed.executiveSummary || 'Disbursement readiness evaluation completed.',
-    completedChecks: Array.isArray(parsed.completedChecks) && parsed.completedChecks.length > 0 ? parsed.completedChecks : checks,
-    blockers: Array.isArray(parsed.blockers) ? parsed.blockers : [],
-    warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
-    financialConsistency: {
-      sanctionedAmount: principal,
-      processingFeeAmount: processingFeeAmount,
-      netDisbursementAmount: netDisbursal,
-      status: parsed.financialConsistency?.status === 'DISCREPANCY_DETECTED' ? 'DISCREPANCY_DETECTED' : 'CONSISTENT',
-      observations:
-        parsed.financialConsistency?.observations ||
-        `Sanctioned principal ₹${principal.toLocaleString('en-IN')} less processing fee ₹${processingFeeAmount.toLocaleString('en-IN')} yields net disbursement of ₹${netDisbursal.toLocaleString('en-IN')}.`,
-    },
-    bankAccountReview: {
-      beneficiaryName: primaryBank?.accountHolderName || `${customer.firstName} ${customer.lastName}`,
-      accountNumberMasked: primaryBank?.accountNumber
-        ? primaryBank.accountNumber.slice(-4).padStart(primaryBank.accountNumber.length, '•')
-        : 'None',
-      ifscCode: primaryBank?.ifscCode || 'N/A',
-      bankName: primaryBank?.bankName || 'N/A',
-      isVerified: Boolean(primaryBank?.isVerified),
-      nameMatchStatus: ['MATCH', 'PARTIAL_MATCH', 'UNVERIFIED', 'MISMATCH'].includes(
-        parsed.bankAccountReview?.nameMatchStatus
-      )
-        ? parsed.bankAccountReview.nameMatchStatus
-        : primaryBank?.isVerified
-        ? 'MATCH'
-        : 'UNVERIFIED',
-      observations: parsed.bankAccountReview?.observations || 'Beneficiary bank information verified from customer records.',
-    },
-    transactionReview: {
-      utrReference: inputUtr || undefined,
-      formatValid: inputUtr ? inputUtr.length >= 8 : undefined,
-      duplicateDetected: utrDuplicate,
-      observations: utrDuplicate
-        ? 'Duplicate UTR detected in transaction records.'
-        : inputUtr
-        ? 'UTR reference is unique.'
-        : 'No transaction reference supplied yet.',
-    },
-    exceptions: Array.isArray(parsed.exceptions) ? parsed.exceptions : [],
-    recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
-    confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
-  };
+    result = {
+      applicationId: app.id,
+      applicationNo: app.applicationNo,
+      generatedAt: new Date().toISOString(),
+      model: geminiResult.model,
+      readinessStatus: ['READY', 'NEEDS_REVIEW', 'NOT_READY', 'BLOCKED'].includes(parsed.readinessStatus)
+        ? parsed.readinessStatus
+        : checks.some((c) => c.status === 'FAILED')
+        ? 'BLOCKED'
+        : checks.some((c) => c.status === 'WARNING')
+        ? 'NEEDS_REVIEW'
+        : 'READY',
+      executiveSummary: parsed.executiveSummary || 'Disbursement readiness evaluation completed.',
+      completedChecks: Array.isArray(parsed.completedChecks) && parsed.completedChecks.length > 0 ? parsed.completedChecks : checks,
+      blockers: Array.isArray(parsed.blockers) ? parsed.blockers : [],
+      warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
+      financialConsistency: {
+        sanctionedAmount: principal,
+        processingFeeAmount: processingFeeAmount,
+        netDisbursementAmount: netDisbursal,
+        status: parsed.financialConsistency?.status === 'DISCREPANCY_DETECTED' ? 'DISCREPANCY_DETECTED' : 'CONSISTENT',
+        observations:
+          parsed.financialConsistency?.observations ||
+          `Sanctioned principal ₹${principal.toLocaleString('en-IN')} less processing fee ₹${processingFeeAmount.toLocaleString('en-IN')} yields net disbursement of ₹${netDisbursal.toLocaleString('en-IN')}.`,
+      },
+      bankAccountReview: {
+        beneficiaryName: primaryBank?.accountHolderName || `${customer.firstName} ${customer.lastName}`,
+        accountNumberMasked: primaryBank?.accountNumber
+          ? primaryBank.accountNumber.slice(-4).padStart(primaryBank.accountNumber.length, '•')
+          : 'None',
+        ifscCode: primaryBank?.ifscCode || 'N/A',
+        bankName: primaryBank?.bankName || 'N/A',
+        isVerified: Boolean(primaryBank?.isVerified),
+        nameMatchStatus: ['MATCH', 'PARTIAL_MATCH', 'UNVERIFIED', 'MISMATCH'].includes(
+          parsed.bankAccountReview?.nameMatchStatus
+        )
+          ? parsed.bankAccountReview.nameMatchStatus
+          : primaryBank?.isVerified
+          ? 'MATCH'
+          : 'UNVERIFIED',
+        observations: parsed.bankAccountReview?.observations || 'Beneficiary bank information verified from customer records.',
+      },
+      transactionReview: {
+        utrReference: inputUtr || undefined,
+        formatValid: inputUtr ? inputUtr.length >= 8 : undefined,
+        duplicateDetected: utrDuplicate,
+        observations: utrDuplicate
+          ? 'Duplicate UTR detected in transaction records.'
+          : inputUtr
+          ? 'UTR reference is unique.'
+          : 'No transaction reference supplied yet.',
+      },
+      exceptions: Array.isArray(parsed.exceptions) ? parsed.exceptions : [],
+      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Verify disbursement checklist before release.'],
+      confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
+    };
+  } catch {
+    // Deterministic Rule-Based Fallback
+    const hasBlockers = checks.some((c) => c.status === 'FAILED');
+    const hasWarnings = checks.some((c) => c.status === 'WARNING');
+    const fallbackStatus: DisbursementIntelligenceResult['readinessStatus'] = hasBlockers ? 'BLOCKED' : hasWarnings ? 'NEEDS_REVIEW' : 'READY';
+
+    result = {
+      applicationId: app.id,
+      applicationNo: app.applicationNo,
+      generatedAt: new Date().toISOString(),
+      model: 'deterministic-rules-engine',
+      readinessStatus: fallbackStatus,
+      executiveSummary: `Application #${app.applicationNo} evaluated for disbursement to ${customer.firstName} ${customer.lastName}. Net disbursal: ₹${netDisbursal.toLocaleString('en-IN')}. Overall readiness: ${fallbackStatus}. (Deterministic LMS evaluation).`,
+      completedChecks: checks,
+      blockers: checks.filter((c) => c.status === 'FAILED').map((c) => `${c.name}: ${c.details}`),
+      warnings: checks.filter((c) => c.status === 'WARNING').map((c) => `${c.name}: ${c.details}`),
+      financialConsistency: {
+        sanctionedAmount: principal,
+        processingFeeAmount,
+        netDisbursementAmount: netDisbursal,
+        status: 'CONSISTENT',
+        observations: `Principal ₹${principal.toLocaleString('en-IN')} minus fee ₹${processingFeeAmount.toLocaleString('en-IN')} equals ₹${netDisbursal.toLocaleString('en-IN')} net payout.`,
+      },
+      bankAccountReview: {
+        beneficiaryName: primaryBank?.accountHolderName || `${customer.firstName} ${customer.lastName}`,
+        accountNumberMasked: primaryBank?.accountNumber
+          ? primaryBank.accountNumber.slice(-4).padStart(primaryBank.accountNumber.length, '•')
+          : 'None',
+        ifscCode: primaryBank?.ifscCode || 'N/A',
+        bankName: primaryBank?.bankName || 'N/A',
+        isVerified: Boolean(primaryBank?.isVerified),
+        nameMatchStatus: primaryBank?.isVerified ? 'MATCH' : 'UNVERIFIED',
+        observations: primaryBank ? `Bank account ${primaryBank.bankName} (Verified: ${primaryBank.isVerified}).` : 'No bank account on file.',
+      },
+      transactionReview: {
+        utrReference: inputUtr || undefined,
+        formatValid: inputUtr ? inputUtr.length >= 8 : undefined,
+        duplicateDetected: utrDuplicate,
+        observations: utrDuplicate ? 'Duplicate UTR detected in system.' : inputUtr ? 'UTR is valid.' : 'No UTR specified.',
+      },
+      exceptions: [],
+      recommendedActions: [
+        'Confirm beneficiary bank account verification.',
+        'Validate loan agreement execution prior to payout release.',
+      ],
+      confidence: 'HIGH',
+    };
+  }
 
   // 6. Audit Trail
   await logAudit({
     userId: actor.id,
+    role: actor.roles[0] || 'FINANCE_OFFICER',
     action: 'DISBURSEMENT_INTELLIGENCE_GENERATED',
     entity: 'LoanApplication',
     entityId: app.id,
@@ -404,7 +451,7 @@ You assist the Finance Officer by analyzing loan proposals ready for payout, ver
       model: result.model,
       generatedBy: actor.email,
     },
-  });
+  }).catch(() => {});
 
   return result;
 }

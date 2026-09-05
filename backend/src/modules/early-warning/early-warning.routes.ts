@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { earlyWarningService } from './early-warning.service';
 import { eventBus } from './event-bus.service';
 
@@ -10,12 +10,25 @@ const router = Router();
 // Require authentication for all early warning routes
 router.use(authenticate);
 
+const STAFF_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'UNDERWRITER',
+  'CREDIT_ANALYST',
+  'LOAN_OFFICER',
+  'FINANCE_OFFICER',
+  'COLLECTION_OFFICER',
+  'BRANCH_MANAGER',
+  'AUDITOR',
+];
+
 /**
  * GET /api/v1/early-warnings
  * Lists active and historical early warning alerts with filtering.
  */
 router.get(
   '/',
+  authorize(...STAFF_ROLES),
   asyncHandler(async (req, res) => {
     const { domain, priority, status, customerId, applicationId, loanId } = req.query;
 
@@ -44,6 +57,7 @@ router.get(
  */
 router.get(
   '/stats',
+  authorize(...STAFF_ROLES),
   asyncHandler(async (req, res) => {
     const stats = earlyWarningService.getStats({
       id: req.user!.id,
@@ -60,6 +74,7 @@ router.get(
  */
 router.get(
   '/:warningId',
+  authorize(...STAFF_ROLES),
   asyncHandler(async (req, res) => {
     const { warningId } = req.params;
 
@@ -78,6 +93,16 @@ router.get(
  */
 router.post(
   '/:warningId/acknowledge',
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'UNDERWRITER',
+    'CREDIT_ANALYST',
+    'LOAN_OFFICER',
+    'FINANCE_OFFICER',
+    'COLLECTION_OFFICER',
+    'BRANCH_MANAGER'
+  ),
   asyncHandler(async (req, res) => {
     const { warningId } = req.params;
 
@@ -97,6 +122,14 @@ router.post(
  */
 router.post(
   '/:warningId/resolve',
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'BRANCH_MANAGER',
+    'UNDERWRITER',
+    'COLLECTION_OFFICER',
+    'FINANCE_OFFICER'
+  ),
   asyncHandler(async (req, res) => {
     const { warningId } = req.params;
     const { resolutionNotes } = req.body || {};
@@ -121,6 +154,14 @@ router.post(
  */
 router.post(
   '/:warningId/dismiss',
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'BRANCH_MANAGER',
+    'UNDERWRITER',
+    'COLLECTION_OFFICER',
+    'FINANCE_OFFICER'
+  ),
   asyncHandler(async (req, res) => {
     const { warningId } = req.params;
     const { dismissalReason } = req.body || {};
@@ -145,6 +186,7 @@ router.post(
  */
 router.post(
   '/scan',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await earlyWarningService.runSystemScan();
     res.json(success(result));
@@ -157,6 +199,7 @@ router.post(
  */
 router.post(
   '/publish-event',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const event = await eventBus.publish({
       eventType: req.body.eventType,

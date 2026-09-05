@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev --schema ../database/prisma/schema.prisma",
     "db:deploy": "prisma migrate deploy --schema ../database/prisma/schema.prisma",
     "db:seed": "tsx ../database/prisma/seed.ts",
+    "db:validate": "tsx src/scripts/validate-production-db.ts",
     "db:studio": "prisma studio --schema ../database/prisma/schema.prisma"
   },
   "prisma": {

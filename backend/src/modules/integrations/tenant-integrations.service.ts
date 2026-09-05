@@ -23,14 +23,14 @@ export class TenantIntegrationService {
   }
 
   private seedDefaultTenantRoutings(): void {
-    const now = new Date().toISOString();
+    const testCred = (provider: string, type: string) => `test-${provider.toLowerCase()}-${type.toLowerCase()}-credential`;
 
     // 1. Seed Tenant A: Adyapan Prime Lending (Experian, Razorpay, SendGrid, Setu, NSDL)
     this.saveEncryptedSeed('tenant-adyapan-default', 'CREDIT', {
       primaryProvider: 'EXPERIAN',
       secondaryProvider: 'CIBIL',
-      apiKey: 'exp_live_adyapan_secret_key_8891',
-      clientSecret: 'exp_client_sec_1109',
+      apiKey: testCred('experian', 'key'),
+      clientSecret: testCred('experian', 'secret'),
       customBaseUrl: 'https://api.experian.in/credit/v2',
       customTimeoutMs: 8000,
     });
@@ -38,8 +38,8 @@ export class TenantIntegrationService {
     this.saveEncryptedSeed('tenant-adyapan-default', 'PAYMENT', {
       primaryProvider: 'RAZORPAY',
       secondaryProvider: 'CASHFREE',
-      apiKey: 'rzp_live_adyapan_key_4401',
-      clientSecret: 'rzp_live_sec_adyapan_9921',
+      apiKey: testCred('razorpay', 'key'),
+      clientSecret: testCred('razorpay', 'secret'),
       customBaseUrl: 'https://api.razorpay.com/v1',
       customTimeoutMs: 10000,
     });
@@ -47,28 +47,28 @@ export class TenantIntegrationService {
     this.saveEncryptedSeed('tenant-adyapan-default', 'COMMUNICATION', {
       primaryProvider: 'SENDGRID',
       secondaryProvider: 'TWILIO',
-      apiKey: 'SG.adyapan_live_sendgrid_token_9912',
+      apiKey: testCred('sendgrid', 'token'),
       customBaseUrl: 'https://api.sendgrid.com/v3',
     });
 
     this.saveEncryptedSeed('tenant-adyapan-default', 'KYC', {
       primaryProvider: 'NSDL',
       secondaryProvider: 'UIDAI_GSP',
-      apiKey: 'nsdl_pan_auth_token_3389',
+      apiKey: testCred('nsdl', 'token'),
     });
 
     this.saveEncryptedSeed('tenant-adyapan-default', 'BANKING', {
       primaryProvider: 'SETU',
       secondaryProvider: 'FINVU',
-      apiKey: 'setu_aa_client_key_8812',
+      apiKey: testCred('setu', 'key'),
     });
 
     // 2. Seed Tenant B: Apex Capital Partners (CRIF, Cashfree, AWS SES, Anumati, DigiLocker)
     this.saveEncryptedSeed('tenant-apex-nbfc', 'CREDIT', {
       primaryProvider: 'CRIF',
       secondaryProvider: 'EXPERIAN',
-      apiKey: 'crif_highmark_live_apex_8821',
-      clientSecret: 'crif_sec_apex_9901',
+      apiKey: testCred('crif', 'key'),
+      clientSecret: testCred('crif', 'secret'),
       customBaseUrl: 'https://api.crifhighmark.com/v1',
       customTimeoutMs: 7000,
     });
@@ -76,8 +76,8 @@ export class TenantIntegrationService {
     this.saveEncryptedSeed('tenant-apex-nbfc', 'PAYMENT', {
       primaryProvider: 'CASHFREE',
       secondaryProvider: 'RAZORPAY',
-      apiKey: 'cf_app_live_apex_7712',
-      clientSecret: 'cf_secret_live_apex_6623',
+      apiKey: testCred('cashfree', 'key'),
+      clientSecret: testCred('cashfree', 'secret'),
       customBaseUrl: 'https://api.cashfree.com/pg',
       customTimeoutMs: 10000,
     });
@@ -85,21 +85,21 @@ export class TenantIntegrationService {
     this.saveEncryptedSeed('tenant-apex-nbfc', 'COMMUNICATION', {
       primaryProvider: 'AWS_SES',
       secondaryProvider: 'GUPSHUP',
-      apiKey: 'AKIA_APEX_AWS_SES_KEY_7731',
-      clientSecret: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+      apiKey: testCred('aws_ses', 'key'),
+      clientSecret: testCred('aws_ses', 'secret'),
       customBaseUrl: 'https://email.ap-south-1.amazonaws.com',
     });
 
     this.saveEncryptedSeed('tenant-apex-nbfc', 'KYC', {
       primaryProvider: 'DIGILOCKER',
       secondaryProvider: 'KARZA',
-      apiKey: 'digilocker_gsp_apex_9921',
+      apiKey: testCred('digilocker', 'key'),
     });
 
     this.saveEncryptedSeed('tenant-apex-nbfc', 'BANKING', {
       primaryProvider: 'ANUMATI',
       secondaryProvider: 'PERFIOS',
-      apiKey: 'anumati_aa_apex_token_5521',
+      apiKey: testCred('anumati', 'token'),
     });
   }
 
