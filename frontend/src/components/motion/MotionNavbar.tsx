@@ -353,7 +353,7 @@ export const MotionNavbar: React.FC = () => {
 
             {/* Premium Compact Check Eligibility CTA (Stationary rounded rectangle) */}
             <Link
-              href="/#calculator"
+              href="/apply"
               className="px-5 py-2.5 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white font-semibold text-xs tracking-wider uppercase transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
             >
               <span>Check Eligibility</span>
@@ -578,7 +578,7 @@ export const MotionNavbar: React.FC = () => {
                 Sign In
               </Link>
               <Link
-                href="/products/personal-loans#journey-sim"
+                href="/apply"
                 onClick={() => setMobileOpen(false)}
                 className="w-full py-3 rounded-xl bg-[#155EEF] text-white text-center font-bold text-xs tracking-wider uppercase block shadow-sm"
               >

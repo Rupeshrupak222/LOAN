@@ -43,9 +43,11 @@ import { workflowRoutes } from '../modules/workflows/workflow.routes';
 import { deploymentRoutes } from '../modules/deployment/deployment.routes';
 import { clientOnboardingRoutes } from '../modules/onboarding/client-onboarding.routes';
 import { slaSupportRoutes } from '../modules/support/sla-support.routes';
+import applyRoutes from '../modules/apply/apply.routes';
 
 const router = Router();
 
+router.use('/apply', applyRoutes);
 router.use('/auth', authRoutes);
 router.use('/customers', customerRoutes);
 router.use('/documents', documentRoutes);

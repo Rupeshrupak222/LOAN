@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import gsap from 'gsap';
 import {
   Zap,
@@ -24,6 +25,7 @@ import {
    - Master glowing blue journey ribbon
    ══════════════════════════════════════════════════════════════ */
 export const Hero3DVisual: React.FC = () => {
+  const router = useRouter();
   const [loanAmount, setLoanAmount] = useState<number>(200000);
   const heroRef = useRef<HTMLElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -448,7 +450,7 @@ export const Hero3DVisual: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={handleScrollToLaunchpad}
+                  onClick={() => router.push(`/apply?amount=${loanAmount}`)}
                   className="w-full py-2 rounded-full text-[11px] font-black bg-[#1D4ED8] text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 active:scale-95 transition-all mt-auto cursor-pointer"
                 >
                   Apply Now
@@ -671,8 +673,7 @@ export const Hero3DVisual: React.FC = () => {
               </div>
 
               <Link
-                href="#launchpad"
-                onClick={handleScrollToLaunchpad}
+                href={`/apply?amount=${loanAmount}`}
                 className="px-6 py-2.5 rounded-full text-[13px] font-extrabold bg-[#1D4ED8] hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Check Eligibility
@@ -779,7 +780,7 @@ export const Hero3DVisual: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={handleScrollToLaunchpad}
+                  onClick={() => router.push(`/apply?amount=${loanAmount}`)}
                   className="w-full py-2 rounded-full text-[10px] font-extrabold bg-[#1D4ED8] text-white mt-auto cursor-pointer"
                 >
                   Apply Now
@@ -849,8 +850,7 @@ export const Hero3DVisual: React.FC = () => {
             </h3>
           </div>
           <Link
-            href="#launchpad"
-            onClick={handleScrollToLaunchpad}
+            href={`/apply?amount=${loanAmount}`}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-extrabold bg-[#1D4ED8] text-white shadow-lg cursor-pointer"
           >
             Check Eligibility <ArrowRight size={14} />
