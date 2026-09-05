@@ -206,3 +206,55 @@ export async function getProfile(userId: string) {
   profileCache.set(userId, { data: profile, expiresAt: Date.now() + 60_000 }); // 60s cache
   return profile;
 }
+
+export async function register(input: {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  mobile?: string;
+}) {
+  const cleanEmail = input.email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
+  if (existing) {
+    throw new BadRequestError('An account with this email already exists. Please sign in.');
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  let customerRole = await prisma.role.findUnique({ where: { name: 'CUSTOMER' } });
+  if (!customerRole) {
+    customerRole = await prisma.role.create({
+      data: { name: 'CUSTOMER', description: 'Self-service borrower customer role' },
+    });
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      email: cleanEmail,
+      firstName: input.firstName || 'Borrower',
+      lastName: input.lastName || 'User',
+      passwordHash,
+      status: 'ACTIVE',
+      roles: {
+        create: { roleId: customerRole.id },
+      },
+    },
+    include: {
+      roles: { include: { role: true } },
+    },
+  });
+
+  const roles = user.roles.map((r) => r.role.name);
+  const tokens = await issueTokens({ id: user.id, email: user.email, roles });
+
+  return {
+    ...tokens,
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles,
+    },
+  };
+}

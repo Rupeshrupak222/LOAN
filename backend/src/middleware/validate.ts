@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
-import { AnyZodObject, ZodEffects } from 'zod';
+import { ZodTypeAny } from 'zod';
 
-type Schema = AnyZodObject | ZodEffects<AnyZodObject>;
+type Schema = ZodTypeAny;
 
 /** Validates and replaces req.body/query/params with parsed, typed values. */
 export function validate(schema: Schema | { body?: Schema; query?: Schema; params?: Schema }) {

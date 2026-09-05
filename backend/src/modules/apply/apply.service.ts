@@ -118,7 +118,6 @@ export async function submitPublicApplication(input: PublicApplyInput) {
         data: {
           name: 'CUSTOMER',
           description: 'Self-service retail borrower portal account',
-          isSystem: true,
         },
       });
     }
@@ -234,10 +233,13 @@ export async function submitPublicApplication(input: PublicApplyInput) {
           customerId: customer.id,
           applicationId: application.id,
           category: 'IDENTITY_PROOF',
-          type: input.kycDocType || 'PAN_CARD',
-          url: input.kycDocUrl,
-          status: 'SUBMITTED',
+          documentType: input.kycDocType || 'PAN_CARD',
           fileName: `${input.kycDocType || 'DOCUMENT'}_${cleanMobile}`,
+          storageKey: input.kycDocUrl,
+          contentType: 'application/pdf',
+          sizeBytes: 1024,
+          status: 'PENDING',
+          verified: false,
         },
       });
     }
