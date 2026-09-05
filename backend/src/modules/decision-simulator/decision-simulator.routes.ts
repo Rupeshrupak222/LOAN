@@ -15,12 +15,28 @@ router.use(authenticate);
 router.post(
   '/simulate',
   asyncHandler(async (req, res) => {
-    const { applicationId, hypotheticalInputs } = req.body || {};
+    const {
+      applicationId,
+      hypotheticalInputs,
+      hypotheticalAmount,
+      hypotheticalTenureMonths,
+      hypotheticalInterestRate,
+      hypotheticalMonthlyIncome,
+      hypotheticalMonthlyObligations,
+    } = req.body || {};
+
+    const inputs = hypotheticalInputs || {
+      requestedAmount: hypotheticalAmount,
+      tenureMonths: hypotheticalTenureMonths,
+      interestRatePct: hypotheticalInterestRate,
+      monthlyIncome: hypotheticalMonthlyIncome,
+      existingObligations: hypotheticalMonthlyObligations,
+    };
 
     const result = await decisionSimulatorService.runSimulation(
       {
         applicationId,
-        hypotheticalInputs: hypotheticalInputs || {},
+        hypotheticalInputs: inputs,
       },
       {
         id: req.user!.id,
@@ -57,8 +73,26 @@ router.post(
 );
 
 /**
- * GET /api/v1/decision-simulator/applications/:applicationId
+ * GET /api/v1/decision-simulator/saved/:applicationId
  * Lists all saved simulation snapshots for a given application.
+ */
+router.get(
+  '/saved/:applicationId',
+  asyncHandler(async (req, res) => {
+    const { applicationId } = req.params;
+
+    const snapshots = decisionSimulatorService.listSavedSimulations(applicationId, {
+      id: req.user!.id,
+      roles: req.user!.roles,
+    });
+
+    res.json(success(snapshots));
+  })
+);
+
+/**
+ * GET /api/v1/decision-simulator/applications/:applicationId
+ * Lists all saved simulation snapshots for a given application (alias).
  */
 router.get(
   '/applications/:applicationId',

@@ -78,6 +78,13 @@ export function DecisionSimulatorCard({
     mutationFn: async () => {
       const res = await api.post('/decision-simulator/simulate', {
         applicationId,
+        hypotheticalInputs: {
+          requestedAmount: hypAmount,
+          tenureMonths: hypTenure,
+          interestRatePct: hypRate,
+          monthlyIncome: hypIncome,
+          existingObligations: hypObligations,
+        },
         hypotheticalAmount: hypAmount,
         hypotheticalTenureMonths: hypTenure,
         hypotheticalInterestRate: hypRate,
@@ -119,12 +126,14 @@ export function DecisionSimulatorCard({
   };
 
   const handleLoadSnapshot = (snap: any) => {
-    if (snap.assumptions) {
-      if (snap.assumptions.requestedAmount) setHypAmount(Number(snap.assumptions.requestedAmount));
-      if (snap.assumptions.tenureMonths) setHypTenure(Number(snap.assumptions.tenureMonths));
-      if (snap.assumptions.interestRate) setHypRate(Number(snap.assumptions.interestRate));
-      if (snap.assumptions.monthlyIncome) setHypIncome(Number(snap.assumptions.monthlyIncome));
-      if (snap.assumptions.monthlyObligations) setHypObligations(Number(snap.assumptions.monthlyObligations));
+    if (snap?.assumptions) {
+      if (snap.assumptions.requestedAmount !== undefined) setHypAmount(Number(snap.assumptions.requestedAmount));
+      if (snap.assumptions.tenureMonths !== undefined) setHypTenure(Number(snap.assumptions.tenureMonths));
+      if (snap.assumptions.interestRatePct !== undefined) setHypRate(Number(snap.assumptions.interestRatePct));
+      else if (snap.assumptions.interestRate !== undefined) setHypRate(Number(snap.assumptions.interestRate));
+      if (snap.assumptions.monthlyIncome !== undefined) setHypIncome(Number(snap.assumptions.monthlyIncome));
+      if (snap.assumptions.existingObligations !== undefined) setHypObligations(Number(snap.assumptions.existingObligations));
+      else if (snap.assumptions.monthlyObligations !== undefined) setHypObligations(Number(snap.assumptions.monthlyObligations));
     }
   };
 

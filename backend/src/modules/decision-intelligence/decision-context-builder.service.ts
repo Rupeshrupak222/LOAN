@@ -58,29 +58,21 @@ export class DecisionContextBuilderService {
     const tenureMonths = app.tenureMonths;
     const appAgeDays = Math.round((Date.now() - app.createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
-    // 3. Bank Statement Intelligence
-    let bankIntel: any = null;
-    try {
-      bankIntel = await bankIntelligenceService.analyzeCustomerStatement(
+    // 3 & 4. Bank Statement & Fraud Intelligence (Executed concurrently for optimal performance)
+    const [bankIntelRes, fraudScanRes] = await Promise.allSettled([
+      bankIntelligenceService.analyzeCustomerStatement(
         customer.id,
         { forceRefresh: false },
         actor
-      );
-    } catch {
-      // Graceful fallback if bank intelligence is not yet run
-    }
-
-    // 4. Fraud & Anomaly Intelligence
-    let fraudSignals: any[] = [];
-    try {
-      const fraudScan = await scanDeterministicSignals({
+      ),
+      scanDeterministicSignals({
         scope: 'CUSTOMER',
         customerId: customer.id,
-      });
-      fraudSignals = fraudScan.signals || [];
-    } catch {
-      // Graceful fallback
-    }
+      }),
+    ]);
+
+    const bankIntel: any = bankIntelRes.status === 'fulfilled' ? bankIntelRes.value : null;
+    const fraudSignals: any[] = fraudScanRes.status === 'fulfilled' ? (fraudScanRes.value as any)?.signals || [] : [];
     const highRiskFraudCount = fraudSignals.filter((s) => s.severity === 'Critical' || s.severity === 'High').length;
 
     // 5. Credit & Historical Servicing

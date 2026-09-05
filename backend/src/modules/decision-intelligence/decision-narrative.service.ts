@@ -93,6 +93,7 @@ SCHEMA:
         prompt: compactPrompt,
         systemInstruction,
         temperature: 0.1,
+        timeoutMs: 5000,
       });
 
       const cleaned = response.text.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
