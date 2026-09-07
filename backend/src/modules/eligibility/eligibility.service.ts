@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../common/errors';
 import { calculateEmi } from '../finance/emi';
@@ -182,4 +183,162 @@ export async function evaluateApplicationEligibility(
   });
 
   return assessment;
+}
+
+export interface PreEligibilityInput {
+  monthlyIncome: number;
+  employmentType?: string;
+  existingObligations?: number;
+  requestedAmount: number;
+  tenureMonths: number;
+  productId?: string;
+  dateOfBirth?: string;
+}
+
+export async function evaluatePreApplicationEligibility(
+  input: PreEligibilityInput,
+  tenantId: string = 'tenant-adyapan-default'
+) {
+  const monthlyIncome = Math.max(0, Number(input.monthlyIncome) || 0);
+  const existingObligations = Math.max(0, Number(input.existingObligations) || 0);
+  const requestedAmount = Math.max(1000, Number(input.requestedAmount) || 50000);
+  const tenure = Math.max(3, Number(input.tenureMonths) || 12);
+
+  // Resolve Product (either specified or default active product)
+  const rawProduct = input.productId
+    ? await prisma.loanProduct.findUnique({ where: { id: input.productId } })
+    : await prisma.loanProduct.findFirst({ where: { isActive: true }, orderBy: { minAmount: 'asc' } });
+
+  const product = rawProduct ?? {
+    id: 'default-product',
+    code: 'PERS-STD',
+    name: 'Personal Instant Loan',
+    productType: 'PERSONAL',
+    minAmount: new Decimal(10000),
+    maxAmount: new Decimal(1000000),
+    minTenureMonths: 6,
+    maxTenureMonths: 60,
+    interestRate: new Decimal(12.5),
+    interestMethod: 'REDUCING' as const,
+    processingFeePct: new Decimal(1.5),
+    lateFeePct: new Decimal(2.0),
+    gracePeriodDays: 3,
+    eligibilityRules: null,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const interestRate = Number(product.interestRate);
+
+  // Tenant policies
+  const tenantFoirConfig = configurationService.getTenantConfig<any>(tenantId, 'FOIR_DTI');
+  const tenantEligibilityConfig = configurationService.getTenantConfig<any>(tenantId, 'ELIGIBILITY');
+
+  const minAge = Number(tenantEligibilityConfig.minAge ?? 21);
+  const maxAge = Number(tenantEligibilityConfig.maxAge ?? 60);
+  const maxAllowedDti = Number(tenantFoirConfig.maxDtiRatio ?? 0.55);
+  const warningDti = Number(tenantFoirConfig.warningDtiRatio ?? 0.45);
+  const minSalaried = Number(tenantEligibilityConfig.minSalariedIncome ?? 25000);
+  const minBusiness = Number(tenantEligibilityConfig.minBusinessIncome ?? 50000);
+
+  // Calculate estimated EMI
+  const emiCalc = calculateEmi(requestedAmount, interestRate, tenure);
+  const estimatedEmiNum = Number(emiCalc.emi);
+
+  const factors: { factor: string; status: 'PASS' | 'WARNING' | 'FAIL'; detail: string }[] = [];
+  let fails = 0;
+  let warnings = 0;
+
+  // 1. Age Factor (if DOB provided)
+  if (input.dateOfBirth) {
+    const age = Math.floor(
+      (Date.now() - new Date(input.dateOfBirth).getTime()) / (365.25 * 86400000)
+    );
+    if (age >= minAge && age <= maxAge) {
+      factors.push({ factor: 'Age Requirement', status: 'PASS', detail: `Age is ${age} years (Policy: ${minAge}-${maxAge} years)` });
+    } else {
+      factors.push({ factor: 'Age Requirement', status: 'FAIL', detail: `Age is ${age} years (Outside allowed ${minAge}-${maxAge} range)` });
+      fails++;
+    }
+  }
+
+  // 2. Minimum Income Factor
+  const minRequiredIncome = input.employmentType === 'BUSINESS' || input.employmentType === 'SELF_EMPLOYED' ? minBusiness : minSalaried;
+  if (monthlyIncome >= minRequiredIncome) {
+    factors.push({
+      factor: 'Minimum Monthly Income',
+      status: 'PASS',
+      detail: `Monthly income ₹${monthlyIncome.toLocaleString('en-IN')} meets min threshold of ₹${minRequiredIncome.toLocaleString('en-IN')}`,
+    });
+  } else {
+    factors.push({
+      factor: 'Minimum Monthly Income',
+      status: 'FAIL',
+      detail: `Monthly income ₹${monthlyIncome.toLocaleString('en-IN')} below required ₹${minRequiredIncome.toLocaleString('en-IN')}`,
+    });
+    fails++;
+  }
+
+  // 3. Debt-To-Income (DTI / FOIR) Ratio
+  const totalMonthlyDebt = existingObligations + estimatedEmiNum;
+  const dtiRatio = monthlyIncome > 0 ? totalMonthlyDebt / monthlyIncome : 1;
+
+  if (dtiRatio <= warningDti) {
+    factors.push({
+      factor: 'Debt-To-Income (DTI) Ratio',
+      status: 'PASS',
+      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Healthy capacity under ${(warningDti * 100).toFixed(0)}%)`,
+    });
+  } else if (dtiRatio <= maxAllowedDti) {
+    factors.push({
+      factor: 'Debt-To-Income (DTI) Ratio',
+      status: 'WARNING',
+      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Approaching threshold limit ${(maxAllowedDti * 100).toFixed(0)}%)`,
+    });
+    warnings++;
+  } else {
+    factors.push({
+      factor: 'Debt-To-Income (DTI) Ratio',
+      status: 'FAIL',
+      detail: `DTI ratio is ${(dtiRatio * 100).toFixed(1)}% (Exceeds maximum allowable ${(maxAllowedDti * 100).toFixed(0)}% threshold)`,
+    });
+    fails++;
+  }
+
+  // Final Decision Synthesis
+  let result: 'ELIGIBLE' | 'CONDITIONALLY_ELIGIBLE' | 'NOT_ELIGIBLE' = 'ELIGIBLE';
+  if (fails > 0) result = 'NOT_ELIGIBLE';
+  else if (warnings > 0) result = 'CONDITIONALLY_ELIGIBLE';
+
+  // Calculate Max Eligible Loan Amount based on 50% DTI
+  const availableEmiCapacity = Math.max(0, monthlyIncome * 0.5 - existingObligations);
+  const rawMaxEligible = availableEmiCapacity * tenure * 0.85; // approx principal capacity
+  const maxProductAmount = Number(product.maxAmount || 1000000);
+  const minProductAmount = Number(product.minAmount || 10000);
+
+  const calculatedMax = Math.min(Math.max(minProductAmount, Math.round(rawMaxEligible / 10000) * 10000), maxProductAmount);
+  const calculatedMin = Math.min(minProductAmount, calculatedMax);
+
+  return {
+    result,
+    score: Math.max(10, 100 - fails * 35 - warnings * 15),
+    factors,
+    minEligibleAmount: calculatedMin.toFixed(2),
+    maxEligibleAmount: calculatedMax.toFixed(2),
+    requestedAmount: requestedAmount.toFixed(2),
+    tenureMonths: tenure,
+    interestRate: interestRate.toFixed(2),
+    estimatedEmi: emiCalc.emi,
+    totalInterest: emiCalc.totalInterest,
+    totalRepayment: emiCalc.totalRepayment,
+    product: {
+      id: product.id,
+      name: product.name,
+      code: product.code,
+      productType: product.productType,
+      interestRate: Number(product.interestRate),
+      processingFeePct: Number(product.processingFeePct || 0),
+    },
+  };
 }

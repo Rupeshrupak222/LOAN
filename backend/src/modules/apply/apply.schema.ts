@@ -15,7 +15,7 @@ export const publicApplySchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid email address is required'),
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Valid 10-digit Indian mobile number required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   dateOfBirth: z.coerce.date(),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).default('MALE'),
   maritalStatus: z.enum(['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED']).optional(),
@@ -32,6 +32,7 @@ export const publicApplySchema = z.object({
   existingEmi: z.coerce.number().nonnegative().optional(),
 
   // 3. KYC & Identity
+  pan: z.string().optional(),
   panNumber: z.string().toUpperCase().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format (e.g. ABCDE1234F)').optional().or(z.literal('')),
   aadhaarNumber: z.string().regex(/^\d{12}$/, 'Aadhaar must be 12 digits').optional().or(z.literal('')),
   kycDocType: z.string().optional().default('PAN_CARD'),
@@ -48,8 +49,10 @@ export const publicApplySchema = z.object({
 
   // 5. Bank Account for Fund Disbursement
   bankName: z.string().min(1, 'Bank name is required'),
-  accountNumber: z.string().min(5, 'Valid bank account number required'),
-  ifscCode: z.string().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code (e.g. HDFC0001234)'),
+  accountNumber: z.string().min(5, 'Valid bank account number required').optional(),
+  bankAccountNo: z.string().min(5, 'Valid bank account number required').optional(),
+  ifscCode: z.string().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code (e.g. HDFC0001234)').optional(),
+  bankIfsc: z.string().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code (e.g. HDFC0001234)').optional(),
   accountHolderName: z.string().optional(),
   accountType: z.enum(['SAVINGS', 'CURRENT', 'SALARY']).default('SAVINGS'),
 

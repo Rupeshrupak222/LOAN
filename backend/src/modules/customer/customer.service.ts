@@ -138,10 +138,10 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
       const cleanEmail = input.email.toLowerCase().trim();
       const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
 
-      const rawPassword =
-        input.password && input.password.trim().length >= 6
-          ? input.password.trim()
-          : process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
+      const hasCustomPassword = Boolean(input.password && input.password.trim().length >= 6);
+      const rawPassword = hasCustomPassword
+        ? input.password!.trim()
+        : process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
       const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
 
       const user = await tx.user.upsert({
@@ -149,7 +149,7 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
         update: {
           firstName: input.firstName,
           lastName: input.lastName,
-          passwordHash,
+          ...(hasCustomPassword ? { passwordHash } : {}),
           status: 'ACTIVE',
           branchId: input.branchId,
         },
@@ -302,14 +302,15 @@ export async function updateCustomer(
     } else if (input.email) {
       // Create user if not linked previously
       const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
-      const rawPassword = input.password && input.password.trim().length >= 6 ? input.password.trim() : (process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026');
+      const hasCustomPassword = Boolean(input.password && input.password.trim().length >= 6);
+      const rawPassword = hasCustomPassword ? input.password!.trim() : (process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026');
       const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
       const newUser = await tx.user.upsert({
         where: { email: input.email.toLowerCase().trim() },
         update: {
           firstName: input.firstName || existing.firstName,
           lastName: input.lastName || existing.lastName,
-          passwordHash,
+          ...(hasCustomPassword ? { passwordHash } : {}),
           status: 'ACTIVE',
         },
         create: {

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../common/asyncHandler';
 import { ForbiddenError } from '../../common/errors';
 import { parsePagination } from '../../common/pagination';
@@ -45,6 +46,87 @@ router.get(
     const kycStatus = req.query.kycStatus ? String(req.query.kycStatus) : undefined;
     const result = await listCustomers(params, status, kycStatus);
     res.json(success(result.data, result.pagination));
+  })
+);
+
+router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    let customer = await prisma.customer.findFirst({
+      where: { userId: req.user.id },
+      include: {
+        addresses: true,
+        employmentDetails: true,
+        bankAccounts: true,
+        loans: {
+          include: { product: { select: { name: true, code: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+        applications: {
+          include: {
+            product: { select: { name: true, code: true, minAmount: true, maxAmount: true } },
+            eligibility: true,
+            riskAssessment: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        documents: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!customer && req.user.email) {
+      const existingByEmail = await prisma.customer.findFirst({
+        where: { email: { equals: req.user.email, mode: 'insensitive' } },
+      });
+      if (existingByEmail) {
+        await prisma.customer.update({
+          where: { id: existingByEmail.id },
+          data: { userId: req.user.id },
+        });
+      } else {
+        const dbUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const custCode = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
+        await prisma.customer.create({
+          data: {
+            userId: req.user.id,
+            email: req.user.email,
+            firstName: dbUser?.firstName || 'Borrower',
+            lastName: dbUser?.lastName || 'User',
+            mobile: '9876543210',
+            customerCode: custCode,
+            status: 'ACTIVE',
+            kycStatus: 'VERIFIED',
+          },
+        });
+      }
+
+      customer = await prisma.customer.findFirst({
+        where: { userId: req.user.id },
+        include: {
+          addresses: true,
+          employmentDetails: true,
+          bankAccounts: true,
+          loans: {
+            include: { product: { select: { name: true, code: true } } },
+            orderBy: { createdAt: 'desc' },
+          },
+          applications: {
+            include: {
+              product: { select: { name: true, code: true, minAmount: true, maxAmount: true } },
+              eligibility: true,
+              riskAssessment: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          documents: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+    }
+
+    res.json(success(customer));
   })
 );
 

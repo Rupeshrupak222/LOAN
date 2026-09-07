@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, setAccessToken, onAuthInvalidated } from './api';
 
 export interface AuthUser {
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   // Restore session from token / refresh cookie on mount
   useEffect(() => {
@@ -70,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Subscribe to auth invalidation broadcast (e.g. from 401 interceptor)
     const unsubscribe = onAuthInvalidated(() => {
       if (isMounted) {
+        queryClient.clear();
         setUser(null);
         setLoading(false);
         // Only redirect if inside an authenticated app route
@@ -83,19 +86,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       unsubscribe();
     };
-  }, [pathname, router]);
+  }, [pathname, router, queryClient]);
 
   const login = useCallback(async (identifier: string, password: string) => {
     const res = await api.post('/auth/login', { identifier, password });
+    // Flush cached queries from previous sessions to prevent data bleed
+    queryClient.clear();
+    try {
+      localStorage.removeItem('adyapan_borrower_journey_draft_v2');
+    } catch {}
     setAccessToken(res.data.data.accessToken);
     setUser(res.data.data.user);
-  }, []);
+  }, [queryClient]);
 
   const register = useCallback(async (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => {
     const res = await api.post('/auth/register', data);
+    queryClient.clear();
+    try {
+      localStorage.removeItem('adyapan_borrower_journey_draft_v2');
+    } catch {}
     setAccessToken(res.data.data.accessToken);
     setUser(res.data.data.user);
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     try {
@@ -103,11 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Best-effort logout on backend
     } finally {
+      queryClient.clear();
       setAccessToken(null);
       setUser(null);
+      try {
+        localStorage.removeItem('adyapan_borrower_journey_draft_v2');
+      } catch {}
       router.push('/login');
     }
-  }, [router]);
+  }, [queryClient, router]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout }}>

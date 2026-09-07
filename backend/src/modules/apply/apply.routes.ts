@@ -67,7 +67,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const result = await applyService.submitPublicApplication(req.body);
     res.cookie('refreshToken', result.refreshToken, cookieOptions);
-    res.status(201).json(created(res, result));
+    return created(res, result);
   })
 );
 

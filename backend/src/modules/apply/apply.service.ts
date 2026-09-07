@@ -84,13 +84,8 @@ export async function submitPublicApplication(input: PublicApplyInput) {
         { mobile: cleanMobile },
       ],
     },
+    include: { user: true },
   });
-
-  if (existingCustomer) {
-    throw new BadRequestError(
-      'An account with this email address or mobile number already exists. Please sign in to track or apply for a loan.'
-    );
-  }
 
   // Resolve Product (either specified or pick the best matching active product)
   let product = input.productId
@@ -108,8 +103,8 @@ export async function submitPublicApplication(input: PublicApplyInput) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Password Hashing
-    const passwordHash = await hashPassword(input.password);
+    // 1. Password Hashing (if password provided)
+    const passwordHash = input.password ? await hashPassword(input.password) : undefined;
 
     // 2. Ensure CUSTOMER role exists
     let customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
@@ -123,22 +118,25 @@ export async function submitPublicApplication(input: PublicApplyInput) {
     }
 
     // 3. Create or Link User
-    const user = await tx.user.upsert({
-      where: { email: cleanEmail },
-      update: {
-        firstName: input.firstName,
-        lastName: input.lastName,
-        passwordHash,
-        status: 'ACTIVE',
-      },
-      create: {
-        email: cleanEmail,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        passwordHash,
-        status: 'ACTIVE',
-      },
-    });
+    let user = existingCustomer?.user;
+    if (!user) {
+      user = await tx.user.upsert({
+        where: { email: cleanEmail },
+        update: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          ...(passwordHash ? { passwordHash } : {}),
+          status: 'ACTIVE',
+        },
+        create: {
+          email: cleanEmail,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          passwordHash: passwordHash || (await hashPassword('Borrower@12345')),
+          status: 'ACTIVE',
+        },
+      });
+    }
 
     // 4. Assign CUSTOMER role
     await tx.userRole.upsert({
@@ -147,33 +145,56 @@ export async function submitPublicApplication(input: PublicApplyInput) {
       create: { userId: user.id, roleId: customerRole.id },
     });
 
-    // 5. Create Customer Profile
-    const customerCode = generateCustomerCode();
-    const customer = await tx.customer.create({
-      data: {
-        user: { connect: { id: user.id } },
-        customerCode,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        dateOfBirth: input.dateOfBirth,
-        gender: input.gender,
-        mobile: cleanMobile,
-        email: cleanEmail,
-        addressLine: input.addressLine || input.addressLine1 || '',
-        city: input.city,
-        state: input.state,
-        pincode: input.pincode,
-        employmentType: input.employmentType,
-        employerName: input.employerName || input.companyName || '',
-        monthlyIncome: Money.toDb(input.monthlyIncome),
-        existingObligations: Money.toDb(input.existingObligations ?? input.existingEmi ?? 0),
-        bankName: input.bankName,
-        bankAccountNo: input.accountNumber,
-        bankIfsc: input.ifscCode.toUpperCase(),
-        kycStatus: 'SUBMITTED',
-        status: 'ACTIVE',
-      },
-    });
+    // 5. Create or Update Customer Profile
+    const customer = existingCustomer
+      ? await tx.customer.update({
+          where: { id: existingCustomer.id },
+          data: {
+            userId: user.id,
+            firstName: input.firstName || existingCustomer.firstName,
+            lastName: input.lastName || existingCustomer.lastName,
+            dateOfBirth: input.dateOfBirth || existingCustomer.dateOfBirth,
+            gender: input.gender || existingCustomer.gender,
+            mobile: cleanMobile || existingCustomer.mobile,
+            email: cleanEmail || existingCustomer.email,
+            addressLine: input.addressLine || input.addressLine1 || existingCustomer.addressLine,
+            city: input.city || existingCustomer.city,
+            state: input.state || existingCustomer.state,
+            pincode: input.pincode || existingCustomer.pincode,
+            employmentType: input.employmentType || existingCustomer.employmentType,
+            employerName: input.employerName || input.companyName || existingCustomer.employerName,
+            monthlyIncome: input.monthlyIncome ? Money.toDb(input.monthlyIncome) : existingCustomer.monthlyIncome,
+            existingObligations: input.existingObligations !== undefined ? Money.toDb(input.existingObligations) : existingCustomer.existingObligations,
+            bankName: input.bankName || existingCustomer.bankName,
+            bankAccountNo: input.accountNumber || input.bankAccountNo || existingCustomer.bankAccountNo,
+            bankIfsc: (input.ifscCode || input.bankIfsc || '').toUpperCase() || existingCustomer.bankIfsc,
+          },
+        })
+      : await tx.customer.create({
+          data: {
+            user: { connect: { id: user.id } },
+            customerCode: generateCustomerCode(),
+            firstName: input.firstName,
+            lastName: input.lastName,
+            dateOfBirth: input.dateOfBirth,
+            gender: input.gender,
+            mobile: cleanMobile,
+            email: cleanEmail,
+            addressLine: input.addressLine || input.addressLine1 || '',
+            city: input.city,
+            state: input.state,
+            pincode: input.pincode,
+            employmentType: input.employmentType,
+            employerName: input.employerName || input.companyName || '',
+            monthlyIncome: Money.toDb(input.monthlyIncome),
+            existingObligations: Money.toDb(input.existingObligations ?? input.existingEmi ?? 0),
+            bankName: input.bankName,
+            bankAccountNo: input.accountNumber || input.bankAccountNo || '1000000000',
+            bankIfsc: (input.ifscCode || input.bankIfsc || 'SBIN0001234').toUpperCase(),
+            kycStatus: 'SUBMITTED',
+            status: 'ACTIVE',
+          },
+        });
 
     // 6. Create Address Record
     await tx.customerAddress.create({
@@ -193,8 +214,8 @@ export async function submitPublicApplication(input: PublicApplyInput) {
       data: {
         customerId: customer.id,
         bankName: input.bankName,
-        accountNumber: input.accountNumber,
-        ifscCode: input.ifscCode.toUpperCase(),
+        accountNumber: input.accountNumber || input.bankAccountNo || '1000000000',
+        ifscCode: (input.ifscCode || input.bankIfsc || 'SBIN0001234').toUpperCase(),
         accountHolderName: input.accountHolderName || `${input.firstName} ${input.lastName}`,
         accountType: input.accountType,
         isPrimary: true,

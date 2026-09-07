@@ -44,6 +44,7 @@ import {
   Lock,
   UploadCloud,
   FileUp,
+  Sparkles,
 } from 'lucide-react';
 import {
   BarChart,
@@ -66,6 +67,7 @@ import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
 import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
+import { BorrowerPortalShell } from '@/components/borrower/BorrowerPortalShell';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -351,9 +353,9 @@ export default function DashboardPage() {
       icon: FileCheck,
     },
     CUSTOMER: {
-      title: 'Borrower Self-Service Portal',
-      subtitle: 'View your active loan accounts, upcoming EMI repayments, digital receipts, and loan NOC.',
-      icon: CreditCard,
+      title: 'Instant Loan Application & Borrower Portal',
+      subtitle: 'Check instant loan eligibility, apply online with paperless KYC, and track loan sanction status.',
+      icon: Sparkles,
     },
   };
 
@@ -527,7 +529,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {primaryRole !== 'CUSTOMER' && (
+          <div className="flex flex-wrap items-center gap-2.5">
           {/* Universal Multi-Mode Date Picker */}
           <div className="relative" ref={dropdownRef}>
             <button
@@ -738,23 +741,22 @@ export default function DashboardPage() {
           </button>
 
           {/* Export CSV Button (For staff) */}
-          {primaryRole !== 'CUSTOMER' && (
-            <button
-              type="button"
-              onClick={exportReport}
-              disabled={exporting}
-              className={cn(
-                'flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-2xs cursor-pointer select-none disabled:opacity-60',
-                isDark
-                  ? 'border-[#2B3566] bg-[#1E2445] text-[#60A5FA] hover:bg-[#2B3566]'
-                  : 'border-blue-200 bg-blue-50/70 text-[#2563EB] hover:bg-blue-100/80'
-              )}
-            >
-              <Download className={cn('h-3.5 w-3.5', exporting ? 'animate-bounce' : '')} />
-              <span>{exporting ? 'Exporting...' : 'Export Excel / CSV'}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={exportReport}
+            disabled={exporting}
+            className={cn(
+              'flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-2xs cursor-pointer select-none disabled:opacity-60',
+              isDark
+                ? 'border-[#2B3566] bg-[#1E2445] text-[#60A5FA] hover:bg-[#2B3566]'
+                : 'border-blue-200 bg-blue-50/70 text-[#2563EB] hover:bg-blue-100/80'
+            )}
+          >
+            <Download className={cn('h-3.5 w-3.5', exporting ? 'animate-bounce' : '')} />
+            <span>{exporting ? 'Exporting...' : 'Export Excel / CSV'}</span>
+          </button>
         </div>
+      )}
       </div>
 
       {/* AI Executive Decision Intelligence Card (For Staff & Managers) */}
@@ -1682,459 +1684,7 @@ export default function DashboardPage() {
 
       {/* I. BORROWER / CUSTOMER SELF-SERVICE WORKSPACE */}
       {primaryRole === 'CUSTOMER' && (
-        <div className="space-y-6">
-          {/* Top 6 Borrower KPIs */}
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="ACTIVE LOANS"
-              value={String(customerLoans.filter((l: any) => l.status === 'ACTIVE').length)}
-              hint="Active borrowing accounts"
-              icon={<CreditCard className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="TOTAL BORROWED"
-              value={formatMoney(myTotalBorrowed)}
-              hint="Sanctioned principal"
-              icon={<Wallet className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="NEXT EMI DUE"
-              value={myNextEmiAmount}
-              hint={myNextDueDate}
-              icon={<Coins className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={myActiveLoan ? "Upcoming due" : undefined}
-            />
-            <KpiItem
-              label="OUTSTANDING PRINCIPAL"
-              value={formatMoney(myTotalOutstanding)}
-              hint="Current loan balance"
-              icon={<TrendingUp className="h-4 w-4" />}
-              iconColor="rose"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="KYC VERIFICATION"
-              value={(myActiveLoan?.customer?.kycStatus || appsList[0]?.customer?.kycStatus || (user as any)?.customer?.kycStatus || 'VERIFIED')}
-              hint="Identity verified"
-              icon={<ShieldCheck className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              valueColor="text-emerald-600"
-            />
-            <KpiItem
-              label="LOAN TENURE"
-              value={myActiveLoan ? `${myActiveLoan.tenureMonths || 24} Mos` : '24 Mos'}
-              hint="Scheduled installments"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-          </div>
-
-          {/* Main Loan Details & Actions */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Left 2 Cols: My Active Loan Facility */}
-            <div className={cn('lg:col-span-2 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">
-                      {myActiveLoan ? `Active Loan #${myActiveLoan.loanNo}` : 'Borrowing Facility'}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {myActiveLoan?.productName || 'Personal Loan'} · Disbursed on {myActiveLoan?.disbursementDate ? formatDate(myActiveLoan.disbursementDate) : 'Recently'}
-                    </p>
-                  </div>
-                  {myActiveLoan && <Badge status={myActiveLoan.status} />}
-                </div>
-
-                {myActiveLoan ? (
-                  <div className="space-y-4 pt-3">
-                    {/* Key Loan Metrics Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Sanctioned Amount</span>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white mt-0.5 block">{formatMoney(myActiveLoan.principal || 0)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Monthly EMI</span>
-                        <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5 block">{formatMoney(myActiveLoan.emiAmount || 0)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Tenure Period</span>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white mt-0.5 block">{myActiveLoan.tenureMonths || 24} Months</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Interest Rate</span>
-                        <span className="font-bold text-sm text-[#2563EB] dark:text-[#60A5FA] mt-0.5 block">{myActiveLoan.interestRate || '12.00'}% p.a.</span>
-                      </div>
-                    </div>
-
-                    {/* Next Due Banner */}
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-blue-50/80 dark:bg-[#060F1B] border border-blue-200/70 dark:border-[#2B3566]">
-                      <div className="flex items-center gap-2.5">
-                        <Clock className="w-4 h-4 text-[#2563EB]" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white">Next Monthly Installment Due: {myNextEmiAmount}</p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">Scheduled on {myNextDueDate}. Pay on time to ensure high credit score.</p>
-                        </div>
-                      </div>
-                      <Link href={`/loans/${myActiveLoan.id}`}>
-                        <Button size="sm" className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-sm">
-                          Submit Payment Proof →
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-slate-400 space-y-2">
-                    <p>No active loan account found under your profile.</p>
-                    <Link href="/loans">
-                      <Button size="sm" className="bg-[#2563EB] text-white">View Loan Accounts →</Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              {myActiveLoan && (
-                <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                  <Link href={`/loans/${myActiveLoan.id}`} className="flex-1">
-                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
-                      View 24-Month Amortization Schedule →
-                    </Button>
-                  </Link>
-                  <Link href="/payments">
-                    <Button size="sm" variant="ghost" className="text-xs">
-                      Payment Receipts →
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Right 1 Col: Borrower Profile & Shortcuts */}
-            <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">Borrower Information</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Your profile and registered details</p>
-
-                <div className="space-y-2.5 pt-3 text-xs">
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/60">
-                    <span className="text-[11px] text-slate-400">Borrower Name</span>
-                    <p className="font-bold text-slate-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">Email: {user.email}</p>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/60">
-                    <span className="text-[11px] text-slate-400">Destination Bank Account</span>
-                    <p className="font-bold text-slate-900 dark:text-white">
-                      {(myActiveLoan?.customer?.bankName || appsList[0]?.customer?.bankName || (user as any)?.customer?.bankName || 'Beneficiary Bank')}
-                    </p>
-                    <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-                      A/C: {(myActiveLoan?.customer?.bankAccountNo || appsList[0]?.customer?.bankAccountNo || (user as any)?.customer?.bankAccountNo || 'Recorded on File')} ({(myActiveLoan?.customer?.bankIfsc || appsList[0]?.customer?.bankIfsc || (user as any)?.customer?.bankIfsc || 'IFSC Verified')})
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                <Link href="/loans" className="block">
-                  <Button size="sm" variant="secondary" className="w-full text-xs">
-                    My Loan Accounts & Schedules →
-                  </Button>
-                </Link>
-                <Link href="/payments" className="block">
-                  <Button size="sm" variant="ghost" className="w-full text-xs">
-                    View Payment Ledger & Receipts →
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Real-time Loan Applications & Status Tracker */}
-          <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
-              <div>
-                <h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#2563EB]" />
-                  <span>My Loan Applications & Status Tracker</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Track your loan request lifecycle from submission through credit underwriting to disbursement
-                </p>
-              </div>
-              <Link href="/apply">
-                <Button size="sm" className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Apply for New Loan</span>
-                </Button>
-              </Link>
-            </div>
-
-            {appsList.length > 0 ? (
-              <div className="space-y-4">
-                {appsList.map((app: any) => {
-                  const status = app.status || 'SUBMITTED';
-                  const isApproved = ['APPROVED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(status);
-                  const isUnderwriting = ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(status) || isApproved;
-                  const isDisbursed = status === 'DISBURSED';
-                  const isRejected = status === 'REJECTED';
-
-                  return (
-                    <div
-                      key={app.id}
-                      className="p-4 rounded-xl border border-slate-200/80 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/40 space-y-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 font-bold text-xs">
-                            APP
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-slate-900 dark:text-white font-mono">
-                                {app.applicationNo || 'APP-PENDING'}
-                              </span>
-                              <Badge status={status} />
-                            </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                              {app.product?.name || app.productName || 'Personal Loan'} · Requested {formatMoney(app.requestedAmount || 0)} · {app.tenureMonths || 24} Months
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right text-xs">
-                          <span className="text-slate-400 block text-[11px]">Application Date</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">
-                            {app.createdAt ? formatDate(app.createdAt) : 'Recent'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 4-Step Lifecycle Status Progress */}
-                      {!isRejected ? (
-                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-200/60 dark:border-[#2B3566]/60">
-                          <div className="text-center">
-                            <div className="h-1.5 w-full rounded-full bg-emerald-500 mb-1.5" />
-                            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">1. Applied</p>
-                            <p className="text-[10px] text-slate-400">Application Submitted</p>
-                          </div>
-                          <div className="text-center">
-                            <div className={cn("h-1.5 w-full rounded-full mb-1.5", isUnderwriting ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700")} />
-                            <p className={cn("text-[11px] font-bold", isUnderwriting ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400")}>
-                              2. KYC & Evaluation
-                            </p>
-                            <p className="text-[10px] text-slate-400">{isUnderwriting ? "In Progress / Done" : "Queued"}</p>
-                          </div>
-                          <div className="text-center">
-                            <div className={cn("h-1.5 w-full rounded-full mb-1.5", isApproved ? "bg-emerald-500" : isUnderwriting ? "bg-blue-500 animate-pulse" : "bg-slate-200 dark:bg-slate-700")} />
-                            <p className={cn("text-[11px] font-bold", isApproved ? "text-emerald-600 dark:text-emerald-400" : isUnderwriting ? "text-blue-600 dark:text-blue-400" : "text-slate-400")}>
-                              3. Underwriting
-                            </p>
-                            <p className="text-[10px] text-slate-400">{isApproved ? "Sanction Approved" : "Credit Committee"}</p>
-                          </div>
-                          <div className="text-center">
-                            <div className={cn("h-1.5 w-full rounded-full mb-1.5", isDisbursed ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700")} />
-                            <p className={cn("text-[11px] font-bold", isDisbursed ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400")}>
-                              4. Disbursed
-                            </p>
-                            <p className="text-[10px] text-slate-400">{isDisbursed ? "Funds in Bank" : "Pending Release"}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
-                          <p className="font-bold">Application Not Approved</p>
-                          <p className="text-[11px] mt-0.5">Please review your submitted documents or re-apply after 30 days.</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-10 text-center text-xs space-y-3">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-[#2563EB]">
-                  <FileText className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="font-bold text-sm text-slate-800 dark:text-slate-200">No active loan applications yet</p>
-                  <p className="text-slate-400 mt-1 max-w-sm mx-auto">
-                    Apply for an instant personal loan, education loan, or business credit with quick approval and paperless KYC.
-                  </p>
-                </div>
-                <Link href="/apply" className="inline-block">
-                  <Button className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold px-5 py-2">
-                    Start Loan Application →
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Borrower KYC & Documents Upload Center */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Upload Document Form */}
-            <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
-                  <UploadCloud className="w-4 h-4 text-[#2563EB]" />
-                  <span>Upload KYC & Loan Documents</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Upload PAN, Aadhaar, salary slips, or bank statements for fast-track verification
-                </p>
-              </div>
-
-              <form onSubmit={handleBorrowerDocUpload} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Document Type
-                  </label>
-                  <select
-                    value={uploadDocType}
-                    onChange={(e) => setUploadDocType(e.target.value)}
-                    className={cn(
-                      "w-full h-9 rounded-xl border px-3 text-xs font-medium focus:outline-none focus:border-[#2563EB]",
-                      isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-200 bg-white text-slate-800"
-                    )}
-                  >
-                    <option value="PAN_CARD">PAN Card (Identity & Tax ID)</option>
-                    <option value="AADHAAR_FRONT">Aadhaar Card (Identity & Address)</option>
-                    <option value="BANK_STATEMENT">Bank Statement (Last 6 Months)</option>
-                    <option value="SALARY_SLIP">Salary Slip (Income Proof)</option>
-                    <option value="CUSTOMER_SELFIE_PHOTO">Applicant Photo (Selfie)</option>
-                    <option value="ADDRESS_PROOF">Address Proof (Utility Bill / Passport)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Select File (PDF, PNG, JPG)
-                  </label>
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                    className={cn(
-                      "w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-[#2563EB] hover:file:bg-blue-100 cursor-pointer p-1.5 rounded-xl border",
-                      isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-300" : "border-slate-200 bg-white text-slate-600"
-                    )}
-                  />
-                  {uploadFile && (
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono truncate">
-                      Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(0)} KB)
-                    </p>
-                  )}
-                </div>
-
-                {uploadSuccessMsg && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-700 dark:text-emerald-300">
-                    ✓ {uploadSuccessMsg}
-                  </div>
-                )}
-
-                {uploadErrorMsg && (
-                  <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-[11px] text-rose-700 dark:text-rose-300">
-                    ⚠ {uploadErrorMsg}
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  disabled={uploadLoading || !uploadFile}
-                  className="w-full bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs py-2 shadow-sm"
-                >
-                  {uploadLoading ? 'Uploading File...' : 'Upload Document Now'}
-                </Button>
-              </form>
-            </div>
-
-            {/* Uploaded Documents List */}
-            <div className={cn('lg:col-span-2 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                      <span>My Uploaded Documents & KYC Status</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Verified records used by the bank for credit decisioning and compliance
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-slate-500">
-                    {Array.isArray(borrowerDocs) ? borrowerDocs.length : 0} Files
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 pt-3">
-                  {Array.isArray(borrowerDocs) && borrowerDocs.length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-[#2B3566]">
-                      {borrowerDocs.map((doc: any) => (
-                        <div key={doc.id} className="py-2.5 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-[#060F1B] text-slate-600 dark:text-slate-300">
-                              <FileCheck className="h-4 w-4 text-[#2563EB]" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-800 dark:text-slate-200">
-                                {doc.documentType?.replace(/_/g, ' ') || 'Document'}
-                              </p>
-                              <p className="text-[11px] text-slate-400 font-mono truncate max-w-[200px] sm:max-w-[300px]">
-                                {doc.fileName || 'Uploaded File'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-bold font-mono",
-                                doc.status === 'VERIFIED'
-                                  ? "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400"
-                                  : doc.status === 'REJECTED'
-                                  ? "bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400"
-                                  : "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400"
-                              )}
-                            >
-                              ● {doc.status || 'PENDING'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 hidden sm:inline">
-                              {doc.createdAt ? formatDate(doc.createdAt) : ''}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center text-xs text-slate-400 space-y-1.5">
-                      <p className="font-semibold text-slate-600 dark:text-slate-300">No documents uploaded yet</p>
-                      <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                        Use the upload box on the left to upload your PAN card and Aadhaar for instant KYC verification.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566] text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>All documents are encrypted with 256-bit AES encryption in compliance with RBI digital lending guidelines.</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <BorrowerPortalShell />
       )}
     </div>
   );
