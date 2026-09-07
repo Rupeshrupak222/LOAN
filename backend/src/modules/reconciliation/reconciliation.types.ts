@@ -14,6 +14,7 @@ export interface FinancialException {
   type: FinancialExceptionType;
   severity: ExceptionSeverity;
   status: ExceptionStatus;
+  tenantId?: string;
   loanId?: string;
   loanNo?: string;
   paymentId?: string;
@@ -36,6 +37,7 @@ export type AdjustmentStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 export interface LedgerAdjustment {
   adjustmentId: string;
   type: AdjustmentType;
+  tenantId?: string;
   loanId: string;
   loanNo: string;
   exceptionId?: string;

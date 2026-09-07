@@ -28,9 +28,10 @@ describe('Step 21: Multi-Tenant Architecture & Data Isolation', () => {
     });
 
     it('allows Super Admin to onboard a new lender tenant', async () => {
+      const code = `HORIZON_${Date.now()}`;
       const newTenant = await tenantService.createTenant(
         {
-          code: 'HORIZON_FIN',
+          code,
           name: 'Horizon Microfinance Ltd',
           contactEmail: 'risk@horizonfin.dev',
           tier: 'STANDARD',
@@ -38,11 +39,11 @@ describe('Step 21: Multi-Tenant Architecture & Data Isolation', () => {
         { id: 'usr-sa-1', roles: ['SUPER_ADMIN'] }
       );
 
-      expect(newTenant.id).toContain('tenant-horizon-fin');
-      expect(newTenant.code).toBe('HORIZON_FIN');
+      expect(newTenant.id).toContain('tenant-horizon-');
+      expect(newTenant.code).toBe(code);
       expect(newTenant.status).toBe('ACTIVE');
 
-      const retrieved = tenantService.getTenantById(newTenant.id);
+      const retrieved = await tenantService.getTenantByIdAsync(newTenant.id);
       expect(retrieved.name).toBe('Horizon Microfinance Ltd');
     });
 
@@ -167,23 +168,21 @@ describe('Step 21: Multi-Tenant Architecture & Data Isolation', () => {
   });
 
   describe('5. RBAC & Borrower Isolation', () => {
-    it('blocks borrowers (CUSTOMER role) from listing enterprise tenants', () => {
+    it('blocks borrowers (CUSTOMER role) from listing enterprise tenants', async () => {
       const borrower = { id: 'usr-cust-1', roles: ['CUSTOMER'], tenantId: 'tenant-adyapan-default' };
-      expect(() => {
-        tenantService.listTenants(borrower);
-      }).toThrow(ForbiddenError);
+      await expect(tenantService.listTenants(borrower)).rejects.toThrow(ForbiddenError);
     });
 
-    it('returns only assigned tenant when standard staff lists tenants', () => {
+    it('returns only assigned tenant when standard staff lists tenants', async () => {
       const apexOfficer = { id: 'usr-off-2', roles: ['LOAN_OFFICER'], tenantId: 'tenant-apex-nbfc' };
-      const list = tenantService.listTenants(apexOfficer);
+      const list = await tenantService.listTenants(apexOfficer);
       expect(list.length).toBe(1);
       expect(list[0].id).toBe('tenant-apex-nbfc');
     });
 
-    it('returns all platform tenants when Super Admin lists tenants', () => {
+    it('returns all platform tenants when Super Admin lists tenants', async () => {
       const superAdmin = { id: 'usr-sa-1', roles: ['SUPER_ADMIN'] };
-      const list = tenantService.listTenants(superAdmin);
+      const list = await tenantService.listTenants(superAdmin);
       expect(list.length).toBeGreaterThanOrEqual(2);
     });
   });

@@ -129,17 +129,17 @@ describe('Step 34: Dynamic Role & Permission Builder with SoD Detection', () => 
         tenantId,
       };
 
-      // 1. Has APPLICATIONS_APPROVE within ₹50 Lakh limit
+      // 1. Has APPLICATIONS_APPROVE within ₹10 Lakh limit
       expect(
         rolePermissionService.hasPermission(underwriterUser, 'APPLICATIONS_APPROVE', {
-          requiredSanctionAmount: 2500000, // ₹25 Lakh
+          requiredSanctionAmount: 500000, // ₹5 Lakh within ₹10L limit
         })
       ).toBe(true);
 
-      // 2. Fails when required sanction amount exceeds ₹50 Lakh single officer limit
+      // 2. Fails when required sanction amount exceeds ₹10 Lakh single officer limit
       expect(
         rolePermissionService.hasPermission(underwriterUser, 'APPLICATIONS_APPROVE', {
-          requiredSanctionAmount: 7500000, // ₹75 Lakh exceeds ₹50L
+          requiredSanctionAmount: 2500000, // ₹25 Lakh exceeds ₹10L
         })
       ).toBe(false);
 

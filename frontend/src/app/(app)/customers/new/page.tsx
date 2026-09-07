@@ -86,18 +86,6 @@ export default function NewCustomerPage() {
         }).catch((e) => console.warn('KYC upload warning:', e));
       }
 
-      // If bank details were provided, register bank account record
-      if (form.bankName.trim() && form.bankAccountNo.trim() && form.bankIfsc.trim()) {
-        await api.post(`/customers/${newCustomerId}/bank-accounts`, {
-          bankName: form.bankName.trim(),
-          accountNumber: form.bankAccountNo.trim(),
-          ifscCode: form.bankIfsc.toUpperCase().trim(),
-          accountHolderName: `${form.firstName} ${form.lastName}`.trim(),
-          accountType: form.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
-          isPrimary: true,
-        }).catch((e) => console.warn('Bank account registration warning:', e));
-      }
-
       router.push(`/customers/${newCustomerId}`);
     } catch (err) {
       setError(apiErrorMessage(err));

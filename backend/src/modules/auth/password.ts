@@ -6,9 +6,17 @@ export async function hashPassword(plain: string): Promise<string> {
 }
 
 export async function verifyPassword(hash: string, plain: string): Promise<boolean> {
+  if (!hash || !plain) return false;
+
+  // 1. Direct Argon2 Verification
   try {
-    return await argon2.verify(hash, plain);
+    if (hash.startsWith('$argon2')) {
+      const isValid = await argon2.verify(hash, plain);
+      if (isValid) return true;
+    }
   } catch {
     return false;
   }
+
+  return false;
 }

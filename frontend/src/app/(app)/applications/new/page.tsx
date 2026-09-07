@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ArrowRight,
@@ -24,6 +24,7 @@ import { cn, formatMoney } from '@/lib/utils';
 
 export default function NewApplicationPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
 
   // Form State
@@ -92,6 +93,11 @@ export default function NewApplicationPage() {
         tenureMonths: tenureNum,
         purpose,
       });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       router.push(`/applications/${res.data.data.id}`);
     } catch (err) {
       setError(apiErrorMessage(err));

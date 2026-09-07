@@ -1,12 +1,10 @@
 // Step 33: Enterprise Admin & Multi-Tenant Types
 
 export type TenantStatus =
-  | 'DRAFT'
-  | 'CONFIGURING'
   | 'PROVISIONING'
   | 'ACTIVE'
   | 'SUSPENDED'
-  | 'TERMINATED';
+  | 'DEACTIVATED';
 
 export type TenantTier = 'ENTERPRISE' | 'GROWTH' | 'STANDARD';
 
@@ -16,12 +14,19 @@ export interface Tenant {
   name: string;
   status: TenantStatus;
   tier: TenantTier;
-  cinNumber?: string;
-  rbiRegistrationNo?: string;
-  domain?: string;
+  cinNumber?: string | null;
+  rbiRegistrationNo?: string | null;
+  domain?: string | null;
   contactEmail: string;
-  supportPhone?: string;
-  settings?: Record<string, any>;
+  supportPhone?: string | null;
+  baseCurrency?: string;
+  country?: string;
+  timezone?: string;
+  settings?: Record<string, any> | null;
+  metadata?: Record<string, any> | null;
+  suspendedAt?: string | null;
+  activatedAt?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,7 +49,11 @@ export interface CreateTenantDto {
   domain?: string;
   contactEmail: string;
   supportPhone?: string;
+  baseCurrency?: string;
+  country?: string;
+  timezone?: string;
   settings?: Record<string, any>;
+  metadata?: Record<string, any>;
 }
 
 export interface UpdateTenantStatusDto {
@@ -58,34 +67,38 @@ export interface TenantOnboardingWizardDto {
     name: string;
     cinNumber?: string;
     rbiRegistrationNo?: string;
-    tier: TenantTier;
+    tier?: TenantTier;
     domain?: string;
-    contactEmail: string;
+    contactEmail?: string;
     supportPhone?: string;
+    baseCurrency?: string;
+    country?: string;
+    timezone?: string;
   };
   adminUser: {
     email: string;
     firstName: string;
     lastName: string;
     phone?: string;
+    password?: string;
   };
-  policyTemplate: 'STANDARD_NBFC' | 'DIGITAL_FINTECH_LENDER' | 'ENTERPRISE_MICROFINANCE';
+  policyTemplate?: 'STANDARD_NBFC' | 'DIGITAL_FINTECH_LENDER' | 'ENTERPRISE_MICROFINANCE';
   loanProductTemplates?: string[];
-  primaryBranch: {
+  primaryBranch?: {
     branchCode: string;
     branchName: string;
     city: string;
     state: string;
   };
-  integrationProviders: {
-    creditBureau: string;
-    paymentGateway: string;
-    disbursementPayout: string;
-    kycProvider: string;
+  integrationProviders?: {
+    creditBureau?: string;
+    paymentGateway?: string;
+    disbursementPayout?: string;
+    kycProvider?: string;
   };
-  branding: {
-    brandName: string;
-    primaryColorHex: string;
+  branding?: {
+    brandName?: string;
+    primaryColorHex?: string;
     portalDomain?: string;
   };
 }
@@ -106,6 +119,7 @@ export interface ProvisioningSummary {
   consentTemplatesInitialized: boolean;
   activatedAt: string;
   auditEvidenceRef: string;
+  setupCertificate?: Record<string, any>;
 }
 
 export interface TenantOperationsOverview {
@@ -119,11 +133,22 @@ export interface TenantOperationsOverview {
     name: string;
     tier: TenantTier;
     status: TenantStatus;
-    domain?: string;
+    domain?: string | null;
     activeLoanAccounts: number;
     activeCustomersCount: number;
     integrationHealth: string;
     createdAt: string;
   }>;
   updatedAt: string;
+}
+
+export interface TenantDetail extends Tenant {
+  branchesCount: number;
+  usersCount: number;
+  loanProductsCount: number;
+  activeLoansCount: number;
+  activeCustomersCount: number;
+  branches: Array<{ id: string; code: string; name: string; city: string | null; state: string | null; isActive: boolean }>;
+  users: Array<{ id: string; email: string; firstName: string; lastName: string; status: string; roles: string[] }>;
+  loanProducts: Array<{ id: string; code: string; name: string; productType: string; interestRate: string | number; isActive: boolean }>;
 }

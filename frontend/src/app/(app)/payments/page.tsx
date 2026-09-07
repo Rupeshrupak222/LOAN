@@ -41,7 +41,7 @@ export default function PaymentsPage() {
     ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'COLLECTION_OFFICER', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST'].includes(r)
   );
   const canVerify = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'COLLECTION_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
   );
 
   const [activeTab, setActiveTab] = useState<'ALL' | 'SUBMISSIONS' | 'DISBURSEMENTS' | 'REPAYMENTS'>(
@@ -145,7 +145,13 @@ export default function PaymentsPage() {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['loan'] });
+      queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
+      queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
     onError: (err: any) => {

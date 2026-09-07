@@ -8,6 +8,7 @@ export interface AuthUser {
   email: string;
   roles: string[];
   tenantId?: string;
+  branchId?: string;
 }
 
 declare global {
@@ -15,6 +16,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      tenantId?: string;
+      branchId?: string;
       tenant?: {
         id: string;
         tenantId: string;

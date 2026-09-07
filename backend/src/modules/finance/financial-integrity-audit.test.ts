@@ -469,14 +469,14 @@ describe('Step 5: Production-Grade Financial Integrity, Ledger & Data Consistenc
         financeOfficer
       );
 
-      // Execute OTS Settlement: ₹70,000 for ₹1,00,000 loan
+      // Execute OTS Settlement: ₹70,000 for ₹1,00,000 loan (executed by Credit/Admin authority)
       const settlement = await executeSettlement(
         {
           loanId: loan.id,
           settlementAmount: 70000,
           reason: 'Hardship settlement approved by Credit Committee',
         },
-        financeOfficer
+        superAdmin
       );
 
       expect(settlement.status).toBe('COMPLETED');

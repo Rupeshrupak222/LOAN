@@ -85,7 +85,7 @@ export function DecisionIntelligenceCard() {
     },
     onSuccess: (result) => {
       setData(result);
-      toast.success('Executive Decision Intelligence refreshed.');
+      toast.success('AI Decision Intelligence refreshed.');
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err), { title: 'Decision Intelligence Notice' });
@@ -108,14 +108,19 @@ export function DecisionIntelligenceCard() {
             <Sparkles className="h-4.5 w-4.5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold tracking-tight">AI Executive Decision Intelligence</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold tracking-tight">AI Decision Intelligence</h3>
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
                 Gemini Synthesized
               </span>
+              {data?.roleScope && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  {data.roleScope}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Transforming raw portfolio telemetry into explainable executive decision support
+              Transforming role-scoped telemetry into explainable operational decision support
             </p>
           </div>
         </div>
@@ -173,9 +178,9 @@ export function DecisionIntelligenceCard() {
                 isDark ? 'bg-[#0B1129] border-[#1F2B57] text-slate-200' : 'bg-white border-blue-200/80 text-slate-800'
               )}
             >
-              <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                  Portfolio Briefing:
+                  {data.roleScope ? `${data.roleScope} Briefing:` : 'Operational Briefing:'}
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">
                   Confidence: <strong className="text-emerald-400">{data.confidence}</strong>
