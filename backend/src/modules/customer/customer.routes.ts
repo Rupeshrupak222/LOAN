@@ -16,6 +16,7 @@ import {
 import {
   listCustomers,
   getCustomer,
+  getCustomerByUserId,
   createCustomer,
   updateCustomer,
   updateKycStatus,
@@ -29,6 +30,14 @@ const router = Router();
 
 router.use(authenticate);
 router.use(tenantContext);
+
+router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    const customer = await getCustomerByUserId(req.user?.id!, req.user as any);
+    res.json(success(customer));
+  })
+);
 
 router.get(
   '/',
