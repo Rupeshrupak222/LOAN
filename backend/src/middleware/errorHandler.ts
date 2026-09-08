@@ -50,14 +50,20 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
-  logger.error({ err, path: req.originalUrl }, 'Unhandled error');
+  const correlationId = (res.getHeader('X-Correlation-ID') as string) || (req.headers['x-correlation-id'] as string) || undefined;
+
+  logger.error({ err, path: req.originalUrl, correlationId }, 'Unhandled server error');
+
   res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
-      message: (err as Error)?.message || 'An unexpected error occurred',
-      // Never expose stack traces in production
-      ...(env.isProduction ? {} : { debug: (err as Error)?.message }),
+      message: env.isProduction
+        ? 'An internal server error occurred. Please contact support with the correlation ID.'
+        : ((err as Error)?.message || 'An unexpected error occurred'),
+      correlationId,
+      ...(env.isProduction ? {} : { debug: (err as Error)?.stack || (err as Error)?.message }),
     },
   });
 }
+

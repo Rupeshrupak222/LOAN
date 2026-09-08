@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ArrowRight,
@@ -25,6 +25,7 @@ import { cn, formatMoney } from '@/lib/utils';
 function NewApplicationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
 
   const paramAmount = searchParams?.get('amount');
@@ -99,6 +100,11 @@ function NewApplicationForm() {
         tenureMonths: tenureNum,
         purpose,
       });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       router.push(`/applications/${res.data.data.id}`);
     } catch (err) {
       setError(apiErrorMessage(err));

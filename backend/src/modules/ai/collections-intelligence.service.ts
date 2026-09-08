@@ -260,67 +260,115 @@ You assist Collection Officers by analyzing delinquent accounts, explaining repa
 }
 `;
 
-  // 4. Generate content via Central Gemini Service
-  const geminiResult = await generateGeminiContent({
-    prompt: `Analyze the following delinquent loan collection case and generate the structured Collections Intelligence JSON assessment:\n\n${contextPrompt}`,
-    systemInstruction,
-    temperature: 0.1,
-  });
+  let result: CollectionIntelligenceResult;
 
-  // 5. Safe JSON Parsing
-  let parsed: any;
   try {
+    // 4. Generate content via Central Gemini Service
+    const geminiResult = await generateGeminiContent({
+      prompt: `Analyze the following delinquent loan collection case and generate the structured Collections Intelligence JSON assessment:\n\n${contextPrompt}`,
+      systemInstruction,
+      temperature: 0.1,
+    });
+
+    // 5. Safe JSON Parsing
     const rawText = geminiResult.text.trim();
     const cleanJson = rawText
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    parsed = JSON.parse(cleanJson);
-  } catch (err: any) {
-    throw new BadRequestError(`Failed to parse AI Collections Intelligence response: ${err.message}`);
-  }
+    const parsed = JSON.parse(cleanJson);
 
-  const result: CollectionIntelligenceResult = {
-    caseId: colCase.id,
-    caseNo: colCase.caseNo,
-    loanNo: loan.loanNo,
-    borrowerName: `${customer.firstName} ${customer.lastName}`,
-    generatedAt: new Date().toISOString(),
-    model: geminiResult.model,
-    collectionPriority: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'REVIEW_REQUIRED'].includes(parsed.collectionPriority)
-      ? parsed.collectionPriority
-      : dpd > 60 || brokenPtps.length > 1
-      ? 'CRITICAL'
-      : dpd > 30
-      ? 'HIGH'
-      : 'MEDIUM',
-    priorityReasons: Array.isArray(parsed.priorityReasons) ? parsed.priorityReasons : [`DPD is ${dpd} days with ₹${overdueAmount} overdue.`],
-    accountSummary: parsed.accountSummary || `Account #${loan.loanNo} is ${dpd} days overdue for ₹${overdueAmount.toLocaleString('en-IN')}.`,
-    delinquencySignals: Array.isArray(parsed.delinquencySignals) ? parsed.delinquencySignals : [],
-    observedTrends: Array.isArray(parsed.observedTrends) ? parsed.observedTrends : [],
-    paymentBehaviorSummary: parsed.paymentBehaviorSummary || 'Payment behavior assessed from repayment schedule.',
-    collectionActivitySummary: parsed.collectionActivitySummary || 'Collection activity evaluated from call logs.',
-    ptpSummary: {
-      activePtpStatus: parsed.ptpSummary?.activePtpStatus || (pendingPtp ? 'ACTIVE_PENDING' : 'NO_ACTIVE_PTP'),
-      brokenPtpCount: typeof parsed.ptpSummary?.brokenPtpCount === 'number' ? parsed.ptpSummary.brokenPtpCount : brokenPtps.length,
-      totalPtpCount: typeof parsed.ptpSummary?.totalPtpCount === 'number' ? parsed.ptpSummary.totalPtpCount : colCase.promises.length,
-      observations: parsed.ptpSummary?.observations || 'Commitment history assessed from PTP records.',
-    },
-    exceptions: Array.isArray(parsed.exceptions) ? parsed.exceptions : [],
-    recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Initiate follow-up call with borrower.'],
-    escalationRecommendation: {
-      escalate: Boolean(parsed.escalationRecommendation?.escalate),
-      targetRole: parsed.escalationRecommendation?.targetRole || 'Branch Manager',
-      rationale: parsed.escalationRecommendation?.rationale || 'Standard case management.',
-    },
-    dataGaps: Array.isArray(parsed.dataGaps) ? parsed.dataGaps : [],
-    confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
-  };
+    result = {
+      caseId: colCase.id,
+      caseNo: colCase.caseNo,
+      loanNo: loan.loanNo,
+      borrowerName: `${customer.firstName} ${customer.lastName}`,
+      generatedAt: new Date().toISOString(),
+      model: geminiResult.model,
+      collectionPriority: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'REVIEW_REQUIRED'].includes(parsed.collectionPriority)
+        ? parsed.collectionPriority
+        : dpd > 60 || brokenPtps.length > 1
+        ? 'CRITICAL'
+        : dpd > 30
+        ? 'HIGH'
+        : 'MEDIUM',
+      priorityReasons: Array.isArray(parsed.priorityReasons) ? parsed.priorityReasons : [`DPD is ${dpd} days with ₹${overdueAmount} overdue.`],
+      accountSummary: parsed.accountSummary || `Account #${loan.loanNo} is ${dpd} days overdue for ₹${overdueAmount.toLocaleString('en-IN')}.`,
+      delinquencySignals: Array.isArray(parsed.delinquencySignals) ? parsed.delinquencySignals : [],
+      observedTrends: Array.isArray(parsed.observedTrends) ? parsed.observedTrends : [],
+      paymentBehaviorSummary: parsed.paymentBehaviorSummary || 'Payment behavior assessed from repayment schedule.',
+      collectionActivitySummary: parsed.collectionActivitySummary || 'Collection activity evaluated from call logs.',
+      ptpSummary: {
+        activePtpStatus: parsed.ptpSummary?.activePtpStatus || (pendingPtp ? 'ACTIVE_PENDING' : 'NO_ACTIVE_PTP'),
+        brokenPtpCount: typeof parsed.ptpSummary?.brokenPtpCount === 'number' ? parsed.ptpSummary.brokenPtpCount : brokenPtps.length,
+        totalPtpCount: typeof parsed.ptpSummary?.totalPtpCount === 'number' ? parsed.ptpSummary.totalPtpCount : colCase.promises.length,
+        observations: parsed.ptpSummary?.observations || 'Commitment history assessed from PTP records.',
+      },
+      exceptions: Array.isArray(parsed.exceptions) ? parsed.exceptions : [],
+      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Initiate follow-up call with borrower.'],
+      escalationRecommendation: {
+        escalate: Boolean(parsed.escalationRecommendation?.escalate),
+        targetRole: parsed.escalationRecommendation?.targetRole || 'Branch Manager',
+        rationale: parsed.escalationRecommendation?.rationale || 'Standard case management.',
+      },
+      dataGaps: Array.isArray(parsed.dataGaps) ? parsed.dataGaps : [],
+      confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
+    };
+  } catch {
+    // Deterministic Rule-Based Fallback
+    const priority = dpd > 60 ? 'CRITICAL' : dpd > 30 ? 'HIGH' : 'MEDIUM';
+    const totalScheduleItems = loan.schedule.length;
+    const overdueScheduleItems = loan.schedule.filter((s) => s.status === 'OVERDUE' || s.status === 'DUE');
+    const paidScheduleItems = loan.schedule.filter((s) => s.status === 'PAID');
+
+    result = {
+      caseId: colCase.id,
+      caseNo: colCase.caseNo,
+      loanNo: loan.loanNo,
+      borrowerName: `${customer.firstName} ${customer.lastName}`,
+      generatedAt: new Date().toISOString(),
+      model: 'deterministic-rules-engine',
+      collectionPriority: priority,
+      priorityReasons: [`Account has reached ${dpd} DPD (${colCase.agingBucket}) with ₹${overdueAmount.toLocaleString('en-IN')} overdue.`],
+      accountSummary: `Case #${colCase.caseNo} for Loan #${loan.loanNo} (${customer.firstName} ${customer.lastName}) has ₹${overdueAmount.toLocaleString('en-IN')} overdue at ${dpd} DPD. (Deterministic LMS synthesis).`,
+      delinquencySignals: [
+        {
+          signal: `Overdue balance of ₹${overdueAmount.toLocaleString('en-IN')}`,
+          severity: dpd > 60 ? 'HIGH' : 'MEDIUM',
+          evidence: `DPD reached ${dpd} days with ${overdueScheduleItems.length} overdue EMI(s).`,
+          whyItMatters: 'Requires structured collection follow-up to prevent non-performing asset classification.',
+          suggestedAction: 'Contact borrower on registered phone number.',
+        },
+      ],
+      observedTrends: [`Aging bucket: ${colCase.agingBucket}`],
+      paymentBehaviorSummary: `${paidScheduleItems.length} of ${totalScheduleItems} installments paid to date.`,
+      collectionActivitySummary: `${colCase.activities.length} activity note(s) and ${colCase.promises.length} PTP commitment(s) recorded.`,
+      ptpSummary: {
+        activePtpStatus: pendingPtp ? 'ACTIVE_PENDING' : 'NO_ACTIVE_PTP',
+        brokenPtpCount: brokenPtps.length,
+        totalPtpCount: colCase.promises.length,
+        observations: pendingPtp ? `Active PTP for ₹${Number(pendingPtp.promisedAmount).toLocaleString('en-IN')} due ${new Date(pendingPtp.promisedDate).toLocaleDateString()}.` : 'No active PTP commitment.',
+      },
+      exceptions: [],
+      recommendedActions: [
+        'Attempt customer telephone contact for payment resolution.',
+        'Record updated PTP or disposition note in Collections workbench.',
+      ],
+      escalationRecommendation: {
+        escalate: dpd > 60,
+        targetRole: dpd > 60 ? 'Branch Manager' : 'Collection Officer',
+        rationale: dpd > 60 ? 'High delinquency aging bucket requires supervisor review.' : 'Standard operational outreach.',
+      },
+      dataGaps: [],
+      confidence: 'HIGH',
+    };
+  }
 
   // 6. Audit Trail
   await logAudit({
     userId: actor.id,
+    role: actor.roles[0] || 'COLLECTION_OFFICER',
     action: 'COLLECTIONS_INTELLIGENCE_GENERATED',
     entity: 'CollectionCase',
     entityId: colCase.id,
@@ -331,7 +379,7 @@ You assist Collection Officers by analyzing delinquent accounts, explaining repa
       model: result.model,
       generatedBy: actor.email,
     },
-  });
+  }).catch(() => {});
 
   return result;
 }

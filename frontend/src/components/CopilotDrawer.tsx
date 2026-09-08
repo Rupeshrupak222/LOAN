@@ -221,8 +221,8 @@ export function CopilotDrawer() {
                   ? 'bg-[#060F1B] border-[#1E2445] text-white shadow-black/80'
                   : 'bg-white border-slate-200 text-slate-900 shadow-slate-400/40',
                 isExpanded
-                  ? 'inset-4 md:inset-10'
-                  : 'bottom-5 right-5 w-[94vw] sm:w-[450px] h-[580px] max-h-[85vh]'
+                  ? 'inset-3 sm:inset-4 md:inset-10'
+                  : 'bottom-3 right-3 sm:bottom-5 sm:right-5 w-[calc(100vw-1.5rem)] sm:w-[450px] max-w-[450px] h-[580px] max-h-[85vh]'
               )}
             >
               {/* Header */}

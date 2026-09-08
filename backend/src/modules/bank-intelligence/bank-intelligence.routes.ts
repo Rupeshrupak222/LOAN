@@ -15,7 +15,7 @@ const router = Router();
 router.post(
   '/customers/:customerId/fetch',
   authenticate,
-  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'LOAN_OFFICER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await bankIntelligenceService.fetchViaIntegrationHub(req.params.customerId, {
       id: req.user!.id,
@@ -33,7 +33,7 @@ router.post(
 router.post(
   '/customers/:customerId/ingest',
   authenticate,
-  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'LOAN_OFFICER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await bankIntelligenceService.ingestStatement(
       req.params.customerId,
@@ -55,7 +55,7 @@ router.post(
 router.post(
   '/customers/:customerId/analyze',
   authenticate,
-  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'LOAN_OFFICER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await bankIntelligenceService.analyzeCustomerStatement(
       req.params.customerId,

@@ -17,9 +17,9 @@ router.use(tenantContext);
  */
 router.get(
   '/operations-overview',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
-    const overview = tenantProvisioningService.getOperationsOverview(req.user as any);
+    const overview = await tenantProvisioningService.getOperationsOverview(req.user as any);
     res.json({
       success: true,
       data: overview,
@@ -38,7 +38,24 @@ router.post(
     const summary = await tenantProvisioningService.onboardTenant(req.body, req.user as any);
     res.status(201).json({
       success: true,
-      message: `Institution '${summary.name}' successfully provisioned and activated.`,
+      message: `Institution '${summary.name}' successfully provisioned and activated in PostgreSQL.`,
+      data: summary,
+    });
+  })
+);
+
+/**
+ * POST /api/v1/tenants/provision
+ * Direct transactional tenant provisioning endpoint.
+ */
+router.post(
+  '/provision',
+  authorize('SUPER_ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const summary = await tenantProvisioningService.onboardTenant(req.body, req.user as any);
+    res.status(201).json({
+      success: true,
+      message: `Institution '${summary.name}' successfully provisioned.`,
       data: summary,
     });
   })
@@ -51,7 +68,7 @@ router.post(
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const tenants = tenantService.listTenants(req.user!);
+    const tenants = await tenantService.listTenants(req.user!);
     res.json({
       success: true,
       data: tenants,
@@ -81,10 +98,25 @@ router.get(
 router.get(
   '/:id/setup-certificate',
   asyncHandler(async (req: Request, res: Response) => {
-    const cert = tenantProvisioningService.generateSetupCertificate(req.params.id, req.user as any);
+    const cert = await tenantProvisioningService.generateSetupCertificate(req.params.id, req.user as any);
     res.json({
       success: true,
       data: cert,
+    });
+  })
+);
+
+/**
+ * GET /api/v1/tenants/:id/detail
+ * Comprehensive tenant detail inspection (Super Admin & Company Admin).
+ */
+router.get(
+  '/:id/detail',
+  asyncHandler(async (req: Request, res: Response) => {
+    const detail = await tenantService.getTenantDetail(req.params.id, req.user!);
+    res.json({
+      success: true,
+      data: detail,
     });
   })
 );
@@ -97,7 +129,7 @@ router.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const scopedTenantId = tenantService.resolveTenantScope(req.user!, req.params.id);
-    const tenant = tenantService.getTenantById(scopedTenantId);
+    const tenant = await tenantService.getTenantByIdAsync(scopedTenantId);
     res.json({
       success: true,
       data: tenant,
@@ -116,7 +148,7 @@ router.post(
     const tenant = await tenantService.createTenant(req.body, req.user!);
     res.status(201).json({
       success: true,
-      message: `Tenant '${tenant.name}' successfully onboarded.`,
+      message: `Tenant '${tenant.name}' successfully onboarded in PostgreSQL.`,
       data: tenant,
     });
   })

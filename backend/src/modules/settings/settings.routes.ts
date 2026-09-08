@@ -12,6 +12,7 @@ router.use(authenticate);
 
 router.get(
   '/',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (_req, res) => {
     const settings = await listSettings();
     res.json(success(settings));
@@ -20,6 +21,7 @@ router.get(
 
 router.get(
   '/:key',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const setting = await getSettingByKey(req.params.key);
     res.json(success(setting));

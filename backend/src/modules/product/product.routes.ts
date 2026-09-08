@@ -22,7 +22,7 @@ router.use(tenantContext);
 router.get(
   '/catalog',
   asyncHandler(async (req, res) => {
-    const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const products = productCatalogService.listProducts(tenantId);
     return ok(res, products);
   })
@@ -35,7 +35,7 @@ router.get(
 router.post(
   '/simulate-pricing',
   asyncHandler(async (req, res) => {
-    const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const result = productCatalogService.simulateProductPricing(tenantId, req.body);
     return ok(res, result);
   })
@@ -48,7 +48,7 @@ router.post(
 router.get(
   '/catalog/:id',
   asyncHandler(async (req, res) => {
-    const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const product = productCatalogService.getProductById(tenantId, req.params.id);
     return ok(res, product);
   })
@@ -60,9 +60,9 @@ router.get(
  */
 router.post(
   '/catalog',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
-    const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const product = await productCatalogService.createProduct(tenantId, req.body, req.user as any);
     return created(res, product);
   })
@@ -74,9 +74,9 @@ router.post(
  */
 router.put(
   '/catalog/:id',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
-    const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const product = await productCatalogService.updateProductWithVersioning(
       tenantId,
       req.params.id,
@@ -94,32 +94,70 @@ router.get(
   asyncHandler(async (req, res) => {
     const params = getPageParams(req);
     const activeOnly = req.query.active === 'true';
-    const result = await service.listProducts(params, activeOnly);
+    const result = await service.listProducts(params, activeOnly, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId || req.user?.tenantId,
+    });
     return paginated(res, result.data, result.pagination);
   }),
 );
 
-router.get('/:id', asyncHandler(async (req, res) => ok(res, await service.getProduct(req.params.id))));
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) =>
+    ok(
+      res,
+      await service.getProduct(req.params.id, {
+        id: req.user?.id,
+        roles: req.user?.roles,
+        tenantId: req.tenantId || req.user?.tenantId,
+      })
+    )
+  )
+);
 
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate({ body: createProductSchema }),
-  asyncHandler(async (req, res) => created(res, await service.createProduct(req.body))),
+  asyncHandler(async (req, res) =>
+    created(
+      res,
+      await service.createProduct(req.body, {
+        id: req.user?.id,
+        roles: req.user?.roles,
+        tenantId: req.tenantId || req.user?.tenantId,
+      })
+    )
+  ),
 );
 
 router.patch(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate({ body: updateProductSchema }),
-  asyncHandler(async (req, res) => ok(res, await service.updateProduct(req.params.id, req.body))),
+  asyncHandler(async (req, res) =>
+    ok(
+      res,
+      await service.updateProduct(req.params.id, req.body, {
+        id: req.user?.id,
+        roles: req.user?.roles,
+        tenantId: req.tenantId || req.user?.tenantId,
+      })
+    )
+  ),
 );
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
-    await service.deleteProduct(req.params.id);
+    await service.deleteProduct(req.params.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId || req.user?.tenantId,
+    });
     return ok(res, { message: 'Product deleted successfully' });
   }),
 );

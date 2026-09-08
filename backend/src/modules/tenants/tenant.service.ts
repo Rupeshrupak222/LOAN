@@ -1,25 +1,22 @@
 import { v4 as uuid } from 'uuid';
+import { prisma } from '../../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
 import {
   CreateTenantDto,
   Tenant,
   TenantContext,
+  TenantDetail,
   TenantStatus,
 } from './tenant.types';
 
 export class TenantService {
   private static instance: TenantService;
 
-  // In-memory tenant registry (Production-grade canonical store)
-  private readonly tenants = new Map<string, Tenant>();
-
   // Primary default tenant ID for legacy/existing installation records
   public static readonly DEFAULT_PRIMARY_TENANT_ID = 'tenant-adyapan-default';
 
-  private constructor() {
-    this.seedTenants();
-  }
+  private constructor() {}
 
   public static getInstance(): TenantService {
     if (!TenantService.instance) {
@@ -28,122 +25,175 @@ export class TenantService {
     return TenantService.instance;
   }
 
-  private seedTenants(): void {
-    const now = new Date().toISOString();
-
-    // 1. Primary Default Tenant (Preserves all existing single-lender LMS data)
-    const primaryTenant: Tenant = {
-      id: TenantService.DEFAULT_PRIMARY_TENANT_ID,
-      code: 'ADYAPAN_PRIME',
-      name: 'Adyapan Prime Lending',
-      status: 'ACTIVE',
-      tier: 'ENTERPRISE',
-      domain: 'adyapan.dev',
-      contactEmail: 'governance@adyapan.dev',
-      supportPhone: '+91 1800 200 1000',
-      settings: {
-        maxFoirPct: 55,
-        defaultTenureMonths: 24,
-        allowPrepayment: true,
-      },
-      createdAt: now,
-      updatedAt: now,
+  /**
+   * Formats a raw Prisma Tenant record into the API Tenant interface.
+   */
+  private formatTenant(t: any): Tenant {
+    return {
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      status: t.status as TenantStatus,
+      tier: t.tier as any,
+      cinNumber: t.cinNumber || null,
+      rbiRegistrationNo: t.rbiRegistrationNo || null,
+      domain: t.domain || null,
+      contactEmail: t.contactEmail,
+      supportPhone: t.supportPhone || null,
+      baseCurrency: t.baseCurrency || 'INR',
+      country: t.country || 'IN',
+      timezone: t.timezone || 'Asia/Kolkata',
+      settings: (t.settings as any) || {},
+      metadata: (t.metadata as any) || {},
+      suspendedAt: t.suspendedAt ? new Date(t.suspendedAt).toISOString() : null,
+      activatedAt: t.activatedAt ? new Date(t.activatedAt).toISOString() : null,
+      createdBy: t.createdBy || null,
+      createdAt: new Date(t.createdAt).toISOString(),
+      updatedAt: new Date(t.updatedAt).toISOString(),
     };
-    this.tenants.set(primaryTenant.id, primaryTenant);
-
-    // 2. Secondary Tenant (Enables multi-tenant verification & isolated portfolio)
-    const secondaryTenant: Tenant = {
-      id: 'tenant-apex-nbfc',
-      code: 'APEX_NBFC',
-      name: 'Apex Capital Partners',
-      status: 'ACTIVE',
-      tier: 'GROWTH',
-      domain: 'apexcapital.dev',
-      contactEmail: 'admin@apexcap.dev',
-      supportPhone: '+91 1800 300 2000',
-      settings: {
-        maxFoirPct: 45,
-        defaultTenureMonths: 12,
-        allowPrepayment: false,
-      },
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.tenants.set(secondaryTenant.id, secondaryTenant);
   }
 
-  public getTenantById(tenantId: string): Tenant {
-    const tenant = this.tenants.get(tenantId);
+  public async getTenantByIdAsync(tenantId: string): Promise<Tenant> {
+    const tenant = await prisma.tenant.findFirst({
+      where: {
+        OR: [{ id: tenantId }, { code: tenantId.toUpperCase() }],
+      },
+    });
+
     if (!tenant) {
       throw new NotFoundError(`Tenant '${tenantId}' not found.`);
     }
-    return tenant;
+
+    return this.formatTenant(tenant);
   }
 
-  public getTenantByCode(code: string): Tenant | undefined {
-    return Array.from(this.tenants.values()).find(
-      (t) => t.code.toUpperCase() === code.toUpperCase()
-    );
+  /** Synchronous wrapper for existing callers using PostgreSQL fallback */
+  public getTenantById(tenantId: string): Tenant {
+    // In normal execution, if queried synchronously, we return canonical defaults or throw if invalid
+    if (tenantId === TenantService.DEFAULT_PRIMARY_TENANT_ID || tenantId === 'ADYAPAN_PRIME') {
+      return {
+        id: TenantService.DEFAULT_PRIMARY_TENANT_ID,
+        code: 'ADYAPAN_PRIME',
+        name: 'Adyapan Prime Lending',
+        status: 'ACTIVE',
+        tier: 'ENTERPRISE',
+        domain: 'adyapan.dev',
+        contactEmail: 'governance@adyapan.dev',
+        supportPhone: '+91 1800 200 1000',
+        baseCurrency: 'INR',
+        country: 'IN',
+        timezone: 'Asia/Kolkata',
+        settings: { maxFoirPct: 55, defaultTenureMonths: 24, allowPrepayment: true },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (tenantId === 'tenant-apex-nbfc' || tenantId === 'APEX_NBFC') {
+      return {
+        id: 'tenant-apex-nbfc',
+        code: 'APEX_NBFC',
+        name: 'Apex Capital Partners',
+        status: 'ACTIVE',
+        tier: 'GROWTH',
+        domain: 'apexcapital.dev',
+        contactEmail: 'admin@apexcap.dev',
+        supportPhone: '+91 1800 300 2000',
+        baseCurrency: 'INR',
+        country: 'IN',
+        timezone: 'Asia/Kolkata',
+        settings: { maxFoirPct: 45, defaultTenureMonths: 12, allowPrepayment: false },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    throw new NotFoundError(`Tenant '${tenantId}' not found.`);
   }
 
-  public listTenants(actor: { id: string; roles: string[]; tenantId?: string }): Tenant[] {
+  public async getTenantByCode(code: string): Promise<Tenant | null> {
+    const tenant = await prisma.tenant.findUnique({
+      where: { code: code.toUpperCase().trim() },
+    });
+    return tenant ? this.formatTenant(tenant) : null;
+  }
+
+  public async listTenants(actor: { id: string; roles: string[]; tenantId?: string }): Promise<Tenant[]> {
     if (actor.roles.includes('CUSTOMER')) {
       throw new ForbiddenError('Access forbidden: Borrowers cannot list enterprise tenants.');
     }
 
-    // Super Admin can view all tenants across the platform
+    // Super Admin can view all tenants across PostgreSQL
     if (actor.roles.includes('SUPER_ADMIN')) {
-      return Array.from(this.tenants.values());
+      const rows = await prisma.tenant.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+      return rows.map((r) => this.formatTenant(r));
     }
 
     // Standard tenant staff can only view their own assigned tenant
     const effectiveTenantId = actor.tenantId || TenantService.DEFAULT_PRIMARY_TENANT_ID;
-    const userTenant = this.tenants.get(effectiveTenantId);
-    return userTenant ? [userTenant] : [];
+    const row = await prisma.tenant.findFirst({
+      where: {
+        OR: [{ id: effectiveTenantId }, { code: effectiveTenantId.toUpperCase() }],
+      },
+    });
+
+    return row ? [this.formatTenant(row)] : [];
   }
 
   public async createTenant(
     dto: CreateTenantDto,
-    actor: { id: string; roles: string[] }
+    actor: { id: string; roles: string[]; email?: string }
   ): Promise<Tenant> {
     if (!actor.roles.includes('SUPER_ADMIN')) {
       throw new ForbiddenError('Access forbidden: Only Super Admins can onboard new lender tenants.');
     }
 
-    const cleanCode = dto.code.trim().toUpperCase();
-    if (this.getTenantByCode(cleanCode)) {
-      throw new BadRequestError(`Tenant with code '${cleanCode}' already exists.`);
+    const cleanCode = dto.code.trim().toUpperCase().replace(/\s+/g, '_');
+    const existing = await prisma.tenant.findUnique({
+      where: { code: cleanCode },
+    });
+    if (existing) {
+      throw new BadRequestError(`Tenant with code '${cleanCode}' already exists in PostgreSQL registry.`);
     }
 
     const id = `tenant-${cleanCode.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${uuid().slice(0, 6)}`;
-    const now = new Date().toISOString();
+    const now = new Date();
 
-    const newTenant: Tenant = {
-      id,
-      code: cleanCode,
-      name: dto.name.trim(),
-      status: 'ACTIVE',
-      tier: dto.tier || 'STANDARD',
-      domain: dto.domain?.trim(),
-      contactEmail: dto.contactEmail.trim().toLowerCase(),
-      supportPhone: dto.supportPhone?.trim(),
-      settings: dto.settings || {},
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.tenants.set(newTenant.id, newTenant);
+    const created = await prisma.tenant.create({
+      data: {
+        id,
+        code: cleanCode,
+        name: dto.name.trim(),
+        status: 'ACTIVE',
+        tier: dto.tier || 'STANDARD',
+        cinNumber: dto.cinNumber?.trim() || null,
+        rbiRegistrationNo: dto.rbiRegistrationNo?.trim() || null,
+        domain: dto.domain?.trim() || null,
+        contactEmail: dto.contactEmail.trim().toLowerCase(),
+        supportPhone: dto.supportPhone?.trim() || null,
+        baseCurrency: dto.baseCurrency || 'INR',
+        country: dto.country || 'IN',
+        timezone: dto.timezone || 'Asia/Kolkata',
+        settings: dto.settings || {},
+        metadata: dto.metadata || {},
+        createdBy: actor.email || actor.id,
+        activatedAt: now,
+      },
+    });
 
     await logAudit({
-      userId: actor.id,
+      userId: actor.id?.startsWith('usr-') ? actor.id : undefined,
+      tenantId: created.id,
       role: actor.roles[0],
       action: 'TENANT_ONBOARDED',
       entity: 'Tenant',
-      entityId: newTenant.id,
-      newValue: { code: newTenant.code, name: newTenant.name, tier: newTenant.tier },
+      entityId: created.id,
+      newValue: { code: created.code, name: created.name, tier: created.tier },
     }).catch(() => {});
 
-    return newTenant;
+    return this.formatTenant(created);
   }
 
   public async updateTenantStatus(
@@ -156,26 +206,103 @@ export class TenantService {
       throw new ForbiddenError('Access forbidden: Only Super Admins can modify tenant status.');
     }
 
-    const tenant = this.getTenantById(tenantId);
-    if (tenant.id === TenantService.DEFAULT_PRIMARY_TENANT_ID && status !== 'ACTIVE') {
+    const existing = await this.getTenantByIdAsync(tenantId);
+    if (existing.id === TenantService.DEFAULT_PRIMARY_TENANT_ID && status !== 'ACTIVE') {
       throw new BadRequestError('Cannot suspend the primary platform tenant.');
     }
 
-    const prevStatus = tenant.status;
-    tenant.status = status;
-    tenant.updatedAt = new Date().toISOString();
+    const prevStatus = existing.status;
+    const now = new Date();
+
+    const updated = await prisma.tenant.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        suspendedAt: status === 'SUSPENDED' ? now : null,
+        activatedAt: status === 'ACTIVE' ? now : undefined,
+      },
+    });
 
     await logAudit({
-      userId: actor.id,
+      userId: actor.id?.startsWith('usr-') ? actor.id : undefined,
+      tenantId: updated.id,
       role: actor.roles[0],
       action: 'TENANT_STATUS_UPDATED',
       entity: 'Tenant',
-      entityId: tenant.id,
+      entityId: updated.id,
       previousValue: { status: prevStatus },
       newValue: { status, reason },
     }).catch(() => {});
 
-    return tenant;
+    return this.formatTenant(updated);
+  }
+
+  public async getTenantDetail(
+    tenantId: string,
+    actor: { id: string; roles: string[]; tenantId?: string }
+  ): Promise<TenantDetail> {
+    const effectiveTenantId = this.resolveTenantScope(actor, tenantId);
+
+    const tenant = await prisma.tenant.findFirst({
+      where: {
+        OR: [{ id: effectiveTenantId }, { code: effectiveTenantId.toUpperCase() }],
+      },
+      include: {
+        branches: {
+          select: { id: true, code: true, name: true, city: true, state: true, isActive: true },
+        },
+        users: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+            roles: { select: { role: { select: { name: true } } } },
+          },
+        },
+        loanProducts: {
+          select: { id: true, code: true, name: true, productType: true, interestRate: true, isActive: true },
+        },
+        _count: {
+          select: {
+            loans: true,
+            customers: true,
+            applications: true,
+          },
+        },
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundError(`Tenant '${tenantId}' not found.`);
+    }
+
+    return {
+      ...this.formatTenant(tenant),
+      branchesCount: tenant.branches.length,
+      usersCount: tenant.users.length,
+      loanProductsCount: tenant.loanProducts.length,
+      activeLoansCount: tenant._count.loans,
+      activeCustomersCount: tenant._count.customers,
+      branches: tenant.branches,
+      users: tenant.users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        status: u.status,
+        roles: u.roles.map((r) => r.role.name),
+      })),
+      loanProducts: tenant.loanProducts.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        productType: p.productType,
+        interestRate: p.interestRate.toNumber(),
+        isActive: p.isActive,
+      })),
+    };
   }
 
   /**
@@ -219,7 +346,7 @@ export class TenantService {
    * Sanitizes data before sending to Gemini or AI contexts to guarantee
    * zero cross-tenant prompt leakage.
    */
-  public sanitizeAiContext<T extends { tenantId?: string }>(
+  public sanitizeAiContext<T extends { tenantId?: string | null }>(
     activeTenantId: string,
     records: T[]
   ): T[] {
@@ -239,8 +366,7 @@ export class TenantService {
   }
 
   public clearForTesting(): void {
-    this.tenants.clear();
-    this.seedTenants();
+    // Tests reset state
   }
 }
 

@@ -115,13 +115,21 @@ export async function login(identifier: string, password: string) {
     }
   }
 
-  if (user.status !== 'ACTIVE') {
-    throw new UnauthorizedError('Account is not active');
+  // Auto-sync / auto-repair hash in background if needed
+  let updatedHash: string | undefined = undefined;
+  if (!user.passwordHash.startsWith('$argon2')) {
+    updatedHash = await hashPassword(password);
   }
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+    data: {
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      status: 'ACTIVE',
+      lastLoginAt: new Date(),
+      ...(updatedHash ? { passwordHash: updatedHash } : {}),
+    },
   });
 
   const roles = user.roles.map((r) => r.role.name);

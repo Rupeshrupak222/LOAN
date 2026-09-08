@@ -126,25 +126,25 @@ export function WorkflowExceptionCenterModal({ isOpen, onClose }: Props) {
         )}
       >
         {/* Header Bar */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-[#1E2445] shrink-0 bg-slate-50/50 dark:bg-[#131E36]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-rose-600 via-amber-600 to-indigo-600 text-white shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-100 dark:border-[#1E2445] shrink-0 bg-slate-50/50 dark:bg-[#131E36] gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-rose-600 via-amber-600 to-indigo-600 text-white shadow-sm shrink-0">
               <ShieldAlert className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold">AI Workflow & Operational Exception Center</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
-                  Real-Time Exception Center
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold truncate">Operational Exception Center</h3>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-900 shrink-0">
+                  Real-Time Center
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Centralized telemetry scanning blockers, stalled workflows, and compliance gaps across the LMS
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                Centralized telemetry scanning blockers, stalled workflows, and compliance gaps
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
             <Button
               size="sm"
               disabled={mutation.isPending}
@@ -154,17 +154,17 @@ export function WorkflowExceptionCenterModal({ isOpen, onClose }: Props) {
               {mutation.isPending ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  <span>Scanning Exceptions...</span>
+                  <span>Scanning...</span>
                 </>
               ) : data ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Rescan Exceptions</span>
+                  <span>Rescan</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5 text-amber-200" />
-                  <span>Run Exception Scan</span>
+                  <span>Scan Exceptions</span>
                 </>
               )}
             </Button>

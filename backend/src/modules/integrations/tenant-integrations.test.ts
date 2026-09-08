@@ -14,7 +14,7 @@ describe('Step 24: Tenant-Specific Integration Configuration', () => {
 
   describe('1. AES-256-GCM Authenticated Encryption', () => {
     it('encrypts and decrypts secret credentials cleanly', () => {
-      const plainSecret = 'rzp_live_sec_super_secret_token_12345';
+      const plainSecret = 'test-aes-gcm-sample-token-value';
       const payload = encryptSecret(plainSecret);
 
       expect(payload.encrypted).not.toBe(plainSecret);
@@ -72,7 +72,7 @@ describe('Step 24: Tenant-Specific Integration Configuration', () => {
         expect((routing as any).credentialsEncrypted).toBeUndefined();
         if (routing.maskedCredentials.apiKey) {
           expect(routing.maskedCredentials.apiKey).toContain('****');
-          expect(routing.maskedCredentials.apiKey).not.toContain('exp_live_adyapan_secret_key_8891');
+          expect(routing.maskedCredentials.apiKey).not.toContain('test-experian-key-credential');
         }
       }
     });

@@ -9,9 +9,32 @@ export const logger = pino({
         target: 'pino/file',
         options: { destination: 1 },
       },
-  // Never log secrets or sensitive fields
+  // Never log secrets, credentials, tokens, or sensitive PII
   redact: {
-    paths: ['req.headers.authorization', 'req.headers.cookie', '*.password', '*.token', '*.refreshToken'],
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'req.headers["x-api-key"]',
+      'req.body.password',
+      'req.body.currentPassword',
+      'req.body.newPassword',
+      '*.password',
+      '*.passwordHash',
+      '*.token',
+      '*.refreshToken',
+      '*.tokenHash',
+      '*.secret',
+      '*.apiKey',
+      '*.apiSecret',
+      '*.serviceRoleKey',
+      '*.pan',
+      '*.aadhaar',
+      '*.bankAccountNo',
+      '*.accountNumber',
+      '*.cvv',
+      '*.otp',
+    ],
     remove: true,
   },
 });
+

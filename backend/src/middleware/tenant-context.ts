@@ -1,62 +1,74 @@
 import { NextFunction, Request, Response } from 'express';
-import { ForbiddenError, UnauthorizedError } from '../common/errors';
+import { ForbiddenError } from '../common/errors';
 import { TenantService, tenantService } from '../modules/tenants/tenant.service';
 
 /**
- * Authoritative Server-Side Tenant Context Middleware
- *
- * Enforces:
- * 1. Derives tenant context directly from authenticated user identity.
- * 2. Blocks tenant header spoofing (rejects non-super-admin mismatched X-Tenant-ID with 403).
- * 3. Permits Super Admins to explicitly switch tenant context for oversight.
- * 4. Binds default primary tenant for backwards compatibility.
+ * Derives and validates tenant scope for requests.
  */
-export function tenantContext(req: Request, _res: Response, next: NextFunction): void {
-  // If not authenticated yet, proceed (for public endpoints) or use default primary tenant
+export function resolveTenantScope(req: {
+  headers?: Record<string, any>;
+  query?: Record<string, any>;
+  user?: { id?: string; roles?: string[]; tenantId?: string };
+}): { tenantId: string; code: string; name: string } {
   if (!req.user) {
     const defaultTenant = tenantService.getTenantById(TenantService.DEFAULT_PRIMARY_TENANT_ID);
-    req.tenant = {
-      id: defaultTenant.id,
-      tenantId: defaultTenant.id,
-      code: defaultTenant.code,
-      tenantCode: defaultTenant.code,
-      name: defaultTenant.name,
-      isPrimary: true,
-    };
-    return next();
+    return { tenantId: defaultTenant.id, code: defaultTenant.code, name: defaultTenant.name };
   }
 
   const userTenantId = req.user.tenantId || TenantService.DEFAULT_PRIMARY_TENANT_ID;
-  const headerTenantId = req.headers['x-tenant-id'] as string | undefined;
+  const headerTenantId = req.headers?.['x-tenant-id'] as string | undefined;
+  const queryTenantId = req.query?.tenantId as string | undefined;
+  const isSuperAdmin = req.user.roles?.includes('SUPER_ADMIN') ?? false;
 
-  let effectiveTenantId = userTenantId;
-
+  // Anti-Spoofing: Check header
   if (headerTenantId) {
-    const isSuperAdmin = req.user.roles.includes('SUPER_ADMIN');
-
     if (!isSuperAdmin && headerTenantId !== userTenantId) {
       throw new ForbiddenError(
         `Tenant context mismatch: Authenticated tenant is '${userTenantId}' but requested 'X-Tenant-ID' is '${headerTenantId}'. Cross-tenant access is prohibited.`
       );
     }
+  }
 
-    if (isSuperAdmin) {
-      // Validate that requested target tenant exists
-      tenantService.getTenantById(headerTenantId);
-      effectiveTenantId = headerTenantId;
+  // Anti-Spoofing: Check query parameter
+  if (queryTenantId) {
+    if (!isSuperAdmin && queryTenantId !== userTenantId) {
+      throw new ForbiddenError(
+        `Tenant query mismatch: Authenticated tenant is '${userTenantId}' but requested query parameter 'tenantId' is '${queryTenantId}'. Cross-tenant access is prohibited.`
+      );
     }
+  }
+
+  let effectiveTenantId = userTenantId;
+  if (isSuperAdmin && (headerTenantId || queryTenantId)) {
+    effectiveTenantId = headerTenantId || queryTenantId!;
   }
 
   const tenant = tenantService.getTenantById(effectiveTenantId);
 
-  req.tenant = {
-    id: tenant.id,
+  // Enforce Tenant Status: Block non-superadmins from accessing suspended institutions
+  if (tenant.status === 'SUSPENDED' && !isSuperAdmin) {
+    throw new ForbiddenError(
+      `Tenant '${tenant.name}' (${tenant.code}) is SUSPENDED. User access is blocked until reactivation by Super Admin.`
+    );
+  }
+
+  return {
     tenantId: tenant.id,
     code: tenant.code,
-    tenantCode: tenant.code,
     name: tenant.name,
-    isPrimary: tenant.id === TenantService.DEFAULT_PRIMARY_TENANT_ID,
   };
+}
 
+export function tenantContext(req: Request, _res: Response, next: NextFunction): void {
+  const scope = resolveTenantScope(req);
+  req.tenant = {
+    id: scope.tenantId,
+    tenantId: scope.tenantId,
+    code: scope.code,
+    tenantCode: scope.code,
+    name: scope.name,
+    isPrimary: scope.tenantId === TenantService.DEFAULT_PRIMARY_TENANT_ID,
+  };
+  req.tenantId = scope.tenantId;
   next();
 }

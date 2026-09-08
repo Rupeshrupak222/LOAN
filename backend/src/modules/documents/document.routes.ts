@@ -29,7 +29,12 @@ router.get(
       ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     const userIdFilter = isStaff ? undefined : req.user?.id;
-    const docs = await listDocuments(customerId, applicationId, userIdFilter);
+    const docs = await listDocuments(customerId, applicationId, userIdFilter, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(docs));
   })
 );
@@ -37,7 +42,12 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const doc = await getDocument(req.params.id);
+    const doc = await getDocument(req.params.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     const isStaff = req.user?.roles.some((r) =>
       ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
@@ -130,19 +140,29 @@ router.post(
 
 router.patch(
   '/:id/verify',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
   validate(verifyDocumentSchema),
   asyncHandler(async (req, res) => {
-    const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id);
+    const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(doc));
   })
 );
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
-    const result = await deleteDocument(req.params.id, req.user?.id);
+    const result = await deleteDocument(req.params.id, req.user?.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(result));
   })
 );

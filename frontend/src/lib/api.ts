@@ -1,15 +1,27 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+function getApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL;
+  if (configured && configured.trim() !== '') {
+    return configured.trim();
+  }
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    return `${window.location.origin}/api/v1`;
+  }
+  return 'http://localhost:4000/api/v1';
+}
+
+const API_URL = getApiBaseUrl();
 
 // Timeout configurations based on operation type (in ms)
 export const TIMEOUT_CONFIG = {
   DEFAULT: 15_000,   // Standard REST operations
-  AI: 30_000,        // Generative AI & Decision Intelligence
+  AI: 45_000,        // Generative AI & Decision Intelligence
   UPLOAD: 45_000,    // Document & Binary uploads
   EXPORT: 30_000,    // Large PDF / CSV reports & export bundles
   AUTH_REFRESH: 8_000 // Fast fail on token refresh
 } as const;
+
 
 export const api = axios.create({
   baseURL: API_URL,

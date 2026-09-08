@@ -18,8 +18,10 @@ export default function NewCustomerPage() {
     password: '',
     dateOfBirth: '',
     gender: 'MALE',
+    addressLine: '',
     city: '',
     state: '',
+    pincode: '',
     employmentType: 'SALARIED',
     employerName: '',
     monthlyIncome: '',
@@ -47,6 +49,10 @@ export default function NewCustomerPage() {
     try {
       const payload = {
         ...form,
+        addressLine: form.addressLine.trim() || undefined,
+        city: form.city.trim() || undefined,
+        state: form.state.trim() || undefined,
+        pincode: form.pincode.trim() || undefined,
         email: form.email || undefined,
         password: form.password && form.password.trim().length >= 6 ? form.password.trim() : undefined,
         dateOfBirth: form.dateOfBirth ? form.dateOfBirth : undefined,
@@ -78,18 +84,6 @@ export default function NewCustomerPage() {
         await api.post('/documents/upload', kycData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         }).catch((e) => console.warn('KYC upload warning:', e));
-      }
-
-      // If bank details were provided, register bank account record
-      if (form.bankName.trim() && form.bankAccountNo.trim() && form.bankIfsc.trim()) {
-        await api.post(`/customers/${newCustomerId}/bank-accounts`, {
-          bankName: form.bankName.trim(),
-          accountNumber: form.bankAccountNo.trim(),
-          ifscCode: form.bankIfsc.toUpperCase().trim(),
-          accountHolderName: `${form.firstName} ${form.lastName}`.trim(),
-          accountType: form.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
-          isPrimary: true,
-        }).catch((e) => console.warn('Bank account registration warning:', e));
       }
 
       router.push(`/customers/${newCustomerId}`);
@@ -215,9 +209,18 @@ export default function NewCustomerPage() {
 
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-              2. Geographic Location
+              2. Residential Address & Geographic Location
             </h3>
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+              <div className="sm:col-span-3">
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Street Address / House No. / Locality *</label>
+                <Input
+                  value={form.addressLine}
+                  onChange={(e) => update('addressLine', e.target.value)}
+                  placeholder="e.g. Flat 402, Green Valley Apartments, MG Road"
+                  required
+                />
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-700">City *</label>
                 <Input
@@ -233,6 +236,15 @@ export default function NewCustomerPage() {
                   value={form.state}
                   onChange={(e) => update('state', e.target.value)}
                   placeholder="e.g. Maharashtra"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Pincode *</label>
+                <Input
+                  value={form.pincode}
+                  onChange={(e) => update('pincode', e.target.value)}
+                  placeholder="e.g. 411001"
                   required
                 />
               </div>

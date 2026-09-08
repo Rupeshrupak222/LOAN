@@ -9,7 +9,7 @@ export interface TimeoutOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 25_000;
-const AI_TIMEOUT_MS = 45_000;
+const AI_TIMEOUT_MS = 50_000;
 const UPLOAD_TIMEOUT_MS = 60_000;
 const EXPORT_TIMEOUT_MS = 45_000;
 

@@ -23,13 +23,20 @@ import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { CollectionsIntelligenceModal } from '@/components/CollectionsIntelligenceModal';
 
+import { useAuth } from '@/lib/auth';
+
 export default function CollectionsPage() {
   const { isDark } = useTheme();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [selectedBucket, setSelectedBucket] = useState('');
   const [selectedCase, setSelectedCase] = useState<any | null>(null);
   const [aiCaseSelected, setAiCaseSelected] = useState<any | null>(null);
+
+  const canManageCollections = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER'].includes(r)
+  );
 
   // Modals
   const [activityModalOpen, setActivityModalOpen] = useState(false);
@@ -75,8 +82,11 @@ export default function CollectionsPage() {
       toast.success('Collection follow-up activity logged.');
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['loan'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setActivityModalOpen(false);
       setNotes('');
     },
@@ -98,8 +108,11 @@ export default function CollectionsPage() {
       toast.success('Promise-To-Pay (PTP) commitment recorded.');
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['loan'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setPtpModalOpen(false);
       setPtpAmount('');
     },
@@ -243,28 +256,32 @@ export default function CollectionsPage() {
                         >
                           <Sparkles className="h-3 w-3 text-amber-500" /> AI Brief
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            setSelectedCase(c);
-                            setActivityModalOpen(true);
-                          }}
-                          className="text-xs py-1"
-                        >
-                          <PhoneCall className="h-3 w-3 mr-1" /> Log
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedCase(c);
-                            setPtpAmount(String(c.overdueAmount || ''));
-                            setPtpModalOpen(true);
-                          }}
-                          className="text-xs py-1 text-white"
-                        >
-                          <Clock className="h-3 w-3 mr-1" /> PTP
-                        </Button>
+                        {canManageCollections && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setSelectedCase(c);
+                                setActivityModalOpen(true);
+                              }}
+                              className="text-xs py-1"
+                            >
+                              <PhoneCall className="h-3 w-3 mr-1" /> Log
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedCase(c);
+                                setPtpAmount(String(c.overdueAmount || ''));
+                                setPtpModalOpen(true);
+                              }}
+                              className="text-xs py-1 text-white bg-[#2563EB] hover:bg-blue-700 font-semibold"
+                            >
+                              <Clock className="h-3 w-3 mr-1" /> PTP
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

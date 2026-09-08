@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { decisionSimulatorService } from './decision-simulator.service';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR')
+);
 
 /**
  * POST /api/v1/decision-simulator/simulate

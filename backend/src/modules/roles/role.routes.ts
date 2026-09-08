@@ -15,6 +15,7 @@ router.use(tenantContext);
  */
 router.get(
   '/permissions-matrix',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (_req: Request, res: Response) => {
     const catalog = rolePermissionService.getPermissionCatalog();
     res.json({
@@ -31,6 +32,7 @@ router.get(
  */
 router.get(
   '/sod-rules',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (_req: Request, res: Response) => {
     const rules = rolePermissionService.getSodRules();
     res.json({
@@ -47,6 +49,7 @@ router.get(
  */
 router.post(
   '/check-sod',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req: Request, res: Response) => {
     const { permissions } = req.body;
     const result = rolePermissionService.checkSodConflicts(permissions || []);
@@ -83,6 +86,7 @@ router.get(
  */
 router.get(
   '/',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
     const roles = rolePermissionService.listRoles(tenantId);
@@ -100,7 +104,7 @@ router.get(
  */
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
     const role = await rolePermissionService.createCustomRole(tenantId, req.body, req.user as any);
@@ -118,7 +122,7 @@ router.post(
  */
 router.put(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user?.tenantId || 'tenant-adyapan-default';
     const role = await rolePermissionService.updateRole(tenantId, req.params.id, req.body, req.user as any);
