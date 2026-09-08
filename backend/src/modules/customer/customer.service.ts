@@ -357,44 +357,131 @@ export async function createCustomer(
       });
     }
 
-    if (addressLine || city || state || pincode) {
-      await tx.customerAddress.create({
-        data: {
-          customerId: cust.id,
-          addressType: 'CURRENT',
-          addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
-          city: city || '',
-          state: state || '',
-          pincode: pincode || '',
-          isPrimary: true,
-        },
-      });
-    }
+    if (existingCust) {
+      if (addressLine || city || state || pincode) {
+        const primaryAddr = await tx.customerAddress.findFirst({
+          where: { customerId: existingCust.id, isPrimary: true },
+        });
+        if (primaryAddr) {
+          await tx.customerAddress.update({
+            where: { id: primaryAddr.id },
+            data: {
+              addressLine: addressLine || primaryAddr.addressLine,
+              city: city || primaryAddr.city,
+              state: state || primaryAddr.state,
+              pincode: pincode || primaryAddr.pincode,
+            },
+          });
+        } else {
+          await tx.customerAddress.create({
+            data: {
+              customerId: existingCust.id,
+              addressType: 'CURRENT',
+              addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
+              city: city || '',
+              state: state || '',
+              pincode: pincode || '',
+              isPrimary: true,
+            },
+          });
+        }
+      }
 
-    if (bankAccountNo && bankName) {
-      await tx.customerBankAccount.create({
-        data: {
-          customerId: cust.id,
-          accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
-          bankName: bankName.trim(),
-          accountNumber: bankAccountNo.trim(),
-          ifscCode: bankIfsc?.trim() || '',
-          accountType: input.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
-          isPrimary: true,
-        },
-      });
-    }
+      if (bankAccountNo && bankName) {
+        const primaryBank = await tx.customerBankAccount.findFirst({
+          where: { customerId: existingCust.id, isPrimary: true },
+        });
+        if (primaryBank) {
+          await tx.customerBankAccount.update({
+            where: { id: primaryBank.id },
+            data: {
+              bankName: bankName.trim(),
+              accountNumber: bankAccountNo.trim(),
+              ifscCode: bankIfsc?.trim() || primaryBank.ifscCode,
+              accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
+            },
+          });
+        } else {
+          await tx.customerBankAccount.create({
+            data: {
+              customerId: existingCust.id,
+              accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
+              bankName: bankName.trim(),
+              accountNumber: bankAccountNo.trim(),
+              ifscCode: bankIfsc?.trim() || '',
+              accountType: input.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
+              isPrimary: true,
+            },
+          });
+        }
+      }
 
-    if (input.employerName) {
-      await tx.customerEmployment.create({
-        data: {
-          customerId: cust.id,
-          employmentType: input.employmentType || 'SALARIED',
-          employerName: input.employerName,
-          designation: input.designation,
-          monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
-        },
-      });
+      if (input.employerName || input.employmentType || input.monthlyIncome) {
+        const primaryEmp = await tx.customerEmployment.findFirst({
+          where: { customerId: existingCust.id },
+        });
+        if (primaryEmp) {
+          await tx.customerEmployment.update({
+            where: { id: primaryEmp.id },
+            data: {
+              employerName: input.employerName ?? primaryEmp.employerName,
+              employmentType: input.employmentType ?? primaryEmp.employmentType,
+              designation: input.designation ?? primaryEmp.designation,
+              monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : primaryEmp.monthlyIncome,
+            },
+          });
+        } else if (input.employerName) {
+          await tx.customerEmployment.create({
+            data: {
+              customerId: existingCust.id,
+              employerName: input.employerName,
+              employmentType: input.employmentType || 'SALARIED',
+              designation: input.designation,
+              monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
+            },
+          });
+        }
+      }
+    } else {
+      if (addressLine || city || state || pincode) {
+        await tx.customerAddress.create({
+          data: {
+            customerId: cust.id,
+            addressType: 'CURRENT',
+            addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
+            city: city || '',
+            state: state || '',
+            pincode: pincode || '',
+            isPrimary: true,
+          },
+        });
+      }
+
+      if (bankAccountNo && bankName) {
+        await tx.customerBankAccount.create({
+          data: {
+            customerId: cust.id,
+            accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
+            bankName: bankName.trim(),
+            accountNumber: bankAccountNo.trim(),
+            ifscCode: bankIfsc?.trim() || '',
+            accountType: input.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
+            isPrimary: true,
+          },
+        });
+      }
+
+      if (input.employerName) {
+        await tx.customerEmployment.create({
+          data: {
+            customerId: cust.id,
+            employmentType: input.employmentType || 'SALARIED',
+            employerName: input.employerName,
+            designation: input.designation,
+            monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
+          },
+        });
+      }
     }
 
     return cust;
