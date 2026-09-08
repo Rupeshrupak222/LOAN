@@ -29,6 +29,19 @@ export async function listApplications(params: PageParams, status?: string, user
   if (status) where.status = status as ApplicationStatus;
   if (userId) where.customer = { userId };
 
+  if (params.search && params.search.trim()) {
+    const q = params.search.trim();
+    where.OR = [
+      { applicationNo: { contains: q, mode: 'insensitive' } },
+      { customer: { firstName: { contains: q, mode: 'insensitive' } } },
+      { customer: { lastName: { contains: q, mode: 'insensitive' } } },
+      { customer: { email: { contains: q, mode: 'insensitive' } } },
+      { customer: { mobile: { contains: q } } },
+      { customer: { customerCode: { contains: q, mode: 'insensitive' } } },
+      { product: { name: { contains: q, mode: 'insensitive' } } },
+    ];
+  }
+
   const [rows, total] = await Promise.all([
     prisma.loanApplication.findMany({
       where,

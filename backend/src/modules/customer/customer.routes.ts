@@ -55,6 +55,16 @@ router.get(
     if (!req.user?.id) {
       throw new ForbiddenError('Not authenticated');
     }
+    const loanInclude = {
+      product: { select: { name: true, code: true, productType: true } },
+      schedule: { orderBy: { emiNumber: 'asc' as const } },
+      payments: {
+        include: { allocations: true },
+        orderBy: { paidAt: 'desc' as const },
+      },
+      closure: true,
+    };
+
     let customer = await prisma.customer.findFirst({
       where: { userId: req.user.id },
       include: {
@@ -62,7 +72,7 @@ router.get(
         employmentDetails: true,
         bankAccounts: true,
         loans: {
-          include: { product: { select: { name: true, code: true } } },
+          include: loanInclude,
           orderBy: { createdAt: 'desc' },
         },
         applications: {
@@ -110,7 +120,7 @@ router.get(
           employmentDetails: true,
           bankAccounts: true,
           loans: {
-            include: { product: { select: { name: true, code: true } } },
+            include: loanInclude,
             orderBy: { createdAt: 'desc' },
           },
           applications: {
