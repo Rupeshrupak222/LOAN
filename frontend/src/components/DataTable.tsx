@@ -53,7 +53,7 @@ export function DataTable<T extends { id: string }>({
                   <th
                     key={c.key}
                     className={cn(
-                      'px-4 py-3.5',
+                      'px-4 py-3.5 whitespace-nowrap',
                       c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
                       c.className ?? ''
                     )}
@@ -75,7 +75,7 @@ export function DataTable<T extends { id: string }>({
                     <td
                       key={`skeleton-cell-${i}-${c.key}`}
                       className={cn(
-                        'px-4 py-3.5',
+                        'px-4 py-3.5 whitespace-nowrap',
                         c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
                         c.className ?? ''
                       )}
@@ -104,7 +104,7 @@ export function DataTable<T extends { id: string }>({
                   <th
                     key={c.key}
                     className={cn(
-                      'px-4 py-3.5',
+                      'px-4 py-3.5 whitespace-nowrap',
                       c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
                       c.className ?? ''
                     )}
@@ -132,7 +132,7 @@ export function DataTable<T extends { id: string }>({
                     <td
                       key={c.key}
                       className={cn(
-                        'px-4 py-3.5 text-xs sm:text-sm',
+                        'px-4 py-3.5 text-xs sm:text-sm whitespace-nowrap',
                         c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
                         c.className ?? ''
                       )}

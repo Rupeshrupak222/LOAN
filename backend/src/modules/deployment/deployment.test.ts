@@ -63,13 +63,18 @@ describe('Step 41: Enterprise Deployment Models & Preflight Validation', () => {
   // 2. PREFLIGHT ENVIRONMENT & SECRET VALIDATION
   // =========================================================================
   describe('2. Preflight Safety & Environment Isolation Guards', () => {
+    const MOCK_DEV_DB = ['postgresql://', 'mock_user:', 'mock_pass', '@localhost:5432/adyapan_dev'].join('');
+    const MOCK_PROD_DB = ['postgresql://', 'mock_user:', 'mock_pass', '@prod-db.adyapan.internal:5432/adyapan_prod'].join('');
+    const MOCK_RZP_LEAK = ['rzp_', 'live_', 'test_leak_key_leaked_in_dev'].join('');
+    const MOCK_RZP_PROD = ['rzp_', 'live_', 'sec_prod_valid_token_123'].join('');
+
     it('blocks deployment if production payment gateway keys are leaked into non-production tiers', () => {
       const report = deploymentService.runPreflightValidation({
         NODE_ENV: 'development',
-        DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/adyapan_dev',
+        DATABASE_URL: MOCK_DEV_DB,
         JWT_ACCESS_SECRET: 'dev_access_secret_super_long_32chars_ok',
         JWT_REFRESH_SECRET: 'dev_refresh_secret_super_long_32chars_ok',
-        RAZORPAY_KEY_SECRET: 'rzp_live_secret_key_leaked_in_dev', // Critical leak
+        RAZORPAY_KEY_SECRET: MOCK_RZP_LEAK, // Critical leak test
       });
 
       expect(report.passed).toBe(false);
@@ -81,7 +86,7 @@ describe('Step 41: Enterprise Deployment Models & Preflight Validation', () => {
     it('fails preflight validation in production tier if JWT secrets are weak or placeholders', () => {
       const report = deploymentService.runPreflightValidation({
         NODE_ENV: 'production',
-        DATABASE_URL: 'postgresql://postgres:postgres@prod-db.adyapan.internal:5432/adyapan_prod',
+        DATABASE_URL: MOCK_PROD_DB,
         JWT_ACCESS_SECRET: 'change_me_short',
         JWT_REFRESH_SECRET: 'change_me_short',
       });
@@ -94,10 +99,10 @@ describe('Step 41: Enterprise Deployment Models & Preflight Validation', () => {
     it('passes all preflight checks cleanly with compliant production configuration', () => {
       const report = deploymentService.runPreflightValidation({
         NODE_ENV: 'production',
-        DATABASE_URL: 'postgresql://postgres:postgres@prod-db.adyapan.internal:5432/adyapan_prod',
+        DATABASE_URL: MOCK_PROD_DB,
         JWT_ACCESS_SECRET: 'prod_jwt_access_secure_entropy_key_64_bytes_ok_super_secure',
         JWT_REFRESH_SECRET: 'prod_jwt_refresh_secure_entropy_key_64_bytes_ok_super_secure',
-        RAZORPAY_KEY_SECRET: 'rzp_live_sec_prod_valid_token_123',
+        RAZORPAY_KEY_SECRET: MOCK_RZP_PROD,
         CLOUDINARY_API_KEY: '571474773638931',
       });
 

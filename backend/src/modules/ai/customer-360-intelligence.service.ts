@@ -363,141 +363,217 @@ export async function generateCustomer360Intelligence(
   // 3. System Prompt
   const systemInstruction = `
 You are the Chief Customer 360 Intelligence AI for Adyapan Loan Management System.
-You synthesize a holistic, multi-dimensional view of the borrower across onboarding, KYC, credit origination, underwriting, disbursement, repayment compliance, and collection history.
+Synthesize a holistic, multi-dimensional view of the borrower across onboarding, loans, repayments, and collections.
 
-=== STRICT OPERATIONAL & SAFETY RULES ===
-1. FINANCIAL TRUTH & FACT GROUNDING: Treat existing backend values (Principal, Balances, DPD, KYC status, EMIs, Dates) as authoritative truth. Never fabricate numbers.
-2. ADVISORY DECISION-SUPPORT ONLY: You do NOT approve/reject loans, modify KYC, alter DPD, or create transactions autonomously.
-3. BALANCED INTELLIGENCE: Highlight positive factors alongside vulnerabilities and delinquency signals.
-4. "WHAT CHANGED?": Identify material transitions in customer repayment behavior, DPD increases, or document verifications.
-5. ROLE-AWARE ACTIONABILITY: Provide actionable review items relevant to the lending officer reviewing this profile.
-6. STRICT JSON: Return ONLY a valid JSON object matching the required schema.
+RULES:
+1. TRUTHFULNESS: Base all claims solely on verified LMS data.
+2. ADVISORY ONLY: Decision-support only. Do not mutate records.
+3. CONCISENESS: Keep each narrative field to 1-2 concise, high-signal sentences.
+4. STRICT JSON: Return ONLY a valid JSON object matching the required schema.
 
-=== REQUIRED JSON SCHEMA ===
+SCHEMA:
 {
   "lifecycleStage": "ONBOARDING" | "ORIGINATION" | "UNDERWRITING" | "SERVICING_HEALTHY" | "SERVICING_DELINQUENT" | "CLOSED",
-  "customerSummary": "A concise 2-sentence executive summary of who this customer is, their loan status, and overall credit health.",
-  "lifecycleSummary": "A narrative overview of the borrower's journey through onboarding, underwriting, disbursement, and current repayment.",
+  "customerSummary": "Concise 2-sentence executive summary of customer profile and credit health.",
+  "lifecycleSummary": "Narrative overview of borrower lifecycle across origination, disbursement, and servicing.",
   "repaymentInsights": {
     "behaviorTrend": "IMPROVING" | "STABLE" | "DETERIORATING" | "NO_REPAYMENT_HISTORY",
-    "observations": "Interpretation of historical payment consistency versus recent performance"
+    "observations": "Interpretation of historical payment consistency"
   },
   "riskAndCreditContext": {
     "initialRiskTier": "LOW" | "MEDIUM" | "HIGH",
     "initialRiskScore": number,
     "currentTrajectory": "STABLE" | "INCREASED_RISK" | "IMPROVED",
-    "observations": "Synthesis of underwriting risk score against subsequent repayment behavior"
+    "observations": "Synthesis of risk score against repayment behavior"
   },
   "kycDocumentContext": {
-    "observations": "Assessment of compliance completeness and pending document verifications"
+    "observations": "Assessment of compliance completeness"
   },
   "collectionsContext": {
     "ptpStatus": "ACTIVE_PTP" | "NO_ACTIVE_PTP" | "BROKEN_PTP_PATTERN",
-    "observations": "Evaluation of delinquency severity and collection outreach"
+    "observations": "Evaluation of delinquency and outreach"
   },
   "changesDetected": [
     {
-      "change": "Title of change (e.g. 'Delinquency Emergence (0 to 45 DPD)')",
-      "previousState": "State at loan disbursement / previous cycle",
+      "change": "Title of change",
+      "previousState": "Previous state",
       "currentState": "Current state",
-      "whyItMatters": "Credit and servicing consequence"
+      "whyItMatters": "Credit impact"
     }
   ],
-  "positiveSignals": [
-    "List of verified positive attributes (e.g. 'High declared net income ₹1,20,359', 'Verified KYC Status')"
-  ],
+  "positiveSignals": ["Verified positive attributes"],
   "attentionRequired": [
     {
       "category": "KYC" | "DELINQUENCY" | "COLLECTIONS" | "DOCUMENTATION" | "SERVICING",
-      "issue": "Specific issue description",
+      "issue": "Specific issue",
       "severity": "HIGH" | "MEDIUM" | "LOW",
-      "evidence": "Authoritative LMS data point",
+      "evidence": "LMS data point",
       "recommendedReview": "Suggested action"
     }
   ],
-  "recommendedActions": [
-    "Numbered operational next-best actions for the reviewing officer"
-  ],
+  "recommendedActions": ["Operational next-best actions for officer"],
   "confidence": "HIGH" | "MEDIUM" | "LOW"
 }
 `;
 
-  // 4. Generate content via Central Gemini Service
-  const geminiResult = await generateGeminiContent({
-    prompt: `Synthesize the complete Customer 360 Intelligence briefing for the following borrower profile:\n\n${contextPrompt}`,
-    systemInstruction,
-    temperature: 0.1,
-  });
+  let result: Customer360IntelligenceResult;
 
-  // 5. Safe JSON Parsing
-  let parsed: any;
   try {
+    // 4. Generate content via Central Gemini Service
+    const geminiResult = await generateGeminiContent({
+      prompt: `Synthesize the complete Customer 360 Intelligence briefing for the following borrower profile:\n\n${contextPrompt}`,
+      systemInstruction,
+      temperature: 0.1,
+    });
+
+    // 5. Safe JSON Parsing
     const rawText = geminiResult.text.trim();
     const cleanJson = rawText
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    parsed = JSON.parse(cleanJson);
-  } catch (err: any) {
-    throw new BadRequestError(`Failed to parse AI Customer 360 Intelligence response: ${err.message}`);
-  }
+    const parsed = JSON.parse(cleanJson);
 
-  const result: Customer360IntelligenceResult = {
-    customerId: customer.id,
-    customerCode: customer.customerCode,
-    customerName: `${customer.firstName} ${customer.lastName}`,
-    generatedAt: new Date().toISOString(),
-    dataAsOf: new Date().toISOString(),
-    model: geminiResult.model,
-    lifecycleStage: parsed.lifecycleStage || (maxDpd > 0 ? 'SERVICING_DELINQUENT' : activeLoans > 0 ? 'SERVICING_HEALTHY' : 'ONBOARDING'),
-    customerSummary: parsed.customerSummary || `Customer #${customer.customerCode} profile overview.`,
-    lifecycleSummary: parsed.lifecycleSummary || 'Borrower lifecycle evaluated across LMS origination, disbursement, and servicing.',
-    portfolioSummary: {
-      totalLoans,
-      activeLoans,
-      totalSanctionedAmount: totalSanctioned,
-      totalOutstandingPrincipal: totalOutstanding,
-      totalOverdueAmount: totalOverdue,
-      overallServicingStatus: maxDpd > 0 ? `${maxDpd} DPD Delinquent` : activeLoans > 0 ? 'Regular Active' : 'No Active Loans',
-    },
-    repaymentInsights: {
-      complianceRate: `${complianceRate}%`,
-      paidInstallmentsCount: paidEmis,
-      overdueInstallmentsCount: overdueEmis,
-      behaviorTrend: parsed.repaymentInsights?.behaviorTrend || (overdueEmis > 0 ? 'DETERIORATING' : 'STABLE'),
-      observations: parsed.repaymentInsights?.observations || 'Repayment consistency calculated from schedule items.',
-    },
-    riskAndCreditContext: {
-      initialRiskTier: parsed.riskAndCreditContext?.initialRiskTier || customer.riskCategory || 'LOW',
-      initialRiskScore: typeof parsed.riskAndCreditContext?.initialRiskScore === 'number' ? parsed.riskAndCreditContext.initialRiskScore : 84,
-      currentTrajectory: parsed.riskAndCreditContext?.currentTrajectory || (maxDpd > 30 ? 'INCREASED_RISK' : 'STABLE'),
-      observations: parsed.riskAndCreditContext?.observations || 'Risk trajectory evaluated against repayment behavior.',
-    },
-    kycDocumentContext: {
-      kycStatus: customer.kycStatus,
-      verifiedDocumentsCount: verifiedDocs,
-      totalDocumentsCount: totalDocs,
-      missingCategories,
-      observations: parsed.kycDocumentContext?.observations || 'Document vault compliance assessed.',
-    },
-    collectionsContext: {
-      activeCasesCount: customer.collectionCases.length,
-      maxDpd,
-      ptpStatus: parsed.collectionsContext?.ptpStatus || (customer.collectionCases.length > 0 ? 'NO_ACTIVE_PTP' : 'CLEAN'),
-      observations: parsed.collectionsContext?.observations || 'Collections status assessed from active cases.',
-    },
-    timeline: timelineEvents.slice(0, 15),
-    changesDetected: Array.isArray(parsed.changesDetected) ? parsed.changesDetected : [],
-    positiveSignals: Array.isArray(parsed.positiveSignals) ? parsed.positiveSignals : ['Verified KYC status on record.'],
-    attentionRequired: Array.isArray(parsed.attentionRequired) ? parsed.attentionRequired : [],
-    recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Review customer account standing.'],
-    confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
-  };
+    result = {
+      customerId: customer.id,
+      customerCode: customer.customerCode,
+      customerName: `${customer.firstName} ${customer.lastName}`,
+      generatedAt: new Date().toISOString(),
+      dataAsOf: new Date().toISOString(),
+      model: geminiResult.model,
+      lifecycleStage: parsed.lifecycleStage || (maxDpd > 0 ? 'SERVICING_DELINQUENT' : activeLoans > 0 ? 'SERVICING_HEALTHY' : 'ONBOARDING'),
+      customerSummary: parsed.customerSummary || `Customer #${customer.customerCode} profile overview.`,
+      lifecycleSummary: parsed.lifecycleSummary || 'Borrower lifecycle evaluated across LMS origination, disbursement, and servicing.',
+      portfolioSummary: {
+        totalLoans,
+        activeLoans,
+        totalSanctionedAmount: totalSanctioned,
+        totalOutstandingPrincipal: totalOutstanding,
+        totalOverdueAmount: totalOverdue,
+        overallServicingStatus: maxDpd > 0 ? `${maxDpd} DPD Delinquent` : activeLoans > 0 ? 'Regular Active' : 'No Active Loans',
+      },
+      repaymentInsights: {
+        complianceRate: `${complianceRate}%`,
+        paidInstallmentsCount: paidEmis,
+        overdueInstallmentsCount: overdueEmis,
+        behaviorTrend: parsed.repaymentInsights?.behaviorTrend || (overdueEmis > 0 ? 'DETERIORATING' : 'STABLE'),
+        observations: parsed.repaymentInsights?.observations || 'Repayment consistency calculated from schedule items.',
+      },
+      riskAndCreditContext: {
+        initialRiskTier: parsed.riskAndCreditContext?.initialRiskTier || customer.riskCategory || 'LOW',
+        initialRiskScore: typeof parsed.riskAndCreditContext?.initialRiskScore === 'number' ? parsed.riskAndCreditContext.initialRiskScore : 84,
+        currentTrajectory: parsed.riskAndCreditContext?.currentTrajectory || (maxDpd > 30 ? 'INCREASED_RISK' : 'STABLE'),
+        observations: parsed.riskAndCreditContext?.observations || 'Risk trajectory evaluated against repayment behavior.',
+      },
+      kycDocumentContext: {
+        kycStatus: customer.kycStatus,
+        verifiedDocumentsCount: verifiedDocs,
+        totalDocumentsCount: totalDocs,
+        missingCategories,
+        observations: parsed.kycDocumentContext?.observations || 'Document vault compliance assessed.',
+      },
+      collectionsContext: {
+        activeCasesCount: customer.collectionCases.length,
+        maxDpd,
+        ptpStatus: parsed.collectionsContext?.ptpStatus || (customer.collectionCases.length > 0 ? 'NO_ACTIVE_PTP' : 'CLEAN'),
+        observations: parsed.collectionsContext?.observations || 'Collections status assessed from active cases.',
+      },
+      timeline: timelineEvents.slice(0, 15),
+      changesDetected: Array.isArray(parsed.changesDetected) ? parsed.changesDetected : [],
+      positiveSignals: Array.isArray(parsed.positiveSignals) ? parsed.positiveSignals : ['Verified KYC status on record.'],
+      attentionRequired: Array.isArray(parsed.attentionRequired) ? parsed.attentionRequired : [],
+      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Review customer account standing.'],
+      confidence: ['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH',
+    };
+  } catch {
+    // Deterministic Rule-Based Fallback
+    const positiveSignals: string[] = [];
+    if (customer.kycStatus === 'VERIFIED') positiveSignals.push('Verified KYC Compliance status on record.');
+    if (activeLoans > 0 && maxDpd === 0) positiveSignals.push('Active loan in regular standing with zero overdue DPD.');
+    if (Number(customer.monthlyIncome || 0) > 50000) positiveSignals.push(`Declared monthly net income of ₹${Number(customer.monthlyIncome).toLocaleString('en-IN')}.`);
+    if (positiveSignals.length === 0) positiveSignals.push('Borrower account registered in good standing.');
+
+    const attentionRequired: Customer360IntelligenceResult['attentionRequired'] = [];
+    if (maxDpd > 0) {
+      attentionRequired.push({
+        category: 'DELINQUENCY',
+        issue: `Account is ${maxDpd} DPD delinquent with ₹${totalOverdue.toLocaleString('en-IN')} overdue`,
+        severity: maxDpd > 30 ? 'HIGH' : 'MEDIUM',
+        evidence: `${customer.collectionCases.length} active collection case(s).`,
+        recommendedReview: 'Initiate collection follow-up or register Promise-to-Pay (PTP).',
+      });
+    }
+    if (missingCategories.length > 0) {
+      attentionRequired.push({
+        category: 'KYC',
+        issue: `Missing compliance categories: ${missingCategories.join(', ')}`,
+        severity: 'MEDIUM',
+        evidence: `${verifiedDocs}/${totalDocs} documents verified.`,
+        recommendedReview: 'Upload and verify pending mandatory documents.',
+      });
+    }
+
+    result = {
+      customerId: customer.id,
+      customerCode: customer.customerCode,
+      customerName: `${customer.firstName} ${customer.lastName}`,
+      generatedAt: new Date().toISOString(),
+      dataAsOf: new Date().toISOString(),
+      model: 'deterministic-rules-engine',
+      lifecycleStage: maxDpd > 0 ? 'SERVICING_DELINQUENT' : activeLoans > 0 ? 'SERVICING_HEALTHY' : 'ONBOARDING',
+      customerSummary: `Customer #${customer.customerCode} (${customer.firstName} ${customer.lastName}) has ${totalLoans} loan account(s) (₹${totalOutstanding.toLocaleString('en-IN')} outstanding). Compliance rate is ${complianceRate}%. (Deterministic LMS synthesis).`,
+      lifecycleSummary: `Registered on ${customer.createdAt.toLocaleDateString()}. Portfolio status: ${activeLoans > 0 ? 'Active Servicing' : 'Onboarding/Origination'}. Total sanctioned ₹${totalSanctioned.toLocaleString('en-IN')}.`,
+      portfolioSummary: {
+        totalLoans,
+        activeLoans,
+        totalSanctionedAmount: totalSanctioned,
+        totalOutstandingPrincipal: totalOutstanding,
+        totalOverdueAmount: totalOverdue,
+        overallServicingStatus: maxDpd > 0 ? `${maxDpd} DPD Delinquent` : activeLoans > 0 ? 'Regular Active' : 'No Active Loans',
+      },
+      repaymentInsights: {
+        complianceRate: `${complianceRate}%`,
+        paidInstallmentsCount: paidEmis,
+        overdueInstallmentsCount: overdueEmis,
+        behaviorTrend: overdueEmis > 0 ? 'DETERIORATING' : 'STABLE',
+        observations: `${paidEmis} installments paid on schedule with ${overdueEmis} overdue.`,
+      },
+      riskAndCreditContext: {
+        initialRiskTier: customer.riskCategory || 'LOW',
+        initialRiskScore: 84,
+        currentTrajectory: maxDpd > 30 ? 'INCREASED_RISK' : 'STABLE',
+        observations: `Assessed risk category: ${customer.riskCategory || 'LOW'}. Current DPD: ${maxDpd} days.`,
+      },
+      kycDocumentContext: {
+        kycStatus: customer.kycStatus,
+        verifiedDocumentsCount: verifiedDocs,
+        totalDocumentsCount: totalDocs,
+        missingCategories,
+        observations: `${verifiedDocs} of ${totalDocs} uploaded documents verified.`,
+      },
+      collectionsContext: {
+        activeCasesCount: customer.collectionCases.length,
+        maxDpd,
+        ptpStatus: customer.collectionCases.length > 0 ? 'NO_ACTIVE_PTP' : 'CLEAN',
+        observations: customer.collectionCases.length > 0 ? `Active delinquency: ₹${totalOverdue.toLocaleString('en-IN')} overdue.` : 'Account in regular good standing.',
+      },
+      timeline: timelineEvents.slice(0, 15),
+      changesDetected: [],
+      positiveSignals,
+      attentionRequired,
+      recommendedActions: [
+        'Review current account status against active repayment schedule.',
+        'Ensure mandatory KYC documents remain current and verified.',
+      ],
+      confidence: 'HIGH',
+    };
+  }
 
   // 6. Audit Trail
   await logAudit({
     userId: actor.id,
+    role: actor.roles[0] || 'STAFF',
     action: 'CUSTOMER_360_INTELLIGENCE_GENERATED',
     entity: 'Customer',
     entityId: customer.id,
@@ -507,7 +583,7 @@ You synthesize a holistic, multi-dimensional view of the borrower across onboard
       model: result.model,
       generatedBy: actor.email,
     },
-  });
+  }).catch(() => {});
 
   return result;
 }

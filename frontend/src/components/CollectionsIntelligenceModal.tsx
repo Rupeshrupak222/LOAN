@@ -111,25 +111,25 @@ export function CollectionsIntelligenceModal({ colCase, isOpen, onClose }: Props
         )}
       >
         {/* Header Bar */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-[#1E2445] shrink-0 bg-slate-50/50 dark:bg-[#131E36]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 text-white shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-slate-100 dark:border-[#1E2445] shrink-0 bg-slate-50/50 dark:bg-[#131E36] gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 text-white shadow-sm shrink-0">
               <Sparkles className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold">AI Predictive Collections & Recovery Briefing</h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
-                  Gemini Recovery Intelligence
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold truncate">AI Collections & Recovery</h3>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-900 shrink-0">
+                  Gemini Recovery
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-md">
+              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">
                 Case: {colCase.caseNo} · Borrower: <span className="font-semibold text-slate-300">{colCase.customerName}</span> · DPD: <span className="text-rose-500 font-bold">{colCase.dpd} Days</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
             <Button
               size="sm"
               disabled={mutation.isPending}
@@ -139,7 +139,7 @@ export function CollectionsIntelligenceModal({ colCase, isOpen, onClose }: Props
               {mutation.isPending ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  <span>Evaluating Risk...</span>
+                  <span>Evaluating...</span>
                 </>
               ) : data ? (
                 <>

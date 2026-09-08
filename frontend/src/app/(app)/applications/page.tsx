@@ -15,6 +15,8 @@ interface AppRow {
   id: string;
   applicationNo: string;
   customerName: string;
+  kycStatus?: string;
+  riskCategory?: string;
   product: string;
   requestedAmount: string;
   tenureMonths: number;
@@ -52,6 +54,11 @@ export default function ApplicationsPage() {
       ),
     },
     { key: 'customerName', header: 'Borrower' },
+    {
+      key: 'kycStatus' as any,
+      header: 'KYC Status',
+      render: (r) => <Badge status={r.kycStatus || 'NOT_STARTED'} />,
+    },
     { key: 'product', header: 'Loan Product' },
     {
       key: 'requestedAmount',

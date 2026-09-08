@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../common/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../common/errors';
 import { calculateEmi } from '../finance/emi';
 import { Money } from '../finance/money';
 import { generateLoanNo } from '../shared/codes';
@@ -7,11 +7,27 @@ import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import type { ExecuteDisbursementInput } from './disbursement.schema';
 
-export async function getReadyForDisbursementQueue() {
+export async function getReadyForDisbursementQueue(actor?: {
+  id?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}) {
+  const where: any = {
+    status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'] },
+  };
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.tenantId = actor.tenantId;
+    }
+    if ((actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) && actor.branchId) {
+      where.customer = { ...where.customer, branchId: actor.branchId };
+    }
+  }
+
   return prisma.loanApplication.findMany({
-    where: {
-      status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'] },
-    },
+    where,
     include: {
       customer: {
         include: {
@@ -26,8 +42,25 @@ export async function getReadyForDisbursementQueue() {
   });
 }
 
-export async function getDisbursementHistory() {
+export async function getDisbursementHistory(actor?: {
+  id?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}) {
+  const where: any = {};
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.loan = { tenantId: actor.tenantId };
+    }
+    if ((actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) && actor.branchId) {
+      where.loan = { ...where.loan, branchId: actor.branchId };
+    }
+  }
+
   return prisma.disbursement.findMany({
+    where,
     include: {
       loan: {
         include: {
@@ -47,8 +80,15 @@ export async function getDisbursementHistory() {
 
 export async function executeDisbursement(
   input: ExecuteDisbursementInput,
-  actor: { id: string; email: string; roles: string[] }
+  actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  const isAuthorized = actor.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans');
+  }
+
   const app = await prisma.loanApplication.findUnique({
     where: { id: input.applicationId },
     include: {
@@ -58,6 +98,21 @@ export async function executeDisbursement(
     },
   });
   if (!app) throw new NotFoundError('Loan application not found');
+
+  // Multi-Tenant Isolation & Anti-IDOR Check
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      app.customer?.branchId &&
+      app.customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
+  }
 
   // Pre-Disbursement Mandatory Checklist
   if (!['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'].includes(app.status)) {
@@ -82,6 +137,21 @@ export async function executeDisbursement(
   }
 
   const principalNum = Number(app.requestedAmount);
+
+  // Enforce Payout Limits
+  const isSuperAdmin = actor.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'ADMIN' || r === 'COMPANY_ADMIN');
+  if (!isSuperAdmin) {
+    let payoutLimit = 10000000; // Default ₹1 Crore for Finance Officer
+    if (actor.roles?.includes('DISBURSEMENT_OFFICER') && !actor.roles?.includes('FINANCE_OFFICER')) {
+      payoutLimit = 5000000; // ₹50 Lakhs for junior Disbursement Officer
+    }
+    if (principalNum > payoutLimit) {
+      throw new BadRequestError(
+        `Payout amount of ₹${principalNum.toLocaleString('en-IN')} exceeds authorized officer payout limit of ₹${payoutLimit.toLocaleString('en-IN')}. Requires senior committee authorization.`
+      );
+    }
+  }
+
   const rateNum = Number(app.product.interestRate);
   const tenure = app.tenureMonths;
 
@@ -106,6 +176,7 @@ export async function executeDisbursement(
         customerId: app.customerId,
         productId: app.productId,
         branchId: app.branchId || app.customer.branchId,
+        tenantId: app.tenantId || actor.tenantId,
         principal: Money.toDb(principalNum),
         interestRate: Money.round(rateNum).toFixed(3),
         tenureMonths: tenure,
@@ -142,12 +213,15 @@ export async function executeDisbursement(
     await tx.repaymentScheduleItem.createMany({ data: scheduleData });
 
     // 3. Create Disbursement Record
+    const disbMethod = input.disbursementMethod || 'IMPS';
+    const disbRef = input.referenceNumber || (input as any).reference || `DISB-TXN-${Date.now()}`;
+
     await tx.disbursement.create({
       data: {
         loanId: createdLoan.id,
         amount: Money.toDb(principalNum),
-        method: input.disbursementMethod,
-        reference: input.referenceNumber,
+        method: disbMethod,
+        reference: disbRef,
         status: 'COMPLETED',
         disbursedBy: actor.email,
       },
@@ -160,8 +234,8 @@ export async function executeDisbursement(
         type: 'DISBURSEMENT',
         direction: 'DEBIT',
         amount: Money.toDb(principalNum),
-        reference: input.referenceNumber,
-        description: `Disbursement of principal via ${input.disbursementMethod}. Ref: ${input.referenceNumber}`,
+        reference: disbRef,
+        description: `Disbursement of principal via ${disbMethod}. Ref: ${disbRef}`,
       },
     });
 
@@ -182,7 +256,7 @@ export async function executeDisbursement(
     });
 
     return createdLoan;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,

@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import argon2 from 'argon2';
 import { prisma } from '../../config/prisma';
-import { NotFoundError } from '../../common/errors';
+import { NotFoundError, ForbiddenError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { generateCustomerCode } from '../shared/codes';
 import { Money } from '../finance/money';
@@ -14,10 +14,39 @@ import type {
   CreateBankAccountInput,
 } from './customer.schema';
 
-export async function listCustomers(params: PageParams, status?: string, kycStatus?: string) {
+export interface CustomerActorContext {
+  id?: string;
+  email?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}
+
+export async function listCustomers(
+  params: PageParams,
+  status?: string,
+  kycStatus?: string,
+  actor?: CustomerActorContext
+) {
   const where: Prisma.CustomerWhereInput = {};
   if (status) where.status = status as any;
   if (kycStatus) where.kycStatus = kycStatus as any;
+
+  // Enforce Tenant & Branch Scoping
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.tenantId = actor.tenantId;
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') ||
+        actor.roles?.includes('LOAN_OFFICER') ||
+        actor.roles?.includes('COLLECTION_OFFICER') ||
+        actor.roles?.includes('COLLECTION_AGENT')) &&
+      actor.branchId
+    ) {
+      where.branchId = actor.branchId;
+    }
+  }
 
   if (params.search) {
     where.OR = [
@@ -67,7 +96,7 @@ export async function listCustomers(params: PageParams, status?: string, kycStat
   };
 }
 
-export async function getCustomer(id: string) {
+export async function getCustomer(id: string, actor?: CustomerActorContext) {
   const customer = await prisma.customer.findUnique({
     where: { id },
     include: {
@@ -101,6 +130,24 @@ export async function getCustomer(id: string) {
   });
   if (!customer) throw new NotFoundError('Customer not found');
 
+  // Anti-IDOR: Enforce Tenant Isolation
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') ||
+        actor.roles?.includes('LOAN_OFFICER') ||
+        actor.roles?.includes('COLLECTION_OFFICER') ||
+        actor.roles?.includes('COLLECTION_AGENT')) &&
+      actor.branchId &&
+      customer.branchId &&
+      customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to a different branch');
+    }
+  }
+
   const totalOutstanding = customer.loans.reduce(
     (acc, l) => Money.add(acc, l.outstandingPrincipal),
     Money.of(0)
@@ -116,8 +163,57 @@ export async function getCustomer(id: string) {
     Money.of(0)
   );
 
+  // If structured addresses array is empty but customer record has address data, ensure it is populated
+  let addresses = customer.addresses || [];
+  if (addresses.length === 0 && (customer.addressLine || customer.city || customer.state || customer.pincode)) {
+    const fallbackLine = customer.addressLine || (customer.city ? `${customer.city}, ${customer.state || ''}`.trim() : 'Primary Address');
+    try {
+      const autoCreated = await prisma.customerAddress.create({
+        data: {
+          customerId: customer.id,
+          addressType: 'CURRENT',
+          addressLine: fallbackLine,
+          city: customer.city || '',
+          state: customer.state || '',
+          pincode: customer.pincode || '',
+          isPrimary: true,
+        },
+      });
+      addresses = [autoCreated];
+    } catch {
+      addresses = [
+        {
+          id: `addr-legacy-${customer.id.slice(0, 8)}`,
+          customerId: customer.id,
+          addressType: 'CURRENT',
+          addressLine: fallbackLine,
+          city: customer.city || '',
+          state: customer.state || '',
+          pincode: customer.pincode || '',
+          isPrimary: true,
+          createdAt: customer.createdAt,
+        } as any,
+      ];
+    }
+  }
+
+  // Deduplicate bank accounts to guarantee no duplicate cards are shown
+  const rawBankAccounts = customer.bankAccounts || [];
+  const seenBankKeys = new Set<string>();
+  const bankAccounts = [];
+  const sortedBanks = [...rawBankAccounts].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+  for (const b of sortedBanks) {
+    const key = `${b.accountNumber?.trim()}_${b.ifscCode?.trim()}`;
+    if (!seenBankKeys.has(key)) {
+      seenBankKeys.add(key);
+      bankAccounts.push(b);
+    }
+  }
+
   return {
     ...customer,
+    addresses,
+    bankAccounts,
     summary: {
       totalBorrowed: Money.toDb(totalBorrowed),
       totalRepaid: Money.toDb(totalRepaid),
@@ -129,20 +225,39 @@ export async function getCustomer(id: string) {
   };
 }
 
-export async function createCustomer(input: CreateCustomerInput, actorUserId?: string) {
+export async function createCustomer(
+  input: CreateCustomerInput & { phone?: string; address?: any; bankAccount?: any; tenantId?: string },
+  actorUserId?: string,
+  actorOrTenantId?: string | CustomerActorContext
+) {
+  const tenantFromActor = typeof actorOrTenantId === 'string'
+    ? actorOrTenantId
+    : (actorOrTenantId as CustomerActorContext)?.tenantId;
+  const effectiveTenantId = tenantFromActor || input.tenantId || 'tenant-adyapan-default';
+  const mobile = input.mobile || input.phone || '';
+  const addressLine = input.addressLine || input.address?.addressLine || null;
+  const city = input.city || input.address?.city || null;
+  const state = input.state || input.address?.state || null;
+  const pincode = input.pincode || input.address?.pincode || null;
+
+  const bankName = input.bankName || input.bankAccount?.bankName || null;
+  const bankAccountNo = input.bankAccountNo || input.bankAccount?.accountNumber || input.bankAccount?.bankAccountNo || null;
+  const bankIfsc = input.bankIfsc || input.bankAccount?.ifscCode || input.bankAccount?.bankIfsc || null;
+
+  // Compute password hash outside transaction
+  const rawPassword =
+    input.password && input.password.trim().length >= 6
+      ? input.password.trim()
+      : process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
+  const passwordHash = input.email ? await argon2.hash(rawPassword, { type: argon2.argon2id }) : null;
+
   const customer = await prisma.$transaction(async (tx) => {
     let customerUserId: string | undefined = undefined;
 
     // If email is provided, create linked User account with CUSTOMER role and hashed password
-    if (input.email) {
+    if (input.email && passwordHash) {
       const cleanEmail = input.email.toLowerCase().trim();
       const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
-
-      const rawPassword =
-        input.password && input.password.trim().length >= 6
-          ? input.password.trim()
-          : process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
-      const passwordHash = await argon2.hash(rawPassword, { type: argon2.argon2id });
 
       const user = await tx.user.upsert({
         where: { email: cleanEmail },
@@ -150,6 +265,7 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
           firstName: input.firstName,
           lastName: input.lastName,
           status: 'ACTIVE',
+          tenantId: effectiveTenantId,
           ...(input.branchId ? { branchId: input.branchId } : {}),
         },
         create: {
@@ -158,6 +274,7 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
           lastName: input.lastName,
           passwordHash,
           status: 'ACTIVE',
+          tenantId: effectiveTenantId,
           branchId: input.branchId,
         },
       });
@@ -181,7 +298,7 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
         OR: [
           ...(customerUserId ? [{ userId: customerUserId }] : []),
           ...(cleanEmail ? [{ email: cleanEmail }] : []),
-          { mobile: input.mobile },
+          { mobile: mobile || input.mobile },
         ],
       },
     });
@@ -192,47 +309,49 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
         where: { id: existingCust.id },
         data: {
           userId: customerUserId || existingCust.userId,
+          tenantId: effectiveTenantId,
           firstName: input.firstName,
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth || existingCust.dateOfBirth,
           gender: input.gender || existingCust.gender,
-          mobile: input.mobile,
+          mobile: mobile || input.mobile,
           email: cleanEmail || existingCust.email,
-          addressLine: input.addressLine || existingCust.addressLine,
-          city: input.city || existingCust.city,
-          state: input.state || existingCust.state,
-          pincode: input.pincode || existingCust.pincode,
+          addressLine: addressLine || input.addressLine || existingCust.addressLine,
+          city: city || input.city || existingCust.city,
+          state: state || input.state || existingCust.state,
+          pincode: pincode || input.pincode || existingCust.pincode,
           employmentType: input.employmentType || existingCust.employmentType,
           employerName: input.employerName || existingCust.employerName,
           monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : existingCust.monthlyIncome,
-          bankName: input.bankName || existingCust.bankName,
-          bankAccountNo: input.bankAccountNo || existingCust.bankAccountNo,
-          bankIfsc: input.bankIfsc || existingCust.bankIfsc,
+          bankName: bankName || input.bankName || existingCust.bankName,
+          bankAccountNo: bankAccountNo || input.bankAccountNo || existingCust.bankAccountNo,
+          bankIfsc: bankIfsc || input.bankIfsc || existingCust.bankIfsc,
         },
       });
     } else {
       cust = await tx.customer.create({
         data: {
           userId: customerUserId,
+          tenantId: effectiveTenantId,
           customerCode: generateCustomerCode(),
           firstName: input.firstName,
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth,
           gender: input.gender,
-          mobile: input.mobile,
+          mobile: mobile || input.mobile,
           email: cleanEmail,
-          addressLine: input.addressLine,
-          city: input.city,
-          state: input.state,
-          pincode: input.pincode,
+          addressLine: addressLine || input.addressLine,
+          city: city || input.city,
+          state: state || input.state,
+          pincode: pincode || input.pincode,
           employmentType: input.employmentType,
           employerName: input.employerName,
           monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
           existingObligations:
             input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
-          bankName: input.bankName,
-          bankAccountNo: input.bankAccountNo,
-          bankIfsc: input.bankIfsc,
+          bankName: bankName || input.bankName,
+          bankAccountNo: bankAccountNo || input.bankAccountNo,
+          bankIfsc: bankIfsc || input.bankIfsc,
           branchId: input.branchId,
           kycStatus: 'NOT_STARTED',
           status: 'DRAFT',
@@ -240,36 +359,38 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
       });
     }
 
-    if (input.addressLine && input.city) {
+    if (addressLine || city || input.addressLine || input.city) {
       const existingAddr = await tx.customerAddress.findFirst({ where: { customerId: cust.id } });
       if (!existingAddr) {
         await tx.customerAddress.create({
           data: {
             customerId: cust.id,
             addressType: 'CURRENT',
-            addressLine: input.addressLine,
-            city: input.city,
-            state: input.state || '',
-            pincode: input.pincode || '',
+            addressLine: (addressLine || input.addressLine) || (city || input.city ? `${city || input.city}, ${state || input.state || ''}`.trim() : 'Primary Address'),
+            city: (city || input.city) || '',
+            state: (state || input.state) || '',
+            pincode: (pincode || input.pincode) || '',
             isPrimary: true,
           },
         });
       }
     }
 
-    if (input.bankAccountNo && input.bankName) {
+    if ((bankAccountNo || input.bankAccountNo) && (bankName || input.bankName)) {
+      const accNo = (bankAccountNo || input.bankAccountNo)!.trim();
+      const bName = (bankName || input.bankName)!.trim();
       const existingBank = await tx.customerBankAccount.findFirst({
-        where: { customerId: cust.id, accountNumber: input.bankAccountNo },
+        where: { customerId: cust.id, accountNumber: accNo },
       });
       if (!existingBank) {
         await tx.customerBankAccount.create({
           data: {
             customerId: cust.id,
-            accountHolderName: `${input.firstName} ${input.lastName}`,
-            bankName: input.bankName,
-            accountNumber: input.bankAccountNo,
-            ifscCode: input.bankIfsc || '',
-            accountType: 'SAVINGS',
+            accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
+            bankName: bName,
+            accountNumber: accNo,
+            ifscCode: (bankIfsc || input.bankIfsc || '')!.trim(),
+            accountType: input.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
             isPrimary: true,
           },
         });
@@ -289,38 +410,50 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
     }
 
     return cust;
-  });
+  }, { maxWait: 20000, timeout: 60000 });
 
   await logAudit({
-    userId: actorUserId,
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: effectiveTenantId,
     action: 'CUSTOMER_CREATED',
     entity: 'Customer',
     entityId: customer.id,
     newValue: { code: customer.customerCode, name: `${customer.firstName} ${customer.lastName}` },
-  });
+  }).catch(() => {});
 
   return customer;
 }
 
 export async function updateCustomer(
   id: string,
-  input: Partial<CreateCustomerInput>,
-  actorUserId?: string
+  input: Partial<CreateCustomerInput> & { phone?: string; address?: any; bankAccount?: any },
+  actorUserId?: string,
+  actor?: CustomerActorContext
 ) {
-  const existing = await getCustomer(id);
+  const existing = await getCustomer(id, actor);
+
+  const mobile = input.mobile !== undefined ? input.mobile : input.phone;
+  const addressLine = input.addressLine !== undefined ? input.addressLine : input.address?.addressLine;
+  const city = input.city !== undefined ? input.city : input.address?.city;
+  const state = input.state !== undefined ? input.state : input.address?.state;
+  const pincode = input.pincode !== undefined ? input.pincode : input.address?.pincode;
+
+  const bankName = input.bankName !== undefined ? input.bankName : input.bankAccount?.bankName;
+  const bankAccountNo = input.bankAccountNo !== undefined ? input.bankAccountNo : (input.bankAccount?.accountNumber || input.bankAccount?.bankAccountNo);
+  const bankIfsc = input.bankIfsc !== undefined ? input.bankIfsc : (input.bankAccount?.ifscCode || input.bankAccount?.bankIfsc);
 
   const updated = await prisma.$transaction(async (tx) => {
     const data: Prisma.CustomerUpdateInput = {};
     if (input.firstName !== undefined) data.firstName = input.firstName;
     if (input.lastName !== undefined) data.lastName = input.lastName;
-    if (input.mobile !== undefined) data.mobile = input.mobile;
+    if (mobile !== undefined) data.mobile = mobile;
     if (input.email !== undefined) data.email = input.email ? input.email.toLowerCase().trim() : null;
     if (input.dateOfBirth !== undefined) data.dateOfBirth = input.dateOfBirth;
     if (input.gender !== undefined) data.gender = input.gender;
-    if (input.addressLine !== undefined) data.addressLine = input.addressLine;
-    if (input.city !== undefined) data.city = input.city;
-    if (input.state !== undefined) data.state = input.state;
-    if (input.pincode !== undefined) data.pincode = input.pincode;
+    if (addressLine !== undefined) data.addressLine = addressLine;
+    if (city !== undefined) data.city = city;
+    if (state !== undefined) data.state = state;
+    if (pincode !== undefined) data.pincode = pincode;
     if (input.employmentType !== undefined) data.employmentType = input.employmentType;
     if (input.employerName !== undefined) data.employerName = input.employerName;
     if (input.monthlyIncome !== undefined) {
@@ -329,9 +462,9 @@ export async function updateCustomer(
     if (input.existingObligations !== undefined) {
       data.existingObligations = input.existingObligations != null ? Money.toDb(input.existingObligations) : null;
     }
-    if (input.bankName !== undefined) data.bankName = input.bankName;
-    if (input.bankAccountNo !== undefined) data.bankAccountNo = input.bankAccountNo;
-    if (input.bankIfsc !== undefined) data.bankIfsc = input.bankIfsc;
+    if (bankName !== undefined) data.bankName = bankName;
+    if (bankAccountNo !== undefined) data.bankAccountNo = bankAccountNo;
+    if (bankIfsc !== undefined) data.bankIfsc = bankIfsc;
 
     // 1. If password or user details updated, sync with User table
     if (existing.userId) {
@@ -357,6 +490,7 @@ export async function updateCustomer(
           lastName: input.lastName || existing.lastName,
           passwordHash,
           status: 'ACTIVE',
+          tenantId: existing.tenantId,
         },
         create: {
           email: input.email.toLowerCase().trim(),
@@ -364,6 +498,7 @@ export async function updateCustomer(
           lastName: input.lastName || existing.lastName,
           passwordHash,
           status: 'ACTIVE',
+          tenantId: existing.tenantId,
         },
       });
       if (customerRole) {
@@ -377,27 +512,27 @@ export async function updateCustomer(
     }
 
     // 2. Sync Address table if address updated
-    if (input.addressLine || input.city) {
+    if (addressLine !== undefined || city !== undefined || state !== undefined || pincode !== undefined) {
       const primaryAddr = await tx.customerAddress.findFirst({ where: { customerId: id, isPrimary: true } });
       if (primaryAddr) {
         await tx.customerAddress.update({
           where: { id: primaryAddr.id },
           data: {
-            addressLine: input.addressLine ?? primaryAddr.addressLine,
-            city: input.city ?? primaryAddr.city,
-            state: input.state ?? primaryAddr.state,
-            pincode: input.pincode ?? primaryAddr.pincode,
+            addressLine: addressLine !== undefined ? (addressLine || primaryAddr.addressLine) : primaryAddr.addressLine,
+            city: city !== undefined ? (city || primaryAddr.city) : primaryAddr.city,
+            state: state !== undefined ? (state || primaryAddr.state) : primaryAddr.state,
+            pincode: pincode !== undefined ? (pincode || primaryAddr.pincode) : primaryAddr.pincode,
           },
         });
-      } else if (input.addressLine && input.city) {
+      } else if (addressLine || city || state || pincode) {
         await tx.customerAddress.create({
           data: {
             customerId: id,
             addressType: 'CURRENT',
-            addressLine: input.addressLine,
-            city: input.city,
-            state: input.state || '',
-            pincode: input.pincode || '',
+            addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
+            city: city || '',
+            state: state || '',
+            pincode: pincode || '',
             isPrimary: true,
           },
         });
@@ -405,24 +540,24 @@ export async function updateCustomer(
     }
 
     // 3. Sync Bank Account table if bank details updated
-    if (input.bankName || input.bankAccountNo) {
+    if (bankName || bankAccountNo) {
       const primaryBank = await tx.customerBankAccount.findFirst({ where: { customerId: id, isPrimary: true } });
       if (primaryBank) {
         await tx.customerBankAccount.update({
           where: { id: primaryBank.id },
           data: {
-            bankName: input.bankName ?? primaryBank.bankName,
-            accountNumber: input.bankAccountNo ?? primaryBank.accountNumber,
-            ifscCode: input.bankIfsc ?? primaryBank.ifscCode,
+            bankName: bankName ?? primaryBank.bankName,
+            accountNumber: bankAccountNo ?? primaryBank.accountNumber,
+            ifscCode: bankIfsc ?? primaryBank.ifscCode,
           },
         });
-      } else if (input.bankName && input.bankAccountNo) {
+      } else if (bankName && bankAccountNo) {
         await tx.customerBankAccount.create({
           data: {
             customerId: id,
-            bankName: input.bankName,
-            accountNumber: input.bankAccountNo,
-            ifscCode: input.bankIfsc || '',
+            bankName,
+            accountNumber: bankAccountNo,
+            ifscCode: bankIfsc || '',
             accountHolderName: `${input.firstName || existing.firstName} ${input.lastName || existing.lastName}`,
             accountType: 'SAVINGS',
             isPrimary: true,
@@ -457,18 +592,19 @@ export async function updateCustomer(
       }
     }
 
-    // 4. Update customer record
+    // 5. Update customer record
     return tx.customer.update({ where: { id }, data });
   });
 
   await logAudit({
-    userId: actorUserId,
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: existing.tenantId || undefined,
     action: 'CUSTOMER_UPDATED',
     entity: 'Customer',
     entityId: id,
     previousValue: { name: `${existing.firstName} ${existing.lastName}`, status: existing.status },
     newValue: input,
-  });
+  }).catch(() => {});
 
   return updated;
 }
@@ -476,9 +612,10 @@ export async function updateCustomer(
 export async function updateKycStatus(
   id: string,
   input: UpdateKycStatusInput,
-  actorUserId?: string
+  actorUserId?: string,
+  actor?: CustomerActorContext
 ) {
-  const existing = await getCustomer(id);
+  const existing = await getCustomer(id, actor);
 
   let newCustomerStatus = existing.status;
   if (input.kycStatus === 'VERIFIED') newCustomerStatus = 'ACTIVE';
@@ -495,14 +632,42 @@ export async function updateKycStatus(
     },
   });
 
+  // Synchronize related pending loan applications if KYC status is VERIFIED
+  if (input.kycStatus === 'VERIFIED') {
+    const pendingApps = await prisma.loanApplication.findMany({
+      where: {
+        customerId: id,
+        status: { in: ['KYC_PENDING', 'DRAFT'] },
+      },
+    });
+    for (const app of pendingApps) {
+      if (app.status === 'KYC_PENDING') {
+        await prisma.loanApplication.update({
+          where: { id: app.id },
+          data: { status: 'KYC_VERIFIED' },
+        });
+        await prisma.applicationStatusHistory.create({
+          data: {
+            applicationId: app.id,
+            fromStatus: app.status,
+            toStatus: 'KYC_VERIFIED',
+            changedBy: actorUserId || 'Credit Analyst / KYC Compliance',
+            reason: input.remarks || 'Customer identity & KYC compliance successfully verified',
+          },
+        });
+      }
+    }
+  }
+
   await logAudit({
-    userId: actorUserId,
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: existing.tenantId || undefined,
     action: 'KYC_STATUS_UPDATED',
     entity: 'Customer',
     entityId: id,
     previousValue: { kycStatus: existing.kycStatus, status: existing.status },
     newValue: { kycStatus: input.kycStatus, status: newCustomerStatus, remarks: input.remarks },
-  });
+  }).catch(() => {});
 
   // Async non-blocking notification
   void sendNotification({
@@ -521,9 +686,10 @@ export async function updateKycStatus(
 export async function addCustomerAddress(
   customerId: string,
   input: CreateAddressInput,
-  actorUserId?: string
+  actorUserId?: string,
+  actor?: CustomerActorContext
 ) {
-  await getCustomer(customerId);
+  const existing = await getCustomer(customerId, actor);
   if (input.isPrimary) {
     await prisma.customerAddress.updateMany({
       where: { customerId },
@@ -535,12 +701,13 @@ export async function addCustomerAddress(
   });
 
   await logAudit({
-    userId: actorUserId,
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: existing.tenantId || undefined,
     action: 'CUSTOMER_ADDRESS_ADDED',
     entity: 'CustomerAddress',
     entityId: address.id,
     newValue: input,
-  });
+  }).catch(() => {});
 
   return address;
 }
@@ -548,40 +715,109 @@ export async function addCustomerAddress(
 export async function addCustomerBankAccount(
   customerId: string,
   input: CreateBankAccountInput,
-  actorUserId?: string
+  actorUserId?: string,
+  actor?: CustomerActorContext
 ) {
-  await getCustomer(customerId);
+  const existing = await getCustomer(customerId, actor);
+  const cleanAccountNo = input.accountNumber.trim();
+  const cleanIfsc = input.ifscCode.toUpperCase().trim();
+
   if (input.isPrimary) {
     await prisma.customerBankAccount.updateMany({
       where: { customerId },
       data: { isPrimary: false },
     });
   }
+
+  const existingBank = await prisma.customerBankAccount.findFirst({
+    where: {
+      customerId,
+      accountNumber: cleanAccountNo,
+    },
+  });
+
+  if (existingBank) {
+    const updated = await prisma.customerBankAccount.update({
+      where: { id: existingBank.id },
+      data: {
+        bankName: input.bankName.trim(),
+        ifscCode: cleanIfsc,
+        accountHolderName: input.accountHolderName.trim(),
+        accountType: input.accountType || existingBank.accountType,
+        isPrimary: input.isPrimary ?? existingBank.isPrimary,
+      },
+    });
+
+    await logAudit({
+      userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+      tenantId: existing.tenantId || undefined,
+      action: 'CUSTOMER_BANK_ACCOUNT_UPDATED',
+      entity: 'CustomerBankAccount',
+      entityId: updated.id,
+      newValue: { bank: input.bankName, account: cleanAccountNo },
+    }).catch(() => {});
+
+    return updated;
+  }
+
   const account = await prisma.customerBankAccount.create({
-    data: { customerId, ...input },
+    data: {
+      customerId,
+      bankName: input.bankName.trim(),
+      accountNumber: cleanAccountNo,
+      ifscCode: cleanIfsc,
+      accountHolderName: input.accountHolderName.trim(),
+      accountType: input.accountType || 'SAVINGS',
+      isPrimary: input.isPrimary ?? true,
+    },
   });
 
   await logAudit({
-    userId: actorUserId,
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: existing.tenantId || undefined,
     action: 'CUSTOMER_BANK_ACCOUNT_ADDED',
     entity: 'CustomerBankAccount',
     entityId: account.id,
-    newValue: { bank: input.bankName, account: input.accountNumber },
-  });
+    newValue: { bank: input.bankName, account: cleanAccountNo },
+  }).catch(() => {});
 
   return account;
 }
 
-export async function deleteCustomer(id: string, actorUserId?: string) {
-  const customer = await prisma.customer.findUnique({
-    where: { id },
-    include: {
-      user: true,
-      loans: true,
-      applications: true,
-    },
+export async function deleteCustomerBankAccount(
+  customerId: string,
+  bankAccountId: string,
+  actorUserId?: string,
+  actor?: CustomerActorContext
+) {
+  const existing = await getCustomer(customerId, actor);
+  const account = await prisma.customerBankAccount.findFirst({
+    where: { id: bankAccountId, customerId },
   });
-  if (!customer) throw new NotFoundError('Customer not found');
+  if (!account) throw new NotFoundError('Bank account record not found');
+
+  await prisma.customerBankAccount.delete({
+    where: { id: bankAccountId },
+  });
+
+  await logAudit({
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: existing.tenantId || undefined,
+    action: 'CUSTOMER_BANK_ACCOUNT_DELETED',
+    entity: 'CustomerBankAccount',
+    entityId: bankAccountId,
+    newValue: { bank: account.bankName, account: account.accountNumber },
+  }).catch(() => {});
+
+  return { success: true, message: 'Bank account record deleted successfully' };
+}
+
+export async function deleteCustomer(
+  id: string,
+  actorUserId?: string,
+  actor?: CustomerActorContext
+) {
+  const customer = await getCustomer(id, actor);
 
   // Perform cascading deletion in transaction
   await prisma.$transaction(async (tx) => {
@@ -643,7 +879,8 @@ export async function deleteCustomer(id: string, actorUserId?: string) {
   });
 
   await logAudit({
-    userId: actorUserId,
+    userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
+    tenantId: customer.tenantId || undefined,
     action: 'CUSTOMER_DELETED',
     entity: 'Customer',
     entityId: id,
@@ -652,8 +889,7 @@ export async function deleteCustomer(id: string, actorUserId?: string) {
       name: `${customer.firstName} ${customer.lastName}`,
       email: customer.email,
     },
-  });
+  }).catch(() => {});
 
   return { success: true, message: `Customer ${customer.customerCode} permanently deleted from database` };
 }
-

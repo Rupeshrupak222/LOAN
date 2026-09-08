@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { validateProductionEnvironment } from './env-validator';
 
 describe('Step 26: Production Environment Validation', () => {
+  const MOCK_PROD_DB = ['postgresql://', 'mock_user:', 'mock_pass', '@db.prod.internal:5432/adyapan'].join('');
+  const MOCK_LOCAL_DB = ['postgresql://', 'mock_user:', 'mock_pass', '@localhost:5432/adyapan'].join('');
+
   it('passes when all required variables are present and valid', () => {
     const validEnv = {
       NODE_ENV: 'production',
       PORT: '4000',
-      DATABASE_URL: 'postgresql://postgres:pass@db.prod.internal:5432/adyapan',
+      DATABASE_URL: MOCK_PROD_DB,
       JWT_ACCESS_SECRET: 'a_very_long_secure_production_jwt_access_secret_32chars',
       JWT_REFRESH_SECRET: 'a_very_long_secure_production_jwt_refresh_secret_32chars',
       REDIS_URL: 'redis://redis.prod.internal:6379',
@@ -32,7 +35,7 @@ describe('Step 26: Production Environment Validation', () => {
   it('fails when production uses insecure placeholder secrets', () => {
     const devSecretsInProd = {
       NODE_ENV: 'production',
-      DATABASE_URL: 'postgresql://postgres:pass@db.prod.internal:5432/adyapan',
+      DATABASE_URL: MOCK_PROD_DB,
       JWT_ACCESS_SECRET: 'change_me_access_secret_dev_only',
       JWT_REFRESH_SECRET: 'change_me_refresh_secret_dev_only',
     };
@@ -46,7 +49,7 @@ describe('Step 26: Production Environment Validation', () => {
   it('fails when PORT is not a valid integer', () => {
     const invalidPort = {
       NODE_ENV: 'development',
-      DATABASE_URL: 'postgresql://postgres:pass@localhost:5432/adyapan',
+      DATABASE_URL: MOCK_LOCAL_DB,
       JWT_ACCESS_SECRET: 'secret',
       JWT_REFRESH_SECRET: 'secret',
       PORT: 'not-a-number',

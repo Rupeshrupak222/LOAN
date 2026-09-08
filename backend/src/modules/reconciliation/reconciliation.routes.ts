@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { reconciliationService } from './reconciliation.service';
 
 const router = Router();
@@ -14,8 +14,15 @@ router.use(authenticate);
  */
 router.post(
   '/run',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
-    const result = await reconciliationService.runReconciliation();
+    const result = await reconciliationService.runReconciliation({
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(result));
   })
 );
@@ -26,10 +33,14 @@ router.post(
  */
 router.get(
   '/dashboard',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const stats = await reconciliationService.getDashboardStats({
       id: req.user!.id,
+      email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
     res.json(success(stats));
   })
@@ -41,6 +52,7 @@ router.get(
  */
 router.get(
   '/exceptions',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { status, severity, type, loanId } = req.query;
 
@@ -53,7 +65,10 @@ router.get(
       },
       {
         id: req.user!.id,
+        email: req.user!.email,
         roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
       }
     );
 
@@ -67,6 +82,7 @@ router.get(
  */
 router.post(
   '/adjustments',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const { type, loanId, exceptionId, amount, reason } = req.body || {};
 
@@ -82,6 +98,8 @@ router.post(
         id: req.user!.id,
         email: req.user!.email,
         roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
       }
     );
 
@@ -95,6 +113,7 @@ router.post(
  */
 router.post(
   '/adjustments/:id/approve',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -102,6 +121,8 @@ router.post(
       id: req.user!.id,
       email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
 
     res.json(success(approved));
@@ -114,6 +135,7 @@ router.post(
  */
 router.post(
   '/adjustments/:id/reject',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { rejectionReason } = req.body || {};
@@ -125,6 +147,8 @@ router.post(
         id: req.user!.id,
         email: req.user!.email,
         roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
       }
     );
 
@@ -138,10 +162,14 @@ router.post(
  */
 router.get(
   '/adjustments',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const adjustments = reconciliationService.listAdjustments({
       id: req.user!.id,
+      email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
 
     res.json(success(adjustments));
@@ -149,3 +177,4 @@ router.get(
 );
 
 export const reconciliationRoutes = router;
+

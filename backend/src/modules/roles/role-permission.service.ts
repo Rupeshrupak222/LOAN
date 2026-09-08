@@ -149,6 +149,28 @@ export class RolePermissionService {
         payoutLimit: 100000000,
       },
       {
+        code: 'COMPANY_ADMIN',
+        name: 'Company / Institution Administrator',
+        description: 'Tenant management, staff provisioning, policy and integration management for own company',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'APPLICATIONS_ASSIGN',
+          'CONFIGURATION_VIEW_POLICIES',
+          'CONFIGURATION_DRAFT_POLICY',
+          'CONFIGURATION_PUBLISH_POLICY',
+          'CONFIGURATION_CONFIGURE_INTEGRATIONS',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+          'AUDIT_VERIFY_CHAIN',
+          'TENANT_MANAGE_USERS',
+          'TENANT_ASSIGN_ROLES',
+          'TENANT_VIEW_OPERATIONS_CENTER',
+          'TENANT_CONFIGURE_BRANDING',
+        ],
+        scope: 'TENANT',
+        sanctionLimit: 50000000,
+        payoutLimit: 50000000,
+      },
+      {
         code: 'ADMIN',
         name: 'Institutional Administrator',
         description: 'Tenant management, user provisioning, policy and integration management',
@@ -171,6 +193,39 @@ export class RolePermissionService {
         payoutLimit: 50000000,
       },
       {
+        code: 'BRANCH_MANAGER',
+        name: 'Branch Manager',
+        description: 'Branch-level operational oversight, staff management, and pipeline orchestration',
+        permissions: [
+          'APPLICATIONS_CREATE',
+          'APPLICATIONS_VIEW',
+          'APPLICATIONS_ASSIGN',
+          'APPLICATIONS_REVIEW',
+          'CONFIGURATION_VIEW_POLICIES',
+          'CONFIGURATION_DRAFT_POLICY',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+          'TENANT_VIEW_OPERATIONS_CENTER',
+        ],
+        scope: 'BRANCH',
+        sanctionLimit: 2500000,
+        payoutLimit: 2500000,
+      },
+      {
+        code: 'CREDIT_ANALYST',
+        name: 'Credit & Risk Analyst',
+        description: 'Financial statement analysis, bureau review, risk scoring, and credit recommendation',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'APPLICATIONS_REVIEW',
+          'UNDERWRITING_VIEW_BUREAU',
+          'UNDERWRITING_RUN_AI_ASSIST',
+          'CONFIGURATION_VIEW_POLICIES',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+        ],
+        scope: 'TENANT',
+        sanctionLimit: 0,
+      },
+      {
         code: 'UNDERWRITER',
         name: 'Credit Underwriter',
         description: 'Credit assessment, bureau analysis, and loan application sanctioning',
@@ -186,8 +241,22 @@ export class RolePermissionService {
           'CONFIGURATION_VIEW_POLICIES',
           'PRIVACY_VIEW_CONSENT_REGISTRY',
         ],
-        scope: 'BRANCH',
-        sanctionLimit: 5000000, // ₹50 Lakh single officer sanction limit
+        scope: 'TENANT',
+        sanctionLimit: 1000000, // ₹10 Lakh standard underwriter sanction limit
+      },
+      {
+        code: 'FINANCE_OFFICER',
+        name: 'Finance & Accounts Officer',
+        description: 'Payment batch processing, disbursements, reconciliation, and accounting',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'DISBURSEMENTS_INITIATE_PAYOUT',
+          'DISBURSEMENTS_EXECUTE_TRANSFER',
+          'DISBURSEMENTS_RECONCILE',
+          'PRIVACY_VIEW_CONSENT_REGISTRY',
+        ],
+        scope: 'TENANT',
+        payoutLimit: 10000000,
       },
       {
         code: 'DISBURSEMENT_OFFICER',
@@ -216,6 +285,18 @@ export class RolePermissionService {
         payoutLimit: 50000000,
       },
       {
+        code: 'COLLECTION_OFFICER',
+        name: 'Collections Officer',
+        description: 'Branch collections portfolio oversight, delinquent borrower engagement, and PTP logging',
+        permissions: [
+          'APPLICATIONS_VIEW',
+          'COLLECTIONS_VIEW_DPD',
+          'COLLECTIONS_RECORD_PTP',
+          'COLLECTIONS_INITIATE_RECOVERY',
+        ],
+        scope: 'BRANCH',
+      },
+      {
         code: 'COLLECTION_AGENT',
         name: 'Collections & Recovery Agent',
         description: 'Manages overdue accounts, records promises to pay, and initiates recovery actions',
@@ -224,7 +305,6 @@ export class RolePermissionService {
           'COLLECTIONS_VIEW_DPD',
           'COLLECTIONS_RECORD_PTP',
           'COLLECTIONS_INITIATE_RECOVERY',
-          'COLLECTIONS_WAIVE_PENALTY',
         ],
         scope: 'REGION',
       },
@@ -417,8 +497,8 @@ export class RolePermissionService {
       timestamp: now,
     });
 
-    await logAudit({
-      userId: actor.id?.startsWith('usr-') ? actor.id : undefined,
+    logAudit({
+      userId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.id) ? actor.id : undefined,
       role: actor.roles[0],
       action: 'CUSTOM_ROLE_CREATED',
       entity: 'CustomRole',
@@ -534,6 +614,17 @@ export class RolePermissionService {
     return true;
   }
 
+  public validateRoleAssignment(
+    actor: { id: string; roles: string[]; tenantId?: string },
+    targetRoleCode: string
+  ): void {
+    if (targetRoleCode.toUpperCase() === 'SUPER_ADMIN') {
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError('Privilege escalation denied: Only Super Admins can grant the SUPER_ADMIN role.');
+      }
+    }
+  }
+
   public clearForTesting(): void {
     this.roles.clear();
     this.seedSystemRoles('tenant-adyapan-default');
@@ -542,3 +633,12 @@ export class RolePermissionService {
 }
 
 export const rolePermissionService = RolePermissionService.getInstance();
+
+export function validateRoleAssignment(
+  actor: { id: string; roles: string[]; tenantId?: string },
+  targetUserIdOrRole: string,
+  targetRoleCode?: string
+): void {
+  const roleCode = targetRoleCode || targetUserIdOrRole;
+  rolePermissionService.validateRoleAssignment(actor, roleCode);
+}

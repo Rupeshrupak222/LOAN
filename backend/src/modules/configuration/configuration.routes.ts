@@ -14,53 +14,70 @@ router.use(tenantContext);
  * GET /api/v1/configuration/active?area=FOIR_DTI
  * Get active published configuration for the authenticated tenant.
  */
-router.get('/active', (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const area = req.query.area as ConfigArea;
-    if (!area) {
-      throw new BadRequestError("Query parameter 'area' is required.");
-    }
-    const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
-    const config = configurationService.getTenantConfig(tenantId, area);
-    const record = configurationService.getActiveConfigRecord(tenantId, area);
+router.get(
+  '/active',
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'BRANCH_MANAGER',
+    'CREDIT_ANALYST',
+    'UNDERWRITER',
+    'AUDITOR',
+    'FINANCE_OFFICER',
+    'LOAN_OFFICER'
+  ),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const area = req.query.area as ConfigArea;
+      if (!area) {
+        throw new BadRequestError("Query parameter 'area' is required.");
+      }
+      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const config = configurationService.getTenantConfig(tenantId, area);
+      const record = configurationService.getActiveConfigRecord(tenantId, area);
 
-    res.json({
-      success: true,
-      data: {
-        tenantId,
-        area,
-        version: record?.version || 1,
-        effectiveFrom: record?.effectiveFrom,
-        parameters: config,
-      },
-    });
-  } catch (err) {
-    next(err);
+      res.json({
+        success: true,
+        data: {
+          tenantId,
+          area,
+          version: record?.version || 1,
+          effectiveFrom: record?.effectiveFrom,
+          parameters: config,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * GET /api/v1/configuration/versions?area=FOIR_DTI
  * Returns audit version history of configurations for a given area.
  */
-router.get('/versions', (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const area = req.query.area as ConfigArea;
-    if (!area) {
-      throw new BadRequestError("Query parameter 'area' is required.");
-    }
-    const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
-    const versions = configurationService.listConfigVersions(tenantId, area);
+router.get(
+  '/versions',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const area = req.query.area as ConfigArea;
+      if (!area) {
+        throw new BadRequestError("Query parameter 'area' is required.");
+      }
+      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const versions = configurationService.listConfigVersions(tenantId, area);
 
-    res.json({
-      success: true,
-      data: versions,
-      total: versions.length,
-    });
-  } catch (err) {
-    next(err);
+      res.json({
+        success: true,
+        data: versions,
+        total: versions.length,
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * POST /api/v1/configuration/draft
@@ -95,7 +112,7 @@ router.post(
  */
 router.post(
   '/publish',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
@@ -128,7 +145,7 @@ router.post(
  */
 router.post(
   '/rollback',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';

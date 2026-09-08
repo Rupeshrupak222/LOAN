@@ -101,11 +101,13 @@ export default function LoanDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setPayModalOpen(false);
       setPayAmount('');
       setPayReference('');
@@ -130,6 +132,7 @@ export default function LoanDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setRestructureModalOpen(false);
     },
     onError: (err: any) => {
@@ -149,8 +152,11 @@ export default function LoanDetailPage() {
       toast.success('One-Time Settlement (OTS) terms saved.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setSettleModalOpen(false);
     },
     onError: (err: any) => {
@@ -189,7 +195,7 @@ export default function LoanDetailPage() {
             <Badge status={data.status} />
             {data.status !== 'CLOSED' && data.status !== 'SETTLED' && (
               <>
-                {!user?.roles?.includes('AUDITOR') && (
+                {(isCustomer || user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r))) && (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -202,7 +208,7 @@ export default function LoanDetailPage() {
                     {isCustomer ? 'Submit EMI Payment Proof' : 'Collect Repayment'}
                   </Button>
                 )}
-                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
                       Restructure
@@ -595,9 +601,9 @@ export default function LoanDetailPage() {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2">
-      <dt className="text-slate-500 font-medium">{label}</dt>
-      <dd className="text-right font-medium text-slate-900">{value ?? '-'}</dd>
+    <div className="flex justify-between gap-3 py-2 min-w-0">
+      <dt className="text-slate-500 font-medium shrink-0">{label}</dt>
+      <dd className="text-right font-medium text-slate-900 dark:text-slate-200 min-w-0 break-words">{value ?? '-'}</dd>
     </div>
   );
 }

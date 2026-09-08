@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../common/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../common/errors';
 import { calculateEmi } from '../finance/emi';
 import { Money } from '../finance/money';
 import { generateNocNo, generatePaymentNo } from '../shared/codes';
@@ -14,8 +14,15 @@ import type {
 
 export async function restructureLoan(
   input: ProposeRestructureInput,
-  actor: { email: string; id: string; roles: string[] }
+  actor: { email: string; id: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  const isAuthorized = actor.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new ForbiddenError('Access forbidden: Only Credit Administrators and Branch Managers can restructure loans');
+  }
+
   const loan = await prisma.loan.findUnique({
     where: { id: input.loanId },
     include: {
@@ -26,6 +33,12 @@ export async function restructureLoan(
     },
   });
   if (!loan) throw new NotFoundError('Loan account not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && loan.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Loan account belongs to another institution');
+    }
+  }
 
   if (loan.status === 'CLOSED' || loan.status === 'SETTLED') {
     throw new BadRequestError(`Cannot restructure loan in status ${loan.status}`);
@@ -100,7 +113,7 @@ export async function restructureLoan(
     });
 
     return record;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,
@@ -129,10 +142,27 @@ export async function restructureLoan(
 
 export async function executeSettlement(
   input: ProposeSettlementInput,
-  actor: { email: string; id: string; roles: string[] }
+  actor: { email: string; id: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  const isAuthorized = actor.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new ForbiddenError('Access forbidden: Only Credit Administrators and Branch Managers can execute loan debt settlements');
+  }
+
   const loan = await prisma.loan.findUnique({ where: { id: input.loanId } });
   if (!loan) throw new NotFoundError('Loan account not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && loan.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Loan account belongs to another institution');
+    }
+  }
+
+  if (loan.status === 'SETTLED' || loan.status === 'CLOSED') {
+    throw new BadRequestError('Loan account is already settled or closed');
+  }
 
   const totalOutstanding = new Decimal(loan.outstandingPrincipal)
     .plus(loan.outstandingInterest)
@@ -146,6 +176,25 @@ export async function executeSettlement(
   const waivedAmount = totalOutstanding.minus(settlementNum);
 
   const settlement = await prisma.$transaction(async (tx) => {
+    // Atomically claim and lock loan to SETTLED status
+    const lockUpdate = await tx.loan.updateMany({
+      where: {
+        id: input.loanId,
+        status: { notIn: ['SETTLED', 'CLOSED'] },
+      },
+      data: {
+        outstandingPrincipal: '0.00',
+        outstandingInterest: '0.00',
+        outstandingFees: '0.00',
+        status: 'SETTLED',
+        closedAt: new Date(),
+      },
+    });
+
+    if (lockUpdate.count === 0) {
+      throw new BadRequestError('Loan account is already settled or closed');
+    }
+
     const rec = await tx.settlement.create({
       data: {
         loanId: loan.id,
@@ -166,6 +215,7 @@ export async function executeSettlement(
         paymentNo,
         loanId: loan.id,
         customerId: loan.customerId,
+        tenantId: loan.tenantId || actor?.tenantId,
         amount: Money.toDb(settlementNum),
         method: 'BANK_TRANSFER',
         reference: `ONE-TIME-SETTLEMENT-${loan.loanNo}`,
@@ -199,20 +249,8 @@ export async function executeSettlement(
       data: { status: 'WAIVED', outstanding: '0.00' },
     });
 
-    // Mark loan settled
-    await tx.loan.update({
-      where: { id: loan.id },
-      data: {
-        outstandingPrincipal: '0.00',
-        outstandingInterest: '0.00',
-        outstandingFees: '0.00',
-        status: 'SETTLED',
-        closedAt: new Date(),
-      },
-    });
-
     return rec;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,
@@ -239,8 +277,15 @@ export async function executeSettlement(
 
 export async function closeLoanAndIssueNoc(
   input: ExecuteClosureInput,
-  actor: { email: string; id: string; roles: string[] }
+  actor: { email: string; id: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  const isAuthorized = actor.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new ForbiddenError('Access forbidden: Only Finance Officers, Branch Managers, or Administrators can close loan accounts and issue NOC certificates');
+  }
+
   const loan = await prisma.loan.findUnique({
     where: { id: input.loanId },
     include: {
@@ -250,6 +295,12 @@ export async function closeLoanAndIssueNoc(
     },
   });
   if (!loan) throw new NotFoundError('Loan account not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && loan.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Loan account belongs to another institution');
+    }
+  }
 
   const totalOutstanding = new Decimal(loan.outstandingPrincipal)
     .plus(loan.outstandingInterest)
@@ -301,7 +352,7 @@ export async function closeLoanAndIssueNoc(
     });
 
     return cl;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actor.id,

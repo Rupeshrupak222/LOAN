@@ -12,6 +12,58 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-Tenant / Company Architecture
+// ---------------------------------------------------------------------------
+
+enum TenantStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum TenantTier {
+  ENTERPRISE
+  GROWTH
+  STANDARD
+}
+
+model Tenant {
+  id                String            @id @default(uuid())
+  code              String            @unique
+  name              String
+  status            TenantStatus      @default(ACTIVE)
+  tier              TenantTier        @default(STANDARD)
+  cinNumber         String?
+  rbiRegistrationNo String?
+  domain            String?
+  contactEmail      String
+  supportPhone      String?
+  baseCurrency      String            @default("INR")
+  country           String            @default("IN")
+  timezone          String            @default("Asia/Kolkata")
+  settings          Json?
+  metadata          Json?
+  createdBy         String?
+  suspendedAt       DateTime?
+  activatedAt       DateTime?         @default(now())
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  branches          Branch[]
+  users             User[]
+  customers         Customer[]
+  loanProducts      LoanProduct[]
+  applications      LoanApplication[]
+  loans             Loan[]
+  payments          Payment[]
+  auditLogs         AuditLog[]
+
+  @@index([code])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
 // Auth / RBAC
 // ---------------------------------------------------------------------------
 
@@ -29,6 +81,8 @@ model User {
   firstName           String
   lastName            String
   status              UserStatus     @default(ACTIVE)
+  tenantId            String?
+  tenant              Tenant?        @relation(fields: [tenantId], references: [id])
   branchId            String?
   branch              Branch?        @relation(fields: [branchId], references: [id])
 
@@ -47,12 +101,14 @@ model User {
   updatedAt           DateTime       @updatedAt
 
   @@index([email])
+  @@index([tenantId])
   @@index([branchId])
+  @@index([tenantId, branchId])
 }
 
 model Role {
   id          String           @id @default(uuid())
-  name        String           @unique // SUPER_ADMIN, ADMIN, LOAN_OFFICER, etc.
+  name        String           @unique // SUPER_ADMIN, COMPANY_ADMIN, ADMIN, LOAN_OFFICER, etc.
   description String?
   users       UserRole[]
   permissions RolePermission[]
@@ -102,16 +158,21 @@ model RefreshToken {
 
 model Branch {
   id           String            @id @default(uuid())
-  code         String            @unique
+  code         String
   name         String
   city         String?
   state        String?
   isActive     Boolean           @default(true)
+  tenantId     String?
+  tenant       Tenant?           @relation(fields: [tenantId], references: [id])
   users        User[]
   customers    Customer[]
   applications LoanApplication[]
   loans        Loan[]
   createdAt    DateTime          @default(now())
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +208,8 @@ model Customer {
   customerCode        String                @unique
   userId              String?               @unique
   user                User?                 @relation(fields: [userId], references: [id])
+  tenantId            String?
+  tenant              Tenant?               @relation(fields: [tenantId], references: [id])
   branchId            String?
   branch              Branch?               @relation(fields: [branchId], references: [id])
 
@@ -191,7 +254,9 @@ model Customer {
   @@index([mobile])
   @@index([email])
   @@index([status])
+  @@index([tenantId])
   @@index([branchId])
+  @@index([tenantId, branchId])
 }
 
 model CustomerAddress {
@@ -251,9 +316,11 @@ enum InterestMethod {
 
 model LoanProduct {
   id               String            @id @default(uuid())
-  code             String            @unique
+  code             String
   name             String
   productType      String
+  tenantId         String?
+  tenant           Tenant?           @relation(fields: [tenantId], references: [id])
   minAmount        Decimal           @db.Decimal(14, 2)
   maxAmount        Decimal           @db.Decimal(14, 2)
   minTenureMonths  Int
@@ -271,6 +338,9 @@ model LoanProduct {
 
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +370,8 @@ model LoanApplication {
   customer        Customer                   @relation(fields: [customerId], references: [id])
   productId       String
   product         LoanProduct                @relation(fields: [productId], references: [id])
+  tenantId        String?
+  tenant          Tenant?                    @relation(fields: [tenantId], references: [id])
   branchId        String?
   branch          Branch?                    @relation(fields: [branchId], references: [id])
 
@@ -322,6 +394,9 @@ model LoanApplication {
   @@index([applicationNo])
   @@index([customerId])
   @@index([status])
+  @@index([tenantId])
+  @@index([branchId])
+  @@index([tenantId, branchId])
 }
 
 model ApplicationStatusHistory {
@@ -403,6 +478,8 @@ model Loan {
   customer             Customer                @relation(fields: [customerId], references: [id])
   productId            String
   product              LoanProduct             @relation(fields: [productId], references: [id])
+  tenantId             String?
+  tenant               Tenant?                 @relation(fields: [tenantId], references: [id])
   branchId             String?
   branch               Branch?                 @relation(fields: [branchId], references: [id])
 
@@ -439,6 +516,9 @@ model Loan {
   @@index([customerId])
   @@index([status])
   @@index([nextDueDate])
+  @@index([tenantId])
+  @@index([branchId])
+  @@index([tenantId, branchId])
 }
 
 enum InstallmentStatus {
@@ -511,6 +591,8 @@ model Payment {
   loan           Loan                @relation(fields: [loanId], references: [id])
   customerId     String
   customer       Customer            @relation(fields: [customerId], references: [id])
+  tenantId       String?
+  tenant         Tenant?             @relation(fields: [tenantId], references: [id])
   amount         Decimal             @db.Decimal(14, 2)
   method         String              // BANK_TRANSFER, UPI, CASH, CHEQUE, GATEWAY
   reference      String?
@@ -524,6 +606,7 @@ model Payment {
   @@index([loanId])
   @@index([customerId])
   @@index([reference])
+  @@index([tenantId])
 }
 
 model PaymentAllocation {
@@ -763,6 +846,8 @@ model AuditLog {
   id            String   @id @default(uuid())
   userId        String?
   user          User?    @relation(fields: [userId], references: [id])
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id])
   role          String?
   action        String
   entity        String
@@ -775,6 +860,7 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([userId])
+  @@index([tenantId])
   @@index([createdAt])
 }
 

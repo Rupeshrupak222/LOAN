@@ -513,7 +513,7 @@ export default function DashboardPage() {
             {dateFilterOpen && (
               <div
                 className={cn(
-                  'absolute right-0 top-full mt-2 w-80 rounded-2xl border shadow-2xl z-50 animate-fade-in overflow-hidden',
+                  'absolute -right-2 sm:right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-xs rounded-2xl border shadow-2xl z-50 animate-fade-in overflow-hidden',
                   isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-100' : 'border-slate-200 bg-white text-slate-900'
                 )}
               >
@@ -1863,29 +1863,50 @@ function KpiItem({
     amber: isDark ? 'bg-[#060F1B] text-amber-400' : 'bg-amber-50 text-amber-600',
   };
 
+  const valLen = value ? value.length : 0;
+  const fontSizeClass =
+    valLen > 14
+      ? 'text-sm sm:text-base xl:text-sm 2xl:text-base'
+      : valLen > 10
+      ? 'text-base sm:text-lg xl:text-[15px] 2xl:text-lg'
+      : valLen > 7
+      ? 'text-lg sm:text-xl xl:text-lg 2xl:text-xl'
+      : 'text-2xl';
+
   return (
-    <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-        <div className={cn('flex h-8 w-8 items-center justify-center rounded-xl', iconBgMap[iconColor])}>
-          {icon}
+    <div className={cn('rounded-2xl border p-4 transition-all min-w-0 overflow-hidden flex flex-col justify-between', cardBgClass)}>
+      <div>
+        <div className="flex items-center justify-between gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate" title={label}>
+            {label}
+          </span>
+          <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-xl', iconBgMap[iconColor])}>
+            {icon}
+          </div>
         </div>
+        <p
+          className={cn(
+            'mt-2 font-bold tracking-tight truncate leading-tight',
+            fontSizeClass,
+            valueColor || (isDark ? 'text-white' : 'text-slate-900')
+          )}
+          title={value}
+        >
+          {value}
+        </p>
       </div>
-      <p className={cn('mt-2 text-2xl font-bold tracking-tight', valueColor || (isDark ? 'text-white' : 'text-slate-900'))}>
-        {value}
-      </p>
-      <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+      <div className="mt-2 flex items-center gap-1.5 text-[11px] min-w-0 overflow-hidden">
         {trend && (
-          <span className={cn('flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-bold', isDark ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-emerald-50 text-[#10B981]')}>
+          <span className={cn('flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-bold', isDark ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-emerald-50 text-[#10B981]')}>
             <ArrowUp className="h-3 w-3" /> {trend}
           </span>
         )}
         {highlightText && (
-          <span className={cn('font-bold', isDark ? 'text-amber-400' : 'text-amber-600')}>
+          <span className={cn('font-bold shrink-0', isDark ? 'text-amber-400' : 'text-amber-600')}>
             {highlightText}
           </span>
         )}
-        <span className="truncate text-slate-400 font-medium">{hint}</span>
+        <span className="truncate text-slate-400 font-medium" title={hint}>{hint}</span>
       </div>
     </div>
   );

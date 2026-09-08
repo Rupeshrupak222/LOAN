@@ -20,7 +20,7 @@ router.get('/tenant', (req: Request, res: Response, next: NextFunction) => {
       throw new ForbiddenError('Access forbidden: Borrowers cannot view Integration Hub configurations.');
     }
 
-    const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.tenant?.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const routings = tenantIntegrationService.getTenantRoutings(tenantId);
 
     res.json({
@@ -43,7 +43,7 @@ router.get('/tenant/:category', (req: Request, res: Response, next: NextFunction
       throw new ForbiddenError('Access forbidden: Borrowers cannot view Integration Hub configurations.');
     }
 
-    const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+    const tenantId = req.tenantId || req.tenant?.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
     const category = req.params.category.toUpperCase() as IntegrationCategory;
     const routing = tenantIntegrationService.getTenantRoutingForCategory(tenantId, category);
 
@@ -58,14 +58,14 @@ router.get('/tenant/:category', (req: Request, res: Response, next: NextFunction
 
 /**
  * PUT /api/v1/integrations/tenant/:category
- * Upserts provider credentials and routing for a category. Requires SUPER_ADMIN or ADMIN.
+ * Upserts provider credentials and routing for a category. Requires SUPER_ADMIN, COMPANY_ADMIN, or ADMIN.
  */
 router.put(
   '/tenant/:category',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const tenantId = req.tenantId || req.tenant?.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
       const category = req.params.category.toUpperCase() as IntegrationCategory;
 
       const updated = await tenantIntegrationService.upsertTenantRouting(
@@ -92,10 +92,10 @@ router.put(
  */
 router.post(
   '/tenant/:category/test',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const tenantId = req.tenantId || req.tenant?.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
       const category = req.params.category.toUpperCase() as IntegrationCategory;
 
       const result = await tenantIntegrationService.dispatchTenantOperation(

@@ -97,8 +97,10 @@ export default function NewCustomerPage() {
     password: '',
     dateOfBirth: '',
     gender: 'MALE',
+    addressLine: '',
     city: '',
     state: '',
+    pincode: '',
     employmentType: 'SALARIED',
     employerName: '',
     monthlyIncome: '',
@@ -267,6 +269,10 @@ export default function NewCustomerPage() {
       // 1. Create Customer
       const payload = {
         ...form,
+        addressLine: form.addressLine.trim() || undefined,
+        city: form.city.trim() || undefined,
+        state: form.state.trim() || undefined,
+        pincode: form.pincode.trim() || undefined,
         email: form.email || undefined,
         password: form.password && form.password.trim().length >= 6 ? form.password.trim() : undefined,
         dateOfBirth: form.dateOfBirth ? form.dateOfBirth : undefined,

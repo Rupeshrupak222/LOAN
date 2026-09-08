@@ -58,12 +58,16 @@ export default function DisbursementsPage() {
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-history'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['loan'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-count'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setSelectedApp(null);
       setReference('');

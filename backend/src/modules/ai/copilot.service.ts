@@ -22,6 +22,8 @@ export interface CopilotChatOptions {
   userId: string;
   userEmail: string;
   roles: string[];
+  tenantId?: string;
+  branchId?: string;
   message: string;
   history?: CopilotMessage[];
   currentPath?: string;
@@ -36,14 +38,36 @@ export interface CopilotChatResponse {
 /**
  * Builds authorized, compact LMS context for the LLM based on user question and role.
  */
-async function buildAuthorizedContext(
-  user: { id: string; email: string; roles: string[] },
+export async function buildAuthorizedContext(
+  user: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string },
   query: string,
   _currentPath?: string
 ): Promise<{ contextText: string; summary: string }> {
   const isCustomer = user.roles.includes('CUSTOMER');
-  const isSuperAdmin = user.roles.includes('SUPER_ADMIN') || user.roles.includes('ADMIN');
+  const isSuperAdmin = user.roles.includes('SUPER_ADMIN');
   const primaryRole = (user.roles[0] || 'CUSTOMER') as RoleName;
+
+  let effectiveTenantId = user.tenantId;
+  let effectiveBranchId = user.branchId;
+
+  if (!effectiveTenantId || !effectiveBranchId) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { tenantId: true, branchId: true },
+    });
+    if (dbUser) {
+      if (!effectiveTenantId && dbUser.tenantId) effectiveTenantId = dbUser.tenantId;
+      if (!effectiveBranchId && dbUser.branchId) effectiveBranchId = dbUser.branchId;
+    }
+  }
+
+  const isBranchScoped =
+    user.roles.includes('LOAN_OFFICER') ||
+    user.roles.includes('BRANCH_MANAGER') ||
+    user.roles.includes('COLLECTION_OFFICER') ||
+    user.roles.includes('COLLECTION_AGENT');
+  const staffTenantFilter = effectiveTenantId && !isSuperAdmin ? { tenantId: effectiveTenantId } : {};
+  const staffBranchFilter = effectiveBranchId && isBranchScoped ? { branchId: effectiveBranchId } : {};
 
   const lowerQuery = query.toLowerCase();
 
@@ -66,6 +90,13 @@ async function buildAuthorizedContext(
     };
     if (isCustomer) {
       loanWhere.customer = { userId: user.id };
+    } else {
+      if (effectiveTenantId && !isSuperAdmin) {
+        loanWhere.tenantId = effectiveTenantId;
+      }
+      if (effectiveBranchId && isBranchScoped) {
+        loanWhere.branchId = effectiveBranchId;
+      }
     }
 
     const loan = await prisma.loan.findFirst({
@@ -127,6 +158,13 @@ async function buildAuthorizedContext(
     };
     if (isCustomer) {
       appWhere.customer = { userId: user.id };
+    } else {
+      if (effectiveTenantId && !isSuperAdmin) {
+        appWhere.tenantId = effectiveTenantId;
+      }
+      if (effectiveBranchId && isBranchScoped) {
+        appWhere.branchId = effectiveBranchId;
+      }
     }
 
     const app = await prisma.loanApplication.findFirst({
@@ -166,6 +204,13 @@ async function buildAuthorizedContext(
     };
     if (isCustomer) {
       custWhere.userId = user.id;
+    } else {
+      if (effectiveTenantId && !isSuperAdmin) {
+        custWhere.tenantId = effectiveTenantId;
+      }
+      if (effectiveBranchId && isBranchScoped) {
+        custWhere.branchId = effectiveBranchId;
+      }
     }
 
     const customer = await prisma.customer.findFirst({
@@ -252,7 +297,11 @@ ${
     if (needsAttention || isSuperAdmin) {
       // 1. Delinquent / Overdue Loans
       const overdueLoans = await prisma.loan.findMany({
-        where: { status: 'OVERDUE' },
+        where: {
+          status: 'OVERDUE',
+          ...staffTenantFilter,
+          ...staffBranchFilter,
+        },
         include: { customer: true, product: true, collectionCases: true },
         take: 5,
         orderBy: { updatedAt: 'desc' },
@@ -260,7 +309,11 @@ ${
 
       // 2. Ready for Payout Queue (for Finance / Super Admin)
       const readyForDisbursement = await prisma.loanApplication.findMany({
-        where: { status: { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] } },
+        where: {
+          status: { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] },
+          ...staffTenantFilter,
+          ...staffBranchFilter,
+        },
         include: { customer: true, product: true },
         take: 5,
         orderBy: { updatedAt: 'desc' },
@@ -268,15 +321,28 @@ ${
 
       // 3. Pending Underwriting Queue
       const pendingUnderwriting = await prisma.loanApplication.findMany({
-        where: { status: 'UNDERWRITING' },
+        where: {
+          status: 'UNDERWRITING',
+          ...staffTenantFilter,
+          ...staffBranchFilter,
+        },
         include: { customer: true, product: true, riskAssessment: true, eligibility: true },
         take: 5,
         orderBy: { createdAt: 'desc' },
       });
 
+      const staffLoanFilter: any = {};
+      if (effectiveTenantId && !isSuperAdmin) staffLoanFilter.tenantId = effectiveTenantId;
+      if (effectiveBranchId && isBranchScoped) staffLoanFilter.branchId = effectiveBranchId;
+      const staffLoanWhere = Object.keys(staffLoanFilter).length > 0 ? { loan: staffLoanFilter } : {};
+
       // 4. Pending Payment Submissions to verify
       const pendingSubmissions = await prisma.paymentSubmission.findMany({
-        where: { status: 'PENDING_VERIFICATION' },
+        where: {
+          status: 'PENDING_VERIFICATION',
+          ...staffTenantFilter,
+          ...staffLoanWhere,
+        },
         include: { customer: true, loan: true },
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -284,7 +350,10 @@ ${
 
       // 5. Active Collection Cases
       const collectionCases = await prisma.collectionCase.findMany({
-        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] } },
+        where: {
+          status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] },
+          ...staffLoanWhere,
+        },
         include: { customer: true, loan: true, promises: { where: { status: 'PENDING' } } },
         take: 5,
         orderBy: { dpd: 'desc' },
@@ -394,7 +463,7 @@ export async function handleCopilotChat(options: CopilotChatOptions): Promise<Co
 
   // 1. Fetch authorized context from PostgreSQL
   const { contextText, summary } = await buildAuthorizedContext(
-    { id: userId, email: userEmail, roles },
+    { id: userId, email: userEmail, roles, tenantId: options.tenantId, branchId: options.branchId },
     message,
     currentPath
   );
