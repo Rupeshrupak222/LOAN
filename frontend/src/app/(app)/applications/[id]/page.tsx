@@ -35,6 +35,7 @@ import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelli
 import { AdvancedDecisionIntelligenceCard } from '@/components/AdvancedDecisionIntelligenceCard';
 import { EarlyWarningWidget } from '@/components/EarlyWarningWidget';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
+import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -43,6 +44,8 @@ export default function ApplicationDetailPage() {
   const toast = useToast();
   const { user } = useAuth();
   const { isDark } = useTheme();
+
+  const [uwWizardOpen, setUwWizardOpen] = useState(false);
 
   // Modals state
   const [decisionModalOpen, setDecisionModalOpen] = useState(false);
@@ -251,21 +254,16 @@ export default function ApplicationDetailPage() {
               </Button>
             )}
 
-            {/* 2. Direct Underwriter Decision Actions (Approve / Reject / Detailed) */}
+            {/* 2. Direct Underwriter Decision Actions (Step-by-Step Verification & Decision) */}
             {canMakeUnderwritingDecision && (
               <>
                 <Button
                   size="sm"
-                  onClick={() => {
-                    setDecision('APPROVE');
-                    setReason('Credit proposal verified and approved for sanction.');
-                    setConditions('');
-                    setDecisionModalOpen(true);
-                  }}
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm cursor-pointer"
+                  onClick={() => setUwWizardOpen(true)}
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Approve Loan
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Step-by-Step Verification Desk →
                 </Button>
 
                 <Button
@@ -281,16 +279,6 @@ export default function ApplicationDetailPage() {
                 >
                   <XCircle className="w-3.5 h-3.5 text-rose-500" />
                   Reject Loan
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setDecisionModalOpen(true)}
-                  className="gap-1.5 text-xs cursor-pointer"
-                >
-                  <FileCheck className="w-3.5 h-3.5" />
-                  Full Decision / Conditions
                 </Button>
               </>
             )}
@@ -944,6 +932,13 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Underwriter Step-by-Step Verification Wizard */}
+      <UnderwritingVerificationWizard
+        application={data}
+        isOpen={uwWizardOpen}
+        onClose={() => setUwWizardOpen(false)}
+      />
 
       {/* MODAL 4: KYC VERIFICATION & COMPLIANCE MODAL */}
       {kycModalOpen && (

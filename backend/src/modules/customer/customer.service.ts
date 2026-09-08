@@ -291,34 +291,71 @@ export async function createCustomer(
       customerUserId = user.id;
     }
 
-    const cust = await tx.customer.create({
-      data: {
-        userId: customerUserId,
-        tenantId: effectiveTenantId,
-        customerCode: generateCustomerCode(),
-        firstName: input.firstName,
-        lastName: input.lastName,
-        dateOfBirth: input.dateOfBirth,
-        gender: input.gender,
-        mobile,
-        email: input.email?.toLowerCase().trim(),
-        addressLine,
-        city,
-        state,
-        pincode,
-        employmentType: input.employmentType,
-        employerName: input.employerName,
-        monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
-        existingObligations:
-          input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
-        bankName,
-        bankAccountNo,
-        bankIfsc,
-        branchId: input.branchId,
-        kycStatus: 'NOT_STARTED',
-        status: 'DRAFT',
+    const cleanEmail = input.email?.toLowerCase().trim();
+    const existingCust = await tx.customer.findFirst({
+      where: {
+        OR: [
+          ...(customerUserId ? [{ userId: customerUserId }] : []),
+          ...(cleanEmail ? [{ email: cleanEmail }] : []),
+        ],
+        ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
       },
     });
+
+    let cust;
+    if (existingCust) {
+      cust = await tx.customer.update({
+        where: { id: existingCust.id },
+        data: {
+          userId: customerUserId || existingCust.userId,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          dateOfBirth: input.dateOfBirth || existingCust.dateOfBirth,
+          gender: input.gender || existingCust.gender,
+          mobile,
+          email: cleanEmail || existingCust.email,
+          addressLine: addressLine || existingCust.addressLine,
+          city: city || existingCust.city,
+          state: state || existingCust.state,
+          pincode: pincode || existingCust.pincode,
+          employmentType: input.employmentType || existingCust.employmentType,
+          employerName: input.employerName || existingCust.employerName,
+          monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : existingCust.monthlyIncome,
+          bankName: bankName || existingCust.bankName,
+          bankAccountNo: bankAccountNo || existingCust.bankAccountNo,
+          bankIfsc: bankIfsc || existingCust.bankIfsc,
+        },
+      });
+    } else {
+      cust = await tx.customer.create({
+        data: {
+          userId: customerUserId,
+          tenantId: effectiveTenantId,
+          customerCode: generateCustomerCode(),
+          firstName: input.firstName,
+          lastName: input.lastName,
+          dateOfBirth: input.dateOfBirth,
+          gender: input.gender,
+          mobile,
+          email: cleanEmail,
+          addressLine,
+          city,
+          state,
+          pincode,
+          employmentType: input.employmentType,
+          employerName: input.employerName,
+          monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
+          existingObligations:
+            input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
+          bankName,
+          bankAccountNo,
+          bankIfsc,
+          branchId: input.branchId,
+          kycStatus: 'NOT_STARTED',
+          status: 'DRAFT',
+        },
+      });
+    }
 
     if (addressLine || city || state || pincode) {
       await tx.customerAddress.create({

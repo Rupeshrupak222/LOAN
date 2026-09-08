@@ -45,6 +45,8 @@ import { DocumentIntelligenceModal } from '@/components/DocumentIntelligenceModa
 import { Customer360IntelligenceModal } from '@/components/Customer360IntelligenceModal';
 import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
 import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
+import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
+import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -63,6 +65,10 @@ export default function CustomerDetailPage() {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
   >('overview');
+
+  // Underwriter verification wizard state
+  const [selectedAppForWizard, setSelectedAppForWizard] = useState<any>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // KYC modal state
   const [kycModalOpen, setKycModalOpen] = useState(false);
@@ -532,6 +538,171 @@ export default function CustomerDetailPage() {
           icon={<ShieldCheck className="h-4 w-4 text-slate-600" />}
         />
       </div>
+
+      {/* Step-by-Step Borrower Intake & Underwriter Forwarding Stepper Banner */}
+      {data && (() => {
+        const completedSteps: number[] = [1];
+        if (data.kycStatus === 'VERIFIED') completedSteps.push(2);
+        if (data.bankAccounts?.some((b: any) => b.isVerified) || (data.kycStatus === 'VERIFIED' && data.bankAccounts?.length > 0)) completedSteps.push(3);
+        if ((data.applications?.length || 0) > 0) completedSteps.push(4);
+        if (data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))) completedSteps.push(5);
+
+        let stepperCurrentStep = 1;
+        if (data.applications?.some((a: any) => a.status === 'UNDERWRITING')) stepperCurrentStep = 5;
+        else if (!completedSteps.includes(2)) stepperCurrentStep = 2;
+        else if (!completedSteps.includes(3)) stepperCurrentStep = 3;
+        else if (!completedSteps.includes(4)) stepperCurrentStep = 4;
+        else if (!completedSteps.includes(5)) stepperCurrentStep = 5;
+        else stepperCurrentStep = 5;
+
+        const onboardingSteps: StepItem[] = [
+          {
+            id: 1,
+            label: '1. Profile Created',
+            shortLabel: 'Profile',
+            icon: User,
+            description: 'Identity & Customer Credentials Created',
+          },
+          {
+            id: 2,
+            label: '2. KYC & Photo Docs',
+            shortLabel: 'KYC Docs',
+            icon: FileText,
+            description: data.kycStatus === 'VERIFIED' ? 'Identity & Documents Verified ✓' : 'Awaiting Underwriter KYC Audit',
+          },
+          {
+            id: 3,
+            label: '3. Employment & Bank',
+            shortLabel: 'Bank & Income',
+            icon: Building2,
+            description: data.bankAccounts?.[0]?.bankName ? `Bank: ${data.bankAccounts[0].bankName}` : 'Awaiting Bank Verification',
+          },
+          {
+            id: 4,
+            label: '4. Loan Origination',
+            shortLabel: 'Loan Scheme',
+            icon: CreditCard,
+            description: (data.applications?.length || 0) > 0 ? `${data.applications.length} Loan Application(s) Originated` : 'Not Originated Yet',
+          },
+          {
+            id: 5,
+            label: '5. Underwriting Review',
+            shortLabel: 'Underwriting',
+            icon: ShieldCheck,
+            description: data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))
+              ? 'Sanctioned & Forwarded to Finance Queue'
+              : data.applications?.some((a: any) => a.status === 'UNDERWRITING')
+              ? 'Active in Underwriter Queue'
+              : 'Ready for Underwriting Verification',
+          },
+        ];
+
+        const handleStepClick = (stepId: number) => {
+          if (stepId === 1) setActiveTab('overview');
+          else if (stepId === 2) setActiveTab('kyc_docs');
+          else if (stepId === 3) setActiveTab('banking');
+          else if (stepId === 4) setActiveTab('applications');
+          else if (stepId === 5) {
+            setActiveTab('applications');
+            const targetApp = data.applications?.find((a: any) => ['UNDERWRITING', 'APPROVED', 'SUBMITTED'].includes(a.status));
+            if (targetApp) {
+              setSelectedAppForWizard({ ...targetApp, customer: data });
+              setWizardOpen(true);
+            }
+          }
+        };
+
+        const activeAppInUnderwriting = data.applications?.find((a: any) => a.status === 'UNDERWRITING');
+        const activeAppApproved = data.applications?.find((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status));
+        const activeAppPendingForward = data.applications?.find((a: any) => ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED'].includes(a.status));
+
+        return (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Step-by-Step Customer Intake & Underwriting Progress
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Underwriter verifies each step sequentially before sanctioning & forwarding dossier to Finance</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {activeAppInUnderwriting && (
+                  <Button
+                    size="sm"
+                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={() => {
+                      setSelectedAppForWizard({ ...activeAppInUnderwriting, customer: data });
+                      setWizardOpen(true);
+                    }}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" /> Launch Underwriter Desk →
+                  </Button>
+                )}
+                {!activeAppInUnderwriting && activeAppApproved && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs font-semibold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      onClick={async () => {
+                        try {
+                          await api.post(`/applications/${activeAppApproved.id}/transition`, {
+                            toStatus: 'UNDERWRITING',
+                            reason: 'Re-opened for Underwriter step-by-step verification test',
+                          });
+                          toast.success(`Application ${activeAppApproved.applicationNo || ''} reset to Underwriting Queue!`);
+                          queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+                        } catch (err: any) {
+                          toast.error(apiErrorMessage(err));
+                        }
+                      }}
+                    >
+                      ↺ Re-open Underwriting Queue (Test Flow)
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      onClick={() => {
+                        setSelectedAppForWizard({ ...activeAppApproved, customer: data });
+                        setWizardOpen(true);
+                      }}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" /> Review Verification Desk
+                    </Button>
+                  </div>
+                )}
+                {activeAppPendingForward && (
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={async () => {
+                      try {
+                        await api.post(`/applications/${activeAppPendingForward.id}/transition`, {
+                          toStatus: 'UNDERWRITING',
+                          reason: 'Forwarded by Loan Officer from Customer 360 profile',
+                        });
+                        toast.success(`Application ${activeAppPendingForward.applicationNo || ''} forwarded to Underwriter!`);
+                        queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+                      } catch (err: any) {
+                        toast.error(apiErrorMessage(err));
+                      }
+                    }}
+                  >
+                    <ArrowRight className="h-3.5 w-3.5" /> Forward to Underwriter →
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <CustomerOnboardingStepper
+              currentStep={stepperCurrentStep}
+              completedSteps={completedSteps}
+              steps={onboardingSteps}
+              onStepClick={handleStepClick}
+            />
+          </div>
+        );
+      })()}
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto gap-1">
@@ -2043,6 +2214,19 @@ export default function CustomerDetailPage() {
           customerName={`${data.firstName} ${data.lastName}`}
           isOpen={customer360Open}
           onClose={() => setCustomer360Open(false)}
+        />
+      )}
+
+      {/* Underwriting Verification Desk Wizard Modal */}
+      {selectedAppForWizard && (
+        <UnderwritingVerificationWizard
+          application={selectedAppForWizard}
+          isOpen={wizardOpen}
+          onClose={() => {
+            setWizardOpen(false);
+            setSelectedAppForWizard(null);
+            queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+          }}
         />
       )}
     </div>
