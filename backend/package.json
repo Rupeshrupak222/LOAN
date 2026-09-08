@@ -11,16 +11,14 @@
     "lint": "eslint \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:generate": "prisma generate --schema ../database/prisma/schema.prisma",
-    "db:migrate": "prisma migrate dev --schema ../database/prisma/schema.prisma",
-    "db:deploy": "prisma migrate deploy --schema ../database/prisma/schema.prisma",
-    "db:seed": "tsx ../database/prisma/seed.ts",
-    "db:purge-customers": "tsx src/scripts/purge-customer-data.ts",
-    "db:validate": "tsx src/scripts/validate-production-db.ts",
-    "db:studio": "prisma studio --schema ../database/prisma/schema.prisma"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
   },
   "prisma": {
-    "schema": "../database/prisma/schema.prisma"
+    "schema": "prisma/schema.prisma"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",

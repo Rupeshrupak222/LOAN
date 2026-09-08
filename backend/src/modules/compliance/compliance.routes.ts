@@ -133,7 +133,7 @@ router.get(
  */
 router.post(
   '/exceptions/:id/transition',
-  authorize('SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'BRANCH_MANAGER', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'UNDERWRITER'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status, remediationPlan, remediationNotes } = req.body;

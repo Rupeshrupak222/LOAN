@@ -26,7 +26,7 @@ router.get(
 
 router.post(
   '/:applicationId/decision',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(underwritingDecisionSchema),
   asyncHandler(async (req, res) => {
     const result = await submitUnderwritingDecision(

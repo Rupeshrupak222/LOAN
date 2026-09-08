@@ -37,8 +37,14 @@ describe('Step 5: Production-Grade Financial Integrity, Ledger & Data Consistenc
     roles: ['LOAN_OFFICER'],
   };
 
+  const settlementOfficer = {
+    id: '00000000-0000-0000-0000-000000000010',
+    email: 'settlementofficer@adyapan.dev',
+    roles: ['SETTLEMENT_OFFICER'],
+  };
+
   beforeAll(async () => {
-    const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer];
+    const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer, settlementOfficer];
     for (const u of testUsers) {
       const dbUser = await prisma.user.upsert({
         where: { email: u.email },
@@ -476,7 +482,7 @@ describe('Step 5: Production-Grade Financial Integrity, Ledger & Data Consistenc
           settlementAmount: 70000,
           reason: 'Hardship settlement approved by Credit Committee',
         },
-        superAdmin
+        settlementOfficer
       );
 
       expect(settlement.status).toBe('COMPLETED');

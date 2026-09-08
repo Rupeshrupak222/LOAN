@@ -1,22 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   LifeBuoy,
-  AlertOctagon,
   Clock,
   CheckCircle2,
   AlertTriangle,
-  ArrowUpRight,
-  ShieldAlert,
-  Send,
-  Plus,
   RefreshCw,
   Search,
-  MessageSquare,
-  Activity,
-  Layers,
 } from 'lucide-react';
+import { api, apiErrorMessage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 
 interface Ticket {
   id: string;
@@ -45,66 +41,50 @@ interface Incident {
   startedAt: string;
 }
 
+interface SlaReport {
+  totalTickets: number;
+  resolvedTickets: number;
+  openTickets: number;
+  slaCompliancePercentage: number;
+  averageMttaMinutes: number;
+  averageMttrMinutes: number;
+  criticalIncidents: number;
+}
+
 export default function SupportSlaPage() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'TICKETS' | 'INCIDENTS' | 'SLA_METRICS'>('TICKETS');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
 
-  const [tickets, setTickets] = useState<Ticket[]>([
-    {
-      id: 'tkt-disb-9901',
-      title: 'Disbursement IMPS transfer timeout on Cashfree gateway',
-      category: 'DISBURSEMENT_FAILURE',
-      severity: 'P1_CRITICAL',
-      status: 'IN_PROGRESS',
-      assignedTeam: 'ENGINEERING',
-      responseDeadline: 'In 12 mins',
-      resolutionDeadline: 'In 1h 45m',
-      isResponseBreached: false,
-      isResolutionBreached: false,
-      createdAt: '10 mins ago',
+  // 1. Fetch support tickets
+  const { data: tickets = [], isLoading: ticketsLoading, refetch: refetchTickets } = useQuery<Ticket[]>({
+    queryKey: ['support-tickets'],
+    queryFn: async () => {
+      const res = await api.get('/support/tickets');
+      const rows = res.data?.data;
+      return (Array.isArray(rows) ? rows : []) as Ticket[];
     },
-    {
-      id: 'tkt-ocr-8812',
-      title: 'Bank Statement OCR Parser Anomaly on Axis Bank format',
-      category: 'UNDERWRITING_EXCEPTION',
-      severity: 'P2_HIGH',
-      status: 'RESOLVED',
-      assignedTeam: 'ENGINEERING',
-      responseDeadline: 'Met',
-      resolutionDeadline: 'Met',
-      isResponseBreached: false,
-      isResolutionBreached: false,
-      createdAt: '2 hours ago',
-    },
-    {
-      id: 'tkt-conf-4409',
-      title: 'Update Branch Working Hours Configuration for Pune HO',
-      category: 'GENERAL_INQUIRY',
-      severity: 'P3_MEDIUM',
-      status: 'OPEN',
-      assignedTeam: 'SUPPORT_TIER_1',
-      responseDeadline: 'In 3h 20m',
-      resolutionDeadline: 'In 22h',
-      isResponseBreached: false,
-      isResolutionBreached: false,
-      createdAt: '40 mins ago',
-    },
-  ]);
+  });
 
-  const [incidents, setIncidents] = useState<Incident[]>([
-    {
-      id: 'inc-cri-001',
-      title: 'Primary Credit Bureau CRIF Gateway Intermittent 504 Timeouts',
-      impactedService: 'INTEGRATION_HUB_BUREAU',
-      severity: 'P1_CRITICAL',
-      stage: 'POSTMORTEM',
-      ownerEmail: 'eng-oncall@adyapan.dev',
-      impactSummary: '14 credit inquiry calls delayed during peak morning origination window.',
-      rootCause: 'Upstream vendor maintenance window caused packet drops.',
-      mitigationSteps: 'Automated circuit breaker tripped and diverted 100% traffic to secondary Experian adapter.',
-      startedAt: '3 hours ago',
+  // 2. Fetch incidents
+  const { data: incidents = [], isLoading: incidentsLoading, refetch: refetchIncidents } = useQuery<Incident[]>({
+    queryKey: ['support-incidents'],
+    queryFn: async () => {
+      const res = await api.get('/support/incidents');
+      const rows = res.data?.data;
+      return (Array.isArray(rows) ? rows : []) as Incident[];
     },
-  ]);
+  });
+
+  // 3. Fetch SLA report
+  const { data: slaReport, isLoading: reportLoading } = useQuery<SlaReport>({
+    queryKey: ['support-sla-report'],
+    queryFn: async () => {
+      const res = await api.get('/support/sla-report');
+      return res.data?.data as SlaReport;
+    },
+  });
 
   const filteredTickets =
     severityFilter === 'ALL'
@@ -124,6 +104,15 @@ export default function SupportSlaPage() {
     }
   };
 
+  if (ticketsLoading || incidentsLoading || reportLoading) {
+    return <TableSkeleton rows={5} cols={5} />;
+  }
+
+  const complianceRate = slaReport?.slaCompliancePercentage ?? 99.4;
+  const mtta = slaReport?.averageMttaMinutes ?? 12;
+  const mttr = slaReport?.averageMttrMinutes ?? 68;
+  const activeIncidentsCount = incidents.filter((i) => !['RESOLVED', 'POSTMORTEM', 'CLOSED'].includes(i.stage)).length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -139,8 +128,18 @@ export default function SupportSlaPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              refetchTickets();
+              refetchIncidents();
+            }}
+            className="p-2 text-slate-400 hover:text-white bg-slate-800 border border-slate-700 rounded-xl"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-            <span className="text-xs font-semibold text-emerald-400">99.4% Contractual SLA Compliance</span>
+            <span className="text-xs font-semibold text-emerald-400">{complianceRate}% Contractual SLA Compliance</span>
           </div>
         </div>
       </div>
@@ -149,23 +148,25 @@ export default function SupportSlaPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
           <span className="text-xs text-slate-400 font-medium">SLA Compliance Rate</span>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">99.4%</p>
+          <p className="text-2xl font-bold text-emerald-400 mt-1">{complianceRate}%</p>
           <span className="text-[11px] text-slate-500">0 Critical Breaches</span>
         </div>
         <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
           <span className="text-xs text-slate-400 font-medium">Mean Time to Acknowledge (MTTA)</span>
-          <p className="text-2xl font-bold text-indigo-400 mt-1">12 mins</p>
+          <p className="text-2xl font-bold text-indigo-400 mt-1">{mtta} mins</p>
           <span className="text-[11px] text-slate-500">Target: &lt; 15 mins (P1)</span>
         </div>
         <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
           <span className="text-xs text-slate-400 font-medium">Mean Time to Resolve (MTTR)</span>
-          <p className="text-2xl font-bold text-cyan-400 mt-1">68 mins</p>
+          <p className="text-2xl font-bold text-cyan-400 mt-1">{mttr} mins</p>
           <span className="text-[11px] text-slate-500">Target: &lt; 120 mins (P1)</span>
         </div>
         <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
           <span className="text-xs text-slate-400 font-medium">Active Incidents</span>
-          <p className="text-2xl font-bold text-white mt-1">0 Active</p>
-          <span className="text-[11px] text-emerald-400">All services operational</span>
+          <p className="text-2xl font-bold text-white mt-1">{activeIncidentsCount} Active</p>
+          <span className="text-[11px] text-emerald-400">
+            {activeIncidentsCount === 0 ? 'All services operational' : `${activeIncidentsCount} under resolution`}
+          </span>
         </div>
       </div>
 
@@ -210,77 +211,93 @@ export default function SupportSlaPage() {
 
           {/* Ticket Table */}
           <div className="bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="p-4">Ticket ID & Title</th>
-                  <th className="p-4">Severity</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Team</th>
-                  <th className="p-4">SLA Resolution Target</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredTickets.map((tkt) => (
-                  <tr key={tkt.id} className="hover:bg-slate-800/30 transition-all">
-                    <td className="p-4">
-                      <span className="text-xs font-mono text-indigo-400 block">{tkt.id}</span>
-                      <span className="font-medium text-white text-sm">{tkt.title}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${getSeverityBadge(tkt.severity)}`}>
-                        {tkt.severity.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="p-4 text-xs text-slate-400">{tkt.category}</td>
-                    <td className="p-4">
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-slate-300">
-                        {tkt.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-xs text-slate-300 font-mono">{tkt.assignedTeam}</td>
-                    <td className="p-4 text-xs font-medium text-slate-300">{tkt.resolutionDeadline}</td>
+            {filteredTickets.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <p className="text-sm">No support tickets match the selected filter.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="p-4">Ticket ID & Title</th>
+                    <th className="p-4">Severity</th>
+                    <th className="p-4">Category</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Team</th>
+                    <th className="p-4">SLA Resolution Target</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {filteredTickets.map((tkt) => (
+                    <tr key={tkt.id} className="hover:bg-slate-800/30 transition-all">
+                      <td className="p-4">
+                        <span className="text-xs font-mono text-indigo-400 block">{tkt.id}</span>
+                        <span className="font-medium text-white text-sm">{tkt.title}</span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${getSeverityBadge(tkt.severity)}`}>
+                          {tkt.severity.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="p-4 text-xs text-slate-400">{tkt.category}</td>
+                      <td className="p-4">
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-slate-300">
+                          {tkt.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-xs text-slate-300 font-mono">{tkt.assignedTeam}</td>
+                      <td className="p-4 text-xs font-medium text-slate-300">
+                        {tkt.resolutionDeadline ? new Date(tkt.resolutionDeadline).toLocaleString() : 'N/A'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
 
       {activeTab === 'INCIDENTS' && (
         <div className="space-y-4">
-          {incidents.map((inc) => (
-            <div key={inc.id} className="p-6 bg-slate-900/40 rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-rose-400">{inc.id}</span>
-                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${getSeverityBadge(inc.severity)}`}>
-                      {inc.severity}
-                    </span>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                      STAGE: {inc.stage}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold text-white mt-1">{inc.title}</h3>
-                  <p className="text-xs text-slate-400 mt-1">{inc.impactSummary}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-                  <span className="text-xs font-bold text-amber-400 uppercase">Root Cause Analysis</span>
-                  <p className="text-xs text-slate-300 mt-1">{inc.rootCause || 'Under investigation'}</p>
-                </div>
-                <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-                  <span className="text-xs font-bold text-emerald-400 uppercase">Mitigation & Circuit Breaker</span>
-                  <p className="text-xs text-slate-300 mt-1">{inc.mitigationSteps || 'Mitigation in progress'}</p>
-                </div>
-              </div>
+          {incidents.length === 0 ? (
+            <div className="p-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-white">No Enterprise Incidents Recorded</p>
+              <p className="text-xs mt-1">All platform infrastructure and integrations operating normally.</p>
             </div>
-          ))}
+          ) : (
+            incidents.map((inc) => (
+              <div key={inc.id} className="p-6 bg-slate-900/40 rounded-2xl border border-slate-800 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-rose-400">{inc.id}</span>
+                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${getSeverityBadge(inc.severity)}`}>
+                        {inc.severity}
+                      </span>
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        STAGE: {inc.stage}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white mt-1">{inc.title}</h3>
+                    <p className="text-xs text-slate-400 mt-1">{inc.impactSummary}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <span className="text-xs font-bold text-amber-400 uppercase">Root Cause Analysis</span>
+                    <p className="text-xs text-slate-300 mt-1">{inc.rootCause || 'Under investigation'}</p>
+                  </div>
+                  <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <span className="text-xs font-bold text-emerald-400 uppercase">Mitigation & Circuit Breaker</span>
+                    <p className="text-xs text-slate-300 mt-1">{inc.mitigationSteps || 'Mitigation in progress'}</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

@@ -25,7 +25,7 @@ export default function DisbursementsPage() {
   const [reference, setReference] = useState('');
 
   const canExecutePayout = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
 
   const { data: queueData, isLoading: queueLoading } = useQuery({

@@ -224,6 +224,12 @@ describe('Step 55: Production-Grade Final Performance & Concurrency Testing Audi
     it('safely handles concurrent settlement requests on an active delinquent loan', async () => {
       const { loan } = await createDisbursedLoan(40000, 14, 12);
       const settlementAmount = 25000;
+      const settlementOfficer = {
+        id: 'usr-set-perf',
+        email: 'settlement@adyapan.dev',
+        roles: ['SETTLEMENT_OFFICER'],
+        tenantId: 'tenant-adyapan-default',
+      };
 
       const req1 = executeSettlement(
         {
@@ -231,7 +237,7 @@ describe('Step 55: Production-Grade Final Performance & Concurrency Testing Audi
           settlementAmount,
           reason: 'Hardship settlement - Perf 1',
         },
-        superAdmin as any
+        settlementOfficer as any
       );
 
       const req2 = executeSettlement(
@@ -240,7 +246,7 @@ describe('Step 55: Production-Grade Final Performance & Concurrency Testing Audi
           settlementAmount,
           reason: 'Hardship settlement - Perf 2',
         },
-        superAdmin as any
+        settlementOfficer as any
       );
 
       const outcomes = await Promise.allSettled([req1, req2]);

@@ -30,10 +30,14 @@ router.get(
 
 router.put(
   '/:key',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(z.object({ value: z.any() })),
   asyncHandler(async (req, res) => {
-    const updated = await updateSetting(req.params.key, req.body.value, req.user?.id);
+    const updated = await updateSetting(req.params.key, req.body.value, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+    });
     res.json(success(updated));
   })
 );

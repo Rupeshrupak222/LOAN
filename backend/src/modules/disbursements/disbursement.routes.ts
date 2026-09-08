@@ -12,7 +12,7 @@ router.use(authenticate);
 
 router.get(
   '/queue',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const queue = await getReadyForDisbursementQueue({
       id: req.user?.id,
@@ -40,7 +40,7 @@ router.get(
 
 router.post(
   '/execute',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(executeDisbursementSchema),
   asyncHandler(async (req, res) => {
     const loan = await executeDisbursement(req.body, {

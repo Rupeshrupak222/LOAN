@@ -60,7 +60,7 @@ router.get(
 
 router.post(
   '/submissions/:id/verify',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await verifyPaymentSubmission(req.params.id, {
       id: req.user!.id,
@@ -75,7 +75,7 @@ router.post(
 
 router.post(
   '/submissions/:id/reject',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const reason = req.body.reason ? String(req.body.reason) : 'Payment details could not be verified with banking records';
     const result = await rejectPaymentSubmission(req.params.id, reason, {
@@ -131,11 +131,11 @@ router.get(
 
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'CUSTOMER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CUSTOMER'),
   validate(recordPaymentSchema),
   asyncHandler(async (req, res) => {
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
+      ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
     );
     if (!isStaff) {
       const targetLoan = await prisma.loan.findUnique({

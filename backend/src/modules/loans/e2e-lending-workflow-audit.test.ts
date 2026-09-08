@@ -39,8 +39,14 @@ describe('Step 3: Production-Grade End-to-End Lending Workflow Audit & Verificat
     roles: ['LOAN_OFFICER'],
   };
 
+  const settlementOfficer = {
+    id: '00000000-0000-0000-0000-000000000010',
+    email: 'settlementofficer@adyapan.dev',
+    roles: ['SETTLEMENT_OFFICER'],
+  };
+
   beforeAll(async () => {
-    const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer];
+    const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer, settlementOfficer];
     for (const u of testUsers) {
       let dbUser = await prisma.user.findUnique({ where: { email: u.email } });
       if (!dbUser) {
@@ -290,12 +296,12 @@ describe('Step 3: Production-Grade End-to-End Lending Workflow Audit & Verificat
           settlementAmount: 75000,
           reason: 'Hardship settlement approved by Credit Committee. Borrower experienced job loss.',
         },
-        superAdmin
+        settlementOfficer
       );
       expect(settlement.status).toBe('COMPLETED');
       expect(Number(settlement.settlementAmount)).toBe(75000);
       expect(Number(settlement.waivedAmount)).toBeGreaterThanOrEqual(25000);
-      expect(settlement.approvedBy).toBe(superAdmin.email);
+      expect(settlement.approvedBy).toBe(settlementOfficer.email);
     }, 60000);
   });
 

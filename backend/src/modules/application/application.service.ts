@@ -216,14 +216,28 @@ export async function transition(
     }
   }
 
-  // Role-state authorization: Loan Officer, Credit Analyst, and Underwriter transition boundaries
-  const isPrivilegedAdmin = actor?.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
-  );
-  const isPrivilegedDecider = actor?.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
-  );
-  if (actor?.roles?.includes('LOAN_OFFICER') && !isPrivilegedDecider) {
+  // Role-state authorization: Loan Officer, Credit Analyst, Underwriter, and Branch Manager transition boundaries
+  if (actor?.roles?.includes('AUDITOR')) {
+    throw new ForbiddenError('Access forbidden: Auditors have read-only access and cannot transition application statuses');
+  }
+
+  // Branch Manager cannot force final credit approval, rejection, agreement pending, or disbursement states
+  if (actor?.roles?.includes('BRANCH_MANAGER')) {
+    const forbiddenForBranchManager: ApplicationStatus[] = [
+      'APPROVED',
+      'REJECTED',
+      'READY_FOR_DISBURSEMENT',
+      'DISBURSED',
+      'AGREEMENT_PENDING',
+    ];
+    if (forbiddenForBranchManager.includes(toStatus)) {
+      throw new ForbiddenError(
+        `Access forbidden: Branch Manager cannot transition applications to '${toStatus}'. Credit decisions and financial disbursements require Underwriter and Finance Officer authorization.`
+      );
+    }
+  }
+
+  if (actor?.roles?.includes('LOAN_OFFICER')) {
     const allowedForLoanOfficer: ApplicationStatus[] = ['SUBMITTED', 'CANCELLED'];
     if (!allowedForLoanOfficer.includes(toStatus)) {
       throw new ForbiddenError(
@@ -232,7 +246,7 @@ export async function transition(
     }
   }
 
-  if (actor?.roles?.includes('CREDIT_ANALYST') && !isPrivilegedDecider) {
+  if (actor?.roles?.includes('CREDIT_ANALYST')) {
     const allowedForCreditAnalyst: ApplicationStatus[] = [
       'UNDER_REVIEW',
       'CREDIT_ASSESSMENT',
@@ -246,7 +260,7 @@ export async function transition(
     }
   }
 
-  if (actor?.roles?.includes('UNDERWRITER') && !isPrivilegedAdmin) {
+  if (actor?.roles?.includes('UNDERWRITER')) {
     const forbiddenForUnderwriter: ApplicationStatus[] = [
       'DISBURSED',
       'READY_FOR_DISBURSEMENT',

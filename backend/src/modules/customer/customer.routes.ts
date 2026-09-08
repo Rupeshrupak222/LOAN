@@ -175,7 +175,7 @@ router.get(
 
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await createCustomer(req.body, req.user?.id, req.user?.tenantId);
@@ -185,7 +185,7 @@ router.post(
 
 router.patch(
   '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(updateCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateCustomer(req.params.id, req.body, req.user?.id, req.user as any);
@@ -195,7 +195,7 @@ router.patch(
 
 router.patch(
   '/:id/kyc',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(updateKycStatusSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateKycStatus(req.params.id, req.body, req.user?.id, req.user as any);
@@ -205,7 +205,7 @@ router.patch(
 
 router.post(
   '/:id/addresses',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createAddressSchema),
   asyncHandler(async (req, res) => {
     const address = await addCustomerAddress(req.params.id, req.body, req.user?.id, req.user as any);
@@ -215,7 +215,7 @@ router.post(
 
 router.post(
   '/:id/bank-accounts',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createBankAccountSchema),
   asyncHandler(async (req, res) => {
     const account = await addCustomerBankAccount(req.params.id, req.body, req.user?.id, req.user as any);
@@ -225,7 +225,7 @@ router.post(
 
 router.delete(
   '/:id/bank-accounts/:bankAccountId',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomerBankAccount(req.params.id, req.params.bankAccountId, req.user?.id, req.user as any);
     res.json(success(result));
@@ -234,7 +234,7 @@ router.delete(
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomer(req.params.id, req.user?.id, req.user as any);
     res.json(success(result));

@@ -228,7 +228,7 @@ export default function ApplicationDetailPage() {
     ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(data.status);
 
   const canMakeUnderwritingDecision =
-    user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) &&
+    user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) &&
     ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
 
   return (
@@ -301,8 +301,8 @@ export default function ApplicationDetailPage() {
               </Button>
             )}
 
-            {/* 4. Proceed to Payout (Finance Officer / Admin) */}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) &&
+            {/* 4. Proceed to Payout (Finance Officer / Super Admin) */}
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'FINANCE_OFFICER'].includes(r)) &&
               data.status === 'APPROVED' && (
                 <Link href="/disbursements">
                   <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5">
