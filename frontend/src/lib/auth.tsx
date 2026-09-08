@@ -16,10 +16,27 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (identifier: string, password: string) => Promise<void>;
+  register: (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+const PUBLIC_PREFIXES = [
+  '/',
+  '/apply',
+  '/login',
+  '/about',
+  '/contact',
+  '/products',
+  '/resources',
+  '/forgot-password',
+];
+
+function isPublicRoute(path?: string | null): boolean {
+  if (!path || path === '/') return true;
+  return PUBLIC_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -56,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setLoading(false);
         // Only redirect if inside an authenticated app route
-        if (pathname && !pathname.startsWith('/login') && pathname !== '/') {
+        if (pathname && !isPublicRoute(pathname)) {
           router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
       }
@@ -74,6 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data.data.user);
   }, []);
 
+  const register = useCallback(async (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => {
+    const res = await api.post('/auth/register', data);
+    setAccessToken(res.data.data.accessToken);
+    setUser(res.data.data.user);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -87,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
