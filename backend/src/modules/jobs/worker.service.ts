@@ -80,6 +80,20 @@ export class WorkerService {
         ocrQualityScore: 98.5,
       };
     });
+
+    // 6. Automated 3-Day EMI Reminder Handler
+    this.registerHandler('AUTOMATED_EMI_REMINDER', async (payload) => {
+      const { processEmiReminders } = await import('./delinquency.service');
+      const result = await processEmiReminders(payload?.daysAhead || 3);
+      return result;
+    });
+
+    // 7. Midnight DPD & Delinquency Engine Handler
+    this.registerHandler('MIDNIGHT_DPD_DELINQUENCY_ENGINE', async (payload) => {
+      const { processMidnightDelinquencyEngine } = await import('./delinquency.service');
+      const result = await processMidnightDelinquencyEngine();
+      return result;
+    });
   }
 
   public registerHandler<T = any, R = any>(type: JobType, handler: JobHandler<T, R>): void {
