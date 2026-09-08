@@ -96,6 +96,17 @@ export async function listCustomers(
   };
 }
 
+export async function getCustomerByUserId(userId: string, actor?: CustomerActorContext) {
+  const cust = await prisma.customer.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!cust) {
+    throw new NotFoundError('Customer profile not found for current user account');
+  }
+  return getCustomer(cust.id, actor);
+}
+
 export async function getCustomer(id: string, actor?: CustomerActorContext) {
   const customer = await prisma.customer.findUnique({
     where: { id },
@@ -267,10 +278,9 @@ export async function createCustomer(
         update: {
           firstName: input.firstName,
           lastName: input.lastName,
-          passwordHash,
           status: 'ACTIVE',
           tenantId: effectiveTenantId,
-          branchId: input.branchId,
+          ...(input.branchId ? { branchId: input.branchId } : {}),
         },
         create: {
           email: cleanEmail,
@@ -294,14 +304,16 @@ export async function createCustomer(
       customerUserId = user.id;
     }
 
-    const cleanEmail = input.email?.toLowerCase().trim();
+    const cleanEmail = input.email ? input.email.toLowerCase().trim() : undefined;
+
+    // Check if a Customer profile already exists for this userId, email, or mobile
     const existingCust = await tx.customer.findFirst({
       where: {
         OR: [
           ...(customerUserId ? [{ userId: customerUserId }] : []),
           ...(cleanEmail ? [{ email: cleanEmail }] : []),
+          { mobile: mobile || input.mobile },
         ],
-        ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
       },
     });
 
@@ -311,22 +323,23 @@ export async function createCustomer(
         where: { id: existingCust.id },
         data: {
           userId: customerUserId || existingCust.userId,
+          tenantId: effectiveTenantId,
           firstName: input.firstName,
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth || existingCust.dateOfBirth,
           gender: input.gender || existingCust.gender,
-          mobile,
+          mobile: mobile || input.mobile,
           email: cleanEmail || existingCust.email,
-          addressLine: addressLine || existingCust.addressLine,
-          city: city || existingCust.city,
-          state: state || existingCust.state,
-          pincode: pincode || existingCust.pincode,
+          addressLine: addressLine || input.addressLine || existingCust.addressLine,
+          city: city || input.city || existingCust.city,
+          state: state || input.state || existingCust.state,
+          pincode: pincode || input.pincode || existingCust.pincode,
           employmentType: input.employmentType || existingCust.employmentType,
           employerName: input.employerName || existingCust.employerName,
           monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : existingCust.monthlyIncome,
-          bankName: bankName || existingCust.bankName,
-          bankAccountNo: bankAccountNo || existingCust.bankAccountNo,
-          bankIfsc: bankIfsc || existingCust.bankIfsc,
+          bankName: bankName || input.bankName || existingCust.bankName,
+          bankAccountNo: bankAccountNo || input.bankAccountNo || existingCust.bankAccountNo,
+          bankIfsc: bankIfsc || input.bankIfsc || existingCust.bankIfsc,
         },
       });
     } else {
@@ -339,20 +352,20 @@ export async function createCustomer(
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth,
           gender: input.gender,
-          mobile,
+          mobile: mobile || input.mobile,
           email: cleanEmail,
-          addressLine,
-          city,
-          state,
-          pincode,
+          addressLine: addressLine || input.addressLine,
+          city: city || input.city,
+          state: state || input.state,
+          pincode: pincode || input.pincode,
           employmentType: input.employmentType,
           employerName: input.employerName,
           monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
           existingObligations:
             input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
-          bankName,
-          bankAccountNo,
-          bankIfsc,
+          bankName: bankName || input.bankName,
+          bankAccountNo: bankAccountNo || input.bankAccountNo,
+          bankIfsc: bankIfsc || input.bankIfsc,
           branchId: input.branchId,
           kycStatus: 'NOT_STARTED',
           status: 'DRAFT',
@@ -360,131 +373,54 @@ export async function createCustomer(
       });
     }
 
-    if (existingCust) {
-      if (addressLine || city || state || pincode) {
-        const primaryAddr = await tx.customerAddress.findFirst({
-          where: { customerId: existingCust.id, isPrimary: true },
-        });
-        if (primaryAddr) {
-          await tx.customerAddress.update({
-            where: { id: primaryAddr.id },
-            data: {
-              addressLine: addressLine || primaryAddr.addressLine,
-              city: city || primaryAddr.city,
-              state: state || primaryAddr.state,
-              pincode: pincode || primaryAddr.pincode,
-            },
-          });
-        } else {
-          await tx.customerAddress.create({
-            data: {
-              customerId: existingCust.id,
-              addressType: 'CURRENT',
-              addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
-              city: city || '',
-              state: state || '',
-              pincode: pincode || '',
-              isPrimary: true,
-            },
-          });
-        }
-      }
-
-      if (bankAccountNo && bankName) {
-        const primaryBank = await tx.customerBankAccount.findFirst({
-          where: { customerId: existingCust.id, isPrimary: true },
-        });
-        if (primaryBank) {
-          await tx.customerBankAccount.update({
-            where: { id: primaryBank.id },
-            data: {
-              bankName: bankName.trim(),
-              accountNumber: bankAccountNo.trim(),
-              ifscCode: bankIfsc?.trim() || primaryBank.ifscCode,
-              accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
-            },
-          });
-        } else {
-          await tx.customerBankAccount.create({
-            data: {
-              customerId: existingCust.id,
-              accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
-              bankName: bankName.trim(),
-              accountNumber: bankAccountNo.trim(),
-              ifscCode: bankIfsc?.trim() || '',
-              accountType: input.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
-              isPrimary: true,
-            },
-          });
-        }
-      }
-
-      if (input.employerName || input.employmentType || input.monthlyIncome) {
-        const primaryEmp = await tx.customerEmployment.findFirst({
-          where: { customerId: existingCust.id },
-        });
-        if (primaryEmp) {
-          await tx.customerEmployment.update({
-            where: { id: primaryEmp.id },
-            data: {
-              employerName: input.employerName ?? primaryEmp.employerName,
-              employmentType: input.employmentType ?? primaryEmp.employmentType,
-              designation: input.designation ?? primaryEmp.designation,
-              monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : primaryEmp.monthlyIncome,
-            },
-          });
-        } else if (input.employerName) {
-          await tx.customerEmployment.create({
-            data: {
-              customerId: existingCust.id,
-              employerName: input.employerName,
-              employmentType: input.employmentType || 'SALARIED',
-              designation: input.designation,
-              monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
-            },
-          });
-        }
-      }
-    } else {
-      if (addressLine || city || state || pincode) {
+    if (addressLine || city || input.addressLine || input.city) {
+      const existingAddr = await tx.customerAddress.findFirst({ where: { customerId: cust.id } });
+      if (!existingAddr) {
         await tx.customerAddress.create({
           data: {
             customerId: cust.id,
             addressType: 'CURRENT',
-            addressLine: addressLine || (city ? `${city}, ${state || ''}`.trim() : 'Primary Address'),
-            city: city || '',
-            state: state || '',
-            pincode: pincode || '',
+            addressLine: (addressLine || input.addressLine) || (city || input.city ? `${city || input.city}, ${state || input.state || ''}`.trim() : 'Primary Address'),
+            city: (city || input.city) || '',
+            state: (state || input.state) || '',
+            pincode: (pincode || input.pincode) || '',
             isPrimary: true,
           },
         });
       }
+    }
 
-      if (bankAccountNo && bankName) {
+    if ((bankAccountNo || input.bankAccountNo) && (bankName || input.bankName)) {
+      const accNo = (bankAccountNo || input.bankAccountNo)!.trim();
+      const bName = (bankName || input.bankName)!.trim();
+      const existingBank = await tx.customerBankAccount.findFirst({
+        where: { customerId: cust.id, accountNumber: accNo },
+      });
+      if (!existingBank) {
         await tx.customerBankAccount.create({
           data: {
             customerId: cust.id,
             accountHolderName: `${input.firstName} ${input.lastName}`.trim(),
-            bankName: bankName.trim(),
-            accountNumber: bankAccountNo.trim(),
-            ifscCode: bankIfsc?.trim() || '',
+            bankName: bName,
+            accountNumber: accNo,
+            ifscCode: (bankIfsc || input.bankIfsc || '')!.trim(),
             accountType: input.employmentType === 'SALARIED' ? 'SALARY' : 'SAVINGS',
             isPrimary: true,
           },
         });
       }
+    }
 
-      if (input.employerName) {
-        await tx.customerEmployment.create({
-          data: {
-            customerId: cust.id,
-            employmentType: input.employmentType || 'SALARIED',
-            employerName: input.employerName,
-            designation: input.designation,
-            monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
-          },
-        });
-      }
+    if (input.employerName) {
+      await tx.customerEmployment.create({
+        data: {
+          customerId: cust.id,
+          employmentType: input.employmentType || 'SALARIED',
+          employerName: input.employerName,
+          designation: input.designation,
+          monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : '0.00',
+        },
+      });
     }
 
     return cust;
