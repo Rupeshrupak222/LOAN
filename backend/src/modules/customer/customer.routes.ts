@@ -6,6 +6,7 @@ import { success } from '../../common/response';
 import { validate } from '../../middleware/validate';
 import { authenticate, authorize } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenant-context';
+import { prisma } from '../../config/prisma';
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -50,6 +51,109 @@ router.get(
     const kycStatus = req.query.kycStatus ? String(req.query.kycStatus) : undefined;
     const result = await listCustomers(params, status, kycStatus, req.user as any);
     res.json(success(result.data, result.pagination));
+  })
+);
+
+router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    const loanInclude = {
+      product: { select: { name: true, code: true, productType: true } },
+      schedule: { orderBy: { emiNumber: 'asc' as const } },
+      payments: {
+        include: { allocations: true },
+        orderBy: { paidAt: 'desc' as const },
+      },
+      closure: true,
+    };
+
+    const tenantFilter = req.user.tenantId ? { tenantId: req.user.tenantId } : {};
+
+    let customer = await prisma.customer.findFirst({
+      where: {
+        userId: req.user.id,
+        ...tenantFilter,
+      },
+      include: {
+        addresses: true,
+        employmentDetails: true,
+        bankAccounts: true,
+        loans: {
+          include: loanInclude,
+          orderBy: { createdAt: 'desc' },
+        },
+        applications: {
+          include: {
+            product: { select: { name: true, code: true, minAmount: true, maxAmount: true } },
+            eligibility: true,
+            riskAssessment: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        documents: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!customer && req.user.email) {
+      const existingByEmail = await prisma.customer.findFirst({
+        where: {
+          email: { equals: req.user.email, mode: 'insensitive' },
+          ...tenantFilter,
+        },
+      });
+      if (existingByEmail) {
+        await prisma.customer.update({
+          where: { id: existingByEmail.id },
+          data: { userId: req.user.id },
+        });
+      } else {
+        const dbUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const custCode = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
+        await prisma.customer.create({
+          data: {
+            userId: req.user.id,
+            email: req.user.email,
+            firstName: dbUser?.firstName || 'Borrower',
+            lastName: dbUser?.lastName || 'User',
+            mobile: '9876543210',
+            customerCode: custCode,
+            status: 'ACTIVE',
+            kycStatus: 'VERIFIED',
+            tenantId: req.user.tenantId || undefined,
+          },
+        });
+      }
+
+      customer = await prisma.customer.findFirst({
+        where: {
+          userId: req.user.id,
+          ...tenantFilter,
+        },
+        include: {
+          addresses: true,
+          employmentDetails: true,
+          bankAccounts: true,
+          loans: {
+            include: loanInclude,
+            orderBy: { createdAt: 'desc' },
+          },
+          applications: {
+            include: {
+              product: { select: { name: true, code: true, minAmount: true, maxAmount: true } },
+              eligibility: true,
+              riskAssessment: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          documents: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+    }
+
+    res.json(success(customer));
   })
 );
 
