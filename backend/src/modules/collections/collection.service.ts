@@ -191,6 +191,15 @@ export async function logCollectionActivity(
   input: LogActivityInput,
   actor: CollectionActorContext
 ) {
+  if (actor.roles && actor.roles.length > 0) {
+    const isAuthorized = actor.roles.some((r) =>
+      ['COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+    );
+    if (!isAuthorized) {
+      throw new ForbiddenError('Access forbidden: Only Collection Officers, Agents, Branch Managers, or Administrators can log recovery activities');
+    }
+  }
+
   const colCase = await prisma.collectionCase.findUnique({
     where: { id: input.caseId },
     include: { loan: true },
@@ -245,6 +254,15 @@ export async function recordPromiseToPay(
   input: RecordPtpInput,
   actor: CollectionActorContext
 ) {
+  if (actor.roles && actor.roles.length > 0) {
+    const isAuthorized = actor.roles.some((r) =>
+      ['COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+    );
+    if (!isAuthorized) {
+      throw new ForbiddenError('Access forbidden: Only Collection Officers, Agents, Branch Managers, or Administrators can record promises to pay');
+    }
+  }
+
   const colCase = await prisma.collectionCase.findUnique({
     where: { id: input.caseId },
     include: { loan: true },

@@ -14,7 +14,7 @@ router.use(authenticate);
  */
 router.post(
   '/run',
-  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const result = await reconciliationService.runReconciliation({
       id: req.user!.id,
@@ -82,7 +82,7 @@ router.get(
  */
 router.post(
   '/adjustments',
-  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const { type, loanId, exceptionId, amount, reason } = req.body || {};
 
@@ -113,7 +113,7 @@ router.post(
  */
 router.post(
   '/adjustments/:id/approve',
-  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -135,7 +135,7 @@ router.post(
  */
 router.post(
   '/adjustments/:id/reject',
-  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { rejectionReason } = req.body || {};

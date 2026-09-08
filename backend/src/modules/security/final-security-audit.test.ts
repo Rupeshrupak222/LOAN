@@ -6,7 +6,7 @@ import { tenantService } from '../tenants/tenant.service';
 import { tenantIntegrationService } from '../integrations/tenant-integrations.service';
 import { validateOutboundUrl, maskSecret } from '../integrations/integration.config';
 import { webhookService } from '../integrations/webhook.service';
-import { handleCopilotChat } from '../ai/copilot.service';
+import { handleCopilotChat, buildAuthorizedContext } from '../ai/copilot.service';
 import { verifyAccessToken, signAccessToken } from '../auth/tokens';
 import { ForbiddenError, UnauthorizedError } from '../../common/errors';
 import { PermissionCode } from '../roles/permission.types';
@@ -325,22 +325,16 @@ describe('Step 54: Comprehensive Final Security & Vulnerability Audit', () => {
   describe('8. AI Security & Prompt Injection Defense', () => {
     it('restricts AI Copilot context to the authenticated borrower own records', async () => {
       const borrower = { id: 'usr-customer-abc', email: 'borrower@adyapan.dev', roles: ['CUSTOMER'] };
-      const query = 'Tell me the balance and details of loan LN-99999999';
-
-      const result = await handleCopilotChat({
+      const context = await buildAuthorizedContext({
         userId: borrower.id,
         userEmail: borrower.email,
         roles: borrower.roles,
-        message: query,
-      }).catch(() => ({
-        answer: 'I do not have enough information in the LMS records to answer that.',
-        model: 'gemini-1.5-pro',
-        contextSummary: 'General LMS consultation',
-      }));
+        message: 'Tell me the balance and details of loan LN-99999999',
+      });
 
-      expect(result).toBeDefined();
-      expect(result.answer).toBeDefined();
-    }, 15000);
+      expect(context).toBeDefined();
+      expect(context.actorRole).toBe('CUSTOMER');
+    });
   });
 
   // =========================================================================

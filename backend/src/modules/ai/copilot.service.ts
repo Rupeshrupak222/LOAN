@@ -39,10 +39,17 @@ export interface CopilotChatResponse {
  * Builds authorized, compact LMS context for the LLM based on user question and role.
  */
 export async function buildAuthorizedContext(
-  user: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string },
-  query: string,
+  userOrParams: any,
+  query: string = '',
   _currentPath?: string
-): Promise<{ contextText: string; summary: string }> {
+): Promise<{ contextText: string; summary: string; actorRole?: string }> {
+  const user = {
+    id: userOrParams.id || userOrParams.userId || '',
+    email: userOrParams.email || userOrParams.userEmail || '',
+    roles: userOrParams.roles || ['CUSTOMER'],
+    tenantId: userOrParams.tenantId,
+    branchId: userOrParams.branchId,
+  };
   const isCustomer = user.roles.includes('CUSTOMER');
   const isSuperAdmin = user.roles.includes('SUPER_ADMIN');
   const primaryRole = (user.roles[0] || 'CUSTOMER') as RoleName;
@@ -50,11 +57,11 @@ export async function buildAuthorizedContext(
   let effectiveTenantId = user.tenantId;
   let effectiveBranchId = user.branchId;
 
-  if (!effectiveTenantId || !effectiveBranchId) {
+  if ((!effectiveTenantId || !effectiveBranchId) && user.id) {
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: { tenantId: true, branchId: true },
-    });
+    }).catch(() => null);
     if (dbUser) {
       if (!effectiveTenantId && dbUser.tenantId) effectiveTenantId = dbUser.tenantId;
       if (!effectiveBranchId && dbUser.branchId) effectiveBranchId = dbUser.branchId;
@@ -69,12 +76,13 @@ export async function buildAuthorizedContext(
   const staffTenantFilter = effectiveTenantId && !isSuperAdmin ? { tenantId: effectiveTenantId } : {};
   const staffBranchFilter = effectiveBranchId && isBranchScoped ? { branchId: effectiveBranchId } : {};
 
-  const lowerQuery = query.toLowerCase();
+  const safeQuery = query || userOrParams.message || userOrParams.query || '';
+  const lowerQuery = safeQuery.toLowerCase();
 
   // 1. Identify specific entity references in the prompt (e.g. LN-1234, CUST-1234, APP-1234)
-  const loanNoMatch = query.match(/LN-?[0-9]+/i);
-  const custCodeMatch = query.match(/CUST-?[0-9]+/i);
-  const appNoMatch = query.match(/APP-?[0-9]+/i);
+  const loanNoMatch = safeQuery.match(/LN-?[0-9]+/i);
+  const custCodeMatch = safeQuery.match(/CUST-?[0-9]+/i);
+  const appNoMatch = safeQuery.match(/APP-?[0-9]+/i);
 
   const contextBlocks: string[] = [];
   let summary = '';
@@ -239,7 +247,7 @@ export async function buildAuthorizedContext(
   }
 
   // --- Role-Based Action Items & Queue Intelligence ---
-  if (isCustomer) {
+  if (isCustomer && user.id) {
     // Borrower sees ONLY their own active loan & payment status
     const customerRecord = await prisma.customer.findUnique({
       where: { userId: user.id },
@@ -252,7 +260,7 @@ export async function buildAuthorizedContext(
         },
         paymentSubmissions: { orderBy: { createdAt: 'desc' }, take: 3 },
       },
-    });
+    }).catch(() => null);
 
     if (customerRecord) {
       const activeLoan = customerRecord.loans.find((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE');
@@ -449,7 +457,7 @@ ${
       ? contextBlocks.join('\n\n')
       : 'No specific records matched the query directly in the LMS database.';
 
-  return { contextText, summary: summary || 'General LMS consultation' };
+  return { contextText, summary: summary || 'General LMS consultation', actorRole: primaryRole };
 }
 
 /**
@@ -483,11 +491,13 @@ Current User Role: ${primaryRole}
    - If user is LOAN_OFFICER: Focus on customer intake, missing KYC documents, and application submissions.
    - If user is CREDIT_ANALYST: Focus on DTI/FOIR, risk score breakdown, and policy eligibility criteria.
    - If user is UNDERWRITER: Focus on sanction decisions, approval limit tiers, conditions, and risk flags.
+   - If user is BRANCH_MANAGER: Focus on branch-level portfolio overview, branch staff monitoring, customer/application supervision, and collection/DPD performance. Never assist with or promise unauthorized mutations (financial disbursements, loan approvals, ledger adjustments, or user privilege modifications).
    - If user is FINANCE_OFFICER: Focus on disbursement release queue, electronic transfers (NEFT/RTGS), payment verifications, and waterfall ledgers.
    - If user is COLLECTION_OFFICER: Focus on DPD aging buckets, overdue balances, customer phone follow-ups, and PTP commitments.
    - If user is CUSTOMER (Borrower): Focus only on their own active loan facility, upcoming EMI due date, and payment submission proof. Never reveal other customers' data.
 4. FINANCIAL TRUTH: Do not make up financial calculations. The amounts (Principal, Interest, EMI, Outstanding Balance, DPD) given in the LMS Context are authoritative.
-5. FORMATTING: Use clean, concise formatting with bold text and short bullet points. Avoid raw JSON dumps or repeating the user's prompt verbatim.
+5. ADVISORY ONLY: The AI Copilot is strictly an informational and advisory tool. You cannot directly execute mutations, sanction loans, disburse funds, post transactions, or alter system settings. Direct the user to their authorized UI workflow.
+6. FORMATTING: Use clean, concise formatting with bold text and short bullet points. Avoid raw JSON dumps or repeating the user's prompt verbatim.
 
 === VERIFIED LMS DATABASE CONTEXT ===
 ${contextText}

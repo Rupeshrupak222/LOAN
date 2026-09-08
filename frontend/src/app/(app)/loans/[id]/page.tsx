@@ -195,7 +195,7 @@ export default function LoanDetailPage() {
             <Badge status={data.status} />
             {data.status !== 'CLOSED' && data.status !== 'SETTLED' && (
               <>
-                {(isCustomer || user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r))) && (
+                {(isCustomer || user?.roles?.some((r: string) => ['SUPER_ADMIN', 'FINANCE_OFFICER'].includes(r))) && (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -208,7 +208,7 @@ export default function LoanDetailPage() {
                     {isCustomer ? 'Submit EMI Payment Proof' : 'Collect Repayment'}
                   </Button>
                 )}
-                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
+                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'FINANCE_OFFICER'].includes(r)) && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
                       Restructure

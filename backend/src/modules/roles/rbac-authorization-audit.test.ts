@@ -33,7 +33,7 @@ describe('RBAC Authorization & Role Audit Test Suite', () => {
       expect(role.permissions.length).toBeGreaterThan(0);
     });
 
-    it('SUPER_ADMIN should have bypass / universal permission evaluation', () => {
+    it('SUPER_ADMIN should have platform governance and oversight permissions while operational write permissions are segregated', () => {
       const superAdminUser = {
         id: 'usr-superadmin-1',
         email: 'superadmin@adyapan.com',
@@ -41,10 +41,11 @@ describe('RBAC Authorization & Role Audit Test Suite', () => {
         tenantId: 'tenant-adyapan-default',
       };
 
-      expect(rolePermissionService.hasPermission(superAdminUser, 'APPLICATIONS_CREATE')).toBe(true);
-      expect(rolePermissionService.hasPermission(superAdminUser, 'DISBURSEMENTS_EXECUTE_TRANSFER')).toBe(true);
       expect(rolePermissionService.hasPermission(superAdminUser, 'CONFIGURATION_PUBLISH_POLICY')).toBe(true);
       expect(rolePermissionService.hasPermission(superAdminUser, 'PRIVACY_PURGE_PII')).toBe(true);
+      expect(rolePermissionService.hasPermission(superAdminUser, 'APPLICATIONS_VIEW')).toBe(true);
+      expect(rolePermissionService.hasPermission(superAdminUser, 'APPLICATIONS_APPROVE')).toBe(false);
+      expect(rolePermissionService.hasPermission(superAdminUser, 'DISBURSEMENTS_EXECUTE_TRANSFER')).toBe(false);
     });
 
     it('LOAN_OFFICER should have sourcing permissions but NOT credit sanctioning or disbursement execution', () => {

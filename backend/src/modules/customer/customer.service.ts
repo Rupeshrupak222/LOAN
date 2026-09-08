@@ -159,17 +159,20 @@ export async function getCustomer(id: string, actor?: CustomerActorContext) {
     }
   }
 
-  const totalOutstanding = customer.loans.reduce(
+  const customerLoans = customer.loans || [];
+  const customerPayments = customer.payments || [];
+
+  const totalOutstanding = customerLoans.reduce(
     (acc, l) => Money.add(acc, l.outstandingPrincipal),
     Money.of(0)
   );
 
-  const totalBorrowed = customer.loans.reduce(
+  const totalBorrowed = customerLoans.reduce(
     (acc, l) => Money.add(acc, l.principal),
     Money.of(0)
   );
 
-  const totalRepaid = customer.payments.reduce(
+  const totalRepaid = customerPayments.reduce(
     (acc, p) => (p.status === 'SUCCESS' ? Money.add(acc, p.amount) : acc),
     Money.of(0)
   );
@@ -439,6 +442,9 @@ export async function updateCustomer(
   actorUserId?: string,
   actor?: CustomerActorContext
 ) {
+  if (actor?.roles?.includes('AUDITOR')) {
+    throw new ForbiddenError('Access forbidden: Auditors have read-only access and cannot modify customer records');
+  }
   const existing = await getCustomer(id, actor);
 
   const mobile = input.mobile !== undefined ? input.mobile : input.phone;
@@ -624,6 +630,9 @@ export async function updateKycStatus(
   actorUserId?: string,
   actor?: CustomerActorContext
 ) {
+  if (actor?.roles?.includes('AUDITOR')) {
+    throw new ForbiddenError('Access forbidden: Auditors have read-only access and cannot modify KYC records');
+  }
   const existing = await getCustomer(id, actor);
 
   let newCustomerStatus = existing.status;
@@ -826,6 +835,10 @@ export async function deleteCustomer(
   actorUserId?: string,
   actor?: CustomerActorContext
 ) {
+  if (actor?.roles && !actor.roles.includes('SUPER_ADMIN')) {
+    throw new ForbiddenError('Access forbidden: Only Super Administrators can delete customer records');
+  }
+
   const customer = await getCustomer(id, actor);
 
   // Perform cascading deletion in transaction

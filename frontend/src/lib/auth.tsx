@@ -10,6 +10,8 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   roles: string[];
+  tenantId?: string;
+  branchId?: string;
 }
 
 interface AuthContextValue {

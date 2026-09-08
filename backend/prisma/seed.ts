@@ -215,7 +215,7 @@ async function main() {
     return user;
   }
 
-  // 4. Operational Staff Users (9 Protected Employees)
+  // 4. Operational Staff & Customer Users (10 Standard Demo Accounts)
   await createStaffUser('superadmin@adyapan.dev', 'Super', 'Admin', 'SUPER_ADMIN', 'EMP001');
   await createStaffUser('admin@adyapan.dev', 'System', 'Admin', 'COMPANY_ADMIN', 'EMP002');
   await createStaffUser('manager@adyapan.dev', 'Meera', 'Nair', 'BRANCH_MANAGER', 'EMP003', 'PUN01');
@@ -225,6 +225,11 @@ async function main() {
   await createStaffUser('finance@adyapan.dev', 'Farah', 'Khan', 'FINANCE_OFFICER', 'EMP007');
   await createStaffUser('collections@adyapan.dev', 'Rahul', 'Verma', 'COLLECTION_OFFICER', 'EMP008');
   await createStaffUser('auditor@adyapan.dev', 'Asha', 'Iyer', 'AUDITOR', 'EMP009');
+
+  // Standardize password for ALL users in the database to the uniform password
+  await prisma.user.updateMany({
+    data: { passwordHash },
+  });
 
   // 5. Canonical Loan Products (5 Standard Lending Products)
   const products = [
@@ -426,15 +431,15 @@ async function main() {
       key: 'approval_limits',
       category: 'underwriting',
       value: [
-        { maxAmount: 1000000, chain: ['UNDERWRITER', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'] },
-        { maxAmount: 5000000, chain: ['BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'] },
-        { maxAmount: null, chain: ['COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: 1000000, chain: ['UNDERWRITER', 'SUPER_ADMIN'] },
+        { maxAmount: 5000000, chain: ['UNDERWRITER', 'SUPER_ADMIN'] },
+        { maxAmount: null, chain: ['SUPER_ADMIN'] },
       ],
     },
     {
       key: 'payment_allocation_order',
       category: 'finance',
-      value: ['PENALTIES', 'FEES', 'INTEREST', 'PRINCIPAL'],
+      value: ['PENALTY', 'FEES', 'INTEREST', 'PRINCIPAL'],
     },
     {
       key: 'eligibility_criteria',

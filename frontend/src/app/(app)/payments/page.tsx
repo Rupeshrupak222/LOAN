@@ -41,7 +41,7 @@ export default function PaymentsPage() {
     ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'COLLECTION_OFFICER', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST'].includes(r)
   );
   const canVerify = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'FINANCE_OFFICER'].includes(r)
   );
 
   const [activeTab, setActiveTab] = useState<'ALL' | 'SUBMISSIONS' | 'DISBURSEMENTS' | 'REPAYMENTS'>(

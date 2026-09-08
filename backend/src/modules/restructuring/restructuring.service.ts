@@ -17,10 +17,10 @@ export async function restructureLoan(
   actor: { email: string; id: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
   const isAuthorized = actor.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)
+    ['CREDIT_ANALYST', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
   );
   if (!isAuthorized) {
-    throw new ForbiddenError('Access forbidden: Only Credit Administrators and Branch Managers can restructure loans');
+    throw new ForbiddenError('Access forbidden: Only Credit Analysts, Underwriters, or Administrators can restructure loans');
   }
 
   const loan = await prisma.loan.findUnique({
@@ -145,10 +145,10 @@ export async function executeSettlement(
   actor: { email: string; id: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
   const isAuthorized = actor.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)
+    ['SETTLEMENT_OFFICER', 'RECOVERY_HEAD', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
   );
   if (!isAuthorized) {
-    throw new ForbiddenError('Access forbidden: Only Credit Administrators and Branch Managers can execute loan debt settlements');
+    throw new ForbiddenError('Access forbidden: Only Settlement Officers, Recovery Heads, or Administrators can execute loan debt settlements');
   }
 
   const loan = await prisma.loan.findUnique({ where: { id: input.loanId } });
@@ -280,10 +280,10 @@ export async function closeLoanAndIssueNoc(
   actor: { email: string; id: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
   const isAuthorized = actor.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
   );
   if (!isAuthorized) {
-    throw new ForbiddenError('Access forbidden: Only Finance Officers, Branch Managers, or Administrators can close loan accounts and issue NOC certificates');
+    throw new ForbiddenError('Access forbidden: Only Finance Officers or Administrators can close loan accounts and issue NOC certificates');
   }
 
   const loan = await prisma.loan.findUnique({

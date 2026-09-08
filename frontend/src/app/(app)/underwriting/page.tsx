@@ -47,7 +47,7 @@ export default function UnderwritingQueuePage() {
   const [conditions, setConditions] = useState('');
 
   const canDecide = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)
   );
 
   const { data, isLoading } = useQuery({

@@ -13,7 +13,7 @@ const router = Router();
 router.use(authenticate);
 router.use(tenantContext);
 
-const STAFF = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'];
+const INTAKE_STAFF = ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
 
 router.get(
   '/',
@@ -55,7 +55,7 @@ router.get(
 
 router.post(
   '/',
-  authorize(...STAFF),
+  authorize(...INTAKE_STAFF),
   validate({ body: createApplicationSchema }),
   asyncHandler(async (req, res) =>
     created(
@@ -72,7 +72,7 @@ router.post(
 
 router.post(
   '/:id/transition',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'),
   validate({ body: transitionSchema }),
   asyncHandler(async (req, res) =>
     ok(

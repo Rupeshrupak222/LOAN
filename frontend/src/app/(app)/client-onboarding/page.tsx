@@ -1,22 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  ShieldCheck,
-  ChevronRight,
-  Plus,
   RefreshCw,
-  XCircle,
-  FileCheck,
-  Layers,
-  Lock,
-  ArrowUpRight,
-  ExternalLink,
 } from 'lucide-react';
+import { api, apiErrorMessage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 
 interface ChecklistTask {
   code: string;
@@ -40,7 +35,7 @@ interface OnboardingDossier {
     email: string;
     phone: string;
   };
-  organizationDetails: {
+  organizationDetails?: {
     cinNumber?: string;
     rbiRegistrationNo?: string;
     domain?: string;
@@ -52,77 +47,42 @@ interface OnboardingDossier {
 }
 
 export default function ClientOnboardingPage() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'DOSSIERS' | 'CHECKLIST' | 'VALIDATION'>('CHECKLIST');
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'VALIDATION'>('CHECKLIST');
+  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null);
 
-  // Interactive mock state matching live client-onboarding service
-  const [dossiers, setDossiers] = useState<OnboardingDossier[]>([
-    {
-      id: 'onb-adyapan-default',
-      tenantId: 'tenant-adyapan-default',
-      code: 'ADYAPAN_FINANCE',
-      name: 'Adyapan Prime Lending NBFC',
-      tier: 'STRATEGIC_NBFC',
-      stage: 'ACTIVE',
-      primaryContact: { name: 'Rupesh Kumar', email: 'superadmin@adyapan.dev', phone: '+91 98110 22334' },
-      organizationDetails: { cinNumber: 'U65999MH2024PTC123456', rbiRegistrationNo: 'N-14.03219', domain: 'adyapan.dev' },
-      completionPercentage: 100,
-      assignedOwnerEmail: 'superadmin@adyapan.dev',
-      retentionYears: 8,
-      checklist: [
-        { code: 'ORGANIZATION_PROFILE', name: 'Legal Organization Profile', category: 'ORGANIZATION', description: 'Record CIN, RBI NBFC registration number, and registered address.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'ADMIN_ACCOUNT', name: 'Primary Institution Admin', category: 'ORGANIZATION', description: 'Configure institution super-administrator credentials.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'BRANCH_TOPOLOGY', name: 'Branch Network & Hierarchy', category: 'ORGANIZATION', description: 'Configure head office and regional branch network mapping.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'ROLE_SOD_RULES', name: 'Role Catalog & SoD Rules', category: 'SECURITY_RBAC', description: 'Activate Maker-Checker and Sanctioner-Disburser segregation of duties.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'PERMISSION_MAPPINGS', name: 'Granular Permission Scopes', category: 'SECURITY_RBAC', description: 'Map 28 granular permissions and financial sanction authority limits.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'PRODUCT_CATALOG', name: 'Dynamic Product Catalog', category: 'PRODUCT_WORKFLOW', description: 'Configure loan products, interest rate matrices, and KFS fees.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'WORKFLOW_GATES', name: 'Dynamic Workflow & Gates', category: 'PRODUCT_WORKFLOW', description: 'Configure origination stages, SLA targets, and mandatory verification gates.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'COMPLIANCE_POLICIES', name: 'Lending Policy & FOIR Caps', category: 'COMPLIANCE_PRIVACY', description: 'Set statutory FOIR ceiling (65%), CIBIL floor (650), and DTI limits.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'PRIVACY_DPDP', name: 'Statutory DPDP Consent Registry', category: 'COMPLIANCE_PRIVACY', description: 'Publish versioned borrower consent purposes and privacy preferences.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'BRANDING_ASSETS', name: 'White-Label Branding & Portal', category: 'ORGANIZATION', description: 'Upload institution logo, primary colors, and custom sub-domain.', isMandatory: false, status: 'COMPLETED' },
-        { code: 'INTEGRATION_GATEWAYS', name: 'Integration Hub Gateways', category: 'INTEGRATIONS', description: 'Configure credit bureau, payment gateway, eKYC, and AA routing.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'COMMUNICATION_CHANNELS', name: 'SMS & Email Notification Templates', category: 'INTEGRATIONS', description: 'Verify statutory SMS and email templates.', isMandatory: false, status: 'COMPLETED' },
-        { code: 'SECURITY_HARDENING', name: 'Security & Account Lockout Policies', category: 'SECURITY_RBAC', description: 'Enforce 5-attempt brute-force protection and session timeouts.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'STAFF_USER_SETUP', name: 'Staff User Provisioning', category: 'SECURITY_RBAC', description: 'Create initial underwriter, loan officer, and finance checker accounts.', isMandatory: false, status: 'COMPLETED' },
-        { code: 'TESTING_VERIFICATION', name: 'End-to-End Sandbox Simulation', category: 'GO_LIVE_APPROVAL', description: 'Execute synthetic borrower lifecycle test.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'GOLIVE_SIGN_OFF', name: 'Executive Go-Live Sign-Off', category: 'GO_LIVE_APPROVAL', description: 'Formally approve commercial institution activation.', isMandatory: true, status: 'COMPLETED' },
-      ],
+  // Fetch real onboarding dossiers from backend API
+  const { data: dossiers = [], isLoading, refetch } = useQuery<OnboardingDossier[]>({
+    queryKey: ['client-onboardings'],
+    queryFn: async () => {
+      const res = await api.get('/client-onboarding');
+      const rows = res.data?.data;
+      return (Array.isArray(rows) ? rows : []) as OnboardingDossier[];
     },
-    {
-      id: 'onb-kotak-prime-8812',
-      tenantId: 'tenant-kotak-prime',
-      code: 'KOTAK_PRIME',
-      name: 'Kotak Prime Auto Finance',
-      tier: 'STRATEGIC_NBFC',
-      stage: 'VALIDATION',
-      primaryContact: { name: 'Anand Mahindra', email: 'anand@kotakprime.com', phone: '+91 99000 11223' },
-      organizationDetails: { cinNumber: 'U65990MH1996PLC098765', rbiRegistrationNo: 'N-13.00199', domain: 'kotakprime.adyapan.dev' },
-      completionPercentage: 81,
-      assignedOwnerEmail: 'superadmin@adyapan.dev',
-      retentionYears: 8,
-      checklist: [
-        { code: 'ORGANIZATION_PROFILE', name: 'Legal Organization Profile', category: 'ORGANIZATION', description: 'Record CIN, RBI NBFC registration number, and registered address.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'ADMIN_ACCOUNT', name: 'Primary Institution Admin', category: 'ORGANIZATION', description: 'Configure institution super-administrator credentials.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'BRANCH_TOPOLOGY', name: 'Branch Network & Hierarchy', category: 'ORGANIZATION', description: 'Configure head office and regional branch network mapping.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'ROLE_SOD_RULES', name: 'Role Catalog & SoD Rules', category: 'SECURITY_RBAC', description: 'Activate Maker-Checker and Sanctioner-Disburser segregation of duties.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'PERMISSION_MAPPINGS', name: 'Granular Permission Scopes', category: 'SECURITY_RBAC', description: 'Map 28 granular permissions and financial sanction authority limits.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'PRODUCT_CATALOG', name: 'Dynamic Product Catalog', category: 'PRODUCT_WORKFLOW', description: 'Configure loan products, interest rate matrices, and KFS fees.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'WORKFLOW_GATES', name: 'Dynamic Workflow & Gates', category: 'PRODUCT_WORKFLOW', description: 'Configure origination stages, SLA targets, and mandatory verification gates.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'COMPLIANCE_POLICIES', name: 'Lending Policy & FOIR Caps', category: 'COMPLIANCE_PRIVACY', description: 'Set statutory FOIR ceiling (65%), CIBIL floor (650), and DTI limits.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'PRIVACY_DPDP', name: 'Statutory DPDP Consent Registry', category: 'COMPLIANCE_PRIVACY', description: 'Publish versioned borrower consent purposes and privacy preferences.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'BRANDING_ASSETS', name: 'White-Label Branding & Portal', category: 'ORGANIZATION', description: 'Upload institution logo, primary colors, and custom sub-domain.', isMandatory: false, status: 'COMPLETED' },
-        { code: 'INTEGRATION_GATEWAYS', name: 'Integration Hub Gateways', category: 'INTEGRATIONS', description: 'Configure credit bureau, payment gateway, eKYC, and AA routing.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'COMMUNICATION_CHANNELS', name: 'SMS & Email Notification Templates', category: 'INTEGRATIONS', description: 'Verify statutory SMS and email templates.', isMandatory: false, status: 'COMPLETED' },
-        { code: 'SECURITY_HARDENING', name: 'Security & Account Lockout Policies', category: 'SECURITY_RBAC', description: 'Enforce 5-attempt brute-force protection and session timeouts.', isMandatory: true, status: 'COMPLETED' },
-        { code: 'STAFF_USER_SETUP', name: 'Staff User Provisioning', category: 'SECURITY_RBAC', description: 'Create initial underwriter, loan officer, and finance checker accounts.', isMandatory: false, status: 'IN_PROGRESS' },
-        { code: 'TESTING_VERIFICATION', name: 'End-to-End Sandbox Simulation', category: 'GO_LIVE_APPROVAL', description: 'Execute synthetic borrower lifecycle test.', isMandatory: true, status: 'IN_PROGRESS' },
-        { code: 'GOLIVE_SIGN_OFF', name: 'Executive Go-Live Sign-Off', category: 'GO_LIVE_APPROVAL', description: 'Formally approve commercial institution activation.', isMandatory: true, status: 'NOT_STARTED' },
-      ],
-    },
-  ]);
+  });
 
-  const [selectedDossierId, setSelectedDossierId] = useState<string>('onb-kotak-prime-8812');
-  const activeDossier = dossiers.find((d) => d.id === selectedDossierId) || dossiers[0];
+  const activeDossier =
+    dossiers.find((d) => d.id === selectedDossierId) ||
+    dossiers[0] ||
+    null;
+
+  // Mutation to toggle task status
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ dossierId, code, nextStatus }: { dossierId: string; code: string; nextStatus: string }) => {
+      return api.put(`/client-onboarding/${dossierId}/checklist`, {
+        itemCode: code,
+        status: nextStatus,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-onboardings'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Checklist Update Failed' });
+    },
+  });
 
   const stages = [
     'PROSPECT',
@@ -135,28 +95,38 @@ export default function ClientOnboardingPage() {
   ];
 
   const toggleTask = (code: string) => {
-    setDossiers((prev) =>
-      prev.map((dos) => {
-        if (dos.id !== activeDossier.id) return dos;
-        const newChecklist = dos.checklist.map((t) => {
-          if (t.code !== code) return t;
-          const nextStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' =
-            t.status === 'COMPLETED' ? 'NOT_STARTED' : 'COMPLETED';
-          return { ...t, status: nextStatus };
-        });
-        const completed = newChecklist.filter((t) => t.status === 'COMPLETED').length;
-        const pct = Math.round((completed / newChecklist.length) * 100);
-        return { ...dos, checklist: newChecklist, completionPercentage: pct };
-      })
-    );
+    if (!activeDossier) return;
+    const task = activeDossier.checklist?.find((t) => t.code === code);
+    if (!task) return;
+    const nextStatus = task.status === 'COMPLETED' ? 'NOT_STARTED' : 'COMPLETED';
+    updateTaskMutation.mutate({
+      dossierId: activeDossier.id,
+      code,
+      nextStatus,
+    });
   };
+
+  if (isLoading) {
+    return <TableSkeleton rows={5} cols={4} />;
+  }
+
+  if (!activeDossier) {
+    return (
+      <div className="p-8 text-center bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400">
+        <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500 opacity-50" />
+        <h3 className="text-lg font-bold text-white mb-1">No Onboarding Dossiers Found</h3>
+        <p className="text-sm">No commercial clients are currently undergoing onboarding.</p>
+      </div>
+    );
+  }
 
   const filteredTasks =
     selectedCategory === 'ALL'
-      ? activeDossier.checklist
-      : activeDossier.checklist.filter((t) => t.category === selectedCategory);
+      ? activeDossier.checklist || []
+      : (activeDossier.checklist || []).filter((t) => t.category === selectedCategory);
 
-  const pendingMandatory = activeDossier.checklist.filter((t) => t.isMandatory && t.status !== 'COMPLETED');
+  const pendingMandatory = (activeDossier.checklist || []).filter((t) => t.isMandatory && t.status !== 'COMPLETED');
+  const completedCount = (activeDossier.checklist || []).filter((t) => t.status === 'COMPLETED').length;
 
   return (
     <div className="space-y-6">
@@ -175,6 +145,26 @@ export default function ClientOnboardingPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {dossiers.length > 1 && (
+            <select
+              value={activeDossier.id}
+              onChange={(e) => setSelectedDossierId(e.target.value)}
+              className="bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-indigo-500"
+            >
+              {dossiers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.code})
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => refetch()}
+            className="p-2 text-slate-400 hover:text-white bg-slate-800 border border-slate-700 rounded-xl"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
             <span className="text-xs font-semibold text-emerald-400">Statutory 8-Year RBI Retention Lock Active</span>
           </div>
@@ -191,7 +181,7 @@ export default function ClientOnboardingPage() {
               {activeDossier.tier}
             </span>
           </div>
-          <span className="text-sm font-bold text-indigo-400">{activeDossier.completionPercentage}% Onboarding Complete</span>
+          <span className="text-sm font-bold text-indigo-400">{activeDossier.completionPercentage || 0}% Onboarding Complete</span>
         </div>
 
         {/* 10-Stage Lifecycle Stepper */}
@@ -231,7 +221,7 @@ export default function ClientOnboardingPage() {
             activeTab === 'CHECKLIST' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'
           }`}
         >
-          16-Point Institutional Checklist ({activeDossier.checklist.filter((t) => t.status === 'COMPLETED').length}/16)
+          16-Point Institutional Checklist ({completedCount}/16)
         </button>
         <button
           onClick={() => setActiveTab('VALIDATION')}
@@ -343,9 +333,7 @@ export default function ClientOnboardingPage() {
             </div>
             <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
               <span className="text-xs text-emerald-400 font-medium">Completed Tasks</span>
-              <p className="text-2xl font-bold text-emerald-400 mt-1">
-                {activeDossier.checklist.filter((t) => t.status === 'COMPLETED').length}
-              </p>
+              <p className="text-2xl font-bold text-emerald-400 mt-1">{completedCount}</p>
             </div>
             <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
               <span className="text-xs text-amber-400 font-medium">Pending Mandatory</span>
