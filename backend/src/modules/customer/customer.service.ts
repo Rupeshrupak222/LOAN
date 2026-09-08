@@ -96,6 +96,17 @@ export async function listCustomers(
   };
 }
 
+export async function getCustomerByUserId(userId: string, actor?: CustomerActorContext) {
+  const cust = await prisma.customer.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!cust) {
+    throw new NotFoundError('Customer profile not found for current user account');
+  }
+  return getCustomer(cust.id, actor);
+}
+
 export async function getCustomer(id: string, actor?: CustomerActorContext) {
   const customer = await prisma.customer.findUnique({
     where: { id },
