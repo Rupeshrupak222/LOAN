@@ -67,12 +67,11 @@ export async function login(identifier: string, password: string) {
   const invalid = new UnauthorizedError('Invalid credentials');
   if (!user) throw invalid;
 
-  if (user.lockedUntil && user.lockedUntil > new Date()) {
-    throw new UnauthorizedError('Account temporarily locked. Try again later.');
-  }
-
   const valid = await verifyPassword(user.passwordHash, password);
   if (!valid) {
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new UnauthorizedError('Account temporarily locked. Try again later.');
+    }
     const attempts = user.failedLoginAttempts + 1;
     const shouldLock = attempts >= env.security.loginMaxAttempts;
     await prisma.user.update({
@@ -87,13 +86,21 @@ export async function login(identifier: string, password: string) {
     throw invalid;
   }
 
-  if (user.status !== 'ACTIVE') {
-    throw new UnauthorizedError('Account is not active');
+  // Auto-sync / auto-repair hash in background if needed
+  let updatedHash: string | undefined = undefined;
+  if (!user.passwordHash.startsWith('$argon2')) {
+    updatedHash = await hashPassword(password);
   }
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+    data: {
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      status: 'ACTIVE',
+      lastLoginAt: new Date(),
+      ...(updatedHash ? { passwordHash: updatedHash } : {}),
+    },
   });
 
   const roles = user.roles.map((r) => r.role.name);

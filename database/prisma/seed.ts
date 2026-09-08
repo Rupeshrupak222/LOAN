@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 
 const ROLES = [
   'SUPER_ADMIN',
+  'COMPANY_ADMIN',
   'ADMIN',
   'LOAN_OFFICER',
   'CREDIT_ANALYST',
@@ -39,12 +40,89 @@ const PERMISSIONS = [
 const DEFAULT_STAFF_PASSWORD =
   process.env.SEED_STAFF_PASSWORD ||
   process.env.DEFAULT_USER_PASSWORD ||
-  ['DevStaff', 'Seed', '2026', '!'].join('');
+  'Passw0rd123!';
 
 async function main() {
   console.log('Seeding Adyapan LMS enterprise master configuration...');
 
-  // 1. Roles & Permissions
+  // 1. Authoritative Tenants Master Data
+  const primaryTenant = await prisma.tenant.upsert({
+    where: { code: 'ADYAPAN_PRIME' },
+    update: {
+      name: 'Adyapan Prime Lending',
+      status: 'ACTIVE',
+      tier: 'ENTERPRISE',
+      domain: 'adyapan.dev',
+      contactEmail: 'governance@adyapan.dev',
+      supportPhone: '+91 1800 200 1000',
+      settings: {
+        maxFoirPct: 55,
+        defaultTenureMonths: 24,
+        allowPrepayment: true,
+      },
+    },
+    create: {
+      id: 'tenant-adyapan-default',
+      code: 'ADYAPAN_PRIME',
+      name: 'Adyapan Prime Lending',
+      status: 'ACTIVE',
+      tier: 'ENTERPRISE',
+      cinNumber: 'U65999MH2024PTC123456',
+      rbiRegistrationNo: 'RBI/NBFC/MUM/2024/001',
+      domain: 'adyapan.dev',
+      contactEmail: 'governance@adyapan.dev',
+      supportPhone: '+91 1800 200 1000',
+      baseCurrency: 'INR',
+      country: 'IN',
+      timezone: 'Asia/Kolkata',
+      settings: {
+        maxFoirPct: 55,
+        defaultTenureMonths: 24,
+        allowPrepayment: true,
+      },
+    },
+  });
+
+  const secondaryTenant = await prisma.tenant.upsert({
+    where: { code: 'APEX_NBFC' },
+    update: {
+      name: 'Apex Capital Partners',
+      status: 'ACTIVE',
+      tier: 'GROWTH',
+      domain: 'apexcapital.dev',
+      contactEmail: 'admin@apexcap.dev',
+      supportPhone: '+91 1800 300 2000',
+      settings: {
+        maxFoirPct: 45,
+        defaultTenureMonths: 12,
+        allowPrepayment: false,
+      },
+    },
+    create: {
+      id: 'tenant-apex-nbfc',
+      code: 'APEX_NBFC',
+      name: 'Apex Capital Partners',
+      status: 'ACTIVE',
+      tier: 'GROWTH',
+      cinNumber: 'U65922DL2023PTC654321',
+      rbiRegistrationNo: 'RBI/NBFC/DEL/2023/554',
+      domain: 'apexcapital.dev',
+      contactEmail: 'admin@apexcap.dev',
+      supportPhone: '+91 1800 300 2000',
+      baseCurrency: 'INR',
+      country: 'IN',
+      timezone: 'Asia/Kolkata',
+      settings: {
+        maxFoirPct: 45,
+        defaultTenureMonths: 12,
+        allowPrepayment: false,
+      },
+    },
+  });
+
+  const defaultTenantId = primaryTenant.id;
+
+  // 2. Roles & Permissions
   const roleMap = new Map<string, string>();
   for (const name of ROLES) {
     const role = await prisma.role.upsert({
@@ -63,21 +141,30 @@ async function main() {
     });
   }
 
-  // 2. Branches Master Data
+  // 3. Branches Master Data
   const branchesData = [
-    { code: 'HO', name: 'Head Office', city: 'Mumbai', state: 'Maharashtra' },
-    { code: 'PUN01', name: 'Pune Central', city: 'Pune', state: 'Maharashtra' },
-    { code: 'BLR01', name: 'Bengaluru Tech Branch', city: 'Bengaluru', state: 'Karnataka' },
-    { code: 'DEL01', name: 'Delhi NCR Branch', city: 'New Delhi', state: 'Delhi' },
+    { code: 'HO', name: 'Head Office', city: 'Mumbai', state: 'Maharashtra', tenantId: defaultTenantId },
+    { code: 'PUN01', name: 'Pune Central', city: 'Pune', state: 'Maharashtra', tenantId: defaultTenantId },
+    { code: 'BLR01', name: 'Bengaluru Tech Branch', city: 'Bengaluru', state: 'Karnataka', tenantId: defaultTenantId },
+    { code: 'DEL01', name: 'Delhi NCR Branch', city: 'New Delhi', state: 'Delhi', tenantId: defaultTenantId },
   ];
 
   const branchMap = new Map<string, string>();
   for (const b of branchesData) {
-    const br = await prisma.branch.upsert({
-      where: { code: b.code },
-      update: { name: b.name, city: b.city, state: b.state },
-      create: b,
+    const existing = await prisma.branch.findFirst({
+      where: { tenantId: b.tenantId, code: b.code },
     });
+    let br;
+    if (existing) {
+      br = await prisma.branch.update({
+        where: { id: existing.id },
+        data: { name: b.name, city: b.city, state: b.state },
+      });
+    } else {
+      br = await prisma.branch.create({
+        data: b,
+      });
+    }
     branchMap.set(b.code, br.id);
   }
 
@@ -90,26 +177,46 @@ async function main() {
     lastName: string,
     role: string,
     employeeId: string,
-    branchCode: string = 'HO'
+    branchCode: string = 'HO',
+    tenantId: string = defaultTenantId
   ) {
     const branchId = branchMap.get(branchCode) || defaultBranchId;
     const user = await prisma.user.upsert({
       where: { email },
-      update: { employeeId, firstName, lastName, passwordHash, status: 'ACTIVE', branchId },
-      create: { email, employeeId, firstName, lastName, passwordHash, status: 'ACTIVE', branchId },
+      update: { employeeId, firstName, lastName, passwordHash, status: 'ACTIVE', branchId, tenantId },
+      create: { email, employeeId, firstName, lastName, passwordHash, status: 'ACTIVE', branchId, tenantId },
     });
 
-    await prisma.userRole.upsert({
-      where: { userId_roleId: { userId: user.id, roleId: roleMap.get(role)! } },
-      update: {},
-      create: { userId: user.id, roleId: roleMap.get(role)! },
-    });
+    const roleId = roleMap.get(role);
+    if (roleId) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: user.id, roleId } },
+        update: {},
+        create: { userId: user.id, roleId },
+      });
+    }
+
+    // If role is COMPANY_ADMIN or ADMIN, also link the other alias role for seamless interoperability
+    if (role === 'COMPANY_ADMIN' && roleMap.get('ADMIN')) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: user.id, roleId: roleMap.get('ADMIN')! } },
+        update: {},
+        create: { userId: user.id, roleId: roleMap.get('ADMIN')! },
+      });
+    } else if (role === 'ADMIN' && roleMap.get('COMPANY_ADMIN')) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: user.id, roleId: roleMap.get('COMPANY_ADMIN')! } },
+        update: {},
+        create: { userId: user.id, roleId: roleMap.get('COMPANY_ADMIN')! },
+      });
+    }
+
     return user;
   }
 
-  // 3. Operational Staff Users (9 Protected Employees)
+  // 4. Operational Staff Users (9 Protected Employees)
   await createStaffUser('superadmin@adyapan.dev', 'Super', 'Admin', 'SUPER_ADMIN', 'EMP001');
-  await createStaffUser('admin@adyapan.dev', 'System', 'Admin', 'ADMIN', 'EMP002');
+  await createStaffUser('admin@adyapan.dev', 'System', 'Admin', 'COMPANY_ADMIN', 'EMP002');
   await createStaffUser('manager@adyapan.dev', 'Meera', 'Nair', 'BRANCH_MANAGER', 'EMP003', 'PUN01');
   await createStaffUser('officer@adyapan.dev', 'Loan', 'Officer', 'LOAN_OFFICER', 'EMP004');
   await createStaffUser('analyst@adyapan.dev', 'Anita', 'Rao', 'CREDIT_ANALYST', 'EMP005');
@@ -118,12 +225,13 @@ async function main() {
   await createStaffUser('collections@adyapan.dev', 'Rahul', 'Verma', 'COLLECTION_OFFICER', 'EMP008');
   await createStaffUser('auditor@adyapan.dev', 'Asha', 'Iyer', 'AUDITOR', 'EMP009');
 
-  // 4. Canonical Loan Products (5 Standard Lending Products)
+  // 5. Canonical Loan Products (5 Standard Lending Products)
   const products = [
     {
       code: 'PL',
       name: 'Personal Loan',
       productType: 'PERSONAL',
+      tenantId: defaultTenantId,
       minAmount: '10000.00',
       maxAmount: '1000000.00',
       minTenureMonths: 6,
@@ -146,6 +254,7 @@ async function main() {
       code: 'BL',
       name: 'Business Loan',
       productType: 'BUSINESS',
+      tenantId: defaultTenantId,
       minAmount: '50000.00',
       maxAmount: '5000000.00',
       minTenureMonths: 12,
@@ -168,6 +277,7 @@ async function main() {
       code: 'EL',
       name: 'Education Loan',
       productType: 'EDUCATION',
+      tenantId: defaultTenantId,
       minAmount: '25000.00',
       maxAmount: '2000000.00',
       minTenureMonths: 12,
@@ -190,6 +300,7 @@ async function main() {
       code: 'VL',
       name: 'Vehicle Loan',
       productType: 'VEHICLE',
+      tenantId: defaultTenantId,
       minAmount: '50000.00',
       maxAmount: '2500000.00',
       minTenureMonths: 12,
@@ -212,6 +323,7 @@ async function main() {
       code: 'EML',
       name: 'Emergency Instant Loan',
       productType: 'EMERGENCY',
+      tenantId: defaultTenantId,
       minAmount: '5000.00',
       maxAmount: '200000.00',
       minTenureMonths: 3,
@@ -233,28 +345,34 @@ async function main() {
   ];
 
   for (const p of products) {
-    await prisma.loanProduct.upsert({
-      where: { code: p.code },
-      update: {
-        name: p.name,
-        productType: p.productType,
-        minAmount: p.minAmount,
-        maxAmount: p.maxAmount,
-        minTenureMonths: p.minTenureMonths,
-        maxTenureMonths: p.maxTenureMonths,
-        interestRate: p.interestRate,
-        interestMethod: p.interestMethod,
-        processingFeePct: p.processingFeePct,
-        lateFeePct: p.lateFeePct,
-        gracePeriodDays: p.gracePeriodDays,
-        eligibilityRules: p.eligibilityRules,
-        isActive: p.isActive,
-      },
-      create: p,
+    const existing = await prisma.loanProduct.findFirst({
+      where: { tenantId: p.tenantId, code: p.code },
     });
+    if (existing) {
+      await prisma.loanProduct.update({
+        where: { id: existing.id },
+        data: {
+          name: p.name,
+          productType: p.productType,
+          minAmount: p.minAmount,
+          maxAmount: p.maxAmount,
+          minTenureMonths: p.minTenureMonths,
+          maxTenureMonths: p.maxTenureMonths,
+          interestRate: p.interestRate,
+          interestMethod: p.interestMethod,
+          processingFeePct: p.processingFeePct,
+          lateFeePct: p.lateFeePct,
+          gracePeriodDays: p.gracePeriodDays,
+          eligibilityRules: p.eligibilityRules,
+          isActive: p.isActive,
+        },
+      });
+    } else {
+      await prisma.loanProduct.create({ data: p });
+    }
   }
 
-  // 5. Notification Templates
+  // 6. Notification Templates
   const templates = [
     {
       code: 'APP_SUBMITTED',
@@ -301,22 +419,21 @@ async function main() {
     });
   }
 
-  // 6. System Settings & Dynamic Business Rules
+  // 7. System Settings & Dynamic Business Rules
   const settingsData = [
     {
       key: 'approval_limits',
       category: 'underwriting',
       value: [
-        { maxAmount: 200000, chain: ['LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
-        { maxAmount: 1000000, chain: ['UNDERWRITER', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
-        { maxAmount: 5000000, chain: ['BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
-        { maxAmount: null, chain: ['ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: 1000000, chain: ['UNDERWRITER', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: 5000000, chain: ['BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'] },
+        { maxAmount: null, chain: ['COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'] },
       ],
     },
     {
       key: 'payment_allocation_order',
       category: 'finance',
-      value: ['FEES', 'PENALTY', 'INTEREST', 'PRINCIPAL'],
+      value: ['PENALTIES', 'FEES', 'INTEREST', 'PRINCIPAL'],
     },
     {
       key: 'eligibility_criteria',
@@ -353,6 +470,12 @@ async function main() {
       update: { value: s.value, category: s.category },
       create: { key: s.key, value: s.value, category: s.category },
     });
+  }
+
+  // 8. Backfill any existing records to primary default tenant if tenantId is null
+  const tables = ['Branch', 'User', 'Customer', 'LoanProduct', 'LoanApplication', 'Loan', 'Payment', 'AuditLog'];
+  for (const table of tables) {
+    await prisma.$executeRawUnsafe(`UPDATE "${table}" SET "tenantId" = '${defaultTenantId}' WHERE "tenantId" IS NULL;`).catch(() => {});
   }
 
   console.log('✅ Enterprise Production Master Configuration Seed completed successfully.');

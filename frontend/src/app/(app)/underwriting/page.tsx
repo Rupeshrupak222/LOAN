@@ -45,6 +45,10 @@ export default function UnderwritingQueuePage() {
   const [reason, setReason] = useState('');
   const [conditions, setConditions] = useState('');
 
+  const canDecide = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
+  );
+
   const { data, isLoading } = useQuery({
     queryKey: ['underwriting-queue'],
     queryFn: async () => {
@@ -68,11 +72,13 @@ export default function UnderwritingQueuePage() {
       toast.success(`Decision '${decision}' recorded successfully.`);
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setSelectedApp(null);
       setReason('');
       setConditions('');
@@ -311,47 +317,49 @@ export default function UnderwritingQueuePage() {
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {isPending ? (
-                            <>
+                          {canDecide ? (
+                            isPending ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedApp(app);
+                                    setDecision('APPROVE');
+                                    setReason('Credit proposal verified and approved for sanction.');
+                                    setConditions('');
+                                  }}
+                                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline-danger"
+                                  onClick={() => {
+                                    setSelectedApp(app);
+                                    setDecision('REJECT');
+                                    setReason('');
+                                    setConditions('');
+                                  }}
+                                  className="text-xs cursor-pointer flex items-center gap-1"
+                                >
+                                  <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                                  Reject
+                                </Button>
+                              </>
+                            ) : (
                               <Button
                                 size="sm"
-                                onClick={() => {
-                                  setSelectedApp(app);
-                                  setDecision('APPROVE');
-                                  setReason('Credit proposal verified and approved for sanction.');
-                                  setConditions('');
-                                }}
-                                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1"
+                                variant="secondary"
+                                onClick={() => handleOpenDecision(app)}
+                                className="text-xs font-semibold cursor-pointer flex items-center gap-1.5 border border-slate-300 dark:border-[#2B3566]"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Approve
+                                <RotateCcw className="w-3 h-3 text-amber-500" />
+                                Modify Decision
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline-danger"
-                                onClick={() => {
-                                  setSelectedApp(app);
-                                  setDecision('REJECT');
-                                  setReason('');
-                                  setConditions('');
-                                }}
-                                className="text-xs cursor-pointer flex items-center gap-1"
-                              >
-                                <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                                Reject
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleOpenDecision(app)}
-                              className="text-xs font-semibold cursor-pointer flex items-center gap-1.5 border border-slate-300 dark:border-[#2B3566]"
-                            >
-                              <RotateCcw className="w-3 h-3 text-amber-500" />
-                              Modify Decision
-                            </Button>
-                          )}
+                            )
+                          ) : null}
                           <Link href={`/applications/${app.id}`}>
                             <Button size="sm" variant="ghost" className="text-xs">
                               Review →

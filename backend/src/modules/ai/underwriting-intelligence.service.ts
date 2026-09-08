@@ -62,7 +62,10 @@ export interface UnderwritingIntelligenceResult {
 /**
  * Builds authorized, comprehensive LMS context specifically tailored for Underwriting Decision Support.
  */
-async function buildUnderwritingContext(applicationId: string) {
+async function buildUnderwritingContext(
+  applicationId: string,
+  actor?: { id?: string; email?: string; roles?: string[]; tenantId?: string; branchId?: string }
+) {
   const app = await prisma.loanApplication.findUnique({
     where: { id: applicationId },
     include: {
@@ -89,6 +92,21 @@ async function buildUnderwritingContext(applicationId: string) {
 
   if (!app) {
     throw new NotFoundError('Loan application record not found');
+  }
+
+  // Multi-Tenant Isolation
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      app.customer?.branchId &&
+      app.customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
   }
 
   const { customer, product, eligibility, riskAssessment, underwriting } = app;
@@ -199,7 +217,7 @@ Decision Reason: ${underwriting?.reason || 'None'}
  */
 export async function generateUnderwritingIntelligence(
   applicationId: string,
-  actor: { id: string; email: string; roles: string[] }
+  actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ): Promise<UnderwritingIntelligenceResult> {
   // 1. RBAC Guard - only authorized Underwriters and Staff roles
   const isAuthorized = actor.roles.some((r) =>
@@ -220,7 +238,7 @@ export async function generateUnderwritingIntelligence(
     proposedDti,
     netSurplus,
     contextPrompt,
-  } = await buildUnderwritingContext(applicationId);
+  } = await buildUnderwritingContext(applicationId, actor);
 
   // 3. System Prompt for Underwriting Intelligence
   const systemInstruction = `

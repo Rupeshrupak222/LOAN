@@ -4,11 +4,13 @@ import { ForbiddenError } from '../../common/errors';
 import { parsePagination } from '../../common/pagination';
 import { success } from '../../common/response';
 import { authenticate } from '../../middleware/auth';
+import { tenantContext } from '../../middleware/tenant-context';
 import { listLoans, getLoanDetail } from './loan.service';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(tenantContext);
 
 router.get(
   '/',
@@ -18,10 +20,10 @@ router.get(
     const branchId = req.query.branchId ? String(req.query.branchId) : undefined;
     const customerId = req.query.customerId ? String(req.query.customerId) : undefined;
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     const userIdFilter = isStaff ? undefined : req.user?.id;
-    const result = await listLoans(params, status, branchId, customerId, userIdFilter);
+    const result = await listLoans(params, status, branchId, customerId, userIdFilter, req.user as any);
     res.json(success(result.data, result.pagination));
   })
 );
@@ -29,9 +31,9 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const loan = await getLoanDetail(req.params.id);
+    const loan = await getLoanDetail(req.params.id, req.user as any);
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     if (!isStaff && loan.customer?.userId !== req.user?.id) {
       throw new ForbiddenError('Access forbidden: You cannot view another borrower loan account');

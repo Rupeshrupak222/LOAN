@@ -12,7 +12,7 @@ const router = Router();
 
 router.use(authenticate);
 router.use(tenantContext);
-router.use(authorize('SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'BRANCH_MANAGER'));
+router.use(authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'AUDITOR', 'BRANCH_MANAGER'));
 
 /**
  * GET /api/v1/audit/
@@ -24,7 +24,12 @@ router.get(
     const params = parsePagination(req.query);
     const entity = req.query.entity ? String(req.query.entity) : undefined;
     const entityId = req.query.entityId ? String(req.query.entityId) : undefined;
-    const result = await listAuditLogs(params, entity, entityId);
+    const result = await listAuditLogs(params, entity, entityId, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(result.data, result.pagination));
   })
 );
@@ -37,7 +42,7 @@ router.get(
   '/evidence-package/:entityType/:entityId',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const tenantId = req.tenantId || req.tenant?.tenantId || req.user?.tenantId || 'tenant-adyapan-default';
       const entityType = req.params.entityType.toUpperCase() as 'APPLICATION' | 'LOAN' | 'CUSTOMER';
       const entityId = req.params.entityId;
 

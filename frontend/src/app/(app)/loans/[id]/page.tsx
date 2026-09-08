@@ -101,11 +101,13 @@ export default function LoanDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setPayModalOpen(false);
       setPayAmount('');
       setPayReference('');
@@ -130,6 +132,7 @@ export default function LoanDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setRestructureModalOpen(false);
     },
     onError: (err: any) => {
@@ -149,8 +152,11 @@ export default function LoanDetailPage() {
       toast.success('One-Time Settlement (OTS) terms saved.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setSettleModalOpen(false);
     },
     onError: (err: any) => {
@@ -189,7 +195,7 @@ export default function LoanDetailPage() {
             <Badge status={data.status} />
             {data.status !== 'CLOSED' && data.status !== 'SETTLED' && (
               <>
-                {!user?.roles?.includes('AUDITOR') && (
+                {(isCustomer || user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r))) && (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -202,7 +208,7 @@ export default function LoanDetailPage() {
                     {isCustomer ? 'Submit EMI Payment Proof' : 'Collect Repayment'}
                   </Button>
                 )}
-                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
                       Restructure

@@ -16,7 +16,13 @@ router.post(
   '/run',
   authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
-    const result = await reconciliationService.runReconciliation();
+    const result = await reconciliationService.runReconciliation({
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(result));
   })
 );
@@ -31,7 +37,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const stats = await reconciliationService.getDashboardStats({
       id: req.user!.id,
+      email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
     res.json(success(stats));
   })
@@ -56,7 +65,10 @@ router.get(
       },
       {
         id: req.user!.id,
+        email: req.user!.email,
         roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
       }
     );
 
@@ -86,6 +98,8 @@ router.post(
         id: req.user!.id,
         email: req.user!.email,
         roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
       }
     );
 
@@ -107,6 +121,8 @@ router.post(
       id: req.user!.id,
       email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
 
     res.json(success(approved));
@@ -131,6 +147,8 @@ router.post(
         id: req.user!.id,
         email: req.user!.email,
         roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
       }
     );
 
@@ -148,7 +166,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const adjustments = reconciliationService.listAdjustments({
       id: req.user!.id,
+      email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
 
     res.json(success(adjustments));
@@ -156,3 +177,4 @@ router.get(
 );
 
 export const reconciliationRoutes = router;
+

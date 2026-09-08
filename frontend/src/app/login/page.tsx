@@ -13,6 +13,9 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  KeyRound,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { apiErrorMessage } from '@/lib/api';
@@ -20,7 +23,7 @@ import { Button, Input } from '@/components/ui';
 import { Logo, LogoMark } from '@/components/Logo';
 import { ROLE_CONFIG, RoleName } from '@/lib/roles';
 
-// Seeded staff demo accounts (9 roles)
+// Seeded operational staff & borrower demo accounts (10 roles)
 const DEMO_ACCOUNTS: { role: RoleName; email: string }[] = [
   { role: 'SUPER_ADMIN', email: 'superadmin@adyapan.dev' },
   { role: 'ADMIN', email: 'admin@adyapan.dev' },
@@ -31,8 +34,9 @@ const DEMO_ACCOUNTS: { role: RoleName; email: string }[] = [
   { role: 'FINANCE_OFFICER', email: 'finance@adyapan.dev' },
   { role: 'COLLECTION_OFFICER', email: 'collections@adyapan.dev' },
   { role: 'AUDITOR', email: 'auditor@adyapan.dev' },
+  { role: 'CUSTOMER', email: 'customer@adyapan.dev' },
 ];
-const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || ['DevStaff', 'Seed', '2026', '!'].join('');
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || 'Passw0rd123!';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -40,6 +44,7 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState('admin@adyapan.dev');
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -56,6 +61,12 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
+  const handleCopyPassword = () => {
+    navigator.clipboard.writeText(DEMO_PASSWORD);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2 bg-slate-50">
@@ -218,28 +229,68 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="border-t border-slate-100 pt-4">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Demo Accounts (Click to autofill)
-              </p>
+            <div className="border-t border-slate-100 pt-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Demo Accounts (Click to autofill)
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCopyPassword}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:text-brand-700 transition-colors"
+                  title="Copy demo password"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span className="text-emerald-600 font-semibold">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Copy Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Password badge */}
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <KeyRound className="h-3.5 w-3.5 text-brand-600 flex-shrink-0" />
+                  <span className="text-slate-500 text-[11px]">Password:</span>
+                  <code className="font-mono font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[11px] tracking-wide select-all">
+                    {DEMO_PASSWORD}
+                  </code>
+                </div>
+                <span className="text-[10px] text-slate-400 hidden sm:inline font-medium">All accounts</span>
+              </div>
+
               <div className="grid max-h-48 grid-cols-2 gap-1.5 overflow-y-auto pr-1 scrollbar-thin">
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    onClick={() => {
-                      setIdentifier(acc.email);
-                      setPassword(DEMO_PASSWORD);
-                      setError(null);
-                    }}
-                    className="rounded-xl border border-slate-200 p-2 text-left transition-all hover:border-brand-300 hover:bg-brand-50/60"
-                  >
-                    <span className="block text-[11px] font-bold text-slate-800 truncate">
-                      {ROLE_CONFIG[acc.role].label}
-                    </span>
-                    <span className="block truncate text-[10px] text-slate-400 font-mono">{acc.email}</span>
-                  </button>
-                ))}
+                {DEMO_ACCOUNTS.map((acc) => {
+                  const isSelected = identifier === acc.email;
+                  return (
+                    <button
+                      key={acc.email}
+                      type="button"
+                      onClick={() => {
+                        setIdentifier(acc.email);
+                        setPassword(DEMO_PASSWORD);
+                        setError(null);
+                      }}
+                      className={`rounded-xl border p-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50/80 shadow-xs ring-1 ring-brand-400/50'
+                          : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`block text-[11px] font-bold truncate ${isSelected ? 'text-brand-900' : 'text-slate-800'}`}>
+                        {ROLE_CONFIG[acc.role]?.label ?? acc.role}
+                      </span>
+                      <span className="block truncate text-[10px] text-slate-400 font-mono">{acc.email}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -267,6 +267,20 @@ export default function CustomerDetailPage() {
     },
   });
 
+  const deleteBankAccountMutation = useMutation({
+    mutationFn: async (bankAccountId: string) => {
+      return api.delete(`/customers/${params.id}/bank-accounts/${bankAccountId}`);
+    },
+    onSuccess: () => {
+      toast.success('Bank account record removed.');
+      queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Delete Bank Account Notice' });
+    },
+  });
+
   const kycMutation = useMutation({
     mutationFn: async () => {
       return api.patch(`/customers/${params.id}/kyc`, {
@@ -279,8 +293,12 @@ export default function CustomerDetailPage() {
       toast.success(`KYC status updated to ${kycStatusInput}.`);
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-underwriting-queue'] });
       setKycModalOpen(false);
     },
     onError: (err: any) => {
@@ -309,6 +327,10 @@ export default function CustomerDetailPage() {
       toast.success('Document uploaded to cloud storage.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       setDocModalOpen(false);
       setSelectedFile(null);
       setFilePreview(null);
@@ -326,6 +348,8 @@ export default function CustomerDetailPage() {
     onSuccess: () => {
       toast.success('Customer record removed.');
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
       router.push('/customers');
     },
     onError: (err: any) => {
@@ -348,6 +372,10 @@ export default function CustomerDetailPage() {
       toast.success(`Document marked as ${docDecisionStatus}.`);
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       setVerifyModalOpen(false);
       setSelectedDoc(null);
       setDocRejectionReason('');
@@ -366,6 +394,9 @@ export default function CustomerDetailPage() {
       toast.success('Document removed.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err), { title: 'Document Delete Notice' });
@@ -387,7 +418,20 @@ export default function CustomerDetailPage() {
 
   const addresses = Array.isArray(data.addresses) ? data.addresses : [];
   const documents = Array.isArray(data.documents) ? data.documents : [];
-  const bankAccounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
+  
+  // Deduplicate bank accounts in UI as a safeguard
+  const rawBankAccounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
+  const seenBankKeys = new Set<string>();
+  const bankAccounts: any[] = [];
+  const sortedBanks = [...rawBankAccounts].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+  for (const b of sortedBanks) {
+    const key = `${b.accountNumber?.trim()}_${b.ifscCode?.trim()}`;
+    if (!seenBankKeys.has(key)) {
+      seenBankKeys.add(key);
+      bankAccounts.push(b);
+    }
+  }
+
   const applications = Array.isArray(data.applications) ? data.applications : [];
   const loans = Array.isArray(data.loans) ? data.loans : [];
   const payments = Array.isArray(data.payments) ? data.payments : [];
@@ -447,7 +491,7 @@ export default function CustomerDetailPage() {
                 </Button>
               </Link>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -814,6 +858,21 @@ export default function CustomerDetailPage() {
                           <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200 font-bold">
                             PENDING
                           </span>
+                        )}
+                        {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+                          <button
+                            type="button"
+                            title="Remove Bank Account"
+                            disabled={deleteBankAccountMutation.isPending}
+                            onClick={() => {
+                              if (confirm(`Remove bank account ${acc.accountNumber} (${acc.bankName})?`)) {
+                                deleteBankAccountMutation.mutate(acc.id);
+                              }
+                            }}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer ml-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         )}
                       </div>
                     </div>

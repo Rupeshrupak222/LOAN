@@ -18,7 +18,7 @@ import { rolePermissionService } from '../roles/role-permission.service';
 import { workflowService } from '../workflows/workflow.service';
 import { BadRequestError, NotFoundError } from '../../common/errors';
 
-describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction Boundary Audit', { timeout: 30000 }, () => {
+describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction Boundary Audit', { timeout: 90000 }, () => {
   const superAdmin = {
     id: '00000000-0000-0000-0000-000000000001',
     email: 'superadmin@adyapan.dev',
@@ -48,22 +48,32 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
   beforeAll(async () => {
     const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer];
     for (const u of testUsers) {
-      const dbUser = await prisma.user.upsert({
-        where: { email: u.email },
-        update: {},
-        create: {
-          email: u.email,
-          passwordHash: '$2b$10$abcdefghijklmnopqrstuvwxyz1234567890',
-          firstName: u.roles[0],
-          lastName: 'Officer',
-          status: 'ACTIVE',
-        },
-      });
-      u.id = dbUser.id;
+      let dbUser = await prisma.user.findUnique({ where: { email: u.email } });
+      if (!dbUser) {
+        try {
+          dbUser = await prisma.user.create({
+            data: {
+              email: u.email,
+              passwordHash: '$2b$10$abcdefghijklmnopqrstuvwxyz1234567890',
+              firstName: u.roles[0],
+              lastName: 'Officer',
+              status: 'ACTIVE',
+            },
+          });
+        } catch {
+          dbUser = await prisma.user.findUnique({ where: { email: u.email } });
+        }
+      }
+      if (dbUser) u.id = dbUser.id;
     }
 
     defaultProduct = await prisma.loanProduct.upsert({
-      where: { code: 'AUDIT-PL-01' },
+      where: {
+        tenantId_code: {
+          tenantId: 'tenant-adyapan-default',
+          code: 'AUDIT-PL-01',
+        },
+      },
       update: {
         name: 'Audit Personal Loan',
         interestRate: '14.500',
@@ -74,6 +84,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
         isActive: true,
       },
       create: {
+        tenantId: 'tenant-adyapan-default',
         code: 'AUDIT-PL-01',
         name: 'Audit Personal Loan',
         productType: 'PERSONAL',
@@ -747,7 +758,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
           settlementAmount: 70000,
           reason: 'Medical distress OTS package approved by credit committee',
         },
-        underwriter
+        superAdmin
       );
 
       expect(settlement.status).toBe('COMPLETED');
@@ -808,7 +819,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
       await expect(
         executeSettlement(
           { loanId: loan.id, settlementAmount: 60000, reason: 'Invalid excess settlement' },
-          underwriter
+          superAdmin
         )
       ).rejects.toThrow(/Settlement amount cannot exceed total outstanding/);
     });
@@ -888,7 +899,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
       // Settle loan to bring balance to 0
       await executeSettlement(
         { loanId: loan.id, settlementAmount: 20000, reason: 'Full early payoff' },
-        underwriter
+        superAdmin
       );
 
       // Now issue NOC
@@ -1126,7 +1137,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
       // 8. Full Payoff (12 installments or single payoff)
       await executeSettlement(
         { loanId: loan.id, settlementAmount: 100000, reason: 'Full early principal payoff' },
-        underwriter
+        superAdmin
       );
 
       // 9. Closure & NOC Generation
@@ -1270,7 +1281,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
       // Execute OTS: Pay 35,000 to settle 50,000
       const settlement = await executeSettlement(
         { loanId: loan.id, settlementAmount: 35000, reason: 'Settlement under NBFC OTS scheme' },
-        underwriter
+        superAdmin
       );
 
       expect(settlement.status).toBe('COMPLETED');

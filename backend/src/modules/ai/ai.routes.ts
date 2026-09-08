@@ -89,6 +89,8 @@ router.post(
       userId: req.user!.id,
       userEmail: req.user!.email,
       roles: req.user!.roles,
+      tenantId: req.user!.tenantId,
+      branchId: req.user!.branchId,
       message: message.trim(),
       history,
       currentPath,
@@ -128,6 +130,8 @@ router.post(
       id: req.user!.id,
       email: req.user!.email,
       roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
     });
 
     res.json(success(result));
@@ -171,7 +175,7 @@ router.post(
  */
 router.post(
   '/applications/:id/disbursement-intelligence',
-  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER', 'UNDERWRITER', 'AUDITOR'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const { utrReference } = req.body || {};
     const result = await generateDisbursementIntelligence(
@@ -236,21 +240,43 @@ router.post(
   })
 );
 
+async function resolveActor(req: any) {
+  let branchId = (req.user as any)?.branchId;
+  if (!branchId && req.user?.id) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { branchId: true },
+    });
+    branchId = dbUser?.branchId || undefined;
+  }
+  return {
+    id: req.user!.id,
+    email: req.user!.email,
+    roles: req.user!.roles,
+    branchId,
+  };
+}
+
 /**
  * POST /api/v1/ai/dashboard/decision-intelligence
- * Synthesizes executive Decision Intelligence across portfolio KPIs, bottlenecks, and branch performance.
+ * Synthesizes role-scoped Decision Intelligence across portfolio KPIs, bottlenecks, and branch performance.
  */
 router.post(
   '/dashboard/decision-intelligence',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'UNDERWRITER', 'CREDIT_ANALYST', 'AUDITOR'),
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'BRANCH_MANAGER',
+    'LOAN_OFFICER',
+    'CREDIT_ANALYST',
+    'UNDERWRITER',
+    'FINANCE_OFFICER',
+    'COLLECTION_OFFICER',
+    'AUDITOR'
+  ),
   asyncHandler(async (req, res) => {
-    const result = await generateDecisionIntelligence({
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-      branchId: (req.user as any)?.branchId,
-    });
-
+    const actor = await resolveActor(req);
+    const result = await generateDecisionIntelligence(actor);
     res.json(success(result));
   })
 );
@@ -261,15 +287,20 @@ router.post(
  */
 router.post(
   '/exceptions/center',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'UNDERWRITER', 'AUDITOR', 'FINANCE_OFFICER', 'COLLECTION_OFFICER'),
+  authorize(
+    'SUPER_ADMIN',
+    'ADMIN',
+    'BRANCH_MANAGER',
+    'LOAN_OFFICER',
+    'CREDIT_ANALYST',
+    'UNDERWRITER',
+    'AUDITOR',
+    'FINANCE_OFFICER',
+    'COLLECTION_OFFICER'
+  ),
   asyncHandler(async (req, res) => {
-    const result = await generateWorkflowExceptionIntelligence({
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-      branchId: (req.user as any)?.branchId,
-    });
-
+    const actor = await resolveActor(req);
+    const result = await generateWorkflowExceptionIntelligence(actor);
     res.json(success(result));
   })
 );
@@ -280,18 +311,14 @@ router.post(
  */
 router.post(
   '/fraud/portfolio',
-  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR', 'LOAN_OFFICER', 'FINANCE_OFFICER', 'COLLECTION_OFFICER'),
   asyncHandler(async (req, res) => {
     const { forceRefresh } = req.body || {};
+    const actor = await resolveActor(req);
     const result = await generateFraudIntelligence({
       scope: 'PORTFOLIO',
       forceRefresh: Boolean(forceRefresh),
-      actor: {
-        id: req.user!.id,
-        email: req.user!.email,
-        roles: req.user!.roles,
-        branchId: (req.user as any)?.branchId,
-      },
+      actor,
     });
 
     res.json(success(result));
@@ -304,19 +331,15 @@ router.post(
  */
 router.post(
   '/fraud/applications/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR', 'LOAN_OFFICER'),
   asyncHandler(async (req, res) => {
     const { forceRefresh } = req.body || {};
+    const actor = await resolveActor(req);
     const result = await generateFraudIntelligence({
       scope: 'APPLICATION',
       applicationId: req.params.id,
       forceRefresh: Boolean(forceRefresh),
-      actor: {
-        id: req.user!.id,
-        email: req.user!.email,
-        roles: req.user!.roles,
-        branchId: (req.user as any)?.branchId,
-      },
+      actor,
     });
 
     res.json(success(result));
@@ -329,19 +352,15 @@ router.post(
  */
 router.post(
   '/fraud/customers/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'AUDITOR', 'LOAN_OFFICER'),
   asyncHandler(async (req, res) => {
     const { forceRefresh } = req.body || {};
+    const actor = await resolveActor(req);
     const result = await generateFraudIntelligence({
       scope: 'CUSTOMER',
       customerId: req.params.id,
       forceRefresh: Boolean(forceRefresh),
-      actor: {
-        id: req.user!.id,
-        email: req.user!.email,
-        roles: req.user!.roles,
-        branchId: (req.user as any)?.branchId,
-      },
+      actor,
     });
 
     res.json(success(result));

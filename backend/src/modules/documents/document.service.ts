@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../common/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
 import { uploadBufferToCloudinary } from '../../config/cloudinary';
 import type { RegisterDocumentInput, VerifyDocumentInput } from './document.schema';
@@ -7,30 +7,62 @@ import type { RegisterDocumentInput, VerifyDocumentInput } from './document.sche
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx'];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
-export async function listDocuments(customerId?: string, applicationId?: string, userId?: string) {
+export async function listDocuments(
+  customerId?: string,
+  applicationId?: string,
+  userId?: string,
+  actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
+) {
   const where: any = {};
   if (customerId) where.customerId = customerId;
   if (applicationId) where.applicationId = applicationId;
   if (userId) where.customer = { userId };
 
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.customer = { ...where.customer, tenantId: actor.tenantId };
+    }
+    if ((actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) && actor.branchId) {
+      where.customer = { ...where.customer, branchId: actor.branchId };
+    }
+  }
+
   return prisma.document.findMany({
     where,
     include: {
-      customer: { select: { firstName: true, lastName: true, customerCode: true } },
+      customer: { select: { firstName: true, lastName: true, customerCode: true, tenantId: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
 }
 
-export async function getDocument(id: string) {
+export async function getDocument(
+  id: string,
+  actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
+) {
   const doc = await prisma.document.findUnique({
     where: { id },
     include: {
-      customer: { select: { firstName: true, lastName: true, customerCode: true, userId: true } },
+      customer: { select: { firstName: true, lastName: true, customerCode: true, userId: true, tenantId: true, branchId: true } },
       application: { select: { applicationNo: true } },
     },
   });
   if (!doc) throw new NotFoundError('Document not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && (doc.customer as any)?.tenantId && (doc.customer as any).tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Document belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      (doc.customer as any)?.branchId &&
+      (doc.customer as any).branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Document belongs to another branch');
+    }
+  }
+
   return doc;
 }
 
@@ -185,9 +217,10 @@ export async function verifyDocument(
   id: string,
   input: VerifyDocumentInput,
   actorEmail?: string,
-  actorUserId?: string
+  actorUserId?: string,
+  actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
 ) {
-  const existing = await getDocument(id);
+  const existing = await getDocument(id, actor);
   const isVerified = input.status === 'VERIFIED';
 
   const updated = await prisma.document.update({
@@ -213,8 +246,12 @@ export async function verifyDocument(
   return updated;
 }
 
-export async function deleteDocument(id: string, actorUserId?: string) {
-  const existing = await getDocument(id);
+export async function deleteDocument(
+  id: string,
+  actorUserId?: string,
+  actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
+) {
+  const existing = await getDocument(id, actor);
   await prisma.document.delete({ where: { id } });
 
   await logAudit({

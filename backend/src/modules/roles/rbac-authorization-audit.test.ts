@@ -75,15 +75,15 @@ describe('RBAC Authorization & Role Audit Test Suite', () => {
       expect(rolePermissionService.hasPermission(underwriter, 'UNDERWRITING_RUN_AI_ASSIST')).toBe(true);
       // Underwriter cannot execute payout transfers
       expect(rolePermissionService.hasPermission(underwriter, 'DISBURSEMENTS_EXECUTE_TRANSFER')).toBe(false);
-      // Sanction limit test
+      // Sanction limit test (₹10 Lakh single officer authority)
       expect(
         rolePermissionService.hasPermission(underwriter, 'APPLICATIONS_APPROVE', {
-          requiredSanctionAmount: 3000000,
+          requiredSanctionAmount: 500000, // ₹5 Lakh within ₹10 Lakh limit
         })
       ).toBe(true);
       expect(
         rolePermissionService.hasPermission(underwriter, 'APPLICATIONS_APPROVE', {
-          requiredSanctionAmount: 10000000, // ₹1 Crore exceeds ₹50 Lakh limit
+          requiredSanctionAmount: 2000000, // ₹20 Lakh exceeds ₹10 Lakh limit
         })
       ).toBe(false);
     });

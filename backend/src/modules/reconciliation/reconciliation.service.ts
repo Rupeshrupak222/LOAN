@@ -30,19 +30,28 @@ export class ReconciliationService {
   /**
    * Executes a comprehensive 5-pillar reconciliation pass across financial ledgers.
    */
-  public async runReconciliation(): Promise<{ scannedCount: number; exceptionsFound: number }> {
+  public async runReconciliation(actor?: {
+    id?: string;
+    email?: string;
+    roles?: string[];
+    tenantId?: string;
+    branchId?: string;
+  }): Promise<{ scannedCount: number; exceptionsFound: number }> {
     let exceptionsFound = 0;
     const now = new Date().toISOString();
+
+    const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
+    const tenantFilter = !isSuperAdmin && actor?.tenantId ? { tenantId: actor.tenantId } : {};
 
     // -------------------------------------------------------------------------
     // 1. Repayment Allocation Consistency
     // Verifies that sum of buckets (Principal, Interest, Fees, Penalty) == Payment Amount
     // -------------------------------------------------------------------------
     const payments = await prisma.payment.findMany({
-      where: { status: 'SUCCESS' },
+      where: { status: 'SUCCESS', ...tenantFilter },
       include: {
         allocations: true,
-        loan: { select: { loanNo: true } },
+        loan: { select: { loanNo: true, tenantId: true } },
       },
     });
 
@@ -60,6 +69,7 @@ export class ReconciliationService {
               type: 'ALLOCATION_MISMATCH',
               severity: 'HIGH',
               status: 'OPEN',
+              tenantId: p.tenantId || p.loan?.tenantId || actor?.tenantId,
               loanId: p.loanId,
               loanNo: p.loan?.loanNo,
               paymentId: p.id,
@@ -82,7 +92,7 @@ export class ReconciliationService {
     // Verifies Loan.outstandingPrincipal == sum(schedule items outstanding)
     // -------------------------------------------------------------------------
     const loans = await prisma.loan.findMany({
-      where: { status: { in: ['ACTIVE', 'OVERDUE'] } },
+      where: { status: { in: ['ACTIVE', 'OVERDUE'] }, ...tenantFilter },
       include: {
         schedule: {
           where: { status: { not: 'PAID' } },
@@ -103,6 +113,7 @@ export class ReconciliationService {
             type: 'OUTSTANDING_BALANCE_MISMATCH',
             severity: 'CRITICAL',
             status: 'OPEN',
+            tenantId: l.tenantId || actor?.tenantId,
             loanId: l.id,
             loanNo: l.loanNo,
             discrepancyAmount: Number(discrepancy.toFixed(2)),
@@ -122,8 +133,8 @@ export class ReconciliationService {
     // Verifies that customer submissions marked VERIFIED have a corresponding Payment record
     // -------------------------------------------------------------------------
     const verifiedSubmissions = await prisma.paymentSubmission.findMany({
-      where: { status: 'VERIFIED' },
-      include: { loan: { select: { loanNo: true } } },
+      where: { status: 'VERIFIED', ...tenantFilter },
+      include: { loan: { select: { loanNo: true, tenantId: true } } },
     });
 
     for (const sub of verifiedSubmissions) {
@@ -136,6 +147,7 @@ export class ReconciliationService {
             type: 'MISSING_TRANSACTION',
             severity: 'HIGH',
             status: 'OPEN',
+            tenantId: sub.loan?.tenantId || actor?.tenantId,
             loanId: sub.loanId,
             loanNo: sub.loan?.loanNo,
             reference: sub.reference,
@@ -174,6 +186,7 @@ export class ReconciliationService {
             type: 'DUPLICATE_TRANSACTION',
             severity: 'CRITICAL',
             status: 'OPEN',
+            tenantId: list[0].tenantId || list[0].loan?.tenantId || actor?.tenantId,
             loanId: list[0].loanId,
             loanNo: list[0].loan?.loanNo,
             reference: ref,
@@ -193,7 +206,7 @@ export class ReconciliationService {
     // 5. Disbursement Instruction vs Bank Status
     // -------------------------------------------------------------------------
     const activeLoans = await prisma.loan.findMany({
-      where: { status: { in: ['ACTIVE', 'OVERDUE'] } },
+      where: { status: { in: ['ACTIVE', 'OVERDUE'] }, ...tenantFilter },
       include: {
         disbursements: true,
       },
@@ -209,6 +222,7 @@ export class ReconciliationService {
             type: 'DISBURSEMENT_STATUS_MISMATCH',
             severity: 'HIGH',
             status: 'OPEN',
+            tenantId: l.tenantId || actor?.tenantId,
             loanId: l.id,
             loanNo: l.loanNo,
             discrepancyAmount: Number(l.principal),
@@ -233,22 +247,39 @@ export class ReconciliationService {
   /**
    * Returns executive dashboard KPI statistics for reconciliation.
    */
-  public async getDashboardStats(actor: { id: string; roles: string[] }): Promise<ReconciliationDashboardStats> {
+  public async getDashboardStats(actor: {
+    id: string;
+    email?: string;
+    roles: string[];
+    tenantId?: string;
+    branchId?: string;
+  }): Promise<ReconciliationDashboardStats> {
     if (actor.roles.includes('CUSTOMER')) {
       throw new ForbiddenError('Access forbidden: Borrowers cannot access reconciliation metrics.');
     }
 
+    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
+    const tenantFilter = !isSuperAdmin && actor.tenantId ? { tenantId: actor.tenantId } : {};
+
     // Aggregate total payment volume from database
     const paymentAggregate = await prisma.payment.aggregate({
-      where: { status: 'SUCCESS' },
+      where: { status: 'SUCCESS', ...tenantFilter },
       _sum: { amount: true },
     });
     const totalReconciledVolume = Number(paymentAggregate._sum.amount || 0);
 
-    const activeExceptions = Array.from(this.exceptions.values()).filter((e) => e.status !== 'DISMISSED' && e.status !== 'ADJUSTED');
+    const activeExceptions = Array.from(this.exceptions.values()).filter((e) => {
+      if (e.status === 'DISMISSED' || e.status === 'ADJUSTED') return false;
+      if (!isSuperAdmin && actor.tenantId && e.tenantId && e.tenantId !== actor.tenantId) return false;
+      return true;
+    });
     const totalDiscrepancyAmount = activeExceptions.reduce((sum, e) => sum + e.discrepancyAmount, 0);
 
-    const pendingAdjustments = Array.from(this.adjustments.values()).filter((a) => a.status === 'PENDING_APPROVAL');
+    const pendingAdjustments = Array.from(this.adjustments.values()).filter((a) => {
+      if (a.status !== 'PENDING_APPROVAL') return false;
+      if (!isSuperAdmin && actor.tenantId && a.tenantId && a.tenantId !== actor.tenantId) return false;
+      return true;
+    });
 
     const byType: Record<FinancialExceptionType, number> = {
       ALLOCATION_MISMATCH: 0,
@@ -289,7 +320,7 @@ export class ReconciliationService {
   }
 
   /**
-   * Lists financial exceptions with query filtering.
+   * Lists financial exceptions with query filtering and tenant scoping.
    */
   public listExceptions(
     filters: {
@@ -298,13 +329,18 @@ export class ReconciliationService {
       type?: string;
       loanId?: string;
     },
-    actor: { id: string; roles: string[] }
+    actor: { id: string; email?: string; roles: string[]; tenantId?: string; branchId?: string }
   ): FinancialException[] {
     if (actor.roles.includes('CUSTOMER')) {
       throw new ForbiddenError('Access forbidden: Borrowers cannot access financial exceptions.');
     }
 
+    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
     let items = Array.from(this.exceptions.values());
+
+    if (!isSuperAdmin && actor.tenantId) {
+      items = items.filter((e) => !e.tenantId || e.tenantId === actor.tenantId);
+    }
 
     if (filters.status) items = items.filter((e) => e.status === filters.status);
     if (filters.severity) items = items.filter((e) => e.severity === filters.severity);
@@ -326,7 +362,7 @@ export class ReconciliationService {
       amount: number;
       reason: string;
     },
-    actor: { id: string; email: string; roles: string[] }
+    actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
   ): Promise<LedgerAdjustment> {
     if (actor.roles.includes('CUSTOMER')) {
       throw new ForbiddenError('Access forbidden: Borrowers cannot propose ledger adjustments.');
@@ -338,10 +374,22 @@ export class ReconciliationService {
 
     const loan = await prisma.loan.findUnique({
       where: { id: params.loanId },
-      select: { loanNo: true },
+      select: { loanNo: true, tenantId: true },
     });
     if (!loan) {
       throw new NotFoundError(`Loan '${params.loanId}' not found.`);
+    }
+
+    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && actor.tenantId && loan.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: You cannot propose adjustments on another tenant loan.');
+    }
+
+    if (params.exceptionId && this.exceptions.has(params.exceptionId)) {
+      const exc = this.exceptions.get(params.exceptionId)!;
+      if (!isSuperAdmin && actor.tenantId && exc.tenantId && exc.tenantId !== actor.tenantId) {
+        throw new ForbiddenError('Access forbidden: You cannot link an adjustment to an exception belonging to another tenant.');
+      }
     }
 
     // Maker-Checker threshold: Adjustments >= ₹5,000 or status corrections require approval
@@ -352,6 +400,7 @@ export class ReconciliationService {
     const adjustment: LedgerAdjustment = {
       adjustmentId,
       type: params.type,
+      tenantId: loan.tenantId || actor.tenantId,
       loanId: params.loanId,
       loanNo: loan.loanNo,
       exceptionId: params.exceptionId,
@@ -386,6 +435,7 @@ export class ReconciliationService {
         type: params.type,
         amount: params.amount,
         loanId: params.loanId,
+        tenantId: adjustment.tenantId,
         status,
         requiresApproval,
       },
@@ -399,7 +449,7 @@ export class ReconciliationService {
    */
   public async approveAdjustment(
     adjustmentId: string,
-    actor: { id: string; email: string; roles: string[] }
+    actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
   ): Promise<LedgerAdjustment> {
     const isAuthorized =
       actor.roles.includes('SUPER_ADMIN') ||
@@ -415,12 +465,17 @@ export class ReconciliationService {
       throw new NotFoundError(`Adjustment #${adjustmentId} not found.`);
     }
 
+    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && actor.tenantId && adj.tenantId && adj.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: You cannot approve adjustments belonging to another tenant.');
+    }
+
     if (adj.status !== 'PENDING_APPROVAL') {
       throw new BadRequestError(`Adjustment is already '${adj.status}'.`);
     }
 
     // Segregation of duties: Maker cannot approve their own adjustment (unless Super Admin in dev)
-    if (adj.proposedBy === actor.email && !actor.roles.includes('SUPER_ADMIN')) {
+    if (adj.proposedBy === actor.email && !isSuperAdmin) {
       throw new ForbiddenError('Maker-Checker Violation: You cannot approve an adjustment you proposed.');
     }
 
@@ -443,7 +498,7 @@ export class ReconciliationService {
       action: 'LEDGER_ADJUSTMENT_APPROVED',
       entity: 'LedgerAdjustment',
       entityId: adjustmentId,
-      newValue: { approvedBy: actor.email, amount: adj.amount },
+      newValue: { approvedBy: actor.email, amount: adj.amount, tenantId: adj.tenantId },
     }).catch(() => {});
 
     return adj;
@@ -455,7 +510,7 @@ export class ReconciliationService {
   public async rejectAdjustment(
     adjustmentId: string,
     rejectionReason: string,
-    actor: { id: string; email: string; roles: string[] }
+    actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
   ): Promise<LedgerAdjustment> {
     const isAuthorized =
       actor.roles.includes('SUPER_ADMIN') ||
@@ -471,6 +526,11 @@ export class ReconciliationService {
       throw new NotFoundError(`Adjustment #${adjustmentId} not found.`);
     }
 
+    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && actor.tenantId && adj.tenantId && adj.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: You cannot reject adjustments belonging to another tenant.');
+    }
+
     if (adj.status !== 'PENDING_APPROVAL') {
       throw new BadRequestError(`Adjustment is already '${adj.status}'.`);
     }
@@ -484,21 +544,27 @@ export class ReconciliationService {
       action: 'LEDGER_ADJUSTMENT_REJECTED',
       entity: 'LedgerAdjustment',
       entityId: adjustmentId,
-      newValue: { rejectedBy: actor.email, reason: adj.rejectionReason },
+      newValue: { rejectedBy: actor.email, reason: adj.rejectionReason, tenantId: adj.tenantId },
     }).catch(() => {});
 
     return adj;
   }
 
   /**
-   * Lists adjustments with status filtering.
+   * Lists adjustments with status filtering and tenant scoping.
    */
-  public listAdjustments(actor: { id: string; roles: string[] }): LedgerAdjustment[] {
+  public listAdjustments(actor: { id: string; email?: string; roles: string[]; tenantId?: string; branchId?: string }): LedgerAdjustment[] {
     if (actor.roles.includes('CUSTOMER')) {
       throw new ForbiddenError('Access forbidden: Borrowers cannot view adjustments.');
     }
 
-    return Array.from(this.adjustments.values()).sort(
+    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
+    let items = Array.from(this.adjustments.values());
+    if (!isSuperAdmin && actor.tenantId) {
+      items = items.filter((a) => !a.tenantId || a.tenantId === actor.tenantId);
+    }
+
+    return items.sort(
       (a, b) => new Date(b.proposedAt).getTime() - new Date(a.proposedAt).getTime()
     );
   }
@@ -510,3 +576,4 @@ export class ReconciliationService {
 }
 
 export const reconciliationService = ReconciliationService.getInstance();
+
