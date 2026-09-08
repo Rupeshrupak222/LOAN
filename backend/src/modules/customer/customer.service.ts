@@ -149,9 +149,8 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
         update: {
           firstName: input.firstName,
           lastName: input.lastName,
-          passwordHash,
           status: 'ACTIVE',
-          branchId: input.branchId,
+          ...(input.branchId ? { branchId: input.branchId } : {}),
         },
         create: {
           email: cleanEmail,
@@ -174,60 +173,107 @@ export async function createCustomer(input: CreateCustomerInput, actorUserId?: s
       customerUserId = user.id;
     }
 
-    const cust = await tx.customer.create({
-      data: {
-        userId: customerUserId,
-        customerCode: generateCustomerCode(),
-        firstName: input.firstName,
-        lastName: input.lastName,
-        dateOfBirth: input.dateOfBirth,
-        gender: input.gender,
-        mobile: input.mobile,
-        email: input.email?.toLowerCase().trim(),
-        addressLine: input.addressLine,
-        city: input.city,
-        state: input.state,
-        pincode: input.pincode,
-        employmentType: input.employmentType,
-        employerName: input.employerName,
-        monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
-        existingObligations:
-          input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
-        bankName: input.bankName,
-        bankAccountNo: input.bankAccountNo,
-        bankIfsc: input.bankIfsc,
-        branchId: input.branchId,
-        kycStatus: 'NOT_STARTED',
-        status: 'DRAFT',
+    const cleanEmail = input.email ? input.email.toLowerCase().trim() : undefined;
+
+    // Check if a Customer profile already exists for this userId, email, or mobile
+    const existingCust = await tx.customer.findFirst({
+      where: {
+        OR: [
+          ...(customerUserId ? [{ userId: customerUserId }] : []),
+          ...(cleanEmail ? [{ email: cleanEmail }] : []),
+          { mobile: input.mobile },
+        ],
       },
     });
 
-    if (input.addressLine && input.city) {
-      await tx.customerAddress.create({
+    let cust;
+    if (existingCust) {
+      cust = await tx.customer.update({
+        where: { id: existingCust.id },
         data: {
-          customerId: cust.id,
-          addressType: 'CURRENT',
+          userId: customerUserId || existingCust.userId,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          dateOfBirth: input.dateOfBirth || existingCust.dateOfBirth,
+          gender: input.gender || existingCust.gender,
+          mobile: input.mobile,
+          email: cleanEmail || existingCust.email,
+          addressLine: input.addressLine || existingCust.addressLine,
+          city: input.city || existingCust.city,
+          state: input.state || existingCust.state,
+          pincode: input.pincode || existingCust.pincode,
+          employmentType: input.employmentType || existingCust.employmentType,
+          employerName: input.employerName || existingCust.employerName,
+          monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : existingCust.monthlyIncome,
+          bankName: input.bankName || existingCust.bankName,
+          bankAccountNo: input.bankAccountNo || existingCust.bankAccountNo,
+          bankIfsc: input.bankIfsc || existingCust.bankIfsc,
+        },
+      });
+    } else {
+      cust = await tx.customer.create({
+        data: {
+          userId: customerUserId,
+          customerCode: generateCustomerCode(),
+          firstName: input.firstName,
+          lastName: input.lastName,
+          dateOfBirth: input.dateOfBirth,
+          gender: input.gender,
+          mobile: input.mobile,
+          email: cleanEmail,
           addressLine: input.addressLine,
           city: input.city,
-          state: input.state || '',
-          pincode: input.pincode || '',
-          isPrimary: true,
+          state: input.state,
+          pincode: input.pincode,
+          employmentType: input.employmentType,
+          employerName: input.employerName,
+          monthlyIncome: input.monthlyIncome != null ? Money.toDb(input.monthlyIncome) : null,
+          existingObligations:
+            input.existingObligations != null ? Money.toDb(input.existingObligations) : null,
+          bankName: input.bankName,
+          bankAccountNo: input.bankAccountNo,
+          bankIfsc: input.bankIfsc,
+          branchId: input.branchId,
+          kycStatus: 'NOT_STARTED',
+          status: 'DRAFT',
         },
       });
     }
 
+    if (input.addressLine && input.city) {
+      const existingAddr = await tx.customerAddress.findFirst({ where: { customerId: cust.id } });
+      if (!existingAddr) {
+        await tx.customerAddress.create({
+          data: {
+            customerId: cust.id,
+            addressType: 'CURRENT',
+            addressLine: input.addressLine,
+            city: input.city,
+            state: input.state || '',
+            pincode: input.pincode || '',
+            isPrimary: true,
+          },
+        });
+      }
+    }
+
     if (input.bankAccountNo && input.bankName) {
-      await tx.customerBankAccount.create({
-        data: {
-          customerId: cust.id,
-          accountHolderName: `${input.firstName} ${input.lastName}`,
-          bankName: input.bankName,
-          accountNumber: input.bankAccountNo,
-          ifscCode: input.bankIfsc || '',
-          accountType: 'SAVINGS',
-          isPrimary: true,
-        },
+      const existingBank = await tx.customerBankAccount.findFirst({
+        where: { customerId: cust.id, accountNumber: input.bankAccountNo },
       });
+      if (!existingBank) {
+        await tx.customerBankAccount.create({
+          data: {
+            customerId: cust.id,
+            accountHolderName: `${input.firstName} ${input.lastName}`,
+            bankName: input.bankName,
+            accountNumber: input.bankAccountNo,
+            ifscCode: input.bankIfsc || '',
+            accountType: 'SAVINGS',
+            isPrimary: true,
+          },
+        });
+      }
     }
 
     if (input.employerName) {

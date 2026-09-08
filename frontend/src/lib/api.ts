@@ -200,7 +200,15 @@ export function getApiErrorInfo(error: unknown): ApiErrorInfo {
     } else if (isNetworkError) {
       message = 'Unable to reach the server. Please check your network connection.';
     } else if (backendError?.error?.message) {
-      message = backendError.error.message;
+      const baseMsg = backendError.error.message;
+      if (Array.isArray(backendError.error.details) && backendError.error.details.length > 0) {
+        const detailsStr = backendError.error.details
+          .map((d: any) => (d.path ? `${d.path}: ${d.message}` : d.message || String(d)))
+          .join(' | ');
+        message = `${baseMsg}: ${detailsStr}`;
+      } else {
+        message = baseMsg;
+      }
     } else if (status === 401) {
       message = 'Your session has expired. Please sign in again.';
     } else if (status === 403) {

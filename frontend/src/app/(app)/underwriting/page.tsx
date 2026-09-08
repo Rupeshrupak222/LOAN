@@ -27,6 +27,7 @@ import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
 import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useToast } from '@/lib/toast';
+import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 
 type TabKey = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -378,139 +379,12 @@ export default function UnderwritingQueuePage() {
         )}
       </Card>
 
-      {/* QUICK UNDERWRITING / RE-UNDERWRITING DECISION MODAL */}
-      {selectedApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div
-            className={cn(
-              'w-full max-w-lg rounded-2xl border shadow-2xl p-6 relative transition-all',
-              isDark ? 'bg-[#171B36] border-[#2B3566] text-white' : 'bg-white border-slate-200 text-slate-900'
-            )}
-          >
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#2B3566]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
-                  <FileCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base">
-                    {selectedApp.status === 'UNDERWRITING' ? 'Underwrite Loan Proposal' : 'Re-Underwrite / Modify Decision'}
-                  </h3>
-                  <p className="text-xs text-slate-400">Sanction, modify conditions, or decline proposal</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedApp(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 pt-4">
-              <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#1E2445] text-xs space-y-1.5 border border-slate-200/60 dark:border-[#2B3566]">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Application No:</span>
-                  <span className="font-mono font-bold text-blue-600">{selectedApp.applicationNo}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Borrower:</span>
-                  <span className="font-bold">
-                    {selectedApp.customer?.firstName} {selectedApp.customer?.lastName}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Requested Sanction:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                    {formatMoney(selectedApp.requestedAmount || 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Current Status:</span>
-                  <Badge status={selectedApp.status} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
-                  Underwriting Decision Outcome *
-                </label>
-                <select
-                  className={cn(
-                    'h-9 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors focus:border-[#2563EB] focus:outline-none',
-                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-100' : 'border-slate-200 bg-white text-slate-900'
-                  )}
-                  value={decision}
-                  onChange={(e) => setDecision(e.target.value as any)}
-                >
-                  <option value="APPROVE">APPROVE (Sanction Loan & Move to Payout Queue)</option>
-                  <option value="APPROVE_WITH_CONDITIONS">APPROVE WITH CONDITIONS (Covenants required)</option>
-                  <option value="SEND_BACK">SEND BACK (Return to Credit Analyst for Review)</option>
-                  <option value="REJECT">REJECT (Decline Application)</option>
-                </select>
-              </div>
-
-              {decision === 'APPROVE_WITH_CONDITIONS' && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
-                    Conditions / Covenants Required *
-                  </label>
-                  <Input
-                    placeholder="e.g. Requires co-applicant guarantee, post-dated cheques"
-                    value={conditions}
-                    onChange={(e) => setConditions(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
-                  Sanction Rationale / Remarks *
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Detailed credit assessment remarks..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className={cn(
-                    'w-full rounded-xl border p-3 text-xs focus:border-[#2563EB] focus:outline-none',
-                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-white' : 'border-slate-300 bg-white text-slate-900'
-                  )}
-                  required
-                />
-              </div>
-
-              {decisionMutation.isError && (
-                <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 p-3 text-xs">
-                  {apiErrorMessage(decisionMutation.error)}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-[#2B3566]">
-                <Link
-                  href={`/applications/${selectedApp.id}`}
-                  className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline"
-                >
-                  Full Application Review →
-                </Link>
-
-                <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => setSelectedApp(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={!reason.trim() || decisionMutation.isPending}
-                    onClick={() => decisionMutation.mutate()}
-                    className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold"
-                  >
-                    {decisionMutation.isPending ? 'Committing...' : 'Commit Decision'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* STEP-BY-STEP UNDERWRITING VERIFICATION WIZARD MODAL */}
+      <UnderwritingVerificationWizard
+        application={selectedApp}
+        isOpen={Boolean(selectedApp)}
+        onClose={() => setSelectedApp(null)}
+      />
     </div>
   );
 }

@@ -16,7 +16,7 @@ const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   UNDER_REVIEW: ['CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
   CREDIT_ASSESSMENT: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
   UNDERWRITING: ['APPROVED', 'REJECTED', 'SUBMITTED', 'CANCELLED'],
-  APPROVED: ['AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'CANCELLED'],
+  APPROVED: ['AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'UNDERWRITING', 'SUBMITTED', 'CANCELLED'],
   REJECTED: [],
   AGREEMENT_PENDING: ['READY_FOR_DISBURSEMENT', 'CANCELLED'],
   READY_FOR_DISBURSEMENT: ['DISBURSED', 'CANCELLED'],
@@ -65,7 +65,14 @@ export async function getApplication(id: string) {
   const app = await prisma.loanApplication.findUnique({
     where: { id },
     include: {
-      customer: true,
+      customer: {
+        include: {
+          documents: { orderBy: { createdAt: 'desc' } },
+          bankAccounts: { orderBy: { createdAt: 'desc' } },
+          employmentDetails: { orderBy: { createdAt: 'desc' } },
+          addresses: { orderBy: { createdAt: 'desc' } },
+        },
+      },
       product: true,
       statusHistory: { orderBy: { createdAt: 'desc' } },
       eligibility: true,
