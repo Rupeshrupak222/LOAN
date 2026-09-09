@@ -821,14 +821,26 @@ export default function DashboardPage() {
 
       {/* C. CREDIT ANALYST WORKSPACE */}
       {primaryRole === 'CREDIT_ANALYST' && (() => {
-        const cqMetrics = creditQueueData?.metrics || {
-          applicationsAssigned: creditQueueData?.items?.length || appsList.length,
-          pendingAssessments: creditAwaitingCount,
-          assessmentsCompleted: creditEvaluatedCount,
-          eligibleApplications: appsList.filter((a: any) => a.eligibility?.result === 'ELIGIBLE').length,
-          notEligibleApplications: appsList.filter((a: any) => a.eligibility?.result === 'NOT_ELIGIBLE').length,
-          pendingDocuments: appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
-          highRiskCases: highRiskCount,
+        const m = creditQueueData?.metrics;
+        const pendingAssessmentsCount =
+          m?.pendingAssessments ??
+          ((m?.pendingCredit !== undefined || m?.pendingFinancial !== undefined || m?.pendingDocs !== undefined || m?.pendingKyc !== undefined)
+            ? ((m?.pendingCredit ?? 0) + (m?.pendingFinancial ?? 0) + (m?.pendingDocs ?? 0) + (m?.pendingKyc ?? 0))
+            : creditAwaitingCount);
+        const completedAssessmentsCount =
+          m?.assessmentsCompleted ??
+          ((m?.eligibleApplications !== undefined || m?.notEligibleApplications !== undefined)
+            ? ((m?.eligibleApplications ?? 0) + (m?.notEligibleApplications ?? 0) + (m?.furtherReview ?? 0))
+            : creditEvaluatedCount);
+
+        const cqMetrics = {
+          applicationsAssigned: m?.applicationsAssigned ?? creditQueueData?.items?.length ?? appsList.length,
+          pendingAssessments: pendingAssessmentsCount,
+          assessmentsCompleted: completedAssessmentsCount,
+          eligibleApplications: m?.eligibleApplications ?? appsList.filter((a: any) => a.eligibility?.result === 'ELIGIBLE').length,
+          notEligibleApplications: m?.notEligibleApplications ?? appsList.filter((a: any) => a.eligibility?.result === 'NOT_ELIGIBLE').length,
+          pendingDocuments: m?.pendingDocs ?? m?.pendingDocuments ?? appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
+          highRiskCases: m?.highRiskCases ?? highRiskCount,
         };
 
         const creditProposals = creditQueueData?.items?.length ? creditQueueData.items : appsList;

@@ -53,6 +53,8 @@ const NAV_ICONS: Record<string, any> = {
   applications: FileText,
   products: Building2,
   'loan-products': Building2,
+  'credit-assessment': Calculator,
+  'branch-review': FileCheck,
   underwriting: FileCheck,
   loans: DollarSign,
   disbursements: Wallet,

@@ -1348,6 +1348,14 @@ export async function getCreditQueue(tab?: string) {
   return {
     metrics: {
       applicationsAssigned: allApps.length,
+      pendingAssessments:
+        allApps.filter(isKycPending).length +
+        allApps.filter(isDocsPending).length +
+        allApps.filter(isFinancialPending).length +
+        allApps.filter(isCreditPending).length,
+      assessmentsCompleted:
+        allApps.filter(isEligibleOrReadyForUnderwriter).length +
+        allApps.filter(isNotEligible).length,
       pendingKyc: allApps.filter(isKycPending).length,
       pendingDocs: allApps.filter(isDocsPending).length,
       pendingFinancial: allApps.filter(isFinancialPending).length,
