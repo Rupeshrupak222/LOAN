@@ -33,6 +33,8 @@ import {
   Sparkles,
   ShieldAlert,
   Building2,
+  Send,
+  ClipboardCheck,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
@@ -62,6 +64,11 @@ export default function CustomerDetailPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user } = useAuth();
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
+  const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
+  const isUnderwriter = Boolean(user?.roles?.includes('UNDERWRITER'));
+  const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const [activeTab, setActiveTab] = useState<
     'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
   >('overview');
@@ -475,12 +482,12 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+            {(isUnderwriter || isAdmin) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+            {(isLoanOfficer || isAdmin) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -490,14 +497,14 @@ export default function CustomerDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
-              <Link href="/applications">
+            {(isLoanOfficer || isAdmin) && (
+              <Link href="/applications/new">
                 <Button size="sm" className="flex items-center gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> Originate Loan
                 </Button>
               </Link>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
+            {isAdmin && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -604,29 +611,44 @@ export default function CustomerDetailPage() {
           else if (stepId === 4) setActiveTab('applications');
           else if (stepId === 5) {
             setActiveTab('applications');
-            const targetApp = data.applications?.find((a: any) => ['UNDERWRITING', 'APPROVED', 'SUBMITTED'].includes(a.status));
-            if (targetApp) {
-              setSelectedAppForWizard({ ...targetApp, customer: data });
-              setWizardOpen(true);
+            if (isUnderwriter || isAdmin) {
+              const targetApp = data.applications?.find((a: any) => ['UNDERWRITING', 'APPROVED', 'SUBMITTED'].includes(a.status));
+              if (targetApp) {
+                setSelectedAppForWizard({ ...targetApp, customer: data });
+                setWizardOpen(true);
+              }
             }
           }
         };
 
         const activeAppInUnderwriting = data.applications?.find((a: any) => a.status === 'UNDERWRITING');
         const activeAppApproved = data.applications?.find((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status));
-        const activeAppPendingForward = data.applications?.find((a: any) => ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED'].includes(a.status));
+        const activeAppPendingForward = data.applications?.find((a: any) => ['DRAFT', 'KYC_PENDING', 'KYC_VERIFIED'].includes(a.status));
+        const activeAppInReview = data.applications?.find((a: any) => ['SUBMITTED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(a.status));
 
         return (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <div>
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Step-by-Step Customer Intake & Underwriting Progress
+                  {isLoanOfficer ? (
+                    <>
+                      <ClipboardCheck className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Application Origination & Intake Progress
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Step-by-Step Customer Intake & Underwriting Progress
+                    </>
+                  )}
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Underwriter verifies each step sequentially before sanctioning & forwarding dossier to Finance</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {isLoanOfficer
+                    ? 'Originate customer profile, documents, and submit application dossier to Credit Analyst'
+                    : 'Underwriter verifies each step sequentially before sanctioning & forwarding dossier to Finance'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
-                {activeAppInUnderwriting && (
+                {(isUnderwriter || isAdmin) && activeAppInUnderwriting && (
                   <Button
                     size="sm"
                     className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -638,7 +660,7 @@ export default function CustomerDetailPage() {
                     <ShieldCheck className="h-3.5 w-3.5" /> Launch Underwriter Desk →
                   </Button>
                 )}
-                {!activeAppInUnderwriting && activeAppApproved && (
+                {(isUnderwriter || isAdmin) && !activeAppInUnderwriting && activeAppApproved && (
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
@@ -671,25 +693,30 @@ export default function CustomerDetailPage() {
                     </Button>
                   </div>
                 )}
-                {activeAppPendingForward && (
+                {isLoanOfficer && activeAppPendingForward && (
                   <Button
                     size="sm"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     onClick={async () => {
                       try {
                         await api.post(`/applications/${activeAppPendingForward.id}/transition`, {
-                          toStatus: 'UNDERWRITING',
-                          reason: 'Forwarded by Loan Officer from Customer 360 profile',
+                          toStatus: 'SUBMITTED',
+                          reason: 'Originated and submitted by Loan Officer for Credit Analyst review.',
                         });
-                        toast.success(`Application ${activeAppPendingForward.applicationNo || ''} forwarded to Underwriter!`);
+                        toast.success(`Application ${activeAppPendingForward.applicationNo || ''} submitted to Credit Analyst!`);
                         queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
                       } catch (err: any) {
                         toast.error(apiErrorMessage(err));
                       }
                     }}
                   >
-                    <ArrowRight className="h-3.5 w-3.5" /> Forward to Underwriter →
+                    <Send className="h-3.5 w-3.5" /> Submit to Credit Analyst →
                   </Button>
+                )}
+                {isLoanOfficer && (activeAppInUnderwriting || activeAppInReview) && (
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-amber-600" /> In Review / Underwriting
+                  </span>
                 )}
               </div>
             </div>
@@ -825,10 +852,12 @@ export default function CustomerDetailPage() {
               <p className="text-xs text-slate-500">Identity proofs, income documents, bank statements, and signed mandates</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
-                + Upload Document
-              </Button>
-              {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+              {(isLoanOfficer || isAdmin) && !isBranchManager && (
+                <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
+                  + Upload Document
+                </Button>
+              )}
+              {(isUnderwriter || isAdmin) && (
                 <Button size="sm" onClick={() => setKycModalOpen(true)}>
                   Update KYC Status
                 </Button>
@@ -919,7 +948,7 @@ export default function CustomerDetailPage() {
                           >
                             <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
                           </Button>
-                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)) && !isBranchManager && (
                             <Button
                               size="sm"
                               variant="secondary"
@@ -936,18 +965,20 @@ export default function CustomerDetailPage() {
                               {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
                             </Button>
                           )}
-                          <button
-                            type="button"
-                            title="Delete Document"
-                            onClick={() => {
-                              if (confirm(`Delete document "${doc.fileName}" from database?`)) {
-                                docDeleteMutation.mutate(doc.id);
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              title="Delete Document"
+                              onClick={() => {
+                                if (confirm(`Delete document "${doc.fileName}" from database?`)) {
+                                  docDeleteMutation.mutate(doc.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2218,7 +2249,7 @@ export default function CustomerDetailPage() {
       )}
 
       {/* Underwriting Verification Desk Wizard Modal */}
-      {selectedAppForWizard && (
+      {selectedAppForWizard && (isUnderwriter || isAdmin) && (
         <UnderwritingVerificationWizard
           application={selectedAppForWizard}
           isOpen={wizardOpen}

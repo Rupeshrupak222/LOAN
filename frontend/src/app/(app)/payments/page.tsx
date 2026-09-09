@@ -20,6 +20,7 @@ import {
   Clock,
   Send,
   X,
+  Scale,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -37,6 +38,10 @@ export default function PaymentsPage() {
   const toast = useToast();
 
   const isCustomer = user?.roles?.includes('CUSTOMER');
+  const isCollectionOfficer = user?.roles?.includes('COLLECTION_OFFICER');
+  const isFinanceOfficer =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN'].includes(r));
   const isStaff = user?.roles?.some((r: string) =>
     ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'COLLECTION_OFFICER', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST'].includes(r)
   );
@@ -109,19 +114,26 @@ export default function PaymentsPage() {
     enabled: submitModalOpen,
   });
 
-  // Mutation: Submit Payment Intimation
+  // Mutation: Submit Payment Intimation / Collection
   const submitPaymentMutation = useMutation({
-    mutationFn: async () =>
-      api.post('/payments/submissions', {
+    mutationFn: async () => {
+      const endpoint = isCollectionOfficer ? '/payments/collect' : '/payments/submissions';
+      return api.post(endpoint, {
         loanId: selectedLoanId,
         amount: Number(subAmount),
         method: subMethod,
         reference: subRef,
         payerMobile: subMobile,
         notes: subNotes,
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success('Repayment submission sent for verification.');
+      toast.success(
+        isCollectionOfficer ? 'Repayment Collection Recorded' : 'Repayment Submission Sent',
+        isCollectionOfficer
+          ? 'Repayment collection recorded successfully and queued for Finance verification.'
+          : 'Repayment submission sent for verification.'
+      );
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setSubmitModalOpen(false);
@@ -526,6 +538,37 @@ export default function PaymentsPage() {
             >
               <Send className="h-4 w-4" /> Submit Payment Proof
             </Button>
+          ) : isFinanceOfficer ? (
+            <div className="flex items-center gap-2">
+              <Link href="/reconciliation">
+                <Button size="md" variant="secondary" className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Scale className="h-3.5 w-3.5 text-purple-600" /> Reconcile Ledgers →
+                </Button>
+              </Link>
+              <Button
+                size="md"
+                onClick={() => setActiveTab('SUBMISSIONS')}
+                className="flex items-center gap-1.5 text-white bg-[#2563EB] hover:bg-blue-700 shadow-sm text-xs font-semibold"
+              >
+                <FileCheck2 className="h-3.5 w-3.5" />
+                Verify Submissions {pendingSubmissionsCount > 0 ? `(${pendingSubmissionsCount})` : ''}
+              </Button>
+            </div>
+          ) : isCollectionOfficer ? (
+            <div className="flex items-center gap-2">
+              <Button
+                size="md"
+                onClick={() => setSubmitModalOpen(true)}
+                className="flex items-center gap-1.5 text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm text-xs font-semibold"
+              >
+                <CreditCard className="h-3.5 w-3.5" /> Record Repayment Collection
+              </Button>
+              <Link href="/loans">
+                <Button size="md" variant="secondary" className="flex items-center gap-1.5 text-xs font-semibold">
+                  Active Loan Accounts →
+                </Button>
+              </Link>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <Button
@@ -656,10 +699,16 @@ export default function PaymentsPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2B3566]">
               <div>
                 <h3 className={cn("text-base font-bold", isDark ? "text-white" : "text-slate-900")}>
-                  Submit Payment Details / Proof
+                  {isCustomer
+                    ? 'Submit Payment Details / Proof'
+                    : isCollectionOfficer
+                    ? 'Record Repayment Collection'
+                    : 'Submit Payment Intimation'}
                 </h3>
                 <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
-                  Enter the transaction UTR number & payment mode for verification
+                  {isCollectionOfficer
+                    ? 'Record customer repayment collection. Submits to Finance verification and reconciliation queue.'
+                    : 'Enter the transaction UTR number & payment mode for verification'}
                 </p>
               </div>
               <button
@@ -792,10 +841,17 @@ export default function PaymentsPage() {
                 <Button
                   disabled={!selectedLoanId || !subAmount || !subRef.trim() || submitPaymentMutation.isPending}
                   onClick={() => submitPaymentMutation.mutate()}
-                  className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold gap-1.5"
+                  className={cn(
+                    "hover:opacity-90 text-white font-semibold gap-1.5",
+                    isCollectionOfficer ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[#2563EB] hover:bg-blue-700"
+                  )}
                 >
                   <Send className="w-3.5 h-3.5" />
-                  {submitPaymentMutation.isPending ? 'Submitting...' : 'Submit for Verification'}
+                  {submitPaymentMutation.isPending
+                    ? 'Processing...'
+                    : isCollectionOfficer
+                    ? 'Confirm & Record Collection'
+                    : 'Submit for Verification'}
                 </Button>
               </div>
             </div>

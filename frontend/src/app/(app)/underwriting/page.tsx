@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ClipboardCheck,
@@ -34,8 +35,51 @@ type TabKey = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 export default function UnderwritingQueuePage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
+
+  const isBranchManagerOnly =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const isLoanOfficerOnly =
+    user?.roles?.includes('LOAN_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const isCreditAnalystOnly =
+    user?.roles?.includes('CREDIT_ANALYST') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const canSanction = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r)
+  );
+
+  const isFinanceOfficerOnly =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const isCollectionOfficerOnly =
+    user?.roles?.includes('COLLECTION_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  useEffect(() => {
+    if (isBranchManagerOnly) {
+      toast.warning('Branch Managers do not have access to the Underwriter Verification Desk. Please use the Branch Management Desk.');
+      router.replace('/branch-review');
+    } else if (isCreditAnalystOnly) {
+      router.replace('/credit-assessment');
+    } else if (isLoanOfficerOnly) {
+      toast.warning('Loan Officers do not have access to the Underwriter Verification Desk.');
+      router.replace('/applications');
+    } else if (isFinanceOfficerOnly) {
+      toast.warning('Finance Officers do not have access to the Underwriting Desk. Please use the Disbursements Desk.');
+      router.replace('/disbursements');
+    } else if (isCollectionOfficerOnly) {
+      toast.warning('Collection Officers do not have access to the Underwriting Desk.');
+      router.replace('/collections');
+    }
+  }, [isBranchManagerOnly, isCreditAnalystOnly, isLoanOfficerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, router, toast]);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<TabKey>('ALL');
@@ -52,6 +96,7 @@ export default function UnderwritingQueuePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['underwriting-queue'],
+    enabled: !isCreditAnalystOnly && !isLoanOfficerOnly,
     queryFn: async () => {
       const res = await api.get('/underwriting/queue');
       const rows = res.data?.data?.items ?? res.data?.data ?? [];
@@ -88,6 +133,86 @@ export default function UnderwritingQueuePage() {
       toast.error(apiErrorMessage(err), { title: 'Underwriting Decision Notice' });
     },
   });
+
+  if (isBranchManagerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Branch Applications Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Branch Managers review proposals and approve within delegated limits at the Branch Review Desk. Underwriting is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isLoanOfficerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Loan Applications...
+        </p>
+        <p className="text-xs text-slate-400">
+          Loan Officers handle application origination. Underwriting desk is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isCreditAnalystOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Credit Assessment Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Credit Analysts evaluate borrower repayment capacity and eligibility at the Credit Assessment Desk.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isFinanceOfficerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Disbursements Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Finance Officers manage fund payouts and ledger accounting. Underwriting sanction is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isCollectionOfficerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Collections Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Collection Officers handle post-disbursement recoveries. Underwriting is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
 
   if (isLoading) return <TableSkeleton rows={6} cols={6} />;
 
@@ -318,49 +443,53 @@ export default function UnderwritingQueuePage() {
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {canDecide ? (
-                            isPending ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedApp(app);
-                                    setDecision('APPROVE');
-                                    setReason('Credit proposal verified and approved for sanction.');
-                                    setConditions('');
-                                  }}
-                                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline-danger"
-                                  onClick={() => {
-                                    setSelectedApp(app);
-                                    setDecision('REJECT');
-                                    setReason('');
-                                    setConditions('');
-                                  }}
-                                  className="text-xs cursor-pointer flex items-center gap-1"
-                                >
-                                  <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                                  Reject
-                                </Button>
-                              </>
-                            ) : (
+                          {canSanction && isPending && (
+                            <>
                               <Button
                                 size="sm"
-                                variant="secondary"
-                                onClick={() => handleOpenDecision(app)}
-                                className="text-xs font-semibold cursor-pointer flex items-center gap-1.5 border border-slate-300 dark:border-[#2B3566]"
+                                onClick={() => {
+                                  setSelectedApp(app);
+                                  setDecision('APPROVE');
+                                  setReason('Credit proposal verified and approved for sanction.');
+                                  setConditions('');
+                                }}
+                                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1"
                               >
-                                <RotateCcw className="w-3 h-3 text-amber-500" />
-                                Modify Decision
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Approve
                               </Button>
-                            )
-                          ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline-danger"
+                                onClick={() => {
+                                  setSelectedApp(app);
+                                  setDecision('REJECT');
+                                  setReason('');
+                                  setConditions('');
+                                }}
+                                className="text-xs cursor-pointer flex items-center gap-1"
+                              >
+                                <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {canSanction && !isPending && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setSelectedApp(app);
+                                setDecision(app.status === 'APPROVED' ? 'APPROVE' : 'REJECT');
+                                setReason('');
+                                setConditions('');
+                              }}
+                              className="text-xs font-semibold cursor-pointer flex items-center gap-1.5 border border-slate-300 dark:border-[#2B3566]"
+                            >
+                              <RotateCcw className="w-3 h-3 text-amber-500" />
+                              Modify Decision
+                            </Button>
+                          )}
                           <Link href={`/applications/${app.id}`}>
                             <Button size="sm" variant="ghost" className="text-xs">
                               Review →

@@ -9,7 +9,84 @@ export interface ReportActorContext {
   branchId?: string;
 }
 
-export async function getPortfolioOverview(actor?: ReportActorContext) {
+export interface ReportFilterOptions {
+  dateFilter?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export function resolveDateRange(filter?: string, start?: string, end?: string): { from?: Date; to?: Date } {
+  if (start && end) {
+    const from = new Date(start);
+    const to = new Date(end);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (!filter || filter === 'All Time') {
+    return {};
+  }
+
+  const now = new Date();
+  if (filter === 'Today') {
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (filter === 'This Week') {
+    const from = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+    from.setHours(0, 0, 0, 0);
+    return { from, to: now };
+  }
+
+  if (filter === 'This Month') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from, to: now };
+  }
+
+  if (filter === 'Last Month') {
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (filter === 'This Quarter') {
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    const from = new Date(now.getFullYear(), quarterStartMonth, 1);
+    return { from, to: now };
+  }
+
+  if (filter === 'This Financial Year') {
+    const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const from = new Date(fyStartYear, 3, 1);
+    return { from, to: now };
+  }
+
+  const monthMatch = filter.match(/^([A-Za-z]{3})\s+(\d{4})$/);
+  if (monthMatch) {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthIdx = monthNames.indexOf(monthMatch[1]);
+    if (monthIdx !== -1) {
+      const year = parseInt(monthMatch[2], 10);
+      const from = new Date(year, monthIdx, 1);
+      const to = new Date(year, monthIdx + 1, 0, 23, 59, 59, 999);
+      return { from, to };
+    }
+  }
+
+  const rangeMatch = filter.match(/^(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})$/);
+  if (rangeMatch) {
+    const from = new Date(rangeMatch[1]);
+    const to = new Date(rangeMatch[2]);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+
+  return {};
+}
+
+export async function getPortfolioOverview(actor?: ReportActorContext, options?: ReportFilterOptions) {
   const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
   const isCompanyAdmin = actor?.roles?.includes('COMPANY_ADMIN') || actor?.roles?.includes('ADMIN');
 
@@ -20,6 +97,20 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     ...tenantFilter,
     ...branchFilter,
   };
+
+  const { from, to } = resolveDateRange(options?.dateFilter, options?.startDate, options?.endDate);
+  const paymentDateFilter = from || to ? {
+    paidAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
+  const disbursementDateFilter = from || to ? {
+    createdAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
 
   const [loans, payments, disbursements, products, branches, collectionCases] = await Promise.all([
     prisma.loan.findMany({
@@ -32,6 +123,7 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     prisma.payment.findMany({
       where: {
         status: 'SUCCESS',
+        ...paymentDateFilter,
         ...(tenantFilter.tenantId ? { tenantId: tenantFilter.tenantId } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -39,6 +131,7 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     prisma.disbursement.findMany({
       where: {
         status: 'COMPLETED',
+        ...disbursementDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -184,7 +277,8 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
 
 export async function generateCsvReport(
   type: 'loans' | 'disbursements' | 'payments' | 'collections' | 'applications',
-  actor?: ReportActorContext
+  actor?: ReportActorContext,
+  options?: ReportFilterOptions
 ) {
   const BOM = '\uFEFF'; // Excel UTF-8 BOM
   const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
@@ -193,11 +287,26 @@ export async function generateCsvReport(
   const tenantFilter: any = !isSuperAdmin && actor?.tenantId ? { tenantId: actor.tenantId } : {};
   const branchFilter: any = !isSuperAdmin && !isCompanyAdmin && actor?.branchId ? { branchId: actor.branchId } : {};
 
+  const { from, to } = resolveDateRange(options?.dateFilter, options?.startDate, options?.endDate);
+  const createdDateFilter = from || to ? {
+    createdAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
+  const paymentDateFilter = from || to ? {
+    paidAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
+
   if (type === 'loans') {
     const loans = await prisma.loan.findMany({
       where: {
         ...tenantFilter,
         ...branchFilter,
+        ...createdDateFilter,
       },
       include: {
         customer: { select: { firstName: true, lastName: true, customerCode: true, mobile: true, email: true } },
@@ -249,6 +358,7 @@ export async function generateCsvReport(
   if (type === 'disbursements') {
     const disbursements = await prisma.disbursement.findMany({
       where: {
+        ...createdDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -295,6 +405,7 @@ export async function generateCsvReport(
   if (type === 'payments') {
     const payments = await prisma.payment.findMany({
       where: {
+        ...paymentDateFilter,
         ...(tenantFilter.tenantId ? { tenantId: tenantFilter.tenantId } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -333,16 +444,26 @@ export async function generateCsvReport(
   }
 
   if (type === 'collections') {
+    const caseDateFilter = from || to ? {
+      OR: [
+        { updatedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+        { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+      ],
+    } : {};
+
     const cases = await prisma.collectionCase.findMany({
       where: {
+        ...caseDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
       include: {
         customer: { select: { firstName: true, lastName: true, customerCode: true, mobile: true } },
-        loan: { select: { loanNo: true } },
+        loan: { select: { loanNo: true, emiAmount: true } },
+        promises: { take: 1, orderBy: { createdAt: 'desc' } },
+        activities: { take: 1, orderBy: { createdAt: 'desc' } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { dpd: 'desc' },
     });
 
     const headers = [
@@ -351,11 +472,17 @@ export async function generateCsvReport(
       'Customer ID',
       'Borrower Name',
       'Mobile',
+      'EMI Amount (INR)',
       'Overdue Amount (INR)',
       'DPD (Days Past Due)',
       'Aging Bucket',
       'Priority',
       'Case Status',
+      'PTP Promised Date',
+      'PTP Amount (INR)',
+      'PTP Status',
+      'Last Follow-Up Date',
+      'Next Follow-Up Date',
       'Last Updated',
     ];
 
@@ -365,11 +492,17 @@ export async function generateCsvReport(
       c.customer?.customerCode || '-',
       `"${c.customer?.firstName || ''} ${c.customer?.lastName || ''}"`,
       `"${c.customer?.mobile || ''}"`,
+      c.loan?.emiAmount ? Number(c.loan.emiAmount).toFixed(2) : '0.00',
       c.overdueAmount.toFixed(2),
       c.dpd,
       c.agingBucket,
       c.priority,
       c.status,
+      c.promises[0]?.promisedDate ? c.promises[0].promisedDate.toISOString().split('T')[0] : 'N/A',
+      c.promises[0]?.promisedAmount ? Number(c.promises[0].promisedAmount).toFixed(2) : '0.00',
+      c.promises[0]?.status || 'NONE',
+      c.activities[0]?.createdAt ? c.activities[0].createdAt.toISOString().split('T')[0] : 'N/A',
+      c.activities[0]?.nextFollowUpDate ? c.activities[0].nextFollowUpDate.toISOString().split('T')[0] : 'N/A',
       c.updatedAt.toISOString().split('T')[0],
     ]);
 

@@ -133,7 +133,10 @@ export class ReconciliationService {
     // Verifies that customer submissions marked VERIFIED have a corresponding Payment record
     // -------------------------------------------------------------------------
     const verifiedSubmissions = await prisma.paymentSubmission.findMany({
-      where: { status: 'VERIFIED', ...tenantFilter },
+      where: {
+        status: 'VERIFIED',
+        ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
+      },
       include: { loan: { select: { loanNo: true, tenantId: true } } },
     });
 

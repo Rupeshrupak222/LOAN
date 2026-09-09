@@ -38,6 +38,10 @@ export default function ReconciliationPage() {
   const { user } = useAuth();
   const toast = useToast();
 
+  const isReconciliationAuthorized = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'].includes(r)
+  );
+
   const [activeTab, setActiveTab] = useState<'EXCEPTIONS' | 'ADJUSTMENTS' | 'PILLARS'>('EXCEPTIONS');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('OPEN');
@@ -58,12 +62,14 @@ export default function ReconciliationPage() {
   // 1. Fetch Dashboard Stats
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['reconciliation-dashboard'],
+    enabled: !!user && isReconciliationAuthorized,
     queryFn: async () => (await api.get('/reconciliation/dashboard')).data.data,
   });
 
   // 2. Fetch Exceptions
   const { data: exceptions = [], isLoading: exceptionsLoading } = useQuery({
     queryKey: ['reconciliation-exceptions', severityFilter, statusFilter],
+    enabled: !!user && isReconciliationAuthorized,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (severityFilter !== 'ALL') params.set('severity', severityFilter);
@@ -76,6 +82,7 @@ export default function ReconciliationPage() {
   // 3. Fetch Adjustments
   const { data: adjustments = [], isLoading: adjustmentsLoading } = useQuery({
     queryKey: ['reconciliation-adjustments'],
+    enabled: !!user && isReconciliationAuthorized,
     queryFn: async () => (await api.get('/reconciliation/adjustments')).data.data,
   });
 
@@ -177,6 +184,46 @@ export default function ReconciliationPage() {
   };
 
   const willRequireApproval = adjAmount >= 5000 || adjType === 'REVERSAL' || adjType === 'LEDGER_CORRECTION';
+
+  if (user && !isReconciliationAuthorized) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Servicing / Reconciliation"
+          title="Financial Reconciliation & Ledger Balancing"
+          subtitle="Access Restricted"
+        />
+        <div className="max-w-2xl mx-auto rounded-2xl border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#171B36] p-8 text-center space-y-5 my-8 shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Accounting & Reconciliation Access Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Financial reconciliation, 5-pillar ledger balancing, and accounting adjustments are restricted exclusively to Finance Officers, Branch Managers, and authorized Compliance Auditors.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, Collection Officers record customer repayments in the field, while Finance Officers perform secondary verification, ledger reconciliation, and settlement.
+            </p>
+          </div>
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/loans">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                View Loan Accounts
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="md" variant="secondary">
+                Return to Dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

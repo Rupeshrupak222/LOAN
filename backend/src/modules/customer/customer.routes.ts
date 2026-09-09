@@ -71,7 +71,7 @@ router.get(
 
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  authorize('LOAN_OFFICER'),
   validate(createCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await createCustomer(req.body, req.user?.id, req.user?.tenantId);
@@ -81,7 +81,7 @@ router.post(
 
 router.patch(
   '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
   validate(updateCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateCustomer(req.params.id, req.body, req.user?.id, req.user as any);
@@ -91,7 +91,7 @@ router.patch(
 
 router.patch(
   '/:id/kyc',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'),
   validate(updateKycStatusSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateKycStatus(req.params.id, req.body, req.user?.id, req.user as any);
@@ -101,7 +101,7 @@ router.patch(
 
 router.post(
   '/:id/addresses',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
   validate(createAddressSchema),
   asyncHandler(async (req, res) => {
     const address = await addCustomerAddress(req.params.id, req.body, req.user?.id, req.user as any);
@@ -111,7 +111,7 @@ router.post(
 
 router.post(
   '/:id/bank-accounts',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'FINANCE_OFFICER'),
   validate(createBankAccountSchema),
   asyncHandler(async (req, res) => {
     const account = await addCustomerBankAccount(req.params.id, req.body, req.user?.id, req.user as any);
@@ -121,7 +121,7 @@ router.post(
 
 router.delete(
   '/:id/bank-accounts/:bankAccountId',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomerBankAccount(req.params.id, req.params.bankAccountId, req.user?.id, req.user as any);
     res.json(success(result));

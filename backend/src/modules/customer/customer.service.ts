@@ -338,7 +338,7 @@ export async function createCustomer(
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth,
           gender: input.gender,
-          mobile: mobile || input.mobile,
+          mobile: (mobile || input.mobile) || '',
           email: cleanEmail,
           addressLine: addressLine || input.addressLine,
           city: city || input.city,

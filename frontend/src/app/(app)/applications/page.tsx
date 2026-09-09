@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Input } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
@@ -26,8 +27,13 @@ interface AppRow {
 
 export default function ApplicationsPage() {
   const { isDark } = useTheme();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  const canOriginate =
+    user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r)) &&
+    !user?.roles?.includes('BRANCH_MANAGER');
 
   const { data, isLoading } = useQuery({
     queryKey: ['applications', search, statusFilter],
@@ -89,11 +95,13 @@ export default function ApplicationsPage() {
         title="Loan Applications Queue"
         subtitle="Manage and track borrowing requests through eligibility, scoring, and underwriting"
         action={
-          <Link href="/applications/new">
-            <Button className="flex items-center gap-1.5 text-white">
-              <Plus className="h-4 w-4" /> Originate Application
-            </Button>
-          </Link>
+          canOriginate ? (
+            <Link href="/applications/new">
+              <Button className="flex items-center gap-1.5 text-white">
+                <Plus className="h-4 w-4" /> Originate Application
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 

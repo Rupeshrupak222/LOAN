@@ -120,7 +120,7 @@ router.post(
 
 router.patch(
   '/:id/verify',
-  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'),
   validate(verifyDocumentSchema),
   asyncHandler(async (req, res) => {
     const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id, {
@@ -135,7 +135,7 @@ router.patch(
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteDocument(req.params.id, req.user?.id, {
       id: req.user?.id,

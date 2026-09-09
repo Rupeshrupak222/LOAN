@@ -36,6 +36,8 @@ import { AdvancedDecisionIntelligenceCard } from '@/components/AdvancedDecisionI
 import { EarlyWarningWidget } from '@/components/EarlyWarningWidget';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
+import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
+import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -211,24 +213,40 @@ export default function ApplicationDetailPage() {
   const eligibility = data.eligibility;
   const riskAssessment = data.riskAssessment;
 
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
+  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
+  const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+  const isUnderwriter = Boolean(user?.roles?.includes('UNDERWRITER'));
+  const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN'].includes(r)));
+
+  const isBranchManagerOnly = isBranchManager && !isCreditAnalyst && !isUnderwriter && !isAdmin;
+
   const isStaff = user?.roles?.some((r: string) =>
     ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'LOAN_OFFICER'].includes(r)
   );
 
+  const canLoanOfficerSubmit =
+    isLoanOfficer &&
+    !isBranchManagerOnly &&
+    ['DRAFT', 'KYC_PENDING', 'KYC_VERIFIED'].includes(data.status);
+
   const canAssessCredit = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'].includes(r)
   );
 
   const canForwardToUnderwriting =
-    isStaff &&
+    isCreditAnalyst &&
+    !isBranchManagerOnly &&
     ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(data.status);
 
   const canReject =
-    isStaff &&
+    (isUnderwriter || isAdmin) &&
+    !isBranchManagerOnly &&
     ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(data.status);
 
   const canMakeUnderwritingDecision =
-    user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) &&
+    (isUnderwriter || isAdmin) &&
+    !isBranchManagerOnly &&
     ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
 
   return (
@@ -241,6 +259,30 @@ export default function ApplicationDetailPage() {
         action={
           <div className="flex items-center gap-2 flex-wrap">
             <Badge status={data.status} />
+
+            {/* 0. Submit to Credit Analyst Button (Loan Officer) */}
+            {canLoanOfficerSubmit && (
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await api.post(`/applications/${data.id}/transition`, {
+                      toStatus: 'SUBMITTED',
+                      reason: 'Originated and submitted by Loan Officer for Credit Analyst review.',
+                    });
+                    toast.success('Application submitted to Credit Analyst queue.');
+                    queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+                    queryClient.invalidateQueries({ queryKey: ['applications'] });
+                  } catch (err: any) {
+                    toast.error(apiErrorMessage(err));
+                  }
+                }}
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                Submit to Credit Analyst
+              </Button>
+            )}
 
             {/* 1. Forward to Underwriting Button (Credit Analyst / Staff) */}
             {canForwardToUnderwriting && (
@@ -301,8 +343,9 @@ export default function ApplicationDetailPage() {
               </Button>
             )}
 
-            {/* 4. Proceed to Payout (Finance Officer / Admin) */}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) &&
+            {/* 4. Proceed to Payout (Finance Officer / Admin ONLY — NEVER Branch Manager) */}
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER'].includes(r)) &&
+              !user?.roles?.includes('BRANCH_MANAGER') &&
               data.status === 'APPROVED' && (
                 <Link href="/disbursements">
                   <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5">
@@ -328,7 +371,7 @@ export default function ApplicationDetailPage() {
           hint={`ID: ${customer.customerCode || 'N/A'}`}
           icon={<User className="h-4 w-4" />}
         />
-        {canAssessCredit ? (
+        {canAssessCredit || isBranchManager ? (
           <>
             <KpiCard
               label="Eligibility Assessment"
@@ -361,7 +404,96 @@ export default function ApplicationDetailPage() {
         )}
       </div>
 
-      {canAssessCredit ? (
+      {isBranchManagerOnly ? (
+        <div className="space-y-6">
+          {/* Top Row: Borrower Profile & Loan Product Terms (Side-by-side) */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {/* Borrower Profile Card (Read-Only for Branch Manager) */}
+            <Card className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Borrower Profile</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#1E2445] text-slate-500">
+                  READ-ONLY INSPECTION
+                </span>
+              </div>
+              <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
+                <Row label="Customer ID" value={<span className="font-mono font-bold text-blue-600">{customer.customerCode}</span>} />
+                <Row label="Borrower Name" value={`${customer.firstName || ''} ${customer.lastName || ''}`} />
+                <Row label="Mobile" value={customer.mobile} />
+                <Row label="Email" value={customer.email || '-'} />
+                <Row label="Monthly Income" value={customer.monthlyIncome ? formatMoney(customer.monthlyIncome) : '-'} />
+                <Row label="Existing Debt" value={customer.existingObligations ? formatMoney(customer.existingObligations) : '₹0.00'} />
+                <Row label="KYC Status" value={<Badge status={customer.kycStatus || 'NOT_STARTED'} />} />
+                <Row label="Risk Category" value={<Badge status={customer.riskCategory || 'PENDING'} />} />
+              </dl>
+              <div className="pt-2">
+                <Link href={`/customers/${customer.id}`}>
+                  <Button size="sm" variant="ghost" className="w-full text-xs">View Customer 360 →</Button>
+                </Link>
+              </div>
+            </Card>
+
+            {/* Loan Product Terms Card */}
+            <Card className="space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Loan Product Terms</h3>
+              <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
+                <Row label="Product Name" value={product.name || 'General Loan'} />
+                <Row label="Product Code" value={<span className="font-mono">{product.code || '-'}</span>} />
+                <Row label="Interest Rate" value={`${product.interestRate || '14.5'}% p.a.`} />
+                <Row label="Tenure Boundaries" value={`${product.minTenureMonths || 6} - ${product.maxTenureMonths || 60} mos`} />
+                <Row label="Method" value={product.interestMethod || 'REDUCING'} />
+                <Row label="Processing Fee" value={`${product.processingFeePct || 0}%`} />
+                <Row label="Purpose" value={data.purpose || 'General Financing'} />
+              </dl>
+            </Card>
+          </div>
+
+          {/* Branch Manager Review Cockpit */}
+          <BranchManagerReviewSection
+            applicationId={params.id}
+            applicationNo={data.applicationNo}
+            requestedAmount={Number(data.requestedAmount || 0)}
+            currentStatus={data.status}
+            customer={customer}
+            product={product}
+            eligibility={eligibility}
+            riskAssessment={riskAssessment}
+            approvals={data.approvals || []}
+            documents={data.documents || customer?.documents || []}
+            onDecisionSubmitted={() => {
+              queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+              queryClient.invalidateQueries({ queryKey: ['applications'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+              queryClient.invalidateQueries({ queryKey: ['branch-manager-queue'] });
+            }}
+          />
+
+          {/* Lifecycle Audit Trail */}
+          <Card className="space-y-3">
+            <h3 className="text-sm font-bold">Lifecycle Audit Trail</h3>
+            <div className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
+              {Array.isArray(data.statusHistory) && data.statusHistory.length > 0 ? (
+                data.statusHistory.map((h: any) => (
+                  <div key={h.id} className="py-2.5 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Badge status={h.toStatus} />
+                        <span className="text-slate-400">by {h.changedBy || 'System Engine'}</span>
+                      </div>
+                      {h.reason && <p className="text-slate-600 dark:text-slate-300 italic">{h.reason}</p>}
+                    </div>
+                    <span className="text-slate-400 font-mono text-[11px]">
+                      {h.createdAt ? formatDate(h.createdAt) : ''}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-slate-400 py-3 text-center text-xs">No status change history recorded.</p>
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : canAssessCredit ? (
         <div className="space-y-6">
           {/* Top Row: Borrower Profile & Loan Product Terms (Side-by-side) */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -426,6 +558,44 @@ export default function ApplicationDetailPage() {
               </dl>
             </Card>
           </div>
+
+          {/* Branch Manager Review & First-Level Approval Cockpit */}
+          {(isBranchManager || isAdmin) && (
+            <BranchManagerReviewSection
+              applicationId={params.id}
+              applicationNo={data.applicationNo}
+              requestedAmount={Number(data.requestedAmount || 0)}
+              currentStatus={data.status}
+              customer={customer}
+              product={product}
+              eligibility={eligibility}
+              riskAssessment={riskAssessment}
+              approvals={data.approvals || []}
+              documents={data.documents || customer?.documents || []}
+              onDecisionSubmitted={() => {
+                queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+                queryClient.invalidateQueries({ queryKey: ['applications'] });
+                queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+                queryClient.invalidateQueries({ queryKey: ['branch-manager-queue'] });
+              }}
+            />
+          )}
+
+          {/* Credit Analyst Repayment Capacity & Assessment Cockpit */}
+          <CreditAssessmentSection
+            applicationId={params.id}
+            applicationNo={data.applicationNo}
+            currentStatus={data.status}
+            customer={customer}
+            product={product}
+            isCreditAnalyst={isCreditAnalyst || isAdmin}
+            onDecisionSubmitted={() => {
+              queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+              queryClient.invalidateQueries({ queryKey: ['applications'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+              queryClient.invalidateQueries({ queryKey: ['branch-manager-queue'] });
+            }}
+          />
 
           {/* Active Early Warning Surveillance Banner (Full Width) */}
           <EarlyWarningWidget applicationId={params.id} customerId={data?.customerId} />
@@ -934,11 +1104,13 @@ export default function ApplicationDetailPage() {
       )}
 
       {/* Underwriter Step-by-Step Verification Wizard */}
-      <UnderwritingVerificationWizard
-        application={data}
-        isOpen={uwWizardOpen}
-        onClose={() => setUwWizardOpen(false)}
-      />
+      {(isUnderwriter || isAdmin) && (
+        <UnderwritingVerificationWizard
+          application={data}
+          isOpen={uwWizardOpen}
+          onClose={() => setUwWizardOpen(false)}
+        />
+      )}
 
       {/* MODAL 4: KYC VERIFICATION & COMPLIANCE MODAL */}
       {kycModalOpen && (

@@ -18,6 +18,8 @@ export type NavKey =
   | 'customers'
   | 'applications'
   | 'loan-products'
+  | 'credit-assessment'
+  | 'branch-review'
   | 'underwriting'
   | 'loans'
   | 'disbursements'
@@ -65,7 +67,9 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
   applications: { key: 'applications', href: '/applications', label: 'Loan Applications', group: 'LENDING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
-  underwriting: { key: 'underwriting', href: '/underwriting', label: 'Credit Assessment Desk', group: 'LENDING' },
+  'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment Desk', group: 'LENDING' },
+  'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
+  underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting Queue', group: 'LENDING' },
   loans: { key: 'loans', href: '/loans', label: 'Loan Accounts', group: 'LENDING' },
   disbursements: { key: 'disbursements', href: '/disbursements', label: 'Disbursements', group: 'LENDING' },
   partners: { key: 'partners', href: '/partners', label: 'Partners & DSAs', group: 'LENDING' },
@@ -187,11 +191,11 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   CREDIT_ANALYST: {
     label: 'Credit Analyst',
-    description: 'Credit assessment, policy eligibility scoring, and 4-pillar risk analysis',
+    description: 'Credit assessment, policy eligibility scoring, and repayment capacity evaluation',
     nav: [
       'dashboard',
       'applications',
-      'underwriting',
+      'credit-assessment',
       'customers',
       'reports',
       'fraud-intelligence',
@@ -253,14 +257,13 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   BRANCH_MANAGER: {
     label: 'Branch Manager',
-    description: 'Branch portfolio, local originations, branch approvals, and staff oversight',
+    description: 'Branch portfolio, local originations, management approvals within limit, and staff oversight',
     nav: [
       'dashboard',
-      'customers',
+      'branch-review',
       'applications',
-      'underwriting',
+      'customers',
       'loans',
-      'disbursements',
       'partners',
       'payments',
       'collections',
