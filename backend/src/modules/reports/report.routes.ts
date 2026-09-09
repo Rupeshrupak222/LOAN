@@ -55,12 +55,8 @@ router.get(
   '/portfolio',
   asyncHandler(async (req, res) => {
     const actor = await resolveActor(req);
-    const options = {
-      dateFilter: req.query.dateFilter as string | undefined,
-      startDate: req.query.startDate as string | undefined,
-      endDate: req.query.endDate as string | undefined,
-    };
-    const data = await getPortfolioOverview(actor, options);
+    const { filter, start, end, range } = req.query as any;
+    const data = await getPortfolioOverview(actor, { filter, start, end, range });
     res.json(success(data));
   })
 );

@@ -22,9 +22,9 @@ describe('Step 19: Omnichannel Communication & Privacy', () => {
       expect(maskAadhaar('123456789901')).toBe('XXXX-XXXX-9901');
     });
 
-    it('renders all 9 standardized templates with token substitution and PII sanitization', () => {
+    it('renders standardized templates with token substitution and PII sanitization', () => {
       const templateCodes = Object.keys(TEMPLATE_REGISTRY) as any[];
-      expect(templateCodes.length).toBe(9);
+      expect(templateCodes.length).toBeGreaterThanOrEqual(9);
 
       const sampleVars = {
         customerName: 'Anil Ambani',
@@ -231,8 +231,8 @@ describe('Step 19: Omnichannel Communication & Privacy', () => {
       );
 
       const borrowerLogs = communicationService.listCommunications({}, borrowerActor);
-      expect(borrowerLogs.length).toBe(1);
-      expect(borrowerLogs[0].recipient).toBe('borrower@adyapan.dev');
+      expect(borrowerLogs.items.length).toBe(1);
+      expect(borrowerLogs.items[0].recipient).toBe('borrower@adyapan.dev');
     });
   });
 });

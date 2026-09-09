@@ -3,6 +3,7 @@ import { prisma } from '../../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type { UnderwritingDecisionInput } from './underwriting.schema';
 
 export async function getUnderwritingQueue(
@@ -196,6 +197,37 @@ export async function submitUnderwritingDecision(
     title: `Loan Application #${app.applicationNo} Update: ${nextStatus}`,
     message: `Your credit proposal has been updated to ${nextStatus}. Decision: ${input.decision}. ${input.reason ? `Remarks: ${input.reason}` : ''}`,
   }).catch(() => {});
+
+  if (nextStatus === 'APPROVED') {
+    void communicationService.dispatchSystemEvent(
+      'LOAN_APPROVED',
+      {
+        customerId: app.customerId,
+        customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+        customerEmail: app.customer?.email || undefined,
+        customerMobile: app.customer?.mobile || undefined,
+        applicationNo: app.applicationNo,
+        sanctionedAmount: String(app.requestedAmount),
+        tenureMonths: app.tenureMonths,
+        interestRate: Number((app.product as any)?.interestRate || 12.0),
+        emiAmount: String(app.requestedAmount ? Math.round(Number(app.requestedAmount) / (app.tenureMonths || 12)) : '4730'),
+      },
+      app.tenantId || undefined
+    ).catch(() => {});
+  } else if (nextStatus === 'REJECTED') {
+    void communicationService.dispatchSystemEvent(
+      'LOAN_REJECTED',
+      {
+        customerId: app.customerId,
+        customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+        customerEmail: app.customer?.email || undefined,
+        customerMobile: app.customer?.mobile || undefined,
+        applicationNo: app.applicationNo,
+        rejectionReason: input.reason || 'Credit policy threshold criteria not met',
+      },
+      app.tenantId || undefined
+    ).catch(() => {});
+  }
 
   return result;
 }

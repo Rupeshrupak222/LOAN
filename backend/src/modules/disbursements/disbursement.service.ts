@@ -5,6 +5,7 @@ import { Money } from '../finance/money';
 import { generateLoanNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type { ExecuteDisbursementInput } from './disbursement.schema';
 
 export async function getReadyForDisbursementQueue(actor?: {
@@ -287,6 +288,22 @@ export async function executeDisbursement(
     title: `Loan #${loanNo} Disbursed Successfully`,
     message: `Principal amount of ₹${principalNum.toLocaleString('en-IN')} has been transferred via ${input.disbursementMethod}. Ref: ${input.referenceNumber}. First EMI is scheduled for ${firstDueDate.toLocaleDateString()}.`,
   }).catch(() => {});
+
+  void communicationService.dispatchSystemEvent(
+    'DISBURSEMENT_SUCCESSFUL',
+    {
+      customerId: app.customerId,
+      customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+      customerEmail: app.customer?.email || undefined,
+      customerMobile: app.customer?.mobile || undefined,
+      loanNo,
+      netDisbursedAmount: String(principalNum),
+      bankAccount: app.customer?.bankAccountNo || 'On Record',
+      utrNumber: input.referenceNumber,
+      emiAmount: String(loan.emiAmount || '0.00'),
+    },
+    app.tenantId || undefined
+  ).catch(() => {});
 
   return loan;
 }
