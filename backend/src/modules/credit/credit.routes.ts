@@ -6,9 +6,20 @@ import { authenticate, authorize } from '../../middleware/auth';
 import {
   submitCreditDecisionSchema,
   verifyFinancialsSchema,
+  verifyKycStepSchema,
+  verifyDocumentStepSchema,
+  batchVerifyDocumentsStepSchema,
+  evaluateFinancialStepSchema,
+  recordRiskStepSchema,
 } from './credit.schema';
 import {
   getFinancialCapacity,
+  startCreditAssessment,
+  verifyKycStep,
+  verifyDocumentStep,
+  batchVerifyDocumentsStep,
+  evaluateFinancialEligibilityStep,
+  recordRiskAssessmentStep,
   submitCreditDecision,
   verifyFinancials,
   getCreditQueue,
@@ -20,7 +31,7 @@ router.use(authenticate);
 
 /**
  * GET /api/v1/credit/queue
- * Returns Credit Assessment Queue with live Credit Analyst metrics.
+ * Returns Credit Assessment Queue with live Credit Analyst metrics grouped by workflow stage.
  */
 router.get(
   '/queue',
@@ -33,7 +44,7 @@ router.get(
 
 /**
  * GET /api/v1/credit/applications/:id/capacity
- * Returns full financial repayment capacity, DTI, FOIR, disposable income, and bureau score.
+ * Returns full financial repayment capacity, 7-step checklist, DTI, FOIR, disposable income, and bureau score.
  */
 router.get(
   '/applications/:id/capacity',
@@ -52,8 +63,92 @@ router.get(
 );
 
 /**
+ * POST /api/v1/credit/applications/:id/start-assessment
+ * Step 1: Initiates formal credit assessment (SUBMITTED -> CREDIT_ASSESSMENT).
+ */
+router.post(
+  '/applications/:id/start-assessment',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
+  asyncHandler(async (req, res) => {
+    const result = await startCreditAssessment(req.params.id, req.user as any);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/credit/applications/:id/verify-kyc
+ * Step 2: Verifies customer identity & KYC compliance (VERIFIED, FAILED, PENDING).
+ */
+router.post(
+  '/applications/:id/verify-kyc',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
+  validate(verifyKycStepSchema),
+  asyncHandler(async (req, res) => {
+    const result = await verifyKycStep(req.params.id, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/credit/applications/:id/verify-document
+ * Step 3: Verifies an individual document in the checklist.
+ */
+router.post(
+  '/applications/:id/verify-document',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
+  validate(verifyDocumentStepSchema),
+  asyncHandler(async (req, res) => {
+    const result = await verifyDocumentStep(req.params.id, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/credit/applications/:id/batch-verify-documents
+ * Step 3: Batch verifies documents in the checklist.
+ */
+router.post(
+  '/applications/:id/batch-verify-documents',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
+  validate(batchVerifyDocumentsStepSchema),
+  asyncHandler(async (req, res) => {
+    const result = await batchVerifyDocumentsStep(req.params.id, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/credit/applications/:id/evaluate-financials
+ * Step 4: Runs policy financial eligibility verification (Income, FOIR, DTI).
+ */
+router.post(
+  '/applications/:id/evaluate-financials',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
+  validate(evaluateFinancialStepSchema),
+  asyncHandler(async (req, res) => {
+    const result = await evaluateFinancialEligibilityStep(req.params.id, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/credit/applications/:id/evaluate-risk
+ * Step 5: Computes 4-pillar credit risk assessment.
+ */
+router.post(
+  '/applications/:id/evaluate-risk',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
+  validate(recordRiskStepSchema),
+  asyncHandler(async (req, res) => {
+    const result = await recordRiskAssessmentStep(req.params.id, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+/**
  * POST /api/v1/credit/applications/:id/decision
- * Submits official credit assessment decision (ELIGIBLE, NOT_ELIGIBLE, FURTHER_REVIEW).
+ * Step 6 & 7: Submits official credit assessment decision (ELIGIBLE, NOT_ELIGIBLE, FURTHER_REVIEW, REQUEST_ADDITIONAL_DOCS).
+ * Enforces sequential prerequisites: KYC, Documents, Financial Eligibility, and Risk Assessment.
  */
 router.post(
   '/applications/:id/decision',
@@ -71,7 +166,7 @@ router.post(
 
 /**
  * POST /api/v1/credit/applications/:id/verify-financials
- * Verifies income and employment details.
+ * Verifies income and employment details independently.
  */
 router.post(
   '/applications/:id/verify-financials',
