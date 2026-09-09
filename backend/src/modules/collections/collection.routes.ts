@@ -87,7 +87,7 @@ router.get(
 
 router.post(
   '/activities',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(logActivitySchema),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
@@ -98,7 +98,7 @@ router.post(
 
 router.post(
   '/ptp',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(recordPtpSchema),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);

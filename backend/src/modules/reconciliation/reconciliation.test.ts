@@ -188,7 +188,7 @@ describe('Step 17: Advanced Accounting & Reconciliation', () => {
       ).rejects.toThrow(ForbiddenError);
 
       // Authorized Checker approves
-      const checker = { id: 'checker-1', email: 'finhead@adyapan.dev', roles: ['ADMIN'] };
+      const checker = { id: 'checker-1', email: 'finhead@adyapan.dev', roles: ['FINANCE_OFFICER'] };
       const approved = await reconciliationService.approveAdjustment(adj.adjustmentId, checker);
 
       expect(approved.status).toBe('APPROVED');

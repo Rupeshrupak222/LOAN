@@ -143,12 +143,12 @@ describe('Step 34: Dynamic Role & Permission Builder with SoD Detection', () => 
         })
       ).toBe(false);
 
-      // 3. Super Admin has universal bypass
-      expect(
-        rolePermissionService.hasPermission(superAdmin, 'APPLICATIONS_APPROVE', {
-          requiredSanctionAmount: 500000000,
-        })
-      ).toBe(true);
+      // 3. Super Admin has governance permissions but no operational sanctioning authority
+      expect(rolePermissionService.hasPermission(superAdmin, 'TENANT_MANAGE_USERS')).toBe(true);
+      expect(rolePermissionService.hasPermission(superAdmin, 'CONFIGURATION_PUBLISH_POLICY')).toBe(true);
+      expect(rolePermissionService.hasPermission(superAdmin, 'AUDIT_VERIFY_CHAIN')).toBe(true);
+      expect(rolePermissionService.hasPermission(superAdmin, 'APPLICATIONS_APPROVE')).toBe(false);
+      expect(rolePermissionService.hasPermission(superAdmin, 'DISBURSEMENTS_INITIATE_PAYOUT')).toBe(false);
     });
   });
 

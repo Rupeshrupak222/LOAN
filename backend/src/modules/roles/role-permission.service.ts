@@ -161,55 +161,29 @@ export class RolePermissionService {
       {
         code: 'SUPER_ADMIN',
         name: 'Platform Super Administrator',
-        description: 'Unrestricted system governance and institutional administration',
-        permissions: allPerms,
+        description: 'Full platform governance, administration, and unrestricted operations',
+        permissions: [...allPerms],
         scope: 'GLOBAL',
-        sanctionLimit: 100000000,
-        payoutLimit: 100000000,
+        sanctionLimit: 1000000000,
+        payoutLimit: 1000000000,
       },
       {
         code: 'COMPANY_ADMIN',
         name: 'Company / Institution Administrator',
-        description: 'Tenant management, staff provisioning, policy and integration management for own company',
-        permissions: [
-          'APPLICATIONS_VIEW',
-          'APPLICATIONS_ASSIGN',
-          'CONFIGURATION_VIEW_POLICIES',
-          'CONFIGURATION_DRAFT_POLICY',
-          'CONFIGURATION_PUBLISH_POLICY',
-          'CONFIGURATION_CONFIGURE_INTEGRATIONS',
-          'PRIVACY_VIEW_CONSENT_REGISTRY',
-          'AUDIT_VERIFY_CHAIN',
-          'TENANT_MANAGE_USERS',
-          'TENANT_ASSIGN_ROLES',
-          'TENANT_VIEW_OPERATIONS_CENTER',
-          'TENANT_CONFIGURE_BRANDING',
-        ],
+        description: 'Tenant management, staff provisioning, policy and operations for own company',
+        permissions: [...allPerms],
         scope: 'TENANT',
-        sanctionLimit: 50000000,
-        payoutLimit: 50000000,
+        sanctionLimit: 500000000,
+        payoutLimit: 500000000,
       },
       {
         code: 'ADMIN',
         name: 'Institutional Administrator',
-        description: 'Tenant management, user provisioning, policy and integration management',
-        permissions: [
-          'APPLICATIONS_VIEW',
-          'APPLICATIONS_ASSIGN',
-          'CONFIGURATION_VIEW_POLICIES',
-          'CONFIGURATION_DRAFT_POLICY',
-          'CONFIGURATION_PUBLISH_POLICY',
-          'CONFIGURATION_CONFIGURE_INTEGRATIONS',
-          'PRIVACY_VIEW_CONSENT_REGISTRY',
-          'AUDIT_VERIFY_CHAIN',
-          'TENANT_MANAGE_USERS',
-          'TENANT_ASSIGN_ROLES',
-          'TENANT_VIEW_OPERATIONS_CENTER',
-          'TENANT_CONFIGURE_BRANDING',
-        ],
+        description: 'Tenant management, user provisioning, policy and full operations',
+        permissions: [...allPerms],
         scope: 'TENANT',
-        sanctionLimit: 50000000,
-        payoutLimit: 50000000,
+        sanctionLimit: 500000000,
+        payoutLimit: 500000000,
       },
       {
         code: 'BRANCH_MANAGER',
@@ -228,6 +202,10 @@ export class RolePermissionService {
           'ESCALATE_TO_UNDERWRITER',
           'ADD_MANAGER_REMARKS',
           'APPLICATIONS_VIEW',
+          'APPLICATIONS_ASSIGN',
+          'APPLICATIONS_REVIEW',
+          'COLLECTIONS_VIEW_DPD',
+          'COLLECTIONS_RECORD_PTP',
           'CONFIGURATION_VIEW_POLICIES',
           'PRIVACY_VIEW_CONSENT_REGISTRY',
         ],
@@ -340,9 +318,10 @@ export class RolePermissionService {
       {
         code: 'AUDITOR',
         name: 'Compliance & Regulatory Auditor',
-        description: 'Read-only evidence auditing, consent verification, and hash ledger checks',
+        description: 'Independent tenant-wide evidence auditing, consent verification, and ledger inspection',
         permissions: [
           'APPLICATIONS_VIEW',
+          'COLLECTIONS_VIEW_DPD',
           'CONFIGURATION_VIEW_POLICIES',
           'PRIVACY_VIEW_CONSENT_REGISTRY',
           'AUDIT_EXPORT_EVIDENCE_PACKAGE',
@@ -463,6 +442,11 @@ export class RolePermissionService {
       throw new ForbiddenError('Access forbidden: Only Administrators can create custom roles.');
     }
 
+    // System Admin cannot self-authorize SoD override
+    if (dto.allowSodOverride && !actor.roles.includes('SUPER_ADMIN')) {
+      throw new ForbiddenError('Privilege escalation denied: Only Super Admins can authorize Segregation of Duties (SoD) overrides.');
+    }
+
     const cleanCode = dto.code.toUpperCase().replace(/\s+/g, '_');
     const key = `${tenantId}:${cleanCode}`;
 
@@ -479,10 +463,10 @@ export class RolePermissionService {
 
     // Check Segregation of Duties conflicts
     const sodCheck = this.checkSodConflicts(finalPermissions);
-    if (sodCheck.hasCriticalBlock && !dto.allowSodOverride) {
+    if (sodCheck.hasCriticalBlock && (!dto.allowSodOverride || !actor.roles.includes('SUPER_ADMIN'))) {
       const conflictNames = sodCheck.conflicts.map((c) => c.ruleName).join(', ');
       throw new BadRequestError(
-        `Segregation of Duties (SoD) Conflict Detected: [${conflictNames}]. Banking regulations prohibit combining these permissions in a single role without dual Super Admin authorization.`
+        `Segregation of Duties (SoD) Conflict Detected: [${conflictNames}]. Banking regulations prohibit combining these permissions in a single role without Super Admin authorization.`
       );
     }
 
@@ -560,13 +544,21 @@ export class RolePermissionService {
       throw new NotFoundError(`Role '${roleId}' not found.`);
     }
 
-    if (targetRole.isSystemRole && targetRole.code === 'SUPER_ADMIN') {
-      throw new BadRequestError('Cannot modify platform Super Administrator system role.');
+    // Protection of built-in system roles
+    if (targetRole.isSystemRole) {
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError(
+          `Cannot modify protected built-in system role '${targetRole.code}'. Built-in operational and governance roles cannot be altered by tenant administrators.`
+        );
+      }
+      if (targetRole.code === 'SUPER_ADMIN') {
+        throw new BadRequestError('Cannot modify platform Super Administrator system role.');
+      }
     }
 
     if (dto.permissions) {
       const sodCheck = this.checkSodConflicts(dto.permissions);
-      if (sodCheck.hasCriticalBlock) {
+      if (sodCheck.hasCriticalBlock && !actor.roles.includes('SUPER_ADMIN')) {
         throw new BadRequestError(
           `Segregation of Duties (SoD) Conflict Detected: [${sodCheck.conflicts.map((c) => c.ruleName).join(', ')}].`
         );
@@ -613,8 +605,8 @@ export class RolePermissionService {
     requiredPermission: PermissionCode,
     options?: { requiredSanctionAmount?: number }
   ): boolean {
-    if (user.roles.includes('SUPER_ADMIN')) {
-      return true; // Super Admin has universal permission bypass
+    if (user.roles?.includes('SUPER_ADMIN')) {
+      return true;
     }
 
     const tenantId = user.tenantId || 'tenant-adyapan-default';

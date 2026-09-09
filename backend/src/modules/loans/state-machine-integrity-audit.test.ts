@@ -43,10 +43,16 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
     roles: ['LOAN_OFFICER'],
   };
 
+  const settlementOfficer = {
+    id: '00000000-0000-0000-0000-000000000010',
+    email: 'settlementofficer@adyapan.dev',
+    roles: ['SETTLEMENT_OFFICER'],
+  };
+
   let defaultProduct: any;
 
   beforeAll(async () => {
-    const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer];
+    const testUsers = [superAdmin, underwriter, financeOfficer, loanOfficer, settlementOfficer];
     for (const u of testUsers) {
       let dbUser = await prisma.user.findUnique({ where: { email: u.email } });
       if (!dbUser) {
@@ -1281,7 +1287,7 @@ describe('Step 6: Production-Grade Data Integrity, State Machine & Transaction B
       // Execute OTS: Pay 35,000 to settle 50,000
       const settlement = await executeSettlement(
         { loanId: loan.id, settlementAmount: 35000, reason: 'Settlement under NBFC OTS scheme' },
-        superAdmin
+        settlementOfficer
       );
 
       expect(settlement.status).toBe('COMPLETED');

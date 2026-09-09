@@ -37,6 +37,9 @@ export class ReconciliationService {
     tenantId?: string;
     branchId?: string;
   }): Promise<{ scannedCount: number; exceptionsFound: number }> {
+    if (actor?.roles && !actor.roles.some((r) => ['SUPER_ADMIN', 'FINANCE_OFFICER'].includes(r))) {
+      throw new ForbiddenError('Access forbidden: Only Finance Officers and Super Administrators can run ledger reconciliation.');
+    }
     let exceptionsFound = 0;
     const now = new Date().toISOString();
 
@@ -132,11 +135,9 @@ export class ReconciliationService {
     // 3. Gateway / Verified Submission Reconciliation (Missing Transaction)
     // Verifies that customer submissions marked VERIFIED have a corresponding Payment record
     // -------------------------------------------------------------------------
+    const submissionTenantFilter = !isSuperAdmin && actor?.tenantId ? { loan: { tenantId: actor.tenantId } } : {};
     const verifiedSubmissions = await prisma.paymentSubmission.findMany({
-      where: {
-        status: 'VERIFIED',
-        ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
-      },
+      where: { status: 'VERIFIED', ...submissionTenantFilter },
       include: { loan: { select: { loanNo: true, tenantId: true } } },
     });
 
@@ -367,8 +368,12 @@ export class ReconciliationService {
     },
     actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
   ): Promise<LedgerAdjustment> {
-    if (actor.roles.includes('CUSTOMER')) {
-      throw new ForbiddenError('Access forbidden: Borrowers cannot propose ledger adjustments.');
+    const isAuthorized =
+      actor.roles.includes('SUPER_ADMIN') ||
+      actor.roles.includes('FINANCE_OFFICER');
+
+    if (!isAuthorized) {
+      throw new ForbiddenError('Access forbidden: Only Finance Officers and Super Administrators can propose financial adjustments.');
     }
 
     if (!params.reason || params.reason.trim().length < 5) {
@@ -456,11 +461,10 @@ export class ReconciliationService {
   ): Promise<LedgerAdjustment> {
     const isAuthorized =
       actor.roles.includes('SUPER_ADMIN') ||
-      actor.roles.includes('ADMIN') ||
       actor.roles.includes('FINANCE_OFFICER');
 
     if (!isAuthorized) {
-      throw new ForbiddenError('Unauthorized: Only Finance Officers and Administrators can approve ledger adjustments.');
+      throw new ForbiddenError('Unauthorized: Only Finance Officers and Super Administrators can approve ledger adjustments.');
     }
 
     const adj = this.adjustments.get(adjustmentId);
@@ -517,11 +521,10 @@ export class ReconciliationService {
   ): Promise<LedgerAdjustment> {
     const isAuthorized =
       actor.roles.includes('SUPER_ADMIN') ||
-      actor.roles.includes('ADMIN') ||
       actor.roles.includes('FINANCE_OFFICER');
 
     if (!isAuthorized) {
-      throw new ForbiddenError('Unauthorized: Only Finance Officers and Administrators can reject adjustments.');
+      throw new ForbiddenError('Unauthorized: Only Finance Officers and Super Administrators can reject adjustments.');
     }
 
     const adj = this.adjustments.get(adjustmentId);

@@ -65,6 +65,10 @@ router.post(
   '/upload',
   upload.single('file'),
   asyncHandler(async (req, res) => {
+    if (req.user?.roles.includes('AUDITOR')) {
+      throw new ForbiddenError('Auditors have read-only access and cannot upload documents.');
+    }
+
     if (!req.file) {
       throw new BadRequestError('Please provide a file to upload in the "file" field');
     }
@@ -75,7 +79,7 @@ router.post(
     }
 
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: customerId } });
@@ -104,8 +108,12 @@ router.post(
   '/',
   validate(registerDocumentSchema),
   asyncHandler(async (req, res) => {
+    if (req.user?.roles.includes('AUDITOR')) {
+      throw new ForbiddenError('Auditors have read-only access and cannot create or register documents.');
+    }
+
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: req.body.customerId } });
@@ -120,7 +128,7 @@ router.post(
 
 router.patch(
   '/:id/verify',
-  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(verifyDocumentSchema),
   asyncHandler(async (req, res) => {
     const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id, {
@@ -135,7 +143,7 @@ router.patch(
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteDocument(req.params.id, req.user?.id, {
       id: req.user?.id,

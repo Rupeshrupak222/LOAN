@@ -227,3 +227,81 @@ export async function getProfile(userId: string) {
     branchId: user.branchId,
   };
 }
+
+export async function register(input: {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  mobile?: string;
+}) {
+  const cleanEmail = input.email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
+  if (existing) {
+    throw new BadRequestError('An account with this email already exists. Please sign in.');
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  let customerRole = await prisma.role.findUnique({ where: { name: 'CUSTOMER' } });
+  if (!customerRole) {
+    customerRole = await prisma.role.create({
+      data: { name: 'CUSTOMER', description: 'Self-service borrower customer role' },
+    });
+  }
+
+  // Find primary active tenant to associate if available
+  const primaryTenant = await prisma.tenant.findFirst({
+    where: { status: 'ACTIVE' },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const user = await prisma.user.create({
+    data: {
+      email: cleanEmail,
+      firstName: input.firstName || 'Borrower',
+      lastName: input.lastName || 'User',
+      passwordHash,
+      status: 'ACTIVE',
+      tenantId: primaryTenant?.id || null,
+      roles: {
+        create: { roleId: customerRole.id },
+      },
+    },
+    include: {
+      roles: { include: { role: true } },
+    },
+  });
+
+  // Also create/link customer profile
+  const custCode = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
+  const customer = await prisma.customer.create({
+    data: {
+      userId: user.id,
+      email: cleanEmail,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      mobile: input.mobile || '9876543210',
+      customerCode: custCode,
+      status: 'ACTIVE',
+      kycStatus: 'NOT_STARTED',
+      tenantId: primaryTenant?.id || null,
+    },
+  });
+
+  const roles = user.roles.map((r) => r.role.name);
+  const tokens = await issueTokens({ id: user.id, email: user.email, roles });
+
+  return {
+    ...tokens,
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles,
+      customerId: customer.id,
+      customerCode: customer.customerCode,
+      kycStatus: customer.kycStatus,
+    },
+  };
+}

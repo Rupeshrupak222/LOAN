@@ -482,12 +482,12 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {(isUnderwriter || isAdmin) && (
+            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
             )}
-            {(isLoanOfficer || isAdmin) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -497,14 +497,14 @@ export default function CustomerDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
-            {(isLoanOfficer || isAdmin) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Link href="/applications/new">
                 <Button size="sm" className="flex items-center gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> Originate Loan
                 </Button>
               </Link>
             )}
-            {isAdmin && (
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"

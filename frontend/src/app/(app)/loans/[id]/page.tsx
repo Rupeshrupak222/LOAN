@@ -258,7 +258,7 @@ export default function LoanDetailPage() {
             {data.status !== 'CLOSED' && data.status !== 'SETTLED' && (
               <>
                 {/* Collection Officer / Customer: Primary Repayment Collection Action */}
-                {canCollectRepayment && (
+                {(canCollectRepayment || user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER'].includes(r))) && (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -293,8 +293,8 @@ export default function LoanDetailPage() {
                   </>
                 )}
 
-                {/* Branch Manager / Admin Actions */}
-                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
+                {/* Branch Manager / Admin / Finance Actions */}
+                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'FINANCE_OFFICER'].includes(r)) && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
                       Restructure

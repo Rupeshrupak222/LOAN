@@ -42,6 +42,7 @@ router.post(
  */
 router.post(
   '/save',
+  authorize('SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const { simulationId, name } = req.body || {};
 

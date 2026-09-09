@@ -91,4 +91,49 @@ router.post(
   }
 );
 
+/**
+ * POST /api/v1/jobs/emi-reminders
+ * Triggers 3-Day Automated EMI Reminder dispatch.
+ */
+router.post(
+  '/emi-reminders',
+  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { processEmiReminders } = await import('./delinquency.service');
+      const daysAhead = req.body?.daysAhead ? parseInt(req.body.daysAhead, 10) : 3;
+      const result = await processEmiReminders(daysAhead);
+      res.json({
+        success: true,
+        message: `Successfully processed EMI reminders for installments due in ${daysAhead} days.`,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/v1/jobs/midnight-dpd-engine
+ * Triggers Midnight DPD & Delinquency calculation engine.
+ */
+router.post(
+  '/midnight-dpd-engine',
+  authorize('SUPER_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { processMidnightDelinquencyEngine } = await import('./delinquency.service');
+      const result = await processMidnightDelinquencyEngine();
+      res.json({
+        success: true,
+        message: 'Successfully executed Midnight DPD & Delinquency calculation engine.',
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 export const workerRoutes = router;

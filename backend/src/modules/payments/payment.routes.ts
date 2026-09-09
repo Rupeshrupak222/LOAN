@@ -137,7 +137,7 @@ router.get(
 
 router.post(
   '/submissions/:id/verify',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     if (
       req.user?.roles?.includes('COLLECTION_OFFICER') &&
@@ -160,7 +160,7 @@ router.post(
 
 router.post(
   '/submissions/:id/reject',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     if (
       req.user?.roles?.includes('COLLECTION_OFFICER') &&
@@ -224,7 +224,7 @@ router.get(
 
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'CUSTOMER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CUSTOMER'),
   validate(recordPaymentSchema),
   asyncHandler(async (req, res) => {
     // Explicit SoD guard: Collection Officers cannot directly modify accounting ledger entries
@@ -238,7 +238,7 @@ router.post(
     }
 
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
+      ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
     );
     if (!isStaff) {
       const targetLoan = await prisma.loan.findUnique({

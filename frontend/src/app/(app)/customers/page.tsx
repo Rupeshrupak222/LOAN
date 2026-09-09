@@ -30,7 +30,7 @@ interface CustomerRow {
 
 export default function CustomersPage() {
   const { user } = useAuth();
-  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
+
   const { isDark } = useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -228,14 +228,16 @@ export default function CustomersPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => setDeleteModalOpen(true)}
-              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete Selected Candidate{selectedIds.length > 1 ? 's' : ''}</span>
-            </Button>
+            {user?.roles?.includes('SUPER_ADMIN') && (
+              <Button
+                size="sm"
+                onClick={() => setDeleteModalOpen(true)}
+                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Selected Candidate{selectedIds.length > 1 ? 's' : ''}</span>
+              </Button>
+            )}
 
             <Button
               size="sm"

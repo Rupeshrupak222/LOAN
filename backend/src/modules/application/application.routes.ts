@@ -13,7 +13,7 @@ const router = Router();
 router.use(authenticate);
 router.use(tenantContext);
 
-const APPLICATION_ORIGINATORS = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'];
+const INTAKE_STAFF = ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
 
 router.get(
   '/',
@@ -55,7 +55,7 @@ router.get(
 
 router.post(
   '/',
-  authorize(...APPLICATION_ORIGINATORS),
+  authorize(...INTAKE_STAFF),
   validate({ body: createApplicationSchema }),
   asyncHandler(async (req, res) =>
     created(

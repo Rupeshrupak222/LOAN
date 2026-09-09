@@ -245,7 +245,7 @@ export default function ApplicationDetailPage() {
     ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(data.status);
 
   const canMakeUnderwritingDecision =
-    (isUnderwriter || isAdmin) &&
+    (user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) &&
     !isBranchManagerOnly &&
     ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
 
@@ -344,7 +344,7 @@ export default function ApplicationDetailPage() {
             )}
 
             {/* 4. Proceed to Payout (Finance Officer / Admin ONLY — NEVER Branch Manager) */}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER'].includes(r)) &&
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER'].includes(r)) &&
               !user?.roles?.includes('BRANCH_MANAGER') &&
               data.status === 'APPROVED' && (
                 <Link href="/disbursements">

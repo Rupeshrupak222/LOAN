@@ -93,7 +93,7 @@ export async function executeDisbursement(
     ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
   if (!isAuthorized) {
-    throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans');
+    throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans.');
   }
 
   const app = await prisma.loanApplication.findUnique({
@@ -146,7 +146,7 @@ export async function executeDisbursement(
   const principalNum = Number(app.requestedAmount);
 
   // Enforce Payout Limits
-  const isSuperAdmin = actor.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'ADMIN' || r === 'COMPANY_ADMIN');
+  const isSuperAdmin = actor.roles?.some((r) => r === 'SUPER_ADMIN');
   if (!isSuperAdmin) {
     let payoutLimit = 10000000; // Default ₹1 Crore for Finance Officer
     if (actor.roles?.includes('DISBURSEMENT_OFFICER') && !actor.roles?.includes('FINANCE_OFFICER')) {

@@ -12,7 +12,7 @@ router.use(authenticate);
 
 router.get(
   '/queue',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const queue = await getReadyForDisbursementQueue({
       id: req.user?.id,

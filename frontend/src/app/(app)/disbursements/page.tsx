@@ -25,7 +25,7 @@ export default function DisbursementsPage() {
   const [reference, setReference] = useState('');
 
   const canExecutePayout = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
 
   const isDisbursementAuthorized = user?.roles?.some((r: string) =>

@@ -5,7 +5,7 @@ import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { authLimiter } from '../../middleware/rateLimiter';
 import * as authService from './auth.service';
-import { changePasswordSchema, loginSchema, refreshSchema } from './auth.schema';
+import { changePasswordSchema, loginSchema, refreshSchema, registerSchema } from './auth.schema';
 
 const router = Router();
 
@@ -26,6 +26,17 @@ router.post(
     const result = await authService.login(identifier, password);
     res.cookie('refreshToken', result.refreshToken, cookieOptions);
     return ok(res, { accessToken: result.accessToken, user: result.user });
+  }),
+);
+
+router.post(
+  '/register',
+  authLimiter,
+  validate({ body: registerSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await authService.register(req.body);
+    res.cookie('refreshToken', result.refreshToken, cookieOptions);
+    return ok(res, { accessToken: result.accessToken, user: result.user }, 201);
   }),
 );
 

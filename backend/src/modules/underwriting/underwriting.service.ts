@@ -56,12 +56,12 @@ export async function submitUnderwritingDecision(
   input: UnderwritingDecisionInput,
   actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
-  // Service layer defense-in-depth: Credit Analysts and non-deciders cannot commit underwriting decisions
-  const DECISION_MAKER_ROLES = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'];
+  // Service layer defense-in-depth: Credit Analysts, System Admins, Super Admins, Branch Managers, and non-deciders cannot commit underwriting decisions
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
   const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
   if (!isAuthorizedDecider) {
     throw new ForbiddenError(
-      'Access forbidden: Credit Analysts and unauthorized roles cannot commit final underwriting decisions. Only Underwriters, Branch Managers, or Administrators can sanction or reject proposals.'
+      'Access forbidden: Only Underwriters and Administrators can commit final underwriting decisions.'
     );
   }
 
@@ -113,8 +113,7 @@ export async function submitUnderwritingDecision(
   );
   if (matchedTier && isApprovalDecision) {
     const requiredRoles: string[] = matchedTier.chain || [];
-    const isSuper = actor.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'ADMIN');
-    const hasAuthority = isSuper || actor.roles?.some((r) => requiredRoles.includes(r));
+    const hasAuthority = actor.roles?.some((r) => requiredRoles.includes(r));
     if (!hasAuthority) {
       throw new BadRequestError(
         `Your role does not have approval limit authority for ₹${requestedAmount.toLocaleString(

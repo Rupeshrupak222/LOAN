@@ -6,6 +6,7 @@ import { success } from '../../common/response';
 import { validate } from '../../middleware/validate';
 import { authenticate, authorize } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenant-context';
+import { prisma } from '../../config/prisma';
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -16,6 +17,7 @@ import {
 import {
   listCustomers,
   getCustomer,
+  getCustomerByUserId,
   createCustomer,
   updateCustomer,
   updateKycStatus,
@@ -29,6 +31,14 @@ const router = Router();
 
 router.use(authenticate);
 router.use(tenantContext);
+
+router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    const customer = await getCustomerByUserId(req.user?.id!, req.user as any);
+    res.json(success(customer));
+  })
+);
 
 router.get(
   '/',
@@ -54,6 +64,109 @@ router.get(
 );
 
 router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    const loanInclude = {
+      product: { select: { name: true, code: true, productType: true } },
+      schedule: { orderBy: { emiNumber: 'asc' as const } },
+      payments: {
+        include: { allocations: true },
+        orderBy: { paidAt: 'desc' as const },
+      },
+      closure: true,
+    };
+
+    const tenantFilter = req.user.tenantId ? { tenantId: req.user.tenantId } : {};
+
+    let customer = await prisma.customer.findFirst({
+      where: {
+        userId: req.user.id,
+        ...tenantFilter,
+      },
+      include: {
+        addresses: true,
+        employmentDetails: true,
+        bankAccounts: true,
+        loans: {
+          include: loanInclude,
+          orderBy: { createdAt: 'desc' },
+        },
+        applications: {
+          include: {
+            product: { select: { name: true, code: true, minAmount: true, maxAmount: true } },
+            eligibility: true,
+            riskAssessment: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        documents: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!customer && req.user.email) {
+      const existingByEmail = await prisma.customer.findFirst({
+        where: {
+          email: { equals: req.user.email, mode: 'insensitive' },
+          ...tenantFilter,
+        },
+      });
+      if (existingByEmail) {
+        await prisma.customer.update({
+          where: { id: existingByEmail.id },
+          data: { userId: req.user.id },
+        });
+      } else {
+        const dbUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const custCode = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
+        await prisma.customer.create({
+          data: {
+            userId: req.user.id,
+            email: req.user.email,
+            firstName: dbUser?.firstName || 'Borrower',
+            lastName: dbUser?.lastName || 'User',
+            mobile: '9876543210',
+            customerCode: custCode,
+            status: 'ACTIVE',
+            kycStatus: 'VERIFIED',
+            tenantId: req.user.tenantId || undefined,
+          },
+        });
+      }
+
+      customer = await prisma.customer.findFirst({
+        where: {
+          userId: req.user.id,
+          ...tenantFilter,
+        },
+        include: {
+          addresses: true,
+          employmentDetails: true,
+          bankAccounts: true,
+          loans: {
+            include: loanInclude,
+            orderBy: { createdAt: 'desc' },
+          },
+          applications: {
+            include: {
+              product: { select: { name: true, code: true, minAmount: true, maxAmount: true } },
+              eligibility: true,
+              riskAssessment: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          documents: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+    }
+
+    res.json(success(customer));
+  })
+);
+
+router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const isStaff = req.user?.roles.some((r) =>
@@ -71,7 +184,7 @@ router.get(
 
 router.post(
   '/',
-  authorize('LOAN_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await createCustomer(req.body, req.user?.id, req.user?.tenantId);
@@ -81,7 +194,7 @@ router.post(
 
 router.patch(
   '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(updateCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateCustomer(req.params.id, req.body, req.user?.id, req.user as any);
@@ -91,7 +204,7 @@ router.patch(
 
 router.patch(
   '/:id/kyc',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(updateKycStatusSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateKycStatus(req.params.id, req.body, req.user?.id, req.user as any);
@@ -101,7 +214,7 @@ router.patch(
 
 router.post(
   '/:id/addresses',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createAddressSchema),
   asyncHandler(async (req, res) => {
     const address = await addCustomerAddress(req.params.id, req.body, req.user?.id, req.user as any);
@@ -111,7 +224,7 @@ router.post(
 
 router.post(
   '/:id/bank-accounts',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'FINANCE_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createBankAccountSchema),
   asyncHandler(async (req, res) => {
     const account = await addCustomerBankAccount(req.params.id, req.body, req.user?.id, req.user as any);
@@ -121,7 +234,7 @@ router.post(
 
 router.delete(
   '/:id/bank-accounts/:bankAccountId',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'FINANCE_OFFICER'),
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomerBankAccount(req.params.id, req.params.bankAccountId, req.user?.id, req.user as any);
     res.json(success(result));
@@ -130,7 +243,7 @@ router.delete(
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomer(req.params.id, req.user?.id, req.user as any);
     res.json(success(result));

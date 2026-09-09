@@ -71,6 +71,12 @@ describe('Step 56: Final User Acceptance Testing (UAT) & Production Readiness Ve
     roles: ['AUDITOR'],
   };
 
+  const settlementOfficer = {
+    id: '00000000-0000-0000-0000-000000000010',
+    email: 'settlementofficer.uat@adyapan.dev',
+    roles: ['SETTLEMENT_OFFICER'],
+  };
+
   let uatProduct: any;
 
   beforeAll(async () => {
@@ -84,6 +90,7 @@ describe('Step 56: Final User Acceptance Testing (UAT) & Production Readiness Ve
       financeOfficer,
       collectionOfficer,
       auditor,
+      settlementOfficer,
     ];
 
     for (const u of testUsers) {
@@ -249,7 +256,7 @@ describe('Step 56: Final User Acceptance Testing (UAT) & Production Readiness Ve
           closureType: 'NORMAL_MATURITY',
           remarks: 'Full payoff received. Loan successfully closed.',
         },
-        superAdmin as any
+        financeOfficer as any
       );
 
       expect(closureResult).toBeDefined();
@@ -340,7 +347,7 @@ describe('Step 56: Final User Acceptance Testing (UAT) & Production Readiness Ve
           settlementAmount,
           reason: 'Customer experienced medical hardship - Approved by Credit Committee',
         },
-        superAdmin as any
+        settlementOfficer as any
       );
 
       expect(settlementResult.status).toBe('COMPLETED');

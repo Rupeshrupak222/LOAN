@@ -177,6 +177,21 @@ export async function processPayment(
     throw new BadRequestError('Payment amount must be greater than 0');
   }
 
+  // Service-layer RBAC check: System Admin cannot post payments
+  if (actor?.roles && actor.roles.length > 0) {
+    const isStaff = actor.roles.some((r) =>
+      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+    if (isStaff) {
+      const isAuthorizedFinancialOperator = actor.roles.some((r) =>
+        ['FINANCE_OFFICER'].includes(r)
+      );
+      if (!isAuthorizedFinancialOperator) {
+        throw new ForbiddenError('Access forbidden: System Admin, Super Admin, Branch Manager, and unauthorized staff cannot post repayments or record collections');
+      }
+    }
+  }
+
   // 1. Idempotency Check
   if (input.idempotencyKey) {
     const existing = await prisma.payment.findUnique({
@@ -218,12 +233,14 @@ export async function processPayment(
   const allocSetting = await prisma.systemSetting.findUnique({
     where: { key: 'payment_allocation_order' },
   });
-  const allocationBuckets: string[] = (allocSetting?.value as string[]) || [
+  const rawBuckets: string[] = (allocSetting?.value as string[]) || [
     'FEES',
     'PENALTY',
     'INTEREST',
     'PRINCIPAL',
   ];
+  // Canonical waterfall normalization: map PENALTIES -> PENALTY
+  const allocationBuckets = rawBuckets.map((b) => (b === 'PENALTIES' ? 'PENALTY' : b));
 
   let unallocated = new Decimal(input.amount);
   const paymentNo = generatePaymentNo();
