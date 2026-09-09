@@ -58,10 +58,10 @@ LOAN/
 
 | Role         | Email                       | Password            |
 |--------------|-----------------------------|---------------------|
-| Super Admin  | superadmin@adyapan.dev      | DevStaffSeed2026!   |
-| Admin        | admin@adyapan.dev           | DevStaffSeed2026!   |
-| Loan Officer | officer@adyapan.dev         | DevStaffSeed2026!   |
-| Customer     | customer@adyapan.dev        | DevStaffSeed2026!   |
+| Super Admin  | superadmin@adyapan.dev      | Configured in .env  |
+| Admin        | admin@adyapan.dev           | Configured in .env  |
+| Loan Officer | officer@adyapan.dev         | Configured in .env  |
+| Customer     | customer@adyapan.dev        | Configured in .env  |
 
 ## Money & correctness
 

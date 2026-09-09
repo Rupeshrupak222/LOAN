@@ -12,7 +12,6 @@ import {
   submitCreditRecommendation,
   forwardToUnderwriting,
 } from './credit-assessment.service';
-import { startCreditAssessment } from '../credit/credit.service';
 
 const router = Router();
 
@@ -138,36 +137,6 @@ router.post(
         branchId: req.user?.branchId,
       }
     );
-    res.json(success(result));
-  })
-);
-
-/**
- * POST /api/v1/credit-assessment/:applicationId/start-assessment
- * Initiates formal credit assessment (SUBMITTED -> CREDIT_ASSESSMENT).
- */
-router.post(
-  '/:applicationId/start-assessment',
-  authorize('CREDIT_ANALYST', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
-  asyncHandler(async (req, res) => {
-    const result = await startCreditAssessment(req.params.applicationId, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    res.json(success(result));
-  })
-);
-
-router.post(
-  '/applications/:applicationId/start-assessment',
-  authorize('CREDIT_ANALYST', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
-  asyncHandler(async (req, res) => {
-    const result = await startCreditAssessment(req.params.applicationId, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
     res.json(success(result));
   })
 );
