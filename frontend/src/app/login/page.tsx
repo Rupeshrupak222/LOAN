@@ -308,6 +308,20 @@ export default function LoginPage() {
                     Create Account / Sign Up →
                   </button>
                 </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 px-0.5">
+                  <span>Demo Password:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPassword(DEMO_PASSWORD);
+                      setError(null);
+                    }}
+                    className="font-mono font-bold text-brand-600 hover:text-brand-700 underline cursor-pointer"
+                    title="Click to apply demo password"
+                  >
+                    {DEMO_PASSWORD}
+                  </button>
+                </div>
               </>
             ) : (
               <>

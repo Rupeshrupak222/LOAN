@@ -40,7 +40,7 @@ prisma.$use(async (params, next) => {
   throw lastError;
 });
 
-export async function connectDatabase(maxRetries = 2, delayMs = 1000): Promise<void> {
+export async function connectDatabase(maxRetries = 5, delayMs = 1500): Promise<void> {
   let attempt = 0;
   while (attempt < maxRetries) {
     try {

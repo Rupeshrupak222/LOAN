@@ -44,6 +44,10 @@ export default function PaymentsPage() {
   const toast = useToast();
 
   const isCustomer = user?.roles?.includes('CUSTOMER');
+  const isCollectionOfficer = user?.roles?.includes('COLLECTION_OFFICER');
+  const isFinanceOfficer =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN'].includes(r));
   const isStaff = user?.roles?.some((r: string) =>
     ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'COLLECTION_OFFICER', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST'].includes(r)
   );
@@ -125,17 +129,19 @@ export default function PaymentsPage() {
     enabled: submitModalOpen || directPayModalOpen,
   });
 
-  // Mutation: Submit Payment Intimation
+  // Mutation: Submit Payment Intimation / Collection
   const submitPaymentMutation = useMutation({
-    mutationFn: async () =>
-      api.post('/payments/submissions', {
+    mutationFn: async () => {
+      const endpoint = isCollectionOfficer ? '/payments/collect' : '/payments/submissions';
+      return api.post(endpoint, {
         loanId: selectedLoanId,
         amount: Number(subAmount),
         method: subMethod,
         reference: subRef,
         payerMobile: subMobile,
         notes: subNotes,
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success('Payment receipt submitted for verification.');
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
@@ -1136,10 +1142,17 @@ export default function PaymentsPage() {
                 <Button
                   disabled={!selectedLoanId || !subAmount || !subRef.trim() || submitPaymentMutation.isPending}
                   onClick={() => submitPaymentMutation.mutate()}
-                  className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold gap-1.5"
+                  className={cn(
+                    "hover:opacity-90 text-white font-semibold gap-1.5",
+                    isCollectionOfficer ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[#2563EB] hover:bg-blue-700"
+                  )}
                 >
                   <Send className="w-3.5 h-3.5" />
-                  {submitPaymentMutation.isPending ? 'Submitting...' : 'Submit for Verification'}
+                  {submitPaymentMutation.isPending
+                    ? 'Processing...'
+                    : isCollectionOfficer
+                    ? 'Confirm & Record Collection'
+                    : 'Submit for Verification'}
                 </Button>
               </div>
             </div>

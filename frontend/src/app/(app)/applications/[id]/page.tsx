@@ -37,6 +37,8 @@ import { AdvancedDecisionIntelligenceCard } from '@/components/AdvancedDecisionI
 import { EarlyWarningWidget } from '@/components/EarlyWarningWidget';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
+import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
+import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -276,7 +278,8 @@ export default function ApplicationDetailPage() {
     !['REJECTED', 'DISBURSED', 'CANCELLED'].includes(data.status);
 
   const canMakeUnderwritingDecision =
-    user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) &&
+    (user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) &&
+    !isBranchManagerOnly &&
     ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
 
   return (
@@ -1337,11 +1340,13 @@ export default function ApplicationDetailPage() {
       )}
 
       {/* Underwriter Step-by-Step Verification Wizard */}
-      <UnderwritingVerificationWizard
-        application={data}
-        isOpen={uwWizardOpen}
-        onClose={() => setUwWizardOpen(false)}
-      />
+      {(isUnderwriter || isAdmin) && (
+        <UnderwritingVerificationWizard
+          application={data}
+          isOpen={uwWizardOpen}
+          onClose={() => setUwWizardOpen(false)}
+        />
+      )}
 
       {/* MODAL 4: KYC VERIFICATION & COMPLIANCE MODAL */}
       {kycModalOpen && (

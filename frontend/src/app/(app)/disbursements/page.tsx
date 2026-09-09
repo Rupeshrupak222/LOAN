@@ -25,11 +25,20 @@ export default function DisbursementsPage() {
   const [reference, setReference] = useState('');
 
   const canExecutePayout = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
+
+  const isDisbursementAuthorized = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'AUDITOR'].includes(r)
+  );
+
+  const isBranchManagerRestricted =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r));
 
   const { data: queueData, isLoading: queueLoading } = useQuery({
     queryKey: ['disbursements-queue'],
+    enabled: isDisbursementAuthorized && !isBranchManagerRestricted,
     queryFn: async () => {
       const res = await api.get('/disbursements/queue');
       const rows = res.data?.data;
@@ -39,6 +48,7 @@ export default function DisbursementsPage() {
 
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['disbursements-history'],
+    enabled: isDisbursementAuthorized && !isBranchManagerRestricted,
     queryFn: async () => {
       const res = await api.get('/disbursements/history');
       const rows = res.data?.data;
@@ -78,6 +88,102 @@ export default function DisbursementsPage() {
       toast.error(apiErrorMessage(err), { title: 'Disbursement Release Notice' });
     },
   });
+
+  if (isBranchManagerRestricted) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Lending / Disbursements"
+          title="Disbursement & Fund Release"
+          subtitle="Electronic fund execution is restricted to Finance & Treasury Officers"
+        />
+
+        <div
+          className={cn(
+            "max-w-2xl mx-auto rounded-2xl border p-8 text-center space-y-5 my-8 shadow-sm transition-colors",
+            isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          )}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight">
+              Fund Release Authority Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Branch Managers do not have authority to release funds or execute loan disbursements. Your authority covers branch application review, credit report assessment, and management approvals up to <strong className="text-slate-900 dark:text-white">₹5,00,000</strong>.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, electronic fund transfers and disbursement queues are managed exclusively by Finance & Treasury officers.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/branch-review">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                Go to Branch Applications Desk →
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="md" variant="secondary">
+                Return to Dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && !isDisbursementAuthorized) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Lending / Disbursements"
+          title="Disbursement & Fund Release"
+          subtitle="Access Restricted"
+        />
+
+        <div
+          className={cn(
+            "max-w-2xl mx-auto rounded-2xl border p-8 text-center space-y-5 my-8 shadow-sm transition-colors",
+            isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          )}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight">
+              Fund Release Authority Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Collection Officers do not have authority to release funds or execute loan disbursements. Your role is dedicated to borrower follow-ups, delinquency recovery, and recording repayments after disbursement.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, electronic fund transfers and disbursement queues are managed exclusively by Finance & Treasury officers.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/collections">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                Go to Collections Desk →
+              </Button>
+            </Link>
+            <Link href="/loans">
+              <Button size="md" variant="secondary">
+                View Loan Accounts
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (queueLoading || historyLoading) return <TableSkeleton rows={6} cols={5} />;
 

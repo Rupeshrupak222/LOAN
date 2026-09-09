@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -25,8 +25,10 @@ import {
   Calendar,
   Send,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Card, Input } from '@/components/ui';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
@@ -79,6 +81,28 @@ const STEPS: StepItem[] = [
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const isBranchManagerOnly =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r));
+
+  const isFinanceOfficerOnly =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
+
+  const isCollectionOfficerOnly =
+    user?.roles?.includes('COLLECTION_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
+
+  useEffect(() => {
+    if (isBranchManagerOnly) {
+      router.replace('/branch-review');
+    } else if (isFinanceOfficerOnly || isCollectionOfficerOnly) {
+      router.replace('/dashboard');
+    }
+  }, [isBranchManagerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, router]);
+
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
   const [currentStep, setCurrentStep] = useState(1);
 
   // Customer Form State
@@ -127,7 +151,20 @@ export default function NewCustomerPage() {
   });
 
   function update(key: keyof typeof form, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  if (isBranchManagerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Access Restricted
+        </p>
+        <p className="text-xs text-slate-400">
+          Borrower profile creation is restricted to Loan Officers. Branch Managers review applications via the Branch Review Desk.
+        </p>
+      </Card>
+    );
   }
 
   // Live EMI Calculation (Reducing Balance Formula)
@@ -287,6 +324,53 @@ export default function NewCustomerPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="max-w-3xl mx-auto py-12 flex items-center justify-center text-sm text-slate-500">
+        Loading authorization profile...
+      </div>
+    );
+  }
+
+  if (!isLoanOfficer) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 space-y-6">
+        <div>
+          <Link
+            href="/customers"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-white transition-colors group"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E2445] shadow-2xs group-hover:border-brand-500 group-hover:bg-brand-50 dark:group-hover:bg-brand-950/50 transition-all">
+              <ArrowLeft className="h-4 w-4" />
+            </span>
+            <span>Back to Customers Directory</span>
+          </Link>
+        </div>
+
+        <Card className="p-8 text-center space-y-4 border-amber-200 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
+            <Lock className="h-7 w-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Access Restricted to Loan Officers
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Only certified Loan Officers (<span className="font-mono font-bold text-amber-700 dark:text-amber-400">LOAN_OFFICER</span>) have authorization to register and onboard new borrowers into the LMS.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link href="/customers">
+              <Button variant="secondary" size="sm">
+                Return to Borrower Directory
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (

@@ -132,6 +132,9 @@ export async function getLoanDetail(id: string, actor?: LoanActorContext) {
       },
       settlements: true,
       closure: true,
+      paymentSubmissions: {
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
   if (!loan) throw new NotFoundError('Loan account not found');
@@ -165,6 +168,24 @@ export async function getLoanDetail(id: string, actor?: LoanActorContext) {
 
   const totalPaidInstallments = loan.schedule.filter((s) => s.status === 'PAID').length;
 
+  // Calculate Overdue Amount and Days Past Due (DPD)
+  const now = new Date();
+  const overdueItems = loan.schedule.filter(
+    (s) => (s.status === 'OVERDUE' || (s.status === 'DUE' && new Date(s.dueDate) < now)) && Number(s.outstanding) > 0
+  );
+  const overdueAmount = overdueItems.reduce(
+    (acc, s) => Money.add(acc, s.outstanding),
+    Money.of(0)
+  );
+  let dpd = 0;
+  if (overdueItems.length > 0) {
+    const oldestDue = new Date(Math.min(...overdueItems.map((s) => new Date(s.dueDate).getTime())));
+    dpd = Math.max(0, Math.floor((now.getTime() - oldestDue.getTime()) / (1000 * 60 * 60 * 24)));
+  }
+  if (loan.collectionCases?.[0]?.dpd && loan.collectionCases[0].dpd > dpd) {
+    dpd = loan.collectionCases[0].dpd;
+  }
+
   return {
     ...loan,
     metrics: {
@@ -172,6 +193,8 @@ export async function getLoanDetail(id: string, actor?: LoanActorContext) {
       totalInstallments: loan.schedule.length,
       paidInstallments: totalPaidInstallments,
       dueInstallments: totalDueInstallments,
+      overdueAmount: Money.toDb(overdueAmount),
+      dpd,
       progressPercent: loan.schedule.length > 0 ? Math.round((totalPaidInstallments / loan.schedule.length) * 100) : 0,
     },
   };

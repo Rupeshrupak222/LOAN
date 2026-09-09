@@ -61,10 +61,18 @@ export async function evaluateApplicationEligibility(
 
   // 1. Age Factor
   if (customer.dateOfBirth) {
+    const birthDate = new Date(customer.dateOfBirth);
     const age = Math.floor(
-      (Date.now() - new Date(customer.dateOfBirth).getTime()) / (365.25 * 86400000)
+      (Date.now() - birthDate.getTime()) / (365.25 * 86400000)
     );
-    if (age >= minAge && age <= maxAge) {
+    if (age <= 0 || birthDate > new Date()) {
+      factors.push({
+        factor: 'Age Requirement',
+        status: 'FAIL',
+        detail: `Date of birth indicates invalid age (${age} years). Recorded DOB: ${birthDate.toISOString().split('T')[0]}. Please update borrower Date of Birth.`,
+      });
+      fails++;
+    } else if (age >= minAge && age <= maxAge) {
       factors.push({ factor: 'Age Requirement', status: 'PASS', detail: `Age is ${age} years (Policy: ${minAge}-${maxAge} years)` });
     } else {
       factors.push({ factor: 'Age Requirement', status: 'FAIL', detail: `Age is ${age} years (Outside allowed ${minAge}-${maxAge} range)` });
@@ -121,12 +129,16 @@ export async function evaluateApplicationEligibility(
   // 4. KYC Status
   if (customer.kycStatus === 'VERIFIED') {
     factors.push({ factor: 'KYC Compliance', status: 'PASS', detail: 'Borrower identity and address fully verified' });
+  } else if (customer.kycStatus === 'REJECTED') {
+    factors.push({ factor: 'KYC Compliance', status: 'FAIL', detail: 'KYC verification rejected by compliance' });
+    fails++;
   } else if (customer.kycStatus === 'SUBMITTED' || customer.kycStatus === 'UNDER_REVIEW') {
     factors.push({ factor: 'KYC Compliance', status: 'WARNING', detail: 'KYC documents under review' });
     warnings++;
   } else {
-    factors.push({ factor: 'KYC Compliance', status: 'FAIL', detail: 'KYC verification pending' });
-    fails++;
+    // NOT_STARTED or PENDING
+    factors.push({ factor: 'KYC Compliance', status: 'WARNING', detail: 'KYC verification pending (Required prior to sanction & disbursement)' });
+    warnings++;
   }
 
   // 5. Historical Repayment Track Record

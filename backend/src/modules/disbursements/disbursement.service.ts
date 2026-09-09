@@ -83,8 +83,15 @@ export async function executeDisbursement(
   input: ExecuteDisbursementInput,
   actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  if (
+    actor.roles.includes('BRANCH_MANAGER') &&
+    !actor.roles.some((r) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r))
+  ) {
+    throw new ForbiddenError('Branch Manager role is strictly prohibited from releasing funds or executing loan disbursements.');
+  }
+
   const isAuthorized = actor.roles?.some((r) =>
-    ['FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
   if (!isAuthorized) {
     throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans.');

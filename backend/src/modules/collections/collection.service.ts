@@ -34,7 +34,135 @@ function buildCollectionCaseScopeFilter(actor?: CollectionActorContext) {
   return Object.keys(loanFilter).length > 0 ? { loan: loanFilter } : {};
 }
 
-export async function getCollectionDashboard(actor?: CollectionActorContext) {
+import { resolveDateRange } from '../reports/report.service';
+
+export interface CollectionDashboardOptions {
+  dateFilter?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export function calculateAgingBucket(dpd: number): string {
+  if (dpd <= 30) return '0-30';
+  if (dpd <= 60) return '31-60';
+  if (dpd <= 90) return '61-90';
+  if (dpd <= 180) return '91-180';
+  return '180+';
+}
+
+export function calculatePriority(dpd: number, overdueAmount: number, hasBrokenPtp: boolean): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' {
+  if (dpd > 60 || hasBrokenPtp || overdueAmount >= 100000) return 'CRITICAL';
+  if (dpd > 30 || overdueAmount >= 50000) return 'HIGH';
+  if (dpd > 15 || overdueAmount >= 10000) return 'MEDIUM';
+  return 'LOW';
+}
+
+/**
+ * Automatically inspects active loans with overdue installments and ensures an active
+ * CollectionCase is synced with exact DPD, aging bucket, overdue amount, and priority.
+ */
+export async function syncDelinquentCases(actor?: CollectionActorContext): Promise<number> {
+  const scopeFilter = buildCollectionCaseScopeFilter(actor);
+  const now = new Date();
+
+  // Find loans that have overdue installments
+  const loansWithOverdue = await prisma.loan.findMany({
+    where: {
+      status: { in: ['ACTIVE', 'OVERDUE'] },
+      ...(scopeFilter.loan || {}),
+      schedule: {
+        some: {
+          status: { in: ['OVERDUE', 'DUE'] },
+          dueDate: { lt: now },
+          outstanding: { gt: 0 },
+        },
+      },
+    },
+    include: {
+      schedule: {
+        where: {
+          status: { in: ['OVERDUE', 'DUE'] },
+          dueDate: { lt: now },
+          outstanding: { gt: 0 },
+        },
+        orderBy: { dueDate: 'asc' },
+      },
+      collectionCases: {
+        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED'] } },
+        include: {
+          promises: { where: { status: 'BROKEN' } },
+        },
+      },
+    },
+  });
+
+  let synced = 0;
+  for (const loan of loansWithOverdue) {
+    const overdueAmount = loan.schedule.reduce(
+      (sum, s) => sum.plus(new Decimal(s.outstanding)),
+      new Decimal(0)
+    );
+    if (overdueAmount.isZero()) continue;
+
+    const oldestDue = new Date(loan.schedule[0].dueDate);
+    const dpd = Math.max(1, Math.floor((now.getTime() - oldestDue.getTime()) / (1000 * 60 * 60 * 24)));
+    const agingBucket = calculateAgingBucket(dpd);
+
+    const activeCase = loan.collectionCases[0];
+    const hasBrokenPtp = activeCase?.promises ? activeCase.promises.length > 0 : false;
+    const priority = calculatePriority(dpd, overdueAmount.toNumber(), hasBrokenPtp);
+
+    if (activeCase) {
+      await prisma.collectionCase.update({
+        where: { id: activeCase.id },
+        data: {
+          overdueAmount: Money.toDb(overdueAmount),
+          dpd,
+          agingBucket,
+          priority: priority as any,
+        },
+      });
+    } else {
+      const caseNo = `CC-${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+      await prisma.collectionCase.create({
+        data: {
+          caseNo,
+          loanId: loan.id,
+          customerId: loan.customerId,
+          dpd,
+          agingBucket,
+          overdueAmount: Money.toDb(overdueAmount),
+          priority: priority as any,
+          status: 'OPEN',
+        },
+      });
+    }
+
+    if (loan.status !== 'OVERDUE') {
+      await prisma.loan.update({
+        where: { id: loan.id },
+        data: { status: 'OVERDUE' },
+      });
+    }
+    synced++;
+  }
+
+  return synced;
+}
+
+export async function getCollectionDashboard(
+  actor?: CollectionActorContext,
+  options?: CollectionDashboardOptions
+) {
+  // 1. Synchronize overdue PTPs (mark expired as BROKEN)
+  await syncOverduePtps(
+    actor?.tenantId,
+    isBranchScopedRole(actor?.roles) ? actor?.branchId : undefined
+  ).catch(() => {});
+
+  // 2. Synchronize active loans with overdue EMIs into collection cases
+  await syncDelinquentCases(actor).catch(() => {});
+
   const scopeFilter = buildCollectionCaseScopeFilter(actor);
   const cases = await prisma.collectionCase.findMany({
     where: {
@@ -64,18 +192,74 @@ export async function getCollectionDashboard(actor?: CollectionActorContext) {
     b.totalAmount = b.totalAmount.plus(c.overdueAmount);
   });
 
-  const ptpCount = await prisma.promiseToPay.count({
+  // Detailed PTP breakdown
+  const [pendingPtps, brokenPtps, keptPtps] = await Promise.all([
+    prisma.promiseToPay.count({
+      where: {
+        status: 'PENDING',
+        collectionCase: scopeFilter,
+      },
+    }),
+    prisma.promiseToPay.count({
+      where: {
+        status: 'BROKEN',
+        collectionCase: scopeFilter,
+      },
+    }),
+    prisma.promiseToPay.count({
+      where: {
+        status: 'KEPT',
+        collectionCase: scopeFilter,
+      },
+    }),
+  ]);
+
+  // Count PTPs due today
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const dueTodayPtps = await prisma.promiseToPay.count({
     where: {
       status: 'PENDING',
+      promisedDate: {
+        gte: startOfToday,
+        lte: endOfToday,
+      },
       collectionCase: scopeFilter,
     },
   });
+
+  // Calculate collections recovered in the active period
+  const { from, to } = resolveDateRange(options?.dateFilter, options?.startDate, options?.endDate);
+  const paymentDateFilter = from || to ? {
+    paidAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
+
+  const recoveredAggregate = await prisma.payment.aggregate({
+    where: {
+      status: 'SUCCESS',
+      ...paymentDateFilter,
+      ...(actor && !actor.roles?.includes('SUPER_ADMIN') && actor.tenantId ? { tenantId: actor.tenantId } : {}),
+      ...(scopeFilter.loan?.branchId ? { loan: { branchId: scopeFilter.loan.branchId } } : {}),
+    },
+    _sum: { amount: true },
+  });
+  const collectionsRecovered = Number(recoveredAggregate._sum.amount || 0);
 
   return {
     summary: {
       activeCases: cases.length,
       totalOverdueAmount: Money.toDb(totalOverdue),
-      pendingPtps: ptpCount,
+      pendingPtps,
+      dueTodayPtps,
+      brokenPtps,
+      keptPtps,
+      collectionsRecovered,
     },
     agingBuckets: Object.entries(buckets).map(([bucket, data]) => ({
       bucket,
@@ -110,6 +294,12 @@ export async function listCollectionCases(
     ];
   }
 
+  await syncDelinquentCases(actor).catch(() => {});
+  await syncOverduePtps(
+    actor?.tenantId,
+    isBranchScopedRole(actor?.roles) ? actor?.branchId : undefined
+  ).catch(() => {});
+
   const [rows, total] = await Promise.all([
     prisma.collectionCase.findMany({
       where,
@@ -118,7 +308,17 @@ export async function listCollectionCases(
       orderBy: { dpd: 'desc' },
       include: {
         customer: { select: { firstName: true, lastName: true, customerCode: true, mobile: true, city: true } },
-        loan: { select: { loanNo: true, emiAmount: true, nextDueDate: true, tenantId: true, branchId: true } },
+        loan: { select: { id: true, loanNo: true, emiAmount: true, nextDueDate: true, tenantId: true, branchId: true } },
+        activities: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { activityType: true, outcome: true, notes: true, nextFollowUpDate: true, createdAt: true },
+        },
+        promises: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { promisedAmount: true, promisedDate: true, paymentMode: true, status: true, createdAt: true },
+        },
         _count: { select: { activities: true, promises: true } },
       },
     }),
@@ -129,7 +329,10 @@ export async function listCollectionCases(
     data: rows.map((c) => ({
       id: c.id,
       caseNo: c.caseNo,
+      loanId: c.loan.id,
       loanNo: c.loan.loanNo,
+      emiAmount: c.loan.emiAmount ? Number(c.loan.emiAmount).toFixed(2) : '0.00',
+      nextDueDate: c.loan.nextDueDate,
       customerName: `${c.customer.firstName} ${c.customer.lastName}`,
       customerCode: c.customer.customerCode,
       mobile: c.customer.mobile,
@@ -141,6 +344,13 @@ export async function listCollectionCases(
       priority: c.priority,
       activitiesCount: c._count.activities,
       promisesCount: c._count.promises,
+      lastActivityDate: c.activities[0]?.createdAt || null,
+      lastActivityOutcome: c.activities[0]?.outcome || null,
+      lastActivityNotes: c.activities[0]?.notes || null,
+      nextFollowUpDate: c.activities[0]?.nextFollowUpDate || c.promises[0]?.promisedDate || null,
+      latestPtpAmount: c.promises[0]?.promisedAmount ? Number(c.promises[0].promisedAmount).toFixed(2) : null,
+      latestPtpDate: c.promises[0]?.promisedDate || null,
+      latestPtpStatus: c.promises[0]?.status || null,
       createdAt: c.createdAt,
     })),
     pagination: buildPagination(params.page, params.pageSize, total),

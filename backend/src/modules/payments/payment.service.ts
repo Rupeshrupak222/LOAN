@@ -11,6 +11,7 @@ import type { RecordPaymentInput } from './payment.schema';
 
 export interface PaymentActorContext {
   id?: string;
+  email?: string;
   roles?: string[];
   tenantId?: string;
   branchId?: string;
@@ -330,8 +331,12 @@ export async function processPayment(
       orderBy: { emiNumber: 'asc' },
     });
 
+    const hasRemainingOverdue = await tx.repaymentScheduleItem.findFirst({
+      where: { loanId: loan.id, status: 'OVERDUE' },
+    });
+
     const isFullyPaid = newOutstandingPrincipal.isZero() && !nextUnpaid;
-    const newLoanStatus = isFullyPaid ? 'CLOSED' : loan.status === 'OVERDUE' ? 'ACTIVE' : loan.status;
+    const newLoanStatus = isFullyPaid ? 'CLOSED' : hasRemainingOverdue ? 'OVERDUE' : 'ACTIVE';
 
     await tx.loan.update({
       where: { id: loan.id },
@@ -384,7 +389,7 @@ export async function processPayment(
 
     // 8. Update active collection case if any
     const activeCase = await tx.collectionCase.findFirst({
-      where: { loanId: loan.id, status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] } },
+      where: { loanId: loan.id, status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED'] } },
     });
     if (activeCase) {
       const remainingOverdue = Decimal.max(0, new Decimal(activeCase.overdueAmount).minus(input.amount));
@@ -403,15 +408,31 @@ export async function processPayment(
           where: { caseId: activeCase.id, status: 'PENDING' },
           data: { status: 'KEPT' },
         });
+      } else {
+        // Fulfill matching pending PTP if paid amount satisfies it
+        const matchingPtp = await tx.promiseToPay.findFirst({
+          where: {
+            caseId: activeCase.id,
+            status: 'PENDING',
+            promisedAmount: { lte: Money.toDb(input.amount) },
+          },
+          orderBy: { promisedDate: 'asc' },
+        });
+        if (matchingPtp) {
+          await tx.promiseToPay.update({
+            where: { id: matchingPtp.id },
+            data: { status: 'KEPT' },
+          });
+        }
       }
 
       await tx.collectionActivity.create({
         data: {
           caseId: activeCase.id,
-          activityType: 'SMS',
-          outcome: 'PROMISE_TO_PAY',
-          notes: `Payment of ₹${input.amount} received. Remaining overdue: ₹${remainingOverdue.toFixed(2)}`,
-          performedBy: 'System',
+          activityType: 'CALL',
+          outcome: isCleared ? 'RESOLVED' : 'PROMISE_TO_PAY',
+          notes: `Repayment of ₹${Number(input.amount).toLocaleString('en-IN')} confirmed. Ref: ${input.reference || paymentNo}. Remaining overdue: ₹${remainingOverdue.toFixed(2)}`,
+          performedBy: actor?.email || 'System',
         },
       });
     }

@@ -44,6 +44,8 @@ import { workflowRoutes } from '../modules/workflows/workflow.routes';
 import { deploymentRoutes } from '../modules/deployment/deployment.routes';
 import { clientOnboardingRoutes } from '../modules/onboarding/client-onboarding.routes';
 import { slaSupportRoutes } from '../modules/support/sla-support.routes';
+import creditRoutes from '../modules/credit/credit.routes';
+import branchManagerRoutes from '../modules/branch-manager/branch-manager.routes';
 
 const router = Router();
 
@@ -52,6 +54,8 @@ router.use('/customers', customerRoutes);
 router.use('/documents', documentRoutes);
 router.use('/loan-products', productRoutes);
 router.use('/applications', applicationRoutes);
+router.use('/credit', creditRoutes);
+router.use('/branch-manager', branchManagerRoutes);
 router.use('/eligibility', eligibilityRoutes);
 router.use('/risk', riskRoutes);
 router.use('/underwriting', underwritingRoutes);

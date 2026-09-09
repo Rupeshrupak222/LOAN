@@ -30,6 +30,8 @@ interface CustomerRow {
 
 export default function CustomersPage() {
   const { user } = useAuth();
+  const isLoanOfficer = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
+
   const { isDark } = useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -195,11 +197,13 @@ export default function CustomersPage() {
         title="Borrower Directory & KYC Profiles"
         subtitle="Manage customer registrations, identity verification status, and borrower credit histories"
         action={
-          <Link href="/customers/new">
-            <Button className="flex items-center gap-1.5 text-white">
-              <UserPlus className="h-4 w-4" /> Add Customer
-            </Button>
-          </Link>
+          isLoanOfficer ? (
+            <Link href="/customers/new">
+              <Button className="flex items-center gap-1.5 text-white">
+                <UserPlus className="h-4 w-4" /> Add Customer
+              </Button>
+            </Link>
+          ) : null
         }
       />
 
@@ -284,9 +288,11 @@ export default function CustomersPage() {
         emptyTitle="No borrowers found"
         emptyDescription="Start by onboarding a new customer into the LMS."
         emptyAction={
-          <Link href="/customers/new">
-            <Button size="sm" className="text-white">+ Add Customer</Button>
-          </Link>
+          isLoanOfficer ? (
+            <Link href="/customers/new">
+              <Button size="sm" className="text-white">+ Add Customer</Button>
+            </Link>
+          ) : undefined
         }
       />
 

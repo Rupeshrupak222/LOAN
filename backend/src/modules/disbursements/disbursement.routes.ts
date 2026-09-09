@@ -26,7 +26,7 @@ router.get(
 
 router.get(
   '/history',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const history = await getDisbursementHistory({
       id: req.user?.id,
@@ -40,7 +40,7 @@ router.get(
 
 router.post(
   '/execute',
-  authorize('FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'),
   validate(executeDisbursementSchema),
   asyncHandler(async (req, res) => {
     const loan = await executeDisbursement(req.body, {

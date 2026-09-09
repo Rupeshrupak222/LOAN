@@ -66,6 +66,11 @@ export default function CustomerDetailPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user } = useAuth();
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
+  const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
+  const isUnderwriter = Boolean(user?.roles?.includes('UNDERWRITER'));
+  const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const [activeTab, setActiveTab] = useState<
     'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'communications' | 'bank_intelligence' | 'fraud'
   >('overview');
@@ -500,12 +505,12 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -522,7 +527,7 @@ export default function CustomerDetailPage() {
                 </Button>
               </Link>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -857,10 +862,12 @@ export default function CustomerDetailPage() {
               <p className="text-xs text-slate-500">Identity proofs, income documents, bank statements, and signed mandates</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
-                + Upload Document
-              </Button>
-              {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+              {(isLoanOfficer || isAdmin) && !isBranchManager && (
+                <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
+                  + Upload Document
+                </Button>
+              )}
+              {(isUnderwriter || isAdmin) && (
                 <Button size="sm" onClick={() => setKycModalOpen(true)}>
                   Update KYC Status
                 </Button>
@@ -951,7 +958,7 @@ export default function CustomerDetailPage() {
                           >
                             <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
                           </Button>
-                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)) && !isBranchManager && (
                             <Button
                               size="sm"
                               variant="secondary"
@@ -968,18 +975,20 @@ export default function CustomerDetailPage() {
                               {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
                             </Button>
                           )}
-                          <button
-                            type="button"
-                            title="Delete Document"
-                            onClick={() => {
-                              if (confirm(`Delete document "${doc.fileName}" from database?`)) {
-                                docDeleteMutation.mutate(doc.id);
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              title="Delete Document"
+                              onClick={() => {
+                                if (confirm(`Delete document "${doc.fileName}" from database?`)) {
+                                  docDeleteMutation.mutate(doc.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2286,7 +2295,7 @@ export default function CustomerDetailPage() {
       )}
 
       {/* Underwriting Verification Desk Wizard Modal */}
-      {selectedAppForWizard && (
+      {selectedAppForWizard && (isUnderwriter || isAdmin) && (
         <UnderwritingVerificationWizard
           application={selectedAppForWizard}
           isOpen={wizardOpen}

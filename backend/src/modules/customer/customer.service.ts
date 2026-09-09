@@ -458,7 +458,6 @@ export async function createCustomer(
           firstName: input.firstName,
           lastName: input.lastName,
           status: 'ACTIVE',
-          tenantId: effectiveTenantId,
           ...(input.branchId ? { branchId: input.branchId } : {}),
         },
         create: {
@@ -467,8 +466,7 @@ export async function createCustomer(
           lastName: input.lastName,
           passwordHash,
           status: 'ACTIVE',
-          tenantId: effectiveTenantId,
-          branchId: input.branchId,
+          ...(input.branchId ? { branchId: input.branchId } : {}),
         },
       });
 
@@ -501,8 +499,8 @@ export async function createCustomer(
       cust = await tx.customer.update({
         where: { id: existingCust.id },
         data: {
-          userId: customerUserId || existingCust.userId,
-          tenantId: effectiveTenantId,
+          userId: customerUserId || existingCust.userId || undefined,
+          ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           firstName: input.firstName,
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth || existingCust.dateOfBirth,
@@ -524,8 +522,8 @@ export async function createCustomer(
     } else {
       cust = await tx.customer.create({
         data: {
-          userId: customerUserId,
-          tenantId: effectiveTenantId,
+          userId: customerUserId || undefined,
+          ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           customerCode: generateCustomerCode(),
           firstName: input.firstName,
           lastName: input.lastName,
@@ -545,7 +543,7 @@ export async function createCustomer(
           bankName: bankName || input.bankName,
           bankAccountNo: bankAccountNo || input.bankAccountNo,
           bankIfsc: bankIfsc || input.bankIfsc,
-          branchId: input.branchId,
+          ...(input.branchId ? { branchId: input.branchId } : {}),
           kycStatus: 'NOT_STARTED',
           status: 'DRAFT',
         },

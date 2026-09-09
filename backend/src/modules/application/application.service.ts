@@ -103,6 +103,7 @@ export async function getApplication(id: string, actor?: ApplicationActorContext
       eligibility: true,
       riskAssessment: true,
       underwriting: true,
+      approvals: { orderBy: { createdAt: 'desc' } },
     },
   });
   if (!app) throw new NotFoundError('Application not found');
@@ -307,6 +308,19 @@ export async function transition(
         `Access forbidden: Underwriters cannot transition applications to '${toStatus}'. Post-sanction agreement processing and disbursement execution must be conducted by authorized Finance Officers.`
       );
     }
+  }
+
+  const isPrivilegedAdmin = actor?.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+
+  if (
+    (actor?.roles?.includes('COLLECTION_OFFICER') || actor?.roles?.includes('FINANCE_OFFICER')) &&
+    !isPrivilegedAdmin
+  ) {
+    throw new ForbiddenError(
+      'Access forbidden: Neither Collection Officers nor Finance Officers have authority to transition loan applications or modify credit/underwriting decisions.'
+    );
   }
 
   const allowed = TRANSITIONS[app.status] ?? [];

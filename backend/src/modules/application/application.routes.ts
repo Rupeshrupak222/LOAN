@@ -72,10 +72,21 @@ router.post(
 
 router.post(
   '/:id/transition',
-  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'),
   validate({ body: transitionSchema }),
-  asyncHandler(async (req, res) =>
-    ok(
+  asyncHandler(async (req, res) => {
+    const toStatus = req.body.toStatus;
+    if (toStatus === 'APPROVED' || toStatus === 'REJECTED') {
+      const canSanction = req.user?.roles.some((r) =>
+        ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r)
+      );
+      if (!canSanction) {
+        throw new ForbiddenError(
+          'Access forbidden: Final loan sanctioning and rejection is reserved for Underwriters. Branch Managers must approve within delegated limits via the Branch Management Desk.'
+        );
+      }
+    }
+    return ok(
       res,
       await service.transition(
         req.params.id,
@@ -89,8 +100,8 @@ router.post(
           branchId: req.user?.branchId,
         }
       )
-    )
-  ),
+    );
+  }),
 );
 
 export default router;

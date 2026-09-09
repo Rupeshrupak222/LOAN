@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ClipboardCheck,
@@ -41,6 +42,7 @@ type TabKey = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'KYC_PENDING';
 export default function UnderwritingAndCreditAssessmentPage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
 
