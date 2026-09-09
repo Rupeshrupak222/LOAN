@@ -12,6 +12,7 @@ import {
   submitCreditRecommendation,
   forwardToUnderwriting,
 } from './credit-assessment.service';
+import { startCreditAssessment } from '../credit/credit.service';
 
 const router = Router();
 
