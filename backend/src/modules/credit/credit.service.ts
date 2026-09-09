@@ -177,10 +177,25 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
     previousDecision: app.eligibility
       ? {
           result: app.eligibility.result,
-          reason: latestApproval?.decisionReason || eligibilityFactors.decisionReason,
+          reason:
+            latestApproval?.decisionReason ||
+            eligibilityFactors.decisionReason ||
+            (Array.isArray(app.eligibility.factors)
+              ? (() => {
+                  const failed = (app.eligibility.factors as any[]).filter((f) => f.status === 'FAIL');
+                  if (failed.length > 0) {
+                    return `Automated policy check flagged: ${failed.map((f) => `${f.factor} (${f.detail})`).join('; ')}`;
+                  }
+                  const warned = (app.eligibility.factors as any[]).filter((f) => f.status === 'WARNING');
+                  if (warned.length > 0) {
+                    return `Conditionally eligible subject to: ${warned.map((f) => f.detail).join('; ')}`;
+                  }
+                  return 'All automated eligibility checks passed.';
+                })()
+              : undefined),
           evaluatedAt: app.eligibility.createdAt.toISOString(),
-          analyst: eligibilityFactors.analystEmail,
-          riskGrade: eligibilityFactors.riskGrade || app.riskAssessment?.category,
+          analyst: eligibilityFactors.analystEmail || 'Automated Policy Engine',
+          riskGrade: eligibilityFactors.riskGrade || app.riskAssessment?.category || 'LOW',
           positiveFactors: eligibilityFactors.positiveFactors,
           riskFactors: eligibilityFactors.riskFactors,
         }

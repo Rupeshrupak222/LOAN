@@ -246,20 +246,22 @@ export function CreditAssessmentSection({
                   Risk Level: <strong className="text-[#2563EB] dark:text-[#60A5FA]">{previousDecision.riskGrade || 'LOW'}</strong>
                 </span>
                 <span className="font-semibold text-slate-600 dark:text-slate-300">
-                  Repayment Capacity: <strong className={previousDecision.result === 'ELIGIBLE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
-                    {previousDecision.result === 'ELIGIBLE' ? 'SUFFICIENT' : 'INSUFFICIENT / FAILED CRITERIA'}
+                  Repayment Capacity: <strong className={capacity.foirPct <= 45 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                    {capacity.foirPct <= 45 ? `SUFFICIENT (FOIR: ${capacity.foirPct.toFixed(1)}%)` : `INSUFFICIENT (FOIR: ${capacity.foirPct.toFixed(1)}%)`}
                   </strong>
                 </span>
               </div>
               <p className="text-xs text-slate-700 dark:text-slate-200 mt-1">
-                <strong>Reason:</strong> {previousDecision.reason || 'Assessment recorded in credit review audit ledger.'}
+                <strong>Reason:</strong> {previousDecision.reason || 'Automated policy evaluation criteria.'}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                 <strong>Recommendation:</strong> {previousDecision.result === 'ELIGIBLE'
                   ? 'Proceed to next stage (Branch Manager & Underwriting sanction).'
                   : previousDecision.result === 'NOT_ELIGIBLE'
-                  ? 'Decline recommended to Underwriting committee due to debt service capacity.'
-                  : 'Return to Loan Officer for required document resubmission.'}
+                  ? (capacity.foirPct <= 45
+                      ? 'Action Required: Resolve flagged policy criteria (e.g. correct borrower Date of Birth or complete KYC verification).'
+                      : 'Decline recommended to Underwriting committee due to debt service capacity.')
+                  : 'Return to Loan Officer for required document resubmission & KYC completion.'}
               </p>
             </div>
           </div>
