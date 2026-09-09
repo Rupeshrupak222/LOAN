@@ -274,6 +274,10 @@ export async function transition(
     }
   }
 
+  const isPrivilegedAdmin = actor?.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+
   if (
     (actor?.roles?.includes('COLLECTION_OFFICER') || actor?.roles?.includes('FINANCE_OFFICER')) &&
     !isPrivilegedAdmin

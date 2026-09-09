@@ -10,6 +10,7 @@ import type { RecordPaymentInput } from './payment.schema';
 
 export interface PaymentActorContext {
   id?: string;
+  email?: string;
   roles?: string[];
   tenantId?: string;
   branchId?: string;

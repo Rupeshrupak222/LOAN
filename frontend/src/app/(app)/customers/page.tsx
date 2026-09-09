@@ -30,6 +30,7 @@ interface CustomerRow {
 
 export default function CustomersPage() {
   const { user } = useAuth();
+  const isLoanOfficer = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
 
   const { isDark } = useTheme();
   const toast = useToast();

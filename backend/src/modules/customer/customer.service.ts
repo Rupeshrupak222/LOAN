@@ -320,7 +320,7 @@ export async function createCustomer(
       cust = await tx.customer.update({
         where: { id: existingCust.id },
         data: {
-          ...(customerUserId ? { user: { connect: { id: customerUserId } } } : {}),
+          userId: customerUserId || existingCust.userId || undefined,
           ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           firstName: input.firstName,
           lastName: input.lastName,
@@ -343,7 +343,7 @@ export async function createCustomer(
     } else {
       cust = await tx.customer.create({
         data: {
-          ...(customerUserId ? { user: { connect: { id: customerUserId } } } : {}),
+          userId: customerUserId || undefined,
           ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           customerCode: generateCustomerCode(),
           firstName: input.firstName,
