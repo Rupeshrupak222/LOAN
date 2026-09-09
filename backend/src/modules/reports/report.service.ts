@@ -9,6 +9,57 @@ export interface ReportActorContext {
   branchId?: string;
 }
 
+export interface ReportFilterOptions {
+  dateFilter?: string;
+  startDate?: string;
+  endDate?: string;
+  filter?: string;
+  start?: string;
+  end?: string;
+  range?: string;
+}
+
+export function resolveDateRange(dateFilter?: string, startDate?: string, endDate?: string): { from?: Date; to?: Date } {
+  const now = new Date();
+  if (startDate && endDate) {
+    const from = new Date(startDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(endDate);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+  if (!dateFilter) return {};
+  const f = dateFilter.toLowerCase().trim();
+  if (f === 'today') {
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0),
+      to: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999),
+    };
+  }
+  if (f === 'this_week' || f === 'week') {
+    const d = new Date(now);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const from = new Date(d.setDate(diff));
+    from.setHours(0, 0, 0, 0);
+    return { from, to: now };
+  }
+  if (f === 'this_month' || f === 'month') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    return { from, to: now };
+  }
+  if (f === 'this_quarter' || f === 'quarter') {
+    const qMonth = Math.floor(now.getMonth() / 3) * 3;
+    const from = new Date(now.getFullYear(), qMonth, 1, 0, 0, 0);
+    return { from, to: now };
+  }
+  if (f === 'this_year' || f === 'year') {
+    const from = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+    return { from, to: now };
+  }
+  return {};
+}
+
 export async function getPortfolioOverview(
   actor?: ReportActorContext,
   options?: { filter?: string; start?: string; end?: string; range?: string }
