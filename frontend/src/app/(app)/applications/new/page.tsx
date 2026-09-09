@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -16,6 +16,8 @@ import {
   Calendar,
   IndianRupee,
   Layers,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
@@ -24,11 +26,14 @@ import { cn, formatMoney } from '@/lib/utils';
 
 export default function NewApplicationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
 
+  const urlCustomerId = searchParams?.get('customerId') || '';
+
   // Form State
-  const [customerId, setCustomerId] = useState('');
+  const [customerId, setCustomerId] = useState(urlCustomerId);
   const [loanMode, setLoanMode] = useState<'CUSTOM' | 'PRESET'>('CUSTOM');
   const [productId, setProductId] = useState('');
   const [customLoanName, setCustomLoanName] = useState('Personal Loan');
@@ -40,6 +45,12 @@ export default function NewApplicationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (urlCustomerId && !customerId) {
+      setCustomerId(urlCustomerId);
+    }
+  }, [urlCustomerId, customerId]);
+
   // Fetch Customers
   const { data: customersData } = useQuery({
     queryKey: ['customers-list'],
@@ -50,6 +61,13 @@ export default function NewApplicationPage() {
   const { data: productsData } = useQuery({
     queryKey: ['products-list'],
     queryFn: async () => (await api.get('/loan-products')).data.data,
+  });
+
+  // Fetch Customer Origination Eligibility
+  const { data: eligibilityData, isLoading: isCheckingEligibility } = useQuery({
+    queryKey: ['customer-origination-eligibility', customerId],
+    queryFn: async () => (await api.get(`/customers/${customerId}/origination-eligibility`)).data.data,
+    enabled: Boolean(customerId),
   });
 
   const selectedCustomer = customersData?.find((c: any) => c.id === customerId);
@@ -193,21 +211,69 @@ export default function NewApplicationPage() {
           </div>
 
           {selectedCustomer && (
-            <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4 text-xs space-y-1">
-              <p className="font-bold text-brand-900 text-sm">Selected: {selectedCustomer.name}</p>
-              <p className="text-slate-600">
-                Mobile: {selectedCustomer.mobile} · Customer ID: {selectedCustomer.customerCode}
-              </p>
-              <p className="text-slate-600">
-                KYC Status: <span className="font-semibold text-brand-800">{selectedCustomer.kycStatus}</span> · Risk:{' '}
-                <span className="font-semibold">{selectedCustomer.riskCategory || 'PENDING'}</span>
-              </p>
+            <div className="space-y-3">
+              <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4 text-xs space-y-1">
+                <p className="font-bold text-brand-900 text-sm">Selected: {selectedCustomer.name}</p>
+                <p className="text-slate-600">
+                  Mobile: {selectedCustomer.mobile} · Customer ID: {selectedCustomer.customerCode}
+                </p>
+                <p className="text-slate-600">
+                  KYC Status: <span className="font-semibold text-brand-800">{selectedCustomer.kycStatus}</span> · Risk:{' '}
+                  <span className="font-semibold">{selectedCustomer.riskCategory || 'PENDING'}</span>
+                </p>
+              </div>
+
+              {/* Onboarding Prerequisites Check */}
+              {isCheckingEligibility && (
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-500 animate-pulse">
+                  Checking borrower onboarding and KYC verification status...
+                </div>
+              )}
+
+              {eligibilityData && !eligibilityData.eligible && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-4 text-xs space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900 dark:text-amber-200">
+                        Borrower Onboarding Incomplete — Origination Blocked
+                      </p>
+                      <p className="text-amber-800 dark:text-amber-300 mt-0.5">
+                        In accordance with policy, loan origination requires core profile, verified KYC/photo documents, employment income, and a registered bank account.
+                      </p>
+                    </div>
+                  </div>
+
+                  {Array.isArray(eligibilityData.reasons) && eligibilityData.reasons.length > 0 && (
+                    <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5 pl-2">
+                      {eligibilityData.reasons.map((r: string, idx: number) => (
+                        <li key={idx} className="font-medium">{r}</li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="pt-1">
+                    <Link href={`/customers/${customerId}`}>
+                      <Button size="sm" variant="secondary" className="text-xs gap-1.5 font-semibold bg-white dark:bg-amber-900/40 border-amber-300">
+                        <ExternalLink className="w-3.5 h-3.5" /> Open Customer 360 to Complete Onboarding →
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {eligibilityData && eligibilityData.eligible && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">Borrower onboarding verified. Ready to configure loan scheme parameters.</span>
+                </div>
+              )}
             </div>
           )}
 
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <Button
-              disabled={!customerId}
+              disabled={!customerId || (eligibilityData && !eligibilityData.eligible)}
               onClick={() => setStep(2)}
               className="flex items-center gap-1.5"
             >
@@ -583,7 +649,7 @@ export default function NewApplicationPage() {
             <Button variant="secondary" onClick={() => setStep(3)} className="flex items-center gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
-            <Button disabled={saving} onClick={handleSubmit} className="px-6">
+            <Button disabled={saving || (eligibilityData && !eligibilityData.eligible)} onClick={handleSubmit} className="px-6">
               {saving ? 'Originating Application...' : 'Confirm & Submit Application ✓'}
             </Button>
           </div>

@@ -77,6 +77,8 @@ export const BorrowerPaymentModal: React.FC<Props> = ({
       queryClient.invalidateQueries({ queryKey: ['loan', loan.id] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       toast.success('Repayment Submitted', 'Your payment proof has been queued for verification.');
 
       setTimeout(() => {

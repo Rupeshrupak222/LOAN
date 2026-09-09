@@ -171,7 +171,6 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'customers',
       'applications',
-      'loans',
       'loan-products',
       'communications',
       'emi-calculator',
@@ -184,9 +183,9 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Credit assessment, policy eligibility scoring, and 4-pillar risk analysis',
     nav: [
       'dashboard',
-      'applications',
-      'underwriting',
       'customers',
+      'underwriting',
+      'applications',
       'reports',
       'fraud-intelligence',
       'early-warnings',
@@ -217,6 +216,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Pre-disbursement checks, electronic fund release, repayments, and NOC closure',
     nav: [
       'dashboard',
+      'customers',
       'disbursements',
       'payments',
       'loans',

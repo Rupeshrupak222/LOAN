@@ -7,6 +7,7 @@ import { generateCustomerCode } from '../shared/codes';
 import { Money } from '../finance/money';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type {
   CreateCustomerInput,
   UpdateKycStatusInput,
@@ -224,10 +225,18 @@ export async function getCustomer(id: string, actor?: CustomerActorContext) {
     }
   }
 
-  return {
+  const enrichedCustomer = {
     ...customer,
     addresses,
     bankAccounts,
+  };
+
+  const originationEligibility = evaluateCustomerOnboardingStatus(enrichedCustomer);
+
+  return {
+    ...enrichedCustomer,
+    originationEligibility,
+    onboardingStatus: originationEligibility,
     summary: {
       totalBorrowed: Money.toDb(totalBorrowed),
       totalRepaid: Money.toDb(totalRepaid),
@@ -237,6 +246,176 @@ export async function getCustomer(id: string, actor?: CustomerActorContext) {
       currentOutstanding: Money.toDb(totalOutstanding),
     },
   };
+}
+
+export interface OriginationEligibilityResult {
+  eligible: boolean;
+  missing: string[];
+  reasons: string[];
+  steps: {
+    profileComplete: boolean;
+    kycDocsComplete: boolean;
+    employmentComplete: boolean;
+    bankComplete: boolean;
+  };
+}
+
+export function evaluateCustomerOnboardingStatus(customer: any): OriginationEligibilityResult {
+  const missing: string[] = [];
+  const reasons: string[] = [];
+
+  // Step 1: Profile Complete
+  const hasFirstName = Boolean(customer.firstName && customer.firstName.trim().length > 0);
+  const hasLastName = Boolean(customer.lastName && customer.lastName.trim().length > 0);
+  const hasMobile = Boolean(customer.mobile && customer.mobile.trim().length >= 10);
+  const profileComplete = hasFirstName && hasLastName && hasMobile;
+
+  if (!hasFirstName) {
+    missing.push('FIRST_NAME');
+    reasons.push('Customer first name is required.');
+  }
+  if (!hasLastName) {
+    missing.push('LAST_NAME');
+    reasons.push('Customer last name is required.');
+  }
+  if (!hasMobile) {
+    missing.push('MOBILE');
+    reasons.push('Valid 10-digit mobile number is required.');
+  }
+
+  // Step 2: KYC & Photo Documents
+  const docs = Array.isArray(customer.documents) ? customer.documents : [];
+  const hasIdentityDoc = docs.some((d: any) =>
+    ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
+    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType)
+  );
+  const hasPhotoDoc = docs.some((d: any) =>
+    ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
+    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType)
+  );
+  const kycDocsComplete =
+    (hasIdentityDoc && (hasPhotoDoc || docs.length >= 2)) ||
+    docs.length >= 2 ||
+    (hasIdentityDoc && customer.kycStatus === 'VERIFIED') ||
+    customer.kycStatus === 'VERIFIED';
+
+  if (!hasIdentityDoc && docs.length === 0 && customer.kycStatus !== 'VERIFIED') {
+    missing.push('IDENTITY_PROOF');
+    reasons.push('Primary identity proof (PAN Card / Aadhaar) is required.');
+  }
+  if (!hasPhotoDoc && docs.length < 2 && customer.kycStatus !== 'VERIFIED') {
+    missing.push('APPLICANT_PHOTO');
+    reasons.push('Applicant photograph / selfie document is required.');
+  }
+
+  // Step 3: Employment & Income
+  const hasEmploymentType = Boolean(
+    (customer.employmentType && customer.employmentType.trim().length > 0) ||
+    (customer.employmentDetails && customer.employmentDetails.length > 0)
+  );
+  const hasEmployer = Boolean(
+    (customer.employerName && customer.employerName.trim().length > 0) ||
+    (customer.employmentDetails &&
+      customer.employmentDetails.some((e: any) => e.employerName && e.employerName.trim().length > 0))
+  );
+  const monthlyIncomeVal =
+    customer.monthlyIncome != null
+      ? Number(customer.monthlyIncome)
+      : customer.employmentDetails?.[0]?.monthlyIncome
+      ? Number(customer.employmentDetails[0].monthlyIncome)
+      : 0;
+  const hasMonthlyIncome = monthlyIncomeVal > 0;
+
+  const employmentComplete = hasEmploymentType && hasEmployer && hasMonthlyIncome;
+
+  if (!hasEmploymentType) {
+    missing.push('EMPLOYMENT_TYPE');
+    reasons.push('Employment classification is required.');
+  }
+  if (!hasEmployer) {
+    missing.push('EMPLOYER_NAME');
+    reasons.push('Employer or business name is required.');
+  }
+  if (!hasMonthlyIncome) {
+    missing.push('MONTHLY_INCOME');
+    reasons.push('Valid monthly income is required.');
+  }
+
+  // Step 4: Bank Account Details
+  const bankAccounts = Array.isArray(customer.bankAccounts) ? customer.bankAccounts : [];
+  const hasBankInList = bankAccounts.some(
+    (b: any) =>
+      b.bankName &&
+      b.bankName.trim().length > 0 &&
+      b.accountNumber &&
+      b.accountNumber.trim().length >= 4 &&
+      b.ifscCode &&
+      b.ifscCode.trim().length >= 4
+  );
+  const hasBankInRoot = Boolean(
+    customer.bankName &&
+      customer.bankName.trim().length > 0 &&
+      customer.bankAccountNo &&
+      customer.bankAccountNo.trim().length >= 4 &&
+      customer.bankIfsc &&
+      customer.bankIfsc.trim().length >= 4
+  );
+  const bankComplete = hasBankInList || hasBankInRoot;
+
+  if (!bankComplete) {
+    missing.push('BANK_ACCOUNT');
+    reasons.push('At least one valid bank account (Bank Name, Account Number, IFSC) is required.');
+  }
+
+  const eligible = profileComplete && kycDocsComplete && employmentComplete && bankComplete;
+
+  return {
+    eligible,
+    missing,
+    reasons,
+    steps: {
+      profileComplete,
+      kycDocsComplete,
+      employmentComplete,
+      bankComplete,
+    },
+  };
+}
+
+export async function validateLoanOfficerOriginationEligibility(
+  customerId: string,
+  tenantId?: string,
+  actor?: CustomerActorContext
+): Promise<OriginationEligibilityResult> {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: {
+      documents: true,
+      employmentDetails: true,
+      bankAccounts: true,
+      addresses: true,
+    },
+  });
+  if (!customer) {
+    throw new NotFoundError('Customer not found');
+  }
+
+  // Multi-tenant check
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      customer.branchId &&
+      customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to a different branch');
+    }
+  }
+
+  return evaluateCustomerOnboardingStatus(customer);
 }
 
 export async function createCustomer(
@@ -352,7 +531,7 @@ export async function createCustomer(
           lastName: input.lastName,
           dateOfBirth: input.dateOfBirth,
           gender: input.gender,
-          mobile: mobile || input.mobile,
+          mobile: mobile || input.mobile || '',
           email: cleanEmail,
           addressLine: addressLine || input.addressLine,
           city: city || input.city,
@@ -434,6 +613,18 @@ export async function createCustomer(
     entityId: customer.id,
     newValue: { code: customer.customerCode, name: `${customer.firstName} ${customer.lastName}` },
   }).catch(() => {});
+
+  communicationService.dispatchSystemEvent(
+    'CUSTOMER_CREATED',
+    {
+      customerId: customer.id,
+      customerName: `${customer.firstName} ${customer.lastName}`,
+      customerEmail: customer.email || undefined,
+      customerMobile: customer.mobile || undefined,
+      customerCode: customer.customerCode,
+    },
+    effectiveTenantId
+  ).catch(() => {});
 
   return customer;
 }

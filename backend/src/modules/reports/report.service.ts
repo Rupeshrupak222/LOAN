@@ -9,7 +9,10 @@ export interface ReportActorContext {
   branchId?: string;
 }
 
-export async function getPortfolioOverview(actor?: ReportActorContext) {
+export async function getPortfolioOverview(
+  actor?: ReportActorContext,
+  options?: { filter?: string; start?: string; end?: string; range?: string }
+) {
   const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
   const isCompanyAdmin = actor?.roles?.includes('COMPANY_ADMIN') || actor?.roles?.includes('ADMIN');
 
@@ -20,6 +23,60 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     ...tenantFilter,
     ...branchFilter,
   };
+
+  let startDate: Date | undefined;
+  let endDate: Date | undefined;
+  const now = new Date();
+
+  if (options?.start && options?.end) {
+    startDate = new Date(options.start);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(options.end);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (options?.filter) {
+    const f = options.filter.toLowerCase().trim();
+    if (f === 'today') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    } else if (f === 'this week') {
+      startDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (f === 'this month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (f === 'last month') {
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    } else if (f === 'this quarter') {
+      const qMonth = Math.floor(now.getMonth() / 3) * 3;
+      startDate = new Date(now.getFullYear(), qMonth, 1, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59, 999);
+    } else if (f === 'this financial year') {
+      const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      startDate = new Date(fyYear, 3, 1, 0, 0, 0);
+      endDate = new Date(fyYear + 1, 2, 31, 23, 59, 59, 999);
+    }
+  }
+
+  const paymentDateFilter = startDate && endDate
+    ? {
+        OR: [
+          { createdAt: { gte: startDate, lte: endDate } },
+          { paidAt: { gte: startDate, lte: endDate } },
+        ],
+      }
+    : {};
+
+  const disbursementDateFilter = startDate && endDate
+    ? {
+        OR: [
+          { createdAt: { gte: startDate, lte: endDate } },
+          { disbursedAt: { gte: startDate, lte: endDate } },
+        ],
+      }
+    : {};
 
   const [loans, payments, disbursements, products, branches, collectionCases] = await Promise.all([
     prisma.loan.findMany({
@@ -32,6 +89,7 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     prisma.payment.findMany({
       where: {
         status: 'SUCCESS',
+        ...paymentDateFilter,
         ...(tenantFilter.tenantId ? { tenantId: tenantFilter.tenantId } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -39,6 +97,7 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     prisma.disbursement.findMany({
       where: {
         status: 'COMPLETED',
+        ...disbursementDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
