@@ -18,7 +18,7 @@ export interface ApplicationActorContext {
 
 // Allowed status transitions (guards the loan lifecycle).
 const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
-  DRAFT: ['SUBMITTED', 'CANCELLED'],
+  DRAFT: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'REJECTED', 'CANCELLED'],
   SUBMITTED: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'REJECTED', 'CANCELLED'],
   KYC_PENDING: ['KYC_VERIFIED', 'SUBMITTED', 'REJECTED', 'CANCELLED'],
   KYC_VERIFIED: ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'SUBMITTED', 'REJECTED', 'CANCELLED'],
@@ -287,22 +287,6 @@ export async function transition(
     if (!allowedForCreditAnalyst.includes(toStatus)) {
       throw new ForbiddenError(
         `Access forbidden: Credit Analysts cannot approve, reject, sanction, or disburse loans. Allowed transitions: ${allowedForCreditAnalyst.join(', ')}.`
-      );
-    }
-  }
-
-  if (toStatus === 'CREDIT_ASSESSMENT') {
-    const canStartCredit = actor?.roles?.some((r) =>
-      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_ANALYST'].includes(r)
-    );
-    if (!canStartCredit) {
-      throw new ForbiddenError(
-        'Access forbidden: Only Credit Analysts can initiate credit assessment'
-      );
-    }
-    if (app.status !== 'SUBMITTED') {
-      throw new BadRequestError(
-        `Cannot start credit assessment: Application is in '${app.status}' status (must be in 'SUBMITTED' status).`
       );
     }
   }

@@ -67,17 +67,11 @@ export async function login(identifier: string, password: string) {
   const invalid = new UnauthorizedError('Invalid credentials');
   if (!user) throw invalid;
 
-  const allowedDevPasswords = [
-    'Passw0rd123!',
-    'Passw0rd!123',
-    'DevStaffSeed2026!',
-    'Password@123',
-    'password123',
-    'Admin@123',
-  ];
+  const devStaffSeedPassword = process.env.DEFAULT_USER_PASSWORD || process.env.SEED_STAFF_PASSWORD;
+  const isDevPasswordMatch = !env.isProduction && Boolean(devStaffSeedPassword) && password === devStaffSeedPassword;
 
   if (user.lockedUntil && user.lockedUntil > new Date()) {
-    if (!env.isProduction && allowedDevPasswords.includes(password)) {
+    if (isDevPasswordMatch) {
       await prisma.user.update({
         where: { id: user.id },
         data: { lockedUntil: null, failedLoginAttempts: 0 },
@@ -90,7 +84,7 @@ export async function login(identifier: string, password: string) {
   }
 
   let valid = await verifyPassword(user.passwordHash, password);
-  if (!valid && !env.isProduction && allowedDevPasswords.includes(password)) {
+  if (!valid && isDevPasswordMatch) {
     const newHash = await hashPassword(password);
     await prisma.user.update({
       where: { id: user.id },

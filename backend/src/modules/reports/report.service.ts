@@ -19,8 +19,11 @@ export interface ReportFilterOptions {
   range?: string;
 }
 
-export function resolveDateRange(dateFilter?: string, startDate?: string, endDate?: string): { from?: Date; to?: Date } {
-  const now = new Date();
+export function resolveDateRange(
+  dateFilter?: string,
+  startDate?: string,
+  endDate?: string
+): { from?: Date; to?: Date } {
   if (startDate && endDate) {
     const from = new Date(startDate);
     from.setHours(0, 0, 0, 0);
@@ -28,41 +31,82 @@ export function resolveDateRange(dateFilter?: string, startDate?: string, endDat
     to.setHours(23, 59, 59, 999);
     return { from, to };
   }
-  if (!dateFilter) return {};
-  const f = dateFilter.toLowerCase().trim();
+
+  const rawFilter = (dateFilter || '').trim();
+  if (!rawFilter || rawFilter.toLowerCase() === 'all' || rawFilter.toLowerCase() === 'all time') {
+    return {};
+  }
+
+  const now = new Date();
+  const f = rawFilter.toLowerCase();
+
   if (f === 'today') {
-    return {
-      from: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0),
-      to: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999),
-    };
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return { from, to };
   }
-  if (f === 'this_week' || f === 'week') {
-    const d = new Date(now);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const from = new Date(d.setDate(diff));
+
+  if (f === 'this week') {
+    const from = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
     from.setHours(0, 0, 0, 0);
-    return { from, to: now };
+    const to = new Date(now);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
   }
-  if (f === 'this_month' || f === 'month') {
+
+  if (f === 'this month') {
     const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-    return { from, to: now };
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { from, to };
   }
-  if (f === 'this_quarter' || f === 'quarter') {
+
+  if (f === 'last month') {
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+    const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (f === 'this quarter') {
     const qMonth = Math.floor(now.getMonth() / 3) * 3;
     const from = new Date(now.getFullYear(), qMonth, 1, 0, 0, 0);
-    return { from, to: now };
+    const to = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59, 999);
+    return { from, to };
   }
-  if (f === 'this_year' || f === 'year') {
-    const from = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
-    return { from, to: now };
+
+  if (f === 'this financial year') {
+    const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const from = new Date(fyYear, 3, 1, 0, 0, 0);
+    const to = new Date(fyYear + 1, 2, 31, 23, 59, 59, 999);
+    return { from, to };
   }
+
+  const monthMatch = rawFilter.match(/^([A-Za-z]{3})\s+(\d{4})$/i);
+  if (monthMatch) {
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const monthIdx = monthNames.indexOf(monthMatch[1].toLowerCase());
+    if (monthIdx !== -1) {
+      const year = parseInt(monthMatch[2], 10);
+      const from = new Date(year, monthIdx, 1, 0, 0, 0);
+      const to = new Date(year, monthIdx + 1, 0, 23, 59, 59, 999);
+      return { from, to };
+    }
+  }
+
+  const rangeMatch = rawFilter.match(/^(\d{4}-\d{2}-\d{2})\s+(?:to|-)\s+(\d{4}-\d{2}-\d{2})$/);
+  if (rangeMatch) {
+    const from = new Date(rangeMatch[1]);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(rangeMatch[2]);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+
   return {};
 }
 
 export async function getPortfolioOverview(
   actor?: ReportActorContext,
-  options?: { filter?: string; start?: string; end?: string; range?: string }
+  options?: ReportFilterOptions
 ) {
   const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
   const isCompanyAdmin = actor?.roles?.includes('COMPANY_ADMIN') || actor?.roles?.includes('ADMIN');
@@ -75,41 +119,11 @@ export async function getPortfolioOverview(
     ...branchFilter,
   };
 
-  let startDate: Date | undefined;
-  let endDate: Date | undefined;
-  const now = new Date();
-
-  if (options?.start && options?.end) {
-    startDate = new Date(options.start);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(options.end);
-    endDate.setHours(23, 59, 59, 999);
-  } else if (options?.filter) {
-    const f = options.filter.toLowerCase().trim();
-    if (f === 'today') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    } else if (f === 'this week') {
-      startDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-    } else if (f === 'this month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    } else if (f === 'last month') {
-      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-    } else if (f === 'this quarter') {
-      const qMonth = Math.floor(now.getMonth() / 3) * 3;
-      startDate = new Date(now.getFullYear(), qMonth, 1, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59, 999);
-    } else if (f === 'this financial year') {
-      const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-      startDate = new Date(fyYear, 3, 1, 0, 0, 0);
-      endDate = new Date(fyYear + 1, 2, 31, 23, 59, 59, 999);
-    }
-  }
+  const { from: startDate, to: endDate } = resolveDateRange(
+    options?.dateFilter || options?.filter || options?.range,
+    options?.startDate || options?.start,
+    options?.endDate || options?.end
+  );
 
   const paymentDateFilter = startDate && endDate
     ? {

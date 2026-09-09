@@ -28,7 +28,7 @@ export const openApiDocument = {
                 required: ['identifier', 'password'],
                 properties: {
                   identifier: { type: 'string', example: 'admin@adyapan.dev' },
-                  password: { type: 'string', example: 'DevStaffSeed2026!' },
+                  password: { type: 'string', example: '********' },
                 },
               },
             },

@@ -46,10 +46,19 @@ export interface GeminiResponse {
   usageMetadata?: any;
 }
 
+const FALLBACK_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+];
+
 /**
  * Centralized server-side execution function for Google Gemini API.
  * Enforces bounded timeouts (Promise.race), client initialization,
- * error sanitization, and structured output.
+ * multi-model fallback resilience, error sanitization, and structured output.
  */
 export async function generateGeminiContent(
   options: GenerateGeminiContentOptions
@@ -61,98 +70,119 @@ export async function generateGeminiContent(
   }
 
   const client = getGeminiClient();
-  const selectedModel = options.model || env.gemini.model || 'gemma-4-31b-it';
+  const primaryModel = options.model || env.gemini.model || 'gemini-3.5-flash';
 
-  let timerHandle: NodeJS.Timeout | null = null;
+  // Build candidate model list with primary first, followed by fallbacks without duplicates
+  const candidateModels = Array.from(new Set([primaryModel, ...FALLBACK_MODELS]));
 
-  try {
-    const config: any = {};
-    if (systemInstruction) {
-      config.systemInstruction = systemInstruction;
-    }
-    if (temperature !== undefined) {
-      config.temperature = temperature;
-    }
+  let lastError: any = null;
 
-    let contents: any;
-    if (inlineData) {
-      contents = [
-        {
-          role: 'user',
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: inlineData.mimeType,
-                data: inlineData.data,
-              },
-            },
-          ],
-        },
-      ];
-    } else {
-      contents = prompt;
-    }
+  for (const selectedModel of candidateModels) {
+    let timerHandle: NodeJS.Timeout | null = null;
 
-    // Execute Gemini call with bounded Promise.race timeout
-    const generatePromise = client.models.generateContent({
-      model: selectedModel,
-      contents,
-      ...(Object.keys(config).length > 0 ? { config } : {}),
-    });
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timerHandle = setTimeout(() => {
-        reject(
-          new AppError(
-            504,
-            'AI_GATEWAY_TIMEOUT',
-            `AI intelligence request timed out after ${timeoutMs}ms. Please retry.`
-          )
-        );
-      }, timeoutMs);
-
-      if (typeof timerHandle.unref === 'function') {
-        timerHandle.unref();
+    try {
+      const config: any = {};
+      if (systemInstruction) {
+        config.systemInstruction = systemInstruction;
       }
-    });
+      if (temperature !== undefined) {
+        config.temperature = temperature;
+      }
 
-    const response = await Promise.race([generatePromise, timeoutPromise]);
-    if (timerHandle) {
-      clearTimeout(timerHandle);
-      timerHandle = null;
-    }
+      let contents: any;
+      if (inlineData) {
+        contents = [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: inlineData.mimeType,
+                  data: inlineData.data,
+                },
+              },
+            ],
+          },
+        ];
+      } else {
+        contents = prompt;
+      }
 
-    const text = response.text || '';
-    const candidate = response.candidates?.[0];
-    const finishReason = candidate?.finishReason || 'STOP';
-
-    return {
-      text,
-      model: selectedModel,
-      finishReason,
-      usageMetadata: response.usageMetadata,
-    };
-  } catch (error: any) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
-    // Sanitize error message to prevent accidental key exposure
-    const rawMessage = error?.message || 'Unknown error occurred during Gemini execution';
-    const sanitizedMessage = rawMessage.replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_API_KEY]');
-
-    logger.error(
-      {
+      // Execute Gemini call with bounded Promise.race timeout
+      const generatePromise = client.models.generateContent({
         model: selectedModel,
-        errorMessage: sanitizedMessage,
-        errorCode: error?.status || error?.code,
-      },
-      'Google Gemini API call failed'
-    );
+        contents,
+        ...(Object.keys(config).length > 0 ? { config } : {}),
+      });
 
-    throw new AppError(503, 'AI_SERVICE_ERROR', `AI Service Unavailable: ${sanitizedMessage}`);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timerHandle = setTimeout(() => {
+          reject(
+            new AppError(
+              504,
+              'AI_GATEWAY_TIMEOUT',
+              `AI intelligence request timed out after ${timeoutMs}ms. Please retry.`
+            )
+          );
+        }, timeoutMs);
+
+        if (typeof timerHandle.unref === 'function') {
+          timerHandle.unref();
+        }
+      });
+
+      const response = await Promise.race([generatePromise, timeoutPromise]);
+      if (timerHandle) {
+        clearTimeout(timerHandle);
+        timerHandle = null;
+      }
+
+      const text = response.text || '';
+      const candidate = response.candidates?.[0];
+      const finishReason = candidate?.finishReason || 'STOP';
+
+      return {
+        text,
+        model: selectedModel,
+        finishReason,
+        usageMetadata: response.usageMetadata,
+      };
+    } catch (error: any) {
+      if (timerHandle) {
+        clearTimeout(timerHandle);
+        timerHandle = null;
+      }
+
+      // If user passed explicit timeout or bad request error, rethrow immediately
+      if (error instanceof AppError && error.statusCode !== 504) {
+        throw error;
+      }
+
+      lastError = error;
+      logger.warn(
+        {
+          model: selectedModel,
+          errorMessage: error?.message,
+        },
+        'Gemini model attempt failed, attempting fallback model...'
+      );
+    }
   }
+
+  // All candidates failed — sanitize and format error
+  const rawMessage = lastError?.message || 'Unknown error occurred during Gemini execution';
+  const sanitizedMessage = rawMessage.replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_API_KEY]');
+
+  logger.error(
+    {
+      errorMessage: sanitizedMessage,
+      errorCode: lastError?.status || lastError?.code,
+    },
+    'All Google Gemini model fallbacks failed'
+  );
+
+  throw new AppError(503, 'AI_SERVICE_ERROR', `AI Service Unavailable: ${sanitizedMessage}`);
 }
 
 /**

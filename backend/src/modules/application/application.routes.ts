@@ -8,7 +8,6 @@ import { tenantContext } from '../../middleware/tenant-context';
 import { validate } from '../../middleware/validate';
 import { createApplicationSchema, transitionSchema } from './application.schema';
 import * as service from './application.service';
-import { startCreditAssessment } from '../credit/credit.service';
 
 const router = Router();
 router.use(authenticate);
@@ -103,23 +102,6 @@ router.post(
       )
     );
   }),
-);
-
-/**
- * POST /api/v1/applications/:id/start-assessment
- * Initiates formal credit assessment (SUBMITTED -> CREDIT_ASSESSMENT).
- */
-router.post(
-  '/:id/start-assessment',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_ANALYST'),
-  asyncHandler(async (req, res) => {
-    const result = await startCreditAssessment(req.params.id, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    return ok(res, result);
-  })
 );
 
 export default router;
