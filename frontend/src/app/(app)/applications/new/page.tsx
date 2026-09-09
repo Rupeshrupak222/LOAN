@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ArrowRight,
@@ -18,12 +18,35 @@ import {
   Layers,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Card, Input } from '@/components/ui';
 import { cn, formatMoney } from '@/lib/utils';
 
 export default function NewApplicationPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isBranchManagerOnly =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r));
+
+  const isFinanceOfficerOnly =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
+
+  const isCollectionOfficerOnly =
+    user?.roles?.includes('COLLECTION_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
+
+  useEffect(() => {
+    if (isBranchManagerOnly) {
+      router.replace('/branch-review');
+    } else if (isFinanceOfficerOnly || isCollectionOfficerOnly) {
+      router.replace('/dashboard');
+    }
+  }, [isBranchManagerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, router]);
+
   const [step, setStep] = useState(1);
 
   // Form State
@@ -53,6 +76,19 @@ export default function NewApplicationPage() {
 
   const selectedCustomer = customersData?.find((c: any) => c.id === customerId);
   const selectedProduct = productsData?.find((p: any) => p.id === productId);
+
+  if (isBranchManagerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Access Restricted
+        </p>
+        <p className="text-xs text-slate-400">
+          Loan application origination is restricted to Loan Officers. Branch Managers review proposals via the Branch Review Desk.
+        </p>
+      </Card>
+    );
+  }
 
   // When a preset product is clicked, autofill custom inputs
   function handleSelectPreset(p: any) {
@@ -92,6 +128,11 @@ export default function NewApplicationPage() {
         tenureMonths: tenureNum,
         purpose,
       });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       router.push(`/applications/${res.data.data.id}`);
     } catch (err) {
       setError(apiErrorMessage(err));

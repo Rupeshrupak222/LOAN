@@ -23,9 +23,17 @@ export interface CreatePaymentSubmissionInput {
   notes?: string;
 }
 
+export interface SubmissionActorContext {
+  id: string;
+  roles: string[];
+  email?: string;
+  tenantId?: string;
+  branchId?: string;
+}
+
 export async function createPaymentSubmission(
   input: CreatePaymentSubmissionInput,
-  actorUser: { id: string; roles: string[]; email?: string }
+  actorUser: SubmissionActorContext
 ) {
   const loan = await prisma.loan.findUnique({
     where: { id: input.loanId },
@@ -39,9 +47,16 @@ export async function createPaymentSubmission(
     throw new NotFoundError('Loan account not found');
   }
 
+  // Check tenant isolation
+  if (!actorUser.roles.includes('SUPER_ADMIN') && actorUser.tenantId) {
+    if (loan.tenantId && loan.tenantId !== actorUser.tenantId) {
+      throw new BadRequestError('Access forbidden: Loan account belongs to another institution');
+    }
+  }
+
   // Check if customer is making submission for their own loan
   const isStaff = actorUser.roles.some((r) =>
-    ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
   );
 
   if (!isStaff && loan.customer.userId !== actorUser.id) {
@@ -132,13 +147,28 @@ export async function listPaymentSubmissions(
   status?: string,
   loanId?: string,
   customerId?: string,
-  userIdFilter?: string
+  userIdFilter?: string,
+  actor?: SubmissionActorContext
 ) {
   const where: any = {};
   if (status) where.status = status;
   if (loanId) where.loanId = loanId;
   if (customerId) where.customerId = customerId;
   if (userIdFilter) where.customer = { userId: userIdFilter };
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.loan = { ...where.loan, tenantId: actor.tenantId };
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') ||
+        actor.roles?.includes('LOAN_OFFICER') ||
+        actor.roles?.includes('COLLECTION_OFFICER')) &&
+      actor.branchId
+    ) {
+      where.loan = { ...where.loan, branchId: actor.branchId };
+    }
+  }
 
   if (params.search) {
     where.OR = [
@@ -199,8 +229,15 @@ export async function listPaymentSubmissions(
 
 export async function verifyPaymentSubmission(
   submissionId: string,
-  actorUser: { id: string; email?: string; roles: string[] }
+  actorUser: SubmissionActorContext
 ) {
+  const isAuthorized = actorUser.roles?.some((r) =>
+    ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new BadRequestError('Access forbidden: You do not have permission to verify payment submissions.');
+  }
+
   const submission = await prisma.paymentSubmission.findUnique({
     where: { id: submissionId },
     include: {
@@ -217,6 +254,12 @@ export async function verifyPaymentSubmission(
     throw new NotFoundError('Payment submission not found');
   }
 
+  if (!actorUser.roles.includes('SUPER_ADMIN') && actorUser.tenantId) {
+    if (submission.loan.tenantId && submission.loan.tenantId !== actorUser.tenantId) {
+      throw new BadRequestError('Access forbidden: Payment submission belongs to another institution');
+    }
+  }
+
   if (submission.status !== 'PENDING_VERIFICATION') {
     throw new BadRequestError(`Payment submission is already ${submission.status}`);
   }
@@ -230,7 +273,8 @@ export async function verifyPaymentSubmission(
       reference: submission.reference,
       paidAt: submission.paidAt,
     },
-    actorUser.id
+    actorUser.id,
+    actorUser
   );
 
   // 2. Mark submission as VERIFIED
@@ -274,8 +318,15 @@ export async function verifyPaymentSubmission(
 export async function rejectPaymentSubmission(
   submissionId: string,
   reason: string,
-  actorUser: { id: string; email?: string; roles: string[] }
+  actorUser: SubmissionActorContext
 ) {
+  const isAuthorized = actorUser.roles?.some((r) =>
+    ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new BadRequestError('Access forbidden: You do not have permission to reject payment submissions.');
+  }
+
   const submission = await prisma.paymentSubmission.findUnique({
     where: { id: submissionId },
     include: {
@@ -286,6 +337,12 @@ export async function rejectPaymentSubmission(
 
   if (!submission) {
     throw new NotFoundError('Payment submission not found');
+  }
+
+  if (!actorUser.roles.includes('SUPER_ADMIN') && actorUser.tenantId) {
+    if (submission.loan.tenantId && submission.loan.tenantId !== actorUser.tenantId) {
+      throw new BadRequestError('Access forbidden: Payment submission belongs to another institution');
+    }
   }
 
   if (submission.status !== 'PENDING_VERIFICATION') {

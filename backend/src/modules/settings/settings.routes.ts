@@ -12,6 +12,7 @@ router.use(authenticate);
 
 router.get(
   '/',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (_req, res) => {
     const settings = await listSettings();
     res.json(success(settings));
@@ -20,6 +21,7 @@ router.get(
 
 router.get(
   '/:key',
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const setting = await getSettingByKey(req.params.key);
     res.json(success(setting));
@@ -28,10 +30,14 @@ router.get(
 
 router.put(
   '/:key',
-  authorize('SUPER_ADMIN', 'ADMIN'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(z.object({ value: z.any() })),
   asyncHandler(async (req, res) => {
-    const updated = await updateSetting(req.params.key, req.body.value, req.user?.id);
+    const updated = await updateSetting(req.params.key, req.body.value, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+    });
     res.json(success(updated));
   })
 );

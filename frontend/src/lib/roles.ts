@@ -18,6 +18,8 @@ export type NavKey =
   | 'customers'
   | 'applications'
   | 'loan-products'
+  | 'credit-assessment'
+  | 'branch-review'
   | 'underwriting'
   | 'loans'
   | 'disbursements'
@@ -28,7 +30,22 @@ export type NavKey =
   | 'branches'
   | 'users'
   | 'settings'
-  | 'audit-logs';
+  | 'audit-logs'
+  | 'fraud-intelligence'
+  | 'integrations'
+  | 'early-warnings'
+  | 'reconciliation'
+  | 'partners'
+  | 'communications'
+  | 'command-center'
+  | 'operations'
+  | 'compliance'
+  | 'privacy'
+  | 'tenants'
+  | 'roles'
+  | 'workflows'
+  | 'configuration'
+  | 'branding';
 
 export type NavGroupKey =
   | 'OVERVIEW'
@@ -50,17 +67,34 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
   applications: { key: 'applications', href: '/applications', label: 'Loan Applications', group: 'LENDING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
+  'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment Desk', group: 'LENDING' },
+  'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
   underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting Queue', group: 'LENDING' },
   loans: { key: 'loans', href: '/loans', label: 'Loan Accounts', group: 'LENDING' },
   disbursements: { key: 'disbursements', href: '/disbursements', label: 'Disbursements', group: 'LENDING' },
+  partners: { key: 'partners', href: '/partners', label: 'Partners & DSAs', group: 'LENDING' },
   payments: { key: 'payments', href: '/payments', label: 'Payments Ledger', group: 'SERVICING' },
   collections: { key: 'collections', href: '/collections', label: 'Collections & Delinquency', group: 'SERVICING' },
+  reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Accounting & Recon', group: 'SERVICING' },
+  communications: { key: 'communications', href: '/communications', label: 'Omnichannel Hub', group: 'SERVICING' },
+  'command-center': { key: 'command-center', href: '/command-center', label: 'AI Command Center', group: 'INSIGHTS' },
+  operations: { key: 'operations', href: '/operations', label: 'Operations & Observability', group: 'INSIGHTS' },
+  compliance: { key: 'compliance', href: '/compliance', label: 'Regulatory & Compliance', group: 'INSIGHTS' },
+  privacy: { key: 'privacy', href: '/privacy', label: 'Privacy & Consent', group: 'ADMINISTRATION' },
   reports: { key: 'reports', href: '/reports', label: 'Reports & Analytics', group: 'INSIGHTS' },
+  'fraud-intelligence': { key: 'fraud-intelligence', href: '/fraud-intelligence', label: 'Fraud & Anomaly Intelligence', group: 'INSIGHTS' },
+  'early-warnings': { key: 'early-warnings', href: '/early-warnings', label: 'Early Warning Center', group: 'INSIGHTS' },
   'emi-calculator': { key: 'emi-calculator', href: '/emi-calculator', label: 'EMI Calculator', group: 'INSIGHTS' },
   branches: { key: 'branches', href: '/branches', label: 'Branch Directory', group: 'ADMINISTRATION' },
   users: { key: 'users', href: '/users', label: 'Staff Users', group: 'ADMINISTRATION' },
+  tenants: { key: 'tenants', href: '/tenants', label: 'Lender Tenants', group: 'ADMINISTRATION' },
+  roles: { key: 'roles', href: '/roles', label: 'Roles & Permissions', group: 'ADMINISTRATION' },
+  workflows: { key: 'workflows', href: '/workflows', label: 'Workflow Studio', group: 'ADMINISTRATION' },
+  configuration: { key: 'configuration', href: '/configuration', label: 'Policy Configuration', group: 'ADMINISTRATION' },
+  branding: { key: 'branding', href: '/branding', label: 'Branding & White-Label', group: 'ADMINISTRATION' },
   settings: { key: 'settings', href: '/settings', label: 'System Settings', group: 'ADMINISTRATION' },
   'audit-logs': { key: 'audit-logs', href: '/audit-logs', label: 'Audit Logs', group: 'ADMINISTRATION' },
+  integrations: { key: 'integrations', href: '/integrations', label: 'Integration Hub', group: 'ADMINISTRATION' },
 };
 
 export interface RoleConfig {
@@ -83,14 +117,29 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'underwriting',
       'loans',
       'disbursements',
+      'partners',
       'payments',
       'collections',
+      'reconciliation',
+      'communications',
+      'command-center',
+      'operations',
+      'compliance',
+      'privacy',
       'reports',
+      'fraud-intelligence',
+      'early-warnings',
       'emi-calculator',
       'branches',
       'users',
+      'tenants',
+      'roles',
+      'workflows',
+      'configuration',
+      'branding',
       'settings',
       'audit-logs',
+      'integrations',
     ],
     landing: '/dashboard',
     dashboard: 'SUPER_ADMIN',
@@ -102,11 +151,19 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'users',
       'branches',
+      'roles',
       'loan-products',
+      'configuration',
+      'workflows',
       'settings',
+      'branding',
+      'integrations',
       'audit-logs',
+      'privacy',
+      'operations',
+      'command-center',
+      'compliance',
       'reports',
-      'emi-calculator',
     ],
     landing: '/dashboard',
     dashboard: 'ADMIN',
@@ -120,6 +177,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'applications',
       'loans',
       'loan-products',
+      'communications',
       'emi-calculator',
     ],
     landing: '/dashboard',
@@ -127,13 +185,15 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   CREDIT_ANALYST: {
     label: 'Credit Analyst',
-    description: 'Credit assessment, policy eligibility scoring, and 4-pillar risk analysis',
+    description: 'Credit assessment, policy eligibility scoring, and repayment capacity evaluation',
     nav: [
       'dashboard',
       'applications',
-      'underwriting',
+      'credit-assessment',
       'customers',
       'reports',
+      'fraud-intelligence',
+      'early-warnings',
       'emi-calculator',
     ],
     landing: '/dashboard',
@@ -148,8 +208,9 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'applications',
       'underwriting',
       'loans',
-      'disbursements',
       'reports',
+      'fraud-intelligence',
+      'early-warnings',
       'emi-calculator',
     ],
     landing: '/dashboard',
@@ -160,10 +221,13 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Pre-disbursement checks, electronic fund release, repayments, and NOC closure',
     nav: [
       'dashboard',
-      'loans',
       'disbursements',
       'payments',
+      'loans',
+      'reconciliation',
       'reports',
+      'fraud-intelligence',
+      'early-warnings',
       'emi-calculator',
     ],
     landing: '/dashboard',
@@ -175,9 +239,11 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     nav: [
       'dashboard',
       'collections',
-      'payments',
       'loans',
       'customers',
+      'payments',
+      'early-warnings',
+      'fraud-intelligence',
       'emi-calculator',
     ],
     landing: '/dashboard',
@@ -185,36 +251,53 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   BRANCH_MANAGER: {
     label: 'Branch Manager',
-    description: 'Branch portfolio, local originations, branch approvals, and staff oversight',
+    description: 'Branch portfolio, local originations, management approvals within limit, and staff oversight',
     nav: [
       'dashboard',
-      'customers',
+      'branch-review',
       'applications',
-      'underwriting',
+      'customers',
       'loans',
-      'disbursements',
+      'partners',
       'payments',
       'collections',
-      'reports',
-      'branches',
       'users',
-      'emi-calculator',
+      'reports',
+      'early-warnings',
+      'fraud-intelligence',
+      'branches',
+      'communications',
+      'command-center',
     ],
     landing: '/dashboard',
     dashboard: 'BRANCH_MANAGER',
   },
   AUDITOR: {
     label: 'Auditor',
-    description: 'Read-only compliance audit, immutable ledger, and security inspection',
+    description: 'Independent tenant-wide compliance audit, immutable ledger, and security inspection',
     nav: [
       'dashboard',
-      'audit-logs',
-      'reports',
       'customers',
       'applications',
       'loans',
-      'disbursements',
       'payments',
+      'reconciliation',
+      'collections',
+      'underwriting',
+      'disbursements',
+      'compliance',
+      'reports',
+      'fraud-intelligence',
+      'early-warnings',
+      'privacy',
+      'roles',
+      'branches',
+      'configuration',
+      'workflows',
+      'settings',
+      'integrations',
+      'audit-logs',
+      'command-center',
     ],
     landing: '/dashboard',
     dashboard: 'AUDITOR',
@@ -227,6 +310,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'loans',
       'payments',
       'emi-calculator',
+      'privacy',
     ],
     landing: '/dashboard',
     dashboard: 'CUSTOMER',

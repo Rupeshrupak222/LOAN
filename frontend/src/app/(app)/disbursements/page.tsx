@@ -3,29 +3,42 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, CheckCircle2, Building, ShieldCheck, ArrowRight, Wallet, CheckSquare, X, History, Clock, FileText } from 'lucide-react';
+import { Send, CheckCircle2, Building, ShieldCheck, ArrowRight, Wallet, CheckSquare, X, History, Clock, FileText, Sparkles, Lock } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { useToast } from '@/lib/toast';
+import { DisbursementIntelligenceCard } from '@/components/DisbursementIntelligenceCard';
 
 export default function DisbursementsPage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'QUEUE' | 'HISTORY'>('QUEUE');
   const [selectedApp, setSelectedApp] = useState<any | null>(null);
   const [method, setMethod] = useState('NEFT_BANK_TRANSFER');
   const [reference, setReference] = useState('');
 
   const canExecutePayout = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
+
+  const isDisbursementAuthorized = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'AUDITOR'].includes(r)
+  );
+
+  const isBranchManagerRestricted =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r));
 
   const { data: queueData, isLoading: queueLoading } = useQuery({
     queryKey: ['disbursements-queue'],
+    enabled: isDisbursementAuthorized && !isBranchManagerRestricted,
     queryFn: async () => {
       const res = await api.get('/disbursements/queue');
       const rows = res.data?.data;
@@ -35,6 +48,7 @@ export default function DisbursementsPage() {
 
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['disbursements-history'],
+    enabled: isDisbursementAuthorized && !isBranchManagerRestricted,
     queryFn: async () => {
       const res = await api.get('/disbursements/history');
       const rows = res.data?.data;
@@ -50,23 +64,127 @@ export default function DisbursementsPage() {
         referenceNumber: reference,
       }),
     onSuccess: () => {
+      toast.success('Loan disbursed successfully and active loan account initialized.');
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-history'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['loan'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-count'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setSelectedApp(null);
       setReference('');
       setActiveTab('HISTORY');
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Disbursement Release Notice' });
+    },
   });
 
-  if (queueLoading || historyLoading) return <Spinner />;
+  if (isBranchManagerRestricted) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Lending / Disbursements"
+          title="Disbursement & Fund Release"
+          subtitle="Electronic fund execution is restricted to Finance & Treasury Officers"
+        />
+
+        <div
+          className={cn(
+            "max-w-2xl mx-auto rounded-2xl border p-8 text-center space-y-5 my-8 shadow-sm transition-colors",
+            isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          )}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight">
+              Fund Release Authority Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Branch Managers do not have authority to release funds or execute loan disbursements. Your authority covers branch application review, credit report assessment, and management approvals up to <strong className="text-slate-900 dark:text-white">₹5,00,000</strong>.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, electronic fund transfers and disbursement queues are managed exclusively by Finance & Treasury officers.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/branch-review">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                Go to Branch Applications Desk →
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="md" variant="secondary">
+                Return to Dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && !isDisbursementAuthorized) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Lending / Disbursements"
+          title="Disbursement & Fund Release"
+          subtitle="Access Restricted"
+        />
+
+        <div
+          className={cn(
+            "max-w-2xl mx-auto rounded-2xl border p-8 text-center space-y-5 my-8 shadow-sm transition-colors",
+            isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          )}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight">
+              Fund Release Authority Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Collection Officers do not have authority to release funds or execute loan disbursements. Your role is dedicated to borrower follow-ups, delinquency recovery, and recording repayments after disbursement.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, electronic fund transfers and disbursement queues are managed exclusively by Finance & Treasury officers.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/collections">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                Go to Collections Desk →
+              </Button>
+            </Link>
+            <Link href="/loans">
+              <Button size="md" variant="secondary">
+                View Loan Accounts
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (queueLoading || historyLoading) return <TableSkeleton rows={6} cols={5} />;
 
   const queue = Array.isArray(queueData) ? queueData : [];
   const history = Array.isArray(historyData) ? historyData : [];
@@ -336,12 +454,12 @@ export default function DisbursementsPage() {
         </Card>
       )}
 
-      {/* DIRECT DISBURSEMENT EXECUTION MODAL (Matching Image 2) */}
+      {/* DIRECT DISBURSEMENT EXECUTION MODAL */}
       {selectedApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
           <div
             className={cn(
-              "w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-4 transition-all",
+              "w-full max-w-2xl rounded-2xl border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto transition-all",
               isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
             )}
           >
@@ -361,6 +479,13 @@ export default function DisbursementsPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* AI Disbursement & Treasury Readiness Card */}
+            <DisbursementIntelligenceCard
+              applicationId={selectedApp.id}
+              applicationNo={selectedApp.applicationNo}
+              utrReference={reference}
+            />
 
             {/* Proposal Summary */}
             <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#1E2445] text-xs space-y-1.5 border border-slate-200/60 dark:border-[#2B3566]">
@@ -390,19 +515,6 @@ export default function DisbursementsPage() {
                   ({selectedApp.customer?.bankAccounts?.[0]?.ifscCode || selectedApp.customer?.bankIfsc || 'IFSC'})
                 </span>
               </div>
-            </div>
-
-            {/* Pre-Disbursement Checklist */}
-            <div
-              className={cn(
-                "rounded-xl border p-3 space-y-1 text-xs",
-                isDark ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]" : "border-emerald-200 bg-emerald-50 text-emerald-900"
-              )}
-            >
-              <p className="font-bold">✓ Pre-Disbursement Verification Complete:</p>
-              <p>• Underwriting sanction authorized</p>
-              <p>• Borrower KYC verification status: {selectedApp.customer?.kycStatus || 'VERIFIED'}</p>
-              <p>• Destination bank beneficiary validated</p>
             </div>
 
             <div className="space-y-3">

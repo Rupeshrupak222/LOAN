@@ -16,17 +16,38 @@ import {
   User,
   ArrowRight,
   ShieldAlert,
+  Receipt,
+  Scale,
+  Clock,
+  XCircle,
+  Send,
+  History,
+  AlertTriangle,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
+import { DetailPageSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 export default function LoanDetailPage() {
   const params = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
+
+  // Role separation checks
+  const isCustomer = user?.roles?.includes('CUSTOMER');
+  const isCollectionOfficer = user?.roles?.includes('COLLECTION_OFFICER');
+  const isFinanceOfficer =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN'].includes(r));
+  const canCollectRepayment =
+    isCustomer || user?.roles?.some((r: string) => ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(r));
+  const canVerifyFinance =
+    user?.roles?.some((r: string) => ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r));
 
   // Modals
   const [payModalOpen, setPayModalOpen] = useState(false);
@@ -37,7 +58,9 @@ export default function LoanDetailPage() {
   const [payNotes, setPayNotes] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const isCustomer = user?.roles?.includes('CUSTOMER');
+  // Rejection/Exception modal for Finance Officer
+  const [rejectModalSubId, setRejectModalSubId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('Payment mismatch with bank credit records');
 
   const [restructureModalOpen, setRestructureModalOpen] = useState(false);
   const [newTenure, setNewTenure] = useState(36);
@@ -55,7 +78,7 @@ export default function LoanDetailPage() {
     queryFn: async () => (await api.get(`/loans/${params.id}`)).data.data,
   });
 
-  // Borrower Payment Submission Mutation
+  // 1. Borrower Payment Submission Mutation (for customer self-intimation)
   const submissionMutation = useMutation({
     mutationFn: async () =>
       api.post('/payments/submissions', {
@@ -67,8 +90,10 @@ export default function LoanDetailPage() {
         notes: payNotes,
       }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('Repayment submission initiated successfully.');
       setSubmitSuccess(true);
       setTimeout(() => {
         setPayModalOpen(false);
@@ -78,29 +103,79 @@ export default function LoanDetailPage() {
         setPayNotes('');
       }, 1500);
     },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Repayment Submission Notice' });
+    },
   });
 
-  // Staff Make Payment Mutation
-  const paymentMutation = useMutation({
+  // 2. Collection Officer Collect Repayment Mutation (submits to Finance verification)
+  const collectRepaymentMutation = useMutation({
     mutationFn: async () =>
-      api.post('/payments', {
+      api.post('/payments/collect', {
         loanId: params.id,
         amount: Number(payAmount),
         method: payMethod,
         reference: payReference,
+        payerMobile: payMobile || (data?.customer?.mobile || undefined),
+        notes: payNotes,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success(
+        'Repayment Recorded',
+        `Repayment collection of ₹${Number(payAmount).toLocaleString('en-IN')} recorded successfully. Submitted for Finance verification & reconciliation.`
+      );
+      setSubmitSuccess(true);
+      setTimeout(() => {
+        setPayModalOpen(false);
+        setSubmitSuccess(false);
+        setPayAmount('');
+        setPayReference('');
+        setPayNotes('');
+      }, 1500);
+    },
+    onError: (err: any) => {
+      toast.error('Collection Recording Failed', apiErrorMessage(err));
+    },
+  });
+
+  // 3. Finance Officer Verify Submission Mutation
+  const verifySubmissionMutation = useMutation({
+    mutationFn: async (submissionId: string) =>
+      api.post(`/payments/submissions/${submissionId}/verify`),
+    onSuccess: () => {
+      toast.success(
+        'Payment Verified & Settled',
+        'Payment verified and settled into double-entry accounting ledger via waterfall allocation.'
+      );
+      queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
-      queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
-      setPayModalOpen(false);
-      setPayAmount('');
-      setPayReference('');
+      queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (err: any) => {
+      toast.error('Verification Failed', apiErrorMessage(err));
+    },
+  });
+
+  // 4. Finance Officer Reject / Exception Mutation
+  const rejectSubmissionMutation = useMutation({
+    mutationFn: async ({ submissionId, reason }: { submissionId: string; reason: string }) =>
+      api.post(`/payments/submissions/${submissionId}/reject`, { reason }),
+    onSuccess: () => {
+      toast.warning('Payment Submission Rejected', 'Payment exception recorded and borrower/collector notified.');
+      setRejectModalSubId(null);
+      setRejectReason('');
+      queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+    },
+    onError: (err: any) => {
+      toast.error('Exception Handling Failed', apiErrorMessage(err));
     },
   });
 
@@ -114,32 +189,42 @@ export default function LoanDetailPage() {
         reason: restructureReason,
       }),
     onSuccess: () => {
+      toast.success('Loan restructuring applied successfully.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setRestructureModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Restructuring Notice' });
     },
   });
 
   // Settlement Mutation
   const settlementMutation = useMutation({
     mutationFn: async () =>
-      api.post('/restructuring/settlement', {
+      api.post('/restructuring/settle', {
         loanId: params.id,
         settlementAmount: Number(settleAmount),
         reason: settleReason,
       }),
     onSuccess: () => {
+      toast.success('One-Time Settlement applied. Loan account status updated.');
       queryClient.invalidateQueries({ queryKey: ['loan', params.id] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setSettleModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Settlement Processing Notice' });
     },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
       <div className="py-12 text-center space-y-3">
@@ -157,6 +242,8 @@ export default function LoanDetailPage() {
   const branch = data.branch || {};
   const metrics = data.metrics || {};
   const schedule = Array.isArray(data.schedule) ? data.schedule : [];
+  const submissions = Array.isArray(data.paymentSubmissions) ? data.paymentSubmissions : [];
+  const settledPayments = Array.isArray(data.payments) ? data.payments : [];
 
   return (
     <div className="space-y-6">
@@ -170,20 +257,44 @@ export default function LoanDetailPage() {
             <Badge status={data.status} />
             {data.status !== 'CLOSED' && data.status !== 'SETTLED' && (
               <>
-                {!user?.roles?.includes('AUDITOR') && (
+                {/* Collection Officer / Customer: Primary Repayment Collection Action */}
+                {(canCollectRepayment || user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER'].includes(r))) && (
                   <Button
                     size="sm"
                     onClick={() => {
                       setPayAmount(String(data.emiAmount || ''));
                       setPayModalOpen(true);
                     }}
-                    className={cn("flex items-center gap-1.5 text-white font-semibold shadow-sm", isCustomer ? "bg-[#2563EB] hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700")}
+                    className={cn(
+                      "flex items-center gap-1.5 text-white font-semibold shadow-sm",
+                      isCustomer ? "bg-[#2563EB] hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"
+                    )}
                   >
                     <CreditCard className="h-3.5 w-3.5" />
                     {isCustomer ? 'Submit EMI Payment Proof' : 'Collect Repayment'}
                   </Button>
                 )}
-                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+
+                {/* Finance Officer: Accounting & Verification Actions (NOT primary collection) */}
+                {isFinanceOfficer && (
+                  <>
+                    <Link href={`/payments?loanId=${data.id}`}>
+                      <Button size="sm" variant="secondary" className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Receipt className="h-3.5 w-3.5 text-[#2563EB]" />
+                        Verify Payments & Ledger
+                      </Button>
+                    </Link>
+                    <Link href="/reconciliation">
+                      <Button size="sm" variant="secondary" className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Scale className="h-3.5 w-3.5 text-purple-600" />
+                        Reconcile
+                      </Button>
+                    </Link>
+                  </>
+                )}
+
+                {/* Branch Manager / Admin / Finance Actions */}
+                {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'FINANCE_OFFICER'].includes(r)) && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setRestructureModalOpen(true)}>
                       Restructure
@@ -241,6 +352,7 @@ export default function LoanDetailPage() {
             </h3>
             <dl className="divide-y divide-slate-100 text-xs sm:text-sm">
               <Row label="Loan ID" value={<span className="font-mono text-brand-700 font-bold">{data.loanNo}</span>} />
+              <Row label="Customer ID" value={<span className="font-mono text-slate-700 font-semibold">{customer.customerCode || 'N/A'}</span>} />
               <Row
                 label="Borrower"
                 value={
@@ -261,6 +373,32 @@ export default function LoanDetailPage() {
               <Row label="Monthly EMI" value={<span className="font-bold text-emerald-600">{formatMoney(data.emiAmount || 0)}</span>} />
               <Row label="Disbursed Date" value={data.disbursementDate ? formatDate(data.disbursementDate) : '-'} />
               <Row label="Next Due Date" value={data.nextDueDate ? formatDate(data.nextDueDate) : 'N/A'} />
+              <Row
+                label="Overdue Amount"
+                value={
+                  metrics.overdueAmount && Number(metrics.overdueAmount) > 0 ? (
+                    <span className="font-bold text-rose-600 font-mono">
+                      {formatMoney(metrics.overdueAmount)}
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 font-semibold">₹0.00 (Current)</span>
+                  )
+                }
+              />
+              <Row
+                label="Days Past Due (DPD)"
+                value={
+                  metrics.dpd && Number(metrics.dpd) > 0 ? (
+                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                      {metrics.dpd} DPD
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      0 DPD (Standard)
+                    </span>
+                  )
+                }
+              />
               <Row label="Account Status" value={<Badge status={data.status} />} />
             </dl>
           </Card>
@@ -279,6 +417,7 @@ export default function LoanDetailPage() {
 
         {/* Schedule & Breakdown Tabs */}
         <div className="space-y-6 lg:col-span-2">
+          {/* Amortization Schedule */}
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -289,11 +428,17 @@ export default function LoanDetailPage() {
                 <Button size="sm" onClick={() => { setPayAmount(String(data.emiAmount || '')); setPayModalOpen(true); }} className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold gap-1 shadow-sm">
                   <CreditCard className="w-3.5 h-3.5" /> Submit Payment Proof
                 </Button>
-              ) : (
+              ) : canCollectRepayment ? (
                 <Button size="sm" variant="secondary" onClick={() => { setPayAmount(String(data.emiAmount || '')); setPayModalOpen(true); }} className="text-xs">
                   Collect EMI
                 </Button>
-              )}
+              ) : isFinanceOfficer ? (
+                <Link href={`/payments?loanId=${data.id}`}>
+                  <Button size="sm" variant="secondary" className="text-xs text-[#2563EB] font-bold">
+                    Verify & Reconcile Payments →
+                  </Button>
+                </Link>
+              ) : null}
             </div>
 
             <div className="overflow-x-auto">
@@ -327,10 +472,186 @@ export default function LoanDetailPage() {
               </table>
             </div>
           </Card>
+
+          {/* Recorded Collections & Payment Submissions Section */}
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Recorded Collections & Payment Submissions</h3>
+                <p className="text-xs text-slate-400">
+                  Collections recorded by Collection Officers awaiting Finance verification and ledger settlement
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+                {submissions.length} Total Records
+              </span>
+            </div>
+
+            {submissions.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">
+                No payment collections or submissions recorded for this loan yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Ref / Sub #</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Channel</th>
+                      <th className="py-2.5 px-3">UTR / Reference</th>
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Notes / Collector</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      {canVerifyFinance && <th className="py-2.5 px-3 text-right">Finance Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {submissions.map((sub: any) => (
+                      <tr key={sub.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-[#2563EB]">
+                          {sub.submissionNo || sub.id.slice(0, 8)}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-600">
+                          {formatMoney(sub.amount || 0)}
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold">{sub.method}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700 font-medium">
+                          {sub.reference}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-500">
+                          {sub.paidAt ? formatDate(sub.paidAt) : formatDate(sub.createdAt)}
+                        </td>
+                        <td className="py-2.5 px-3 max-w-xs truncate text-[11px] text-slate-500">
+                          {sub.notes || '-'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {sub.status === 'PENDING_VERIFICATION' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                              <Clock className="w-3 h-3" /> Awaiting Finance Verification
+                            </span>
+                          ) : sub.status === 'VERIFIED' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                              <CheckCircle2 className="w-3 h-3" /> Verified & Settled
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                              <XCircle className="w-3 h-3" /> Rejected
+                            </span>
+                          )}
+                        </td>
+                        {canVerifyFinance && (
+                          <td className="py-2.5 px-3 text-right">
+                            {sub.status === 'PENDING_VERIFICATION' ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  onClick={() => verifySubmissionMutation.mutate(sub.id)}
+                                  disabled={verifySubmissionMutation.isPending}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold gap-1 py-1 px-2.5 h-7"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {verifySubmissionMutation.isPending ? 'Verifying...' : 'Verify & Settle'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setRejectModalSubId(sub.id)}
+                                  className="text-[11px] text-rose-600 hover:bg-rose-50 py-1 px-2 h-7"
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">
+                                {sub.status === 'VERIFIED' ? 'Settled in Ledger' : 'Rejected'}
+                              </span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          {/* Settled Repayments & Allocation History */}
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Settled Repayment Transactions</h3>
+                <p className="text-xs text-slate-400">
+                  Double-entry accounting ledger entries applied via waterfall hierarchy (Fees → Penalty → Interest → Principal)
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {settledPayments.length} Settled
+              </span>
+            </div>
+
+            {settledPayments.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">
+                No finalized repayment transactions settled in accounting ledger yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Receipt #</th>
+                      <th className="py-2.5 px-3">Settled Amount</th>
+                      <th className="py-2.5 px-3">Channel</th>
+                      <th className="py-2.5 px-3">UTR / Ref</th>
+                      <th className="py-2.5 px-3">Settlement Date</th>
+                      <th className="py-2.5 px-3">Waterfall Allocation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {settledPayments.map((p: any) => (
+                      <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{p.paymentNo}</td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-600">{formatMoney(p.amount)}</td>
+                        <td className="py-2.5 px-3 font-semibold">{p.method}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{p.reference || '-'}</td>
+                        <td className="py-2.5 px-3 text-slate-500">{p.paidAt ? formatDate(p.paidAt) : '-'}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                            {Array.isArray(p.allocations) && p.allocations.length > 0 ? (
+                              p.allocations.map((a: any, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className={cn(
+                                    "px-1.5 py-0.5 rounded font-mono font-semibold",
+                                    a.bucket === 'PRINCIPAL'
+                                      ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                      : a.bucket === 'INTEREST'
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      : a.bucket === 'PENALTY'
+                                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : "bg-purple-50 text-purple-700 border border-purple-200"
+                                  )}
+                                >
+                                  {a.bucket}: {formatMoney(a.amount)}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-slate-400 font-mono">Standard Waterfall Applied</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       </div>
 
-      {/* Collect / Submit Payment Modal */}
+      {/* Collect / Submit Payment Modal (Primary for Collection Officer & Customer) */}
       {payModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-dropdown animate-fade-in space-y-4">
@@ -340,8 +661,8 @@ export default function LoanDetailPage() {
               </h3>
               <p className="text-xs text-slate-500">
                 {isCustomer
-                  ? 'Submit your transaction reference for verification by the finance & collections desk'
-                  : 'Waterfall allocation: Fees → Penalty → Interest → Principal'}
+                  ? 'Submit your transaction reference for verification by Finance & Collections'
+                  : 'Record customer payment collection. Submits to Finance verification and reconciliation queue.'}
               </p>
             </div>
 
@@ -350,8 +671,8 @@ export default function LoanDetailPage() {
                 <div className="p-3 bg-emerald-50 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-emerald-600">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-bold text-slate-900">Payment Submitted Successfully!</p>
-                <p className="text-xs text-slate-500">Staff officers have been notified for verification and ledger settlement.</p>
+                <p className="text-sm font-bold text-slate-900">Repayment Collection Recorded!</p>
+                <p className="text-xs text-slate-500">Submitted for Finance Officer verification and ledger reconciliation.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -392,29 +713,27 @@ export default function LoanDetailPage() {
                   />
                 </div>
 
-                {isCustomer && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Payer Mobile / Contact</label>
-                    <Input
-                      placeholder="e.g. 9876543210"
-                      value={payMobile}
-                      onChange={(e) => setPayMobile(e.target.value)}
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Payer Mobile / Contact</label>
+                  <Input
+                    placeholder="e.g. 9876543210"
+                    value={payMobile}
+                    onChange={(e) => setPayMobile(e.target.value)}
+                  />
+                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Notes / Remarks</label>
                   <Input
-                    placeholder="e.g. Paid Monthly EMI via PhonePe"
+                    placeholder="e.g. Received EMI via UPI QR code"
                     value={payNotes}
                     onChange={(e) => setPayNotes(e.target.value)}
                   />
                 </div>
 
-                {(paymentMutation.isError || submissionMutation.isError) && (
+                {(collectRepaymentMutation.isError || submissionMutation.isError) && (
                   <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">
-                    {apiErrorMessage(paymentMutation.error || submissionMutation.error)}
+                    {apiErrorMessage(collectRepaymentMutation.error || submissionMutation.error)}
                   </div>
                 )}
 
@@ -423,14 +742,14 @@ export default function LoanDetailPage() {
                     disabled={
                       !payAmount ||
                       !payReference.trim() ||
-                      paymentMutation.isPending ||
+                      collectRepaymentMutation.isPending ||
                       submissionMutation.isPending
                     }
                     onClick={() => {
                       if (isCustomer) {
                         submissionMutation.mutate();
                       } else {
-                        paymentMutation.mutate();
+                        collectRepaymentMutation.mutate();
                       }
                     }}
                     className={cn(
@@ -442,9 +761,9 @@ export default function LoanDetailPage() {
                       ? submissionMutation.isPending
                         ? 'Submitting...'
                         : 'Submit for Verification'
-                      : paymentMutation.isPending
-                      ? 'Processing...'
-                      : 'Confirm Payment & Settle'}
+                      : collectRepaymentMutation.isPending
+                      ? 'Recording Collection...'
+                      : 'Confirm & Record Collection'}
                   </Button>
                   <Button variant="secondary" onClick={() => setPayModalOpen(false)}>
                     Cancel
@@ -452,6 +771,62 @@ export default function LoanDetailPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Finance Officer Exception / Rejection Modal */}
+      {rejectModalSubId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-dropdown animate-fade-in space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Payment Exception / Rejection</h3>
+              <p className="text-xs text-slate-500">Record reason for rejecting payment submission</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Select Rejection Reason</label>
+                <select
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs focus:border-brand-600 focus:outline-none"
+                >
+                  <option value="Payment mismatch with bank credit records">Payment mismatch with bank credit records</option>
+                  <option value="Incorrect UTR / Reference number">Incorrect UTR / Reference number</option>
+                  <option value="Duplicate payment submission intimation">Duplicate payment submission intimation</option>
+                  <option value="Cheque bounced / Transaction reversed">Cheque bounced / Transaction reversed</option>
+                  <option value="Partial / Incomplete payment amount">Partial / Incomplete payment amount</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Additional Exception Notes</label>
+                <Input
+                  placeholder="e.g. Bank statement on 08/09 does not reflect credit for this UTR"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <Button
+                  disabled={!rejectReason || rejectSubmissionMutation.isPending}
+                  onClick={() =>
+                    rejectSubmissionMutation.mutate({
+                      submissionId: rejectModalSubId,
+                      reason: rejectReason,
+                    })
+                  }
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                >
+                  {rejectSubmissionMutation.isPending ? 'Rejecting...' : 'Confirm Exception & Reject'}
+                </Button>
+                <Button variant="secondary" onClick={() => setRejectModalSubId(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -576,9 +951,9 @@ export default function LoanDetailPage() {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2">
-      <dt className="text-slate-500 font-medium">{label}</dt>
-      <dd className="text-right font-medium text-slate-900">{value ?? '-'}</dd>
+    <div className="flex justify-between gap-3 py-2 min-w-0">
+      <dt className="text-slate-500 font-medium shrink-0">{label}</dt>
+      <dd className="text-right font-medium text-slate-900 dark:text-slate-200 min-w-0 break-words">{value ?? '-'}</dd>
     </div>
   );
 }

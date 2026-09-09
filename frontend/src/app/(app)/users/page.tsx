@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Shield, Building2, Search } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Input, Card } from '@/components/ui';
@@ -22,6 +23,7 @@ interface UserRow {
 }
 
 export default function UsersPage() {
+  const { user } = useAuth();
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -141,7 +143,7 @@ export default function UsersPage() {
           )}>
             <div>
               <h3 className={cn("text-base font-bold", isDark ? "text-white" : "text-slate-900")}>Add New Staff Member</h3>
-              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>Initial default login password: <code>Passw0rd!123</code></p>
+              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>Initial default login password: <code>DevStaffSeed2026!</code></p>
             </div>
 
             <div className="space-y-3">
@@ -176,15 +178,25 @@ export default function UsersPage() {
                     isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
                   )}
                 >
-                  <option value="LOAN_OFFICER">Loan Officer (Origination)</option>
-                  <option value="CREDIT_ANALYST">Credit Analyst (Scoring & KYC)</option>
-                  <option value="UNDERWRITER">Underwriter (Sanctions)</option>
-                  <option value="FINANCE_OFFICER">Finance Officer (Disbursements & Payments)</option>
-                  <option value="COLLECTION_OFFICER">Collection Officer (Delinquency & Recovery)</option>
-                  <option value="BRANCH_MANAGER">Branch Manager (Branch Oversight)</option>
-                  <option value="AUDITOR">Auditor (Compliance & Ledger)</option>
-                  <option value="ADMIN">System Admin</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
+                  {user?.roles?.includes('BRANCH_MANAGER') && !user?.roles?.includes('SUPER_ADMIN') && !user?.roles?.includes('ADMIN') ? (
+                    <>
+                      <option value="LOAN_OFFICER">Loan Officer (Origination)</option>
+                      <option value="COLLECTION_OFFICER">Collection Officer (Delinquency & Recovery)</option>
+                      <option value="COLLECTION_AGENT">Collection Agent (Field Recovery)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="LOAN_OFFICER">Loan Officer (Origination)</option>
+                      <option value="CREDIT_ANALYST">Credit Analyst (Scoring & KYC)</option>
+                      <option value="UNDERWRITER">Underwriter (Sanctions)</option>
+                      <option value="FINANCE_OFFICER">Finance Officer (Disbursements & Payments)</option>
+                      <option value="COLLECTION_OFFICER">Collection Officer (Delinquency & Recovery)</option>
+                      <option value="BRANCH_MANAGER">Branch Manager (Branch Oversight)</option>
+                      <option value="AUDITOR">Auditor (Compliance & Ledger)</option>
+                      <option value="ADMIN">System Admin</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -193,12 +205,15 @@ export default function UsersPage() {
                 <select
                   value={branchId}
                   onChange={(e) => setBranchId(e.target.value)}
+                  disabled={Boolean(user?.roles?.includes('BRANCH_MANAGER') && !user?.roles?.includes('SUPER_ADMIN') && !user?.roles?.includes('ADMIN') && user?.branchId)}
                   className={cn(
                     "w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none",
                     isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
                   )}
                 >
-                  <option value="">Headquarters / Corporate HQ (Default)</option>
+                  {!(user?.roles?.includes('BRANCH_MANAGER') && !user?.roles?.includes('SUPER_ADMIN') && !user?.roles?.includes('ADMIN')) && (
+                    <option value="">Headquarters / Corporate HQ (Default)</option>
+                  )}
                   {Array.isArray(branchesData) &&
                     branchesData.map((b: any) => (
                       <option key={b.id} value={b.id}>

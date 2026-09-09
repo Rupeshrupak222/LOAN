@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Search, ShieldCheck, Phone, Trash2, CheckSquare, X, AlertTriangle } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Input, Card } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
@@ -27,7 +29,10 @@ interface CustomerRow {
 }
 
 export default function CustomersPage() {
+  const { user } = useAuth();
+
   const { isDark } = useTheme();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
@@ -74,11 +79,15 @@ export default function CustomersPage() {
     setDeleteError(null);
     try {
       await Promise.all(selectedIds.map((id) => api.delete(`/customers/${id}`)));
+      const count = selectedIds.length;
       setSelectedIds([]);
       setDeleteModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Customers Deleted', `${count} customer profile(s) deleted successfully.`);
     } catch (err) {
-      setDeleteError(apiErrorMessage(err));
+      const msg = apiErrorMessage(err);
+      setDeleteError(msg);
+      toast.error('Bulk Delete Failed', msg);
     } finally {
       setIsDeleting(false);
     }
@@ -187,11 +196,13 @@ export default function CustomersPage() {
         title="Borrower Directory & KYC Profiles"
         subtitle="Manage customer registrations, identity verification status, and borrower credit histories"
         action={
-          <Link href="/customers/new">
-            <Button className="flex items-center gap-1.5 text-white">
-              <UserPlus className="h-4 w-4" /> Add Customer
-            </Button>
-          </Link>
+          isLoanOfficer ? (
+            <Link href="/customers/new">
+              <Button className="flex items-center gap-1.5 text-white">
+                <UserPlus className="h-4 w-4" /> Add Customer
+              </Button>
+            </Link>
+          ) : null
         }
       />
 
@@ -217,14 +228,16 @@ export default function CustomersPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => setDeleteModalOpen(true)}
-              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete Selected Candidate{selectedIds.length > 1 ? 's' : ''}</span>
-            </Button>
+            {user?.roles?.includes('SUPER_ADMIN') && (
+              <Button
+                size="sm"
+                onClick={() => setDeleteModalOpen(true)}
+                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Selected Candidate{selectedIds.length > 1 ? 's' : ''}</span>
+              </Button>
+            )}
 
             <Button
               size="sm"
@@ -274,9 +287,11 @@ export default function CustomersPage() {
         emptyTitle="No borrowers found"
         emptyDescription="Start by onboarding a new customer into the LMS."
         emptyAction={
-          <Link href="/customers/new">
-            <Button size="sm" className="text-white">+ Add Customer</Button>
-          </Link>
+          isLoanOfficer ? (
+            <Link href="/customers/new">
+              <Button size="sm" className="text-white">+ Add Customer</Button>
+            </Link>
+          ) : undefined
         }
       />
 

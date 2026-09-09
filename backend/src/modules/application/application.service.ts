@@ -1,11 +1,18 @@
 import { ApplicationStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../common/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { generateApplicationNo } from '../shared/codes';
 import { Money } from '../finance/money';
 import { sendNotification } from '../notifications/notification.service';
 import type { CreateApplicationInput } from './application.schema';
+
+export interface ApplicationActorContext {
+  id?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}
 
 // Allowed status transitions (guards the loan lifecycle).
 const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
@@ -16,7 +23,7 @@ const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   UNDER_REVIEW: ['CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
   CREDIT_ASSESSMENT: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
   UNDERWRITING: ['APPROVED', 'REJECTED', 'SUBMITTED', 'CANCELLED'],
-  APPROVED: ['AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'CANCELLED'],
+  APPROVED: ['AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'UNDERWRITING', 'SUBMITTED', 'CANCELLED'],
   REJECTED: [],
   AGREEMENT_PENDING: ['READY_FOR_DISBURSEMENT', 'CANCELLED'],
   READY_FOR_DISBURSEMENT: ['DISBURSED', 'CANCELLED'],
@@ -24,10 +31,24 @@ const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   CANCELLED: [],
 };
 
-export async function listApplications(params: PageParams, status?: string, userId?: string) {
+export async function listApplications(
+  params: PageParams,
+  status?: string,
+  userId?: string,
+  actor?: ApplicationActorContext
+) {
   const where: any = {};
   if (status) where.status = status as ApplicationStatus;
   if (userId) where.customer = { userId };
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.tenantId = actor.tenantId;
+    }
+    if ((actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) && actor.branchId) {
+      where.customer = { ...where.customer, branchId: actor.branchId };
+    }
+  }
 
   const [rows, total] = await Promise.all([
     prisma.loanApplication.findMany({
@@ -46,6 +67,8 @@ export async function listApplications(params: PageParams, status?: string, user
       customerId: a.customerId,
       customer: a.customer,
       customerName: `${a.customer.firstName} ${a.customer.lastName}`,
+      kycStatus: a.customer?.kycStatus || 'NOT_STARTED',
+      riskCategory: a.customer?.riskCategory || 'PENDING',
       product: a.product.name,
       productDetail: a.product,
       requestedAmount: a.requestedAmount.toFixed(2),
@@ -61,23 +84,70 @@ export async function listApplications(params: PageParams, status?: string, user
   };
 }
 
-export async function getApplication(id: string) {
+export async function getApplication(id: string, actor?: ApplicationActorContext) {
   const app = await prisma.loanApplication.findUnique({
     where: { id },
     include: {
-      customer: true,
+      customer: {
+        include: {
+          documents: { orderBy: { createdAt: 'desc' } },
+          bankAccounts: { orderBy: { createdAt: 'desc' } },
+          employmentDetails: { orderBy: { createdAt: 'desc' } },
+          addresses: { orderBy: { createdAt: 'desc' } },
+        },
+      },
       product: true,
       statusHistory: { orderBy: { createdAt: 'desc' } },
       eligibility: true,
       riskAssessment: true,
       underwriting: true,
+      approvals: { orderBy: { createdAt: 'desc' } },
     },
   });
   if (!app) throw new NotFoundError('Application not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      app.customer?.branchId &&
+      app.customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
+  }
+
   return app;
 }
 
-export async function createApplication(input: CreateApplicationInput) {
+export async function createApplication(
+  input: CreateApplicationInput,
+  actor?: ApplicationActorContext
+) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: input.customerId },
+  });
+  if (!customer) throw new NotFoundError('Customer not found');
+
+  const effectiveTenantId = customer.tenantId || actor?.tenantId;
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && customer.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      customer.branchId &&
+      customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another branch');
+    }
+  }
+
   let product = input.productId
     ? await prisma.loanProduct.findUnique({ where: { id: input.productId } })
     : null;
@@ -86,12 +156,13 @@ export async function createApplication(input: CreateApplicationInput) {
   if (input.interestRate != null || !product) {
     const rate = input.interestRate != null ? Number(input.interestRate) : (product ? Number(product.interestRate) : 14.5);
     const prodName = input.productName || (product ? product.name : `Custom Loan (${rate}% p.a.)`);
-    const prodCode = `CUST-${rate.toString().replace('.', '_')}-${Date.now().toString().slice(-4)}`;
+    const prodCode = `CUST-${rate.toString().replace('.', '_')}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
     product = await prisma.loanProduct.create({
       data: {
         code: prodCode,
         name: prodName,
+        tenantId: effectiveTenantId,
         productType: 'PERSONAL',
         interestRate: Money.round(rate).toFixed(3),
         minAmount: Money.toDb(100),
@@ -106,6 +177,7 @@ export async function createApplication(input: CreateApplicationInput) {
   return prisma.loanApplication.create({
     data: {
       applicationNo: generateApplicationNo(),
+      tenantId: effectiveTenantId,
       customerId: input.customerId,
       productId: product.id,
       requestedAmount: Money.toDb(input.requestedAmount),
@@ -123,9 +195,93 @@ export async function transition(
   toStatus: ApplicationStatus,
   changedBy?: string,
   reason?: string,
+  actor?: ApplicationActorContext
 ) {
-  const app = await prisma.loanApplication.findUnique({ where: { id } });
+  const app = await prisma.loanApplication.findUnique({
+    where: { id },
+    include: { customer: true },
+  });
   if (!app) throw new NotFoundError('Application not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      app.customer?.branchId &&
+      app.customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
+  }
+
+  // Role-state authorization: Loan Officer, Credit Analyst, Underwriter, and Branch Manager transition boundaries
+  if (actor?.roles?.includes('AUDITOR')) {
+    throw new ForbiddenError('Access forbidden: Auditors have read-only access and cannot transition application statuses');
+  }
+
+  // Branch Manager cannot force final credit approval, rejection, agreement pending, or disbursement states
+  if (actor?.roles?.includes('BRANCH_MANAGER')) {
+    const forbiddenForBranchManager: ApplicationStatus[] = [
+      'APPROVED',
+      'REJECTED',
+      'READY_FOR_DISBURSEMENT',
+      'DISBURSED',
+      'AGREEMENT_PENDING',
+    ];
+    if (forbiddenForBranchManager.includes(toStatus)) {
+      throw new ForbiddenError(
+        `Access forbidden: Branch Manager cannot transition applications to '${toStatus}'. Credit decisions and financial disbursements require Underwriter and Finance Officer authorization.`
+      );
+    }
+  }
+
+  if (actor?.roles?.includes('LOAN_OFFICER')) {
+    const allowedForLoanOfficer: ApplicationStatus[] = ['SUBMITTED', 'CANCELLED'];
+    if (!allowedForLoanOfficer.includes(toStatus)) {
+      throw new ForbiddenError(
+        `Access forbidden: Loan Officer can only submit or cancel applications, not transition to '${toStatus}'.`
+      );
+    }
+  }
+
+  if (actor?.roles?.includes('CREDIT_ANALYST')) {
+    const allowedForCreditAnalyst: ApplicationStatus[] = [
+      'UNDER_REVIEW',
+      'CREDIT_ASSESSMENT',
+      'UNDERWRITING',
+      'SUBMITTED',
+    ];
+    if (!allowedForCreditAnalyst.includes(toStatus)) {
+      throw new ForbiddenError(
+        `Access forbidden: Credit Analysts cannot approve, reject, sanction, or disburse loans. Allowed transitions: ${allowedForCreditAnalyst.join(', ')}.`
+      );
+    }
+  }
+
+  if (actor?.roles?.includes('UNDERWRITER')) {
+    const forbiddenForUnderwriter: ApplicationStatus[] = [
+      'DISBURSED',
+      'READY_FOR_DISBURSEMENT',
+      'AGREEMENT_PENDING',
+    ];
+    if (forbiddenForUnderwriter.includes(toStatus)) {
+      throw new ForbiddenError(
+        `Access forbidden: Underwriters cannot transition applications to '${toStatus}'. Post-sanction agreement processing and disbursement execution must be conducted by authorized Finance Officers.`
+      );
+    }
+  }
+
+  if (
+    (actor?.roles?.includes('COLLECTION_OFFICER') || actor?.roles?.includes('FINANCE_OFFICER')) &&
+    !isPrivilegedAdmin
+  ) {
+    throw new ForbiddenError(
+      'Access forbidden: Neither Collection Officers nor Finance Officers have authority to transition loan applications or modify credit/underwriting decisions.'
+    );
+  }
 
   const allowed = TRANSITIONS[app.status] ?? [];
   if (!allowed.includes(toStatus)) {
@@ -146,15 +302,16 @@ export async function transition(
   // Async non-blocking notification to applicant
   void sendNotification({
     customerId: app.customerId,
-    title: `Application ${app.applicationNo} Status: ${toStatus}`,
-    message: reason || `Your loan application has progressed to ${toStatus}.`,
+    channel: 'IN_APP',
     type: ['APPROVED', 'DISBURSED'].includes(toStatus)
       ? 'SUCCESS'
       : toStatus === 'REJECTED'
       ? 'ALERT'
       : 'INFO',
+    title: `Application ${app.applicationNo} Status: ${toStatus}`,
+    message: reason || `Your loan application has progressed to ${toStatus}.`,
     metadata: { applicationId: id, link: `/applications/${id}` },
-  });
+  }).catch(() => {});
 
   return result;
 }

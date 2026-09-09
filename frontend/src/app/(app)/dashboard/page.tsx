@@ -42,6 +42,7 @@ import {
   XCircle,
   History,
   Lock,
+  Scale,
 } from 'lucide-react';
 import {
   BarChart,
@@ -63,6 +64,8 @@ import { useTheme } from '@/lib/theme';
 import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
+import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
+import { BorrowerPortalShell } from '@/components/borrower/BorrowerPortalShell';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -121,10 +124,16 @@ export default function DashboardPage() {
 
   const primaryRole = (user?.roles?.[0] || 'CUSTOMER') as RoleName;
 
+  // Date filter parameters passed to live portfolio reports
+  const dateParams = {
+    dateFilter,
+    ...(dateFilter.includes('to') ? { startDate: customStart, endDate: customEnd } : {}),
+  };
+
   // Live queries
   const { data: reportsData } = useQuery({
-    queryKey: ['dashboard-reports'],
-    queryFn: async () => (await api.get('/reports/portfolio')).data.data,
+    queryKey: ['dashboard-reports', dateFilter, customStart, customEnd],
+    queryFn: async () => (await api.get('/reports/portfolio', { params: dateParams })).data.data,
     enabled: !!user && primaryRole !== 'CUSTOMER',
   });
 
@@ -149,7 +158,7 @@ export default function DashboardPage() {
   const { data: usersData } = useQuery({
     queryKey: ['dashboard-users'],
     queryFn: async () => (await api.get('/users')).data.data,
-    enabled: !!user && ['ADMIN', 'SUPER_ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['ADMIN', 'SUPER_ADMIN'].includes(primaryRole),
   });
 
   const { data: branchesData } = useQuery({
@@ -161,31 +170,55 @@ export default function DashboardPage() {
   const { data: underwritingData } = useQuery({
     queryKey: ['dashboard-underwriting-queue'],
     queryFn: async () => (await api.get('/underwriting/queue')).data.data,
-    enabled: !!user && ['UNDERWRITER', 'CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['UNDERWRITER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: creditQueueData } = useQuery({
+    queryKey: ['dashboard-credit-queue'],
+    queryFn: async () => (await api.get('/credit/queue')).data.data,
+    enabled: !!user && ['CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: branchQueueData } = useQuery({
+    queryKey: ['dashboard-branch-queue'],
+    queryFn: async () => (await api.get('/branch-manager/queue')).data.data,
+    enabled: !!user && ['BRANCH_MANAGER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: disbursementsData } = useQuery({
     queryKey: ['dashboard-disbursements-queue'],
     queryFn: async () => (await api.get('/disbursements/queue')).data.data,
-    enabled: !!user && ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: collectionsData } = useQuery({
     queryKey: ['dashboard-collections'],
     queryFn: async () => (await api.get('/collections/dashboard')).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: casesData } = useQuery({
     queryKey: ['dashboard-collection-cases'],
     queryFn: async () => (await api.get('/collections/cases', { params: { pageSize: 6 } })).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: submissionsData } = useQuery({
     queryKey: ['dashboard-payment-submissions'],
     queryFn: async () => (await api.get('/payments/submissions', { params: { pageSize: 6 } })).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: pendingSubmissionsData } = useQuery({
+    queryKey: ['dashboard-pending-submissions-count'],
+    queryFn: async () => (await api.get('/payments/submissions', { params: { status: 'PENDING_VERIFICATION', pageSize: 1 } })).data,
+    enabled: !!user && ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: reconStats } = useQuery({
+    queryKey: ['dashboard-reconciliation-stats'],
+    queryFn: async () => (await api.get('/reconciliation/dashboard')).data.data,
+    enabled: !!user && ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: auditData } = useQuery({
@@ -204,10 +237,14 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-users'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-branches'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-underwriting-queue'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-credit-queue'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-branch-queue'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-queue'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-collection-cases'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-payment-submissions'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-pending-submissions-count'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reconciliation-stats'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-audit'] }),
     ]);
     setTimeout(() => setRefreshing(false), 500);
@@ -237,13 +274,20 @@ export default function DashboardPage() {
   async function exportReport() {
     try {
       setExporting(true);
-      const res = await api.get('/reports/export/loans', { responseType: 'blob' });
+      const exportType = primaryRole === 'FINANCE_OFFICER' ? 'payments' : 'loans';
+      const res = await api.get(`/reports/export/${exportType}`, {
+        params: dateParams,
+        responseType: 'blob',
+      });
       const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const cleanFilter = dateFilter.replace(/[^a-zA-Z0-9]/g, '_');
-      link.setAttribute('download', `Loan_Portfolio_Export_${cleanFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+      const filename = primaryRole === 'FINANCE_OFFICER'
+        ? `Finance_Ledger_Export_${cleanFilter}_${new Date().toISOString().split('T')[0]}.csv`
+        : `Loan_Portfolio_Export_${cleanFilter}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -512,7 +556,7 @@ export default function DashboardPage() {
             {dateFilterOpen && (
               <div
                 className={cn(
-                  'absolute right-0 top-full mt-2 w-80 rounded-2xl border shadow-2xl z-50 animate-fade-in overflow-hidden',
+                  'absolute -right-2 sm:right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-xs rounded-2xl border shadow-2xl z-50 animate-fade-in overflow-hidden',
                   isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-100' : 'border-slate-200 bg-white text-slate-900'
                 )}
               >
@@ -716,6 +760,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* AI Executive Decision Intelligence Card (For Staff & Managers) */}
+      {primaryRole !== 'CUSTOMER' && <DecisionIntelligenceCard />}
+
       {/* ========================================================================= */}
       {/* 2. ROLE-SPECIFIC DASHBOARD SECTIONS                                       */}
       {/* ========================================================================= */}
@@ -773,93 +820,119 @@ export default function DashboardPage() {
       )}
 
       {/* C. CREDIT ANALYST WORKSPACE */}
-      {primaryRole === 'CREDIT_ANALYST' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="AWAITING CREDIT ASSESSMENT"
-              value={String(creditAwaitingCount || (appsList.length > 0 && creditEvaluatedCount === 0 ? appsList.length : 0))}
-              hint="Action required"
-              icon={<Clock className="h-4 w-4" />}
-              iconColor="amber"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={creditAwaitingCount > 0 ? `${creditAwaitingCount} pending` : undefined}
-            />
-            <KpiItem
-              label="EVALUATED TODAY"
-              value={String(creditEvaluatedCount)}
-              hint="Assessed proposals"
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="TOTAL POOL APPLICATIONS"
-              value={String(totalAppsCount)}
-              hint="Application inflow"
-              icon={<FileText className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="LOW RISK PROFILES"
-              value={String(lowRiskCount)}
-              hint="Score 75+"
-              icon={<ShieldCheck className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="MEDIUM RISK PROFILES"
-              value={String(medRiskCount)}
-              hint="Score 50-74"
-              icon={<AlertTriangle className="h-4 w-4" />}
-              iconColor="amber"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="HIGH RISK REJECTIONS"
-              value={String(highRiskCount)}
-              hint="Declined applications"
-              icon={<XCircle className="h-4 w-4" />}
-              iconColor="rose"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-          </div>
+      {primaryRole === 'CREDIT_ANALYST' && (() => {
+        const cqMetrics = creditQueueData?.metrics || {
+          applicationsAssigned: creditQueueData?.items?.length || appsList.length,
+          pendingAssessments: creditAwaitingCount,
+          assessmentsCompleted: creditEvaluatedCount,
+          eligibleApplications: appsList.filter((a: any) => a.eligibility?.result === 'ELIGIBLE').length,
+          notEligibleApplications: appsList.filter((a: any) => a.eligibility?.result === 'NOT_ELIGIBLE').length,
+          pendingDocuments: appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
+          highRiskCases: highRiskCount,
+        };
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className={cn('lg:col-span-8 rounded-2xl border p-5 space-y-4', cardBgClass)}>
-              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                <h3 className="text-sm font-bold tracking-tight">Credit Evaluation & Risk Assessment Queue</h3>
-                <Link href="/underwriting" className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline">Assessment Desk →</Link>
-              </div>
-              <ApplicationsTable items={appsList} isDark={isDark} actionLabel="Assess Credit →" />
+        const creditProposals = creditQueueData?.items?.length ? creditQueueData.items : appsList;
+
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              <KpiItem
+                label="APPLICATIONS ASSIGNED"
+                value={String(cqMetrics.applicationsAssigned)}
+                hint="In assessment pool"
+                icon={<FileText className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PENDING ASSESSMENTS"
+                value={String(cqMetrics.pendingAssessments)}
+                hint="Awaiting capacity review"
+                icon={<Clock className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={cqMetrics.pendingAssessments > 0 ? `${cqMetrics.pendingAssessments} pending` : undefined}
+              />
+              <KpiItem
+                label="ASSESSMENTS COMPLETED"
+                value={String(cqMetrics.assessmentsCompleted)}
+                hint="Evaluated proposals"
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="ELIGIBLE APPLICATIONS"
+                value={String(cqMetrics.eligibleApplications)}
+                hint="Repayment verified"
+                icon={<ShieldCheck className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="NOT ELIGIBLE"
+                value={String(cqMetrics.notEligibleApplications)}
+                hint="Criteria / FOIR failed"
+                icon={<XCircle className="h-4 w-4" />}
+                iconColor="rose"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PENDING DOCUMENTS"
+                value={String(cqMetrics.pendingDocuments)}
+                hint="Missing KYC / income proofs"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="HIGH RISK CASES"
+                value={String(cqMetrics.highRiskCases)}
+                hint="Tier 3 / FOIR > 60%"
+                icon={<AlertTriangle className="h-4 w-4" />}
+                iconColor="rose"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
             </div>
 
-            <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">4-Pillar Risk Engine Breakdown</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Scoring weights allocation</p>
-                <div className="space-y-3 pt-3 text-xs">
-                  <div className="flex justify-between items-center"><span className="text-slate-400">1. Debt Service Capacity (DTI)</span><span className="font-bold">30%</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400">2. Credit & Bureau History</span><span className="font-bold">25%</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400">3. Employment & Vintage</span><span className="font-bold">25%</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400">4. Document Completeness</span><span className="font-bold">20%</span></div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className={cn('lg:col-span-8 rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                  <div>
+                    <h3 className="text-sm font-bold tracking-tight">Credit Evaluation & Risk Assessment Queue</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Assess repayment capacity, calculate FOIR/DTI, and forward recommendation</p>
+                  </div>
+                  <Link href="/credit-assessment" className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline">Credit Assessment Desk →</Link>
+                </div>
+                <ApplicationsTable items={creditProposals} isDark={isDark} actionLabel="Assess Credit →" />
+              </div>
+
+              <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">4-Pillar Risk Engine Breakdown</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Scoring weights allocation</p>
+                  <div className="space-y-3 pt-3 text-xs">
+                    <div className="flex justify-between items-center"><span className="text-slate-400">1. Debt Service Capacity (DTI)</span><span className="font-bold">30%</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-400">2. Credit & Bureau History</span><span className="font-bold">25%</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-400">3. Employment & Vintage</span><span className="font-bold">25%</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-400">4. Document Completeness</span><span className="font-bold">20%</span></div>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <Link href="/credit-assessment" className="block"><Button size="sm" className="w-full text-xs text-white">Open Credit Assessment Desk</Button></Link>
                 </div>
               </div>
-              <div className="pt-2">
-                <Link href="/underwriting" className="block"><Button size="sm" className="w-full text-xs text-white">Open Credit Evaluation Desk</Button></Link>
-              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* D. UNDERWRITER WORKSPACE */}
       {primaryRole === 'UNDERWRITER' && (
@@ -959,140 +1032,270 @@ export default function DashboardPage() {
       )}
 
       {/* E. FINANCE OFFICER WORKSPACE */}
-      {primaryRole === 'FINANCE_OFFICER' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem label="PENDING DISBURSEMENTS" value={String(pendingPayoutCount)} hint="Awaiting NEFT payout" icon={<Wallet className="h-4 w-4" />} iconColor="purple" cardBgClass={cardBgClass} isDark={isDark} highlightText={pendingPayoutCount > 0 ? "Action Required" : undefined} />
-            <KpiItem label="DISBURSED VOLUME" value={totalDisbursedFormatted} hint={`${dateFilter} Released`} icon={<Coins className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="COLLECTIONS RECOVERED" value={totalCollectedFormatted} hint={`${dateFilter} Payments`} icon={<CheckCircle2 className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem
-              label="PAYMENT INTIMATIONS"
-              value={String(Array.isArray(submissionsData) ? submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length : 0)}
-              hint="Borrower UTR proofs"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={
-                Array.isArray(submissionsData) && submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length > 0
-                  ? "Verify & Settle"
-                  : undefined
-              }
-            />
-            <KpiItem label="NOC CLOSURES" value={String(closedLoansCount)} hint="Full clearance certificates" icon={<FileCheck className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="TREASURY STATUS" value="HEALTHY" hint="Liquidity buffer 100%" icon={<Building className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} valueColor="text-emerald-600" />
-          </div>
+      {primaryRole === 'FINANCE_OFFICER' && (() => {
+        const totalPendingSubmissions =
+          pendingSubmissionsData?.pagination?.total ??
+          (Array.isArray(submissionsData)
+            ? submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length
+            : 0);
+        const reconHealth = reconStats?.reconciliationHealthPercent ?? 100;
+        const activeExceptions = reconStats?.totalActiveExceptions ?? 0;
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-8 space-y-6">
-              {/* Card 1: Disbursement Queue */}
-              <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <h3 className="text-sm font-bold tracking-tight">Electronic Disbursement Payout Queue (NEFT / RTGS)</h3>
-                  <Link href="/disbursements" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">Disbursements Desk →</Link>
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiItem
+                label="PENDING DISBURSEMENTS"
+                value={String(pendingPayoutCount)}
+                hint="Awaiting NEFT payout"
+                icon={<Wallet className="h-4 w-4" />}
+                iconColor="purple"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={pendingPayoutCount > 0 ? "Action Required" : undefined}
+              />
+              <KpiItem
+                label="DISBURSED VOLUME"
+                value={totalDisbursedFormatted}
+                hint={`${dateFilter} Released`}
+                icon={<Coins className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="COLLECTIONS RECOVERED"
+                value={totalCollectedFormatted}
+                hint={`${dateFilter} Payments`}
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PAYMENT INTIMATIONS"
+                value={String(totalPendingSubmissions)}
+                hint="Borrower UTR proofs"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={totalPendingSubmissions > 0 ? "Verify & Settle" : undefined}
+              />
+              <KpiItem
+                label="NOC CLOSURES"
+                value={String(closedLoansCount)}
+                hint="Full clearance certificates"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="TREASURY STATUS"
+                value={`${reconHealth}% RECON`}
+                hint={activeExceptions > 0 ? `${activeExceptions} exceptions flagged` : "Ledger 100% balanced"}
+                icon={<Building className="h-4 w-4" />}
+                iconColor={reconHealth >= 98 ? "emerald" : "amber"}
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                valueColor={reconHealth >= 98 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-500"}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className="lg:col-span-8 space-y-6">
+                {/* Card 1: Disbursement Queue */}
+                <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                  <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                    <div>
+                      <h3 className="text-sm font-bold tracking-tight">Electronic Disbursement Payout Queue (NEFT / RTGS)</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Approved applications awaiting electronic fund transfer to borrower verified bank accounts</p>
+                    </div>
+                    <Link href="/disbursements" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">Disbursements Desk →</Link>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
+                    {Array.isArray(disbursementsData) && disbursementsData.length > 0 ? (
+                      disbursementsData.map((d: any) => {
+                        const appNo = d.applicationNo || d.id?.slice(0, 8);
+                        const borrowerName = d.customer ? `${d.customer.firstName} ${d.customer.lastName}` : 'Borrower';
+                        const bank = d.customer?.bankAccounts?.[0];
+                        const payoutAmount = Number(d.underwriting?.approvedAmount || d.requestedAmount || 0);
+
+                        return (
+                          <div key={d.id} className="flex items-center justify-between py-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-900 dark:text-white">App #{appNo}</p>
+                                <span className="text-slate-500 font-medium">· {borrowerName}</span>
+                                <span className="font-mono text-[10px] text-blue-500 font-bold">{d.product?.name || 'Loan'}</span>
+                              </div>
+                              <p className="text-slate-400 text-[11px] font-mono mt-0.5">
+                                Bank: {bank?.bankName || 'Verified Bank'} · A/C: {bank?.accountNumber ? `••••${bank.accountNumber.slice(-4)}` : '-'} · IFSC: {bank?.ifscCode || '-'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-[#2563EB] dark:text-[#60A5FA]">{formatMoney(payoutAmount)}</span>
+                              <Link href="/disbursements"><Button size="sm" className="text-xs text-white bg-[#2563EB] hover:bg-blue-700">Execute NEFT Payout</Button></Link>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-8 text-center text-slate-400">No loans currently awaiting disbursement release.</div>
+                    )}
+                  </div>
                 </div>
-                <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
-                  {Array.isArray(disbursementsData) && disbursementsData.length > 0 ? (
-                    disbursementsData.map((d: any) => (
-                      <div key={d.id} className="flex items-center justify-between py-3">
-                        <div>
-                          <p className="font-bold text-slate-900 dark:text-white">Loan #{d.loanAccountNo || d.id?.slice(0, 8)}</p>
-                          <p className="text-slate-400 text-[11px] font-mono">Bank: {d.bankName || 'Verified Account'} · IFSC: {d.ifscCode || '-'}</p>
+
+                {/* Card 2: Borrower Payment Submissions to Verify */}
+                <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                  <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                    <div>
+                      <h3 className="text-sm font-bold tracking-tight">Recorded Collections & Payment Submissions</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Verify UTR and settle into double-entry accounting ledger</p>
+                    </div>
+                    <Link href="/payments" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
+                      Verification Desk →
+                    </Link>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
+                    {Array.isArray(submissionsData) && submissionsData.length > 0 ? (
+                      submissionsData.slice(0, 4).map((sub: any) => (
+                        <div key={sub.id} className="py-3 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 dark:text-white">{sub.customerName || 'Borrower'}</span>
+                              <span className="font-mono text-[10px] text-blue-500 font-bold">Loan #{sub.loanNo}</span>
+                              <span className="font-mono text-[10px] text-slate-400">Ref: {sub.reference}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Mode: <strong>{sub.method}</strong> · Submitted: {sub.createdAt ? formatDate(sub.createdAt) : '-'}
+                              {sub.notes && <span className="ml-2 text-[10px] text-slate-500">({sub.notes})</span>}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                              {formatMoney(sub.amount || 0)}
+                            </span>
+                            <Link href="/payments">
+                              <Button size="sm" variant="secondary" className="text-xs">
+                                {sub.status === 'PENDING_VERIFICATION' ? 'Verify & Settle →' : 'View →'}
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-[#2563EB] dark:text-[#60A5FA]">{formatMoney(d.amount)}</span>
-                          <Link href="/disbursements"><Button size="sm" className="text-xs text-white bg-[#2563EB] hover:bg-blue-700">Execute NEFT Payout</Button></Link>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-xs text-slate-400">
+                        No pending payment submissions requiring verification.
                       </div>
-                    ))
-                  ) : (
-                    <div className="py-8 text-center text-slate-400">No loans currently awaiting disbursement release.</div>
-                  )}
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 4: Accounting, Reconciliation & Exceptions Summary */}
+                <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                  <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                    <div>
+                      <h3 className="text-sm font-bold tracking-tight">Accounting & 5-Pillar Ledger Reconciliation</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Automated detection of ledger discrepancies, duplicate transactions, and allocation mismatches</p>
+                    </div>
+                    <Link href="/reconciliation" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
+                      Accounting & Recon Desk →
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Reconciliation Health</p>
+                      <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                        {reconStats?.reconciliationHealthPercent ?? 100}%
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Across all 5 audit pillars</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Active Exceptions</p>
+                      <p className={cn("text-base font-bold mt-1", (reconStats?.totalActiveExceptions ?? 0) > 0 ? "text-amber-500" : "text-slate-700 dark:text-slate-200")}>
+                        {reconStats?.totalActiveExceptions ?? 0}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{reconStats?.criticalExceptionsCount ?? 0} critical severity</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Maker-Checker Adjustments</p>
+                      <p className="text-base font-bold text-slate-700 dark:text-slate-200 mt-1">
+                        {reconStats?.pendingAdjustmentsCount ?? 0}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Awaiting dual verification</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Total Discrepancy Volume</p>
+                      <p className="text-base font-bold text-slate-700 dark:text-slate-200 mt-1">
+                        {formatMoney(reconStats?.totalDiscrepancyAmount ?? 0)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Net variance flagged</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs">
+                    <span className="text-[11px] text-slate-400">
+                      Last reconciliation pass: {reconStats?.lastRunAt ? formatDate(reconStats.lastRunAt) : 'Recently executed'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Link href="/reconciliation">
+                        <Button size="sm" variant="secondary" className="text-xs">
+                          Inspect Exceptions ({reconStats?.totalActiveExceptions ?? 0})
+                        </Button>
+                      </Link>
+                      <Link href="/reconciliation">
+                        <Button size="sm" variant="secondary" className="text-xs">
+                          Review Adjustments
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Card 2: Borrower Payment Submissions to Verify */}
-              <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">Borrower Payment Submissions to Settle</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Verify UTR and settle into double-entry accounting ledger</p>
+              <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">Waterfall Allocation Hierarchy</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Automated settlement order</p>
+                  <div className="space-y-2 pt-3 text-xs">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">1</span>
+                      <span>Late & Processing Fees</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">2</span>
+                      <span>Overdue Penalty Interest</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">3</span>
+                      <span>Regular EMI Interest</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">4</span>
+                      <span>Principal Reduction</span>
+                    </div>
                   </div>
-                  <Link href="/payments" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
-                    Verification Desk →
+                </div>
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#2B3566]">
+                  <Link href="/disbursements" className="block">
+                    <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700">Open Disbursements Desk</Button>
+                  </Link>
+                  <Link href="/payments" className="block">
+                    <Button size="sm" variant="secondary" className="w-full text-xs">Open Payments Ledger</Button>
+                  </Link>
+                  <Link href="/reconciliation" className="block">
+                    <Button size="sm" variant="secondary" className="w-full text-xs">Open Accounting & Recon</Button>
                   </Link>
                 </div>
-
-                <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
-                  {Array.isArray(submissionsData) && submissionsData.length > 0 ? (
-                    submissionsData.slice(0, 4).map((sub: any) => (
-                      <div key={sub.id} className="py-3 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 dark:text-white">{sub.customerName || 'Borrower'}</span>
-                            <span className="font-mono text-[10px] text-blue-500 font-bold">Loan #{sub.loanNo}</span>
-                            <span className="font-mono text-[10px] text-slate-400">Ref: {sub.reference}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Mode: <strong>{sub.method}</strong> · Submitted: {sub.createdAt ? formatDate(sub.createdAt) : '-'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                            {formatMoney(sub.amount || 0)}
-                          </span>
-                          <Link href="/payments">
-                            <Button size="sm" variant="secondary" className="text-xs">
-                              {sub.status === 'PENDING_VERIFICATION' ? 'Verify & Settle →' : 'View →'}
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-center text-xs text-slate-400">
-                      No pending payment submissions requiring verification.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">Waterfall Allocation Hierarchy</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Automated settlement order</p>
-                <div className="space-y-2 pt-3 text-xs">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">1</span>
-                    <span>Late & Processing Fees</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">2</span>
-                    <span>Overdue Penalty Interest</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">3</span>
-                    <span>Regular EMI Interest</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">4</span>
-                    <span>Principal Reduction</span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#2B3566]">
-                <Link href="/disbursements" className="block">
-                  <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700">Open Disbursements Desk</Button>
-                </Link>
-                <Link href="/payments" className="block">
-                  <Button size="sm" variant="secondary" className="w-full text-xs">Open Payments Ledger</Button>
-                </Link>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* F. COLLECTION OFFICER WORKSPACE */}
       {primaryRole === 'COLLECTION_OFFICER' && (
@@ -1185,7 +1388,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-900 dark:text-white">{c.customerName || 'Borrower'}</span>
                             <span className="font-mono text-[10px] text-slate-400">Loan #{c.loanNo}</span>
-                            <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
                               {c.dpd} DPD ({c.agingBucket})
                             </span>
                           </div>
@@ -1381,8 +1584,295 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* H. SYSTEM ADMIN / SUPER ADMIN / BRANCH MANAGER WORKSPACE */}
-      {['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) && (
+      {/* H. BRANCH MANAGER WORKSPACE */}
+      {primaryRole === 'BRANCH_MANAGER' && (() => {
+        const bmMetrics = branchQueueData?.metrics || {
+          totalBranchApplications: appsList.length,
+          pendingManagerReview: appsList.filter((a: any) => !!a.eligibility && ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(a.status)).length,
+          approvedWithinLimit: appsList.filter((a: any) => a.status === 'APPROVED').length,
+          sentBackForCorrection: 0,
+          escalatedToUnderwriter: 0,
+          awaitingDocuments: appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
+          awaitingCreditAssessment: appsList.filter((a: any) => !a.eligibility).length,
+          delegatedLimit: 500000,
+        };
+
+        const branchProposals = branchQueueData?.items?.length ? branchQueueData.items : appsList;
+
+        return (
+          <div className="space-y-6">
+            {/* Delegated Authority Banner */}
+            <div
+              className={cn(
+                'rounded-2xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors',
+                isDark ? 'bg-[#171B36] border-[#2B3566] text-slate-200' : 'bg-blue-50/70 border-blue-200 text-slate-800'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-[#2563EB]/10 text-[#2563EB]">
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm">Branch Manager Delegated Authority Limit:</span>
+                    <span className="font-mono font-extrabold text-[#2563EB] text-sm">
+                      {formatMoney(bmMetrics.delegatedLimit || 500000)} (₹5 Lakhs)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Authorized to approve loan proposals up to ₹5,00,000. Proposals exceeding limit must be escalated to Underwriting.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-semibold shrink-0">
+                <Link href="/branch-review">
+                  <Button size="sm" className="text-xs bg-[#2563EB] text-white hover:bg-blue-700">
+                    Open Branch Desk →
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* 7 Management-Level Metrics */}
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              <KpiItem
+                label="BRANCH APPLICATIONS"
+                value={String(bmMetrics.totalBranchApplications)}
+                hint="Total assigned"
+                icon={<FileText className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PENDING REVIEW"
+                value={String(bmMetrics.pendingManagerReview)}
+                hint="Action required"
+                icon={<Clock className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={bmMetrics.pendingManagerReview > 0 ? `${bmMetrics.pendingManagerReview} pending` : undefined}
+              />
+              <KpiItem
+                label="APPROVED IN LIMIT"
+                value={String(bmMetrics.approvedWithinLimit)}
+                hint="≤ ₹5L limit approved"
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="SENT BACK"
+                value={String(bmMetrics.sentBackForCorrection)}
+                hint="Corrections needed"
+                icon={<History className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="ESCALATED TO UW"
+                value={String(bmMetrics.escalatedToUnderwriter)}
+                hint="> ₹5L / High risk"
+                icon={<Send className="h-4 w-4" />}
+                iconColor="purple"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="AWAITING DOCS"
+                value={String(bmMetrics.awaitingDocuments)}
+                hint="KYC / proofs pending"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="AWAITING CREDIT"
+                value={String(bmMetrics.awaitingCreditAssessment)}
+                hint="Analyst evaluation"
+                icon={<AlertCircle className="h-4 w-4" />}
+                iconColor="rose"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+            </div>
+
+            {/* Branch Delegated Authority Quick Matrix */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              <div className="p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-emerald-800 dark:text-emerald-300">Delegated Approval Limit</span>
+                  <span className="font-mono font-bold text-xs text-emerald-600">≤ ₹5,00,000</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Branch Manager can approve verified proposals directly after Credit Analyst assessment.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-purple-800 dark:text-purple-300">Underwriter Escalation</span>
+                  <span className="font-mono font-bold text-xs text-purple-600">&gt; ₹5,00,000</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Proposals above ₹5 Lakhs or with elevated risk must be escalated to Underwriter.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-blue-800 dark:text-blue-300">Correction Workflow</span>
+                  <span className="font-mono font-bold text-xs text-blue-600">Send Back</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Return proposals to Loan Officer or Credit Analyst for document or KYC corrections.
+                </p>
+              </div>
+            </div>
+
+            {/* Applications Waiting for Branch Manager Review */}
+            <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">Applications Waiting for Branch Manager Review</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Proposals evaluated by Credit Analyst awaiting management approval, send-back, or escalation
+                  </p>
+                </div>
+                <Link href="/branch-review">
+                  <Button size="sm" variant="secondary" className="text-xs">
+                    Open Branch Applications Desk →
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className={cn('border-b text-[11px] font-bold uppercase tracking-wider', isDark ? 'border-[#2B3566] text-slate-400 bg-[#171B36]' : 'border-slate-200 text-slate-500 bg-slate-50/50')}>
+                      <th className="py-3 px-3">Application ID</th>
+                      <th className="py-3 px-3">Customer Name</th>
+                      <th className="py-3 px-3">Loan Product</th>
+                      <th className="py-3 px-3">Requested Amount</th>
+                      <th className="py-3 px-3">Credit Score</th>
+                      <th className="py-3 px-3">Risk Grade</th>
+                      <th className="py-3 px-3">FOIR / DTI</th>
+                      <th className="py-3 px-3">Credit Analyst Rec.</th>
+                      <th className="py-3 px-3">Current Status</th>
+                      <th className="py-3 px-3 text-right">Required Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className={cn('divide-y', isDark ? 'divide-[#2B3566]' : 'divide-slate-100')}>
+                    {branchProposals.length > 0 ? (
+                      branchProposals.map((app: any) => {
+                        const customer = app.customer || {};
+                        const score = app.creditScore || (app.riskAssessment?.score ? 500 + Math.round((app.riskAssessment.score / 100) * 350) : 750);
+                        const riskGrade = app.riskGrade || app.riskAssessment?.category || customer.riskCategory || 'LOW';
+                        const foirPct = app.foirPct != null ? app.foirPct : (customer.monthlyIncome > 0 ? Math.round((Number(customer.existingObligations || 0) / Number(customer.monthlyIncome)) * 100) : 0);
+                        const recommendation = app.creditAnalystRecommendation || app.eligibility?.recommendation || app.eligibility?.result || 'PENDING';
+                        const currentStatusText = app.reviewStatus || app.status;
+
+                        return (
+                          <tr key={app.id} className={cn('transition-colors', isDark ? 'hover:bg-[#1E2445]/50' : 'hover:bg-slate-50/80')}>
+                            <td className="py-3 px-3 font-mono font-bold text-[#2563EB] dark:text-blue-400">
+                              {app.applicationNo || app.id?.slice(0, 8)}
+                            </td>
+                            <td className="py-3 px-3">
+                              <p className="font-bold text-slate-900 dark:text-white">{customer.firstName} {customer.lastName}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{customer.customerCode || '-'}</p>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="font-semibold">{app.product?.name || 'Standard Loan'}</span>
+                              <div className="text-[10px] text-slate-400">{app.tenureMonths || 12} Mos</div>
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                              {formatMoney(app.requestedAmount || 0)}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{score} pts</span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <Badge status={riskGrade} />
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={cn('font-mono font-bold text-xs', foirPct <= 50 ? 'text-emerald-600' : 'text-amber-600')}>
+                                {foirPct}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <Badge
+                                status={
+                                  recommendation === 'ELIGIBLE' || String(recommendation).includes('Sanction')
+                                    ? 'APPROVED'
+                                    : recommendation === 'NOT_ELIGIBLE'
+                                    ? 'REJECTED'
+                                    : 'UNDER_REVIEW'
+                                }
+                              />
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={cn(
+                                'inline-block px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase',
+                                currentStatusText === 'PENDING_BRANCH_MANAGER_REVIEW'
+                                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                                  : currentStatusText === 'BRANCH_MANAGER_APPROVED'
+                                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                  : currentStatusText === 'RETURNED_FOR_CORRECTION'
+                                  ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                                  : currentStatusText === 'ESCALATED_TO_UNDERWRITER'
+                                  ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              )}>
+                                {String(currentStatusText).replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {(() => {
+                                const isFinished = ['APPROVED', 'DISBURSED', 'REJECTED', 'CANCELLED'].includes(app.status);
+                                return (
+                                  <Link href={`/applications/${app.id}`}>
+                                    <Button
+                                      size="sm"
+                                      variant={isFinished ? 'secondary' : 'primary'}
+                                      className={cn(
+                                        'text-xs gap-1 shadow-xs',
+                                        isFinished
+                                          ? 'text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#2B3566]'
+                                          : 'text-white bg-[#2563EB] hover:bg-blue-700'
+                                      )}
+                                    >
+                                      <span>{isFinished ? 'View Details' : 'Review Application'}</span>
+                                      <ArrowRight className="w-3 h-3" />
+                                    </Button>
+                                  </Link>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-xs text-slate-400">
+                          No applications currently waiting for Branch Manager review.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* I. SYSTEM ADMIN / SUPER ADMIN WORKSPACE */}
+      {['SUPER_ADMIN', 'ADMIN'].includes(primaryRole) && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <KpiItem
@@ -1638,188 +2128,7 @@ export default function DashboardPage() {
 
       {/* I. BORROWER / CUSTOMER SELF-SERVICE WORKSPACE */}
       {primaryRole === 'CUSTOMER' && (
-        <div className="space-y-6">
-          {/* Top 6 Borrower KPIs */}
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="ACTIVE LOANS"
-              value={String(customerLoans.filter((l: any) => l.status === 'ACTIVE').length)}
-              hint="Active borrowing accounts"
-              icon={<CreditCard className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="TOTAL BORROWED"
-              value={formatMoney(myTotalBorrowed)}
-              hint="Sanctioned principal"
-              icon={<Wallet className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="NEXT EMI DUE"
-              value={myNextEmiAmount}
-              hint={myNextDueDate}
-              icon={<Coins className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={myActiveLoan ? "Upcoming due" : undefined}
-            />
-            <KpiItem
-              label="OUTSTANDING PRINCIPAL"
-              value={formatMoney(myTotalOutstanding)}
-              hint="Current loan balance"
-              icon={<TrendingUp className="h-4 w-4" />}
-              iconColor="rose"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="KYC VERIFICATION"
-              value={(myActiveLoan?.customer?.kycStatus || appsList[0]?.customer?.kycStatus || (user as any)?.customer?.kycStatus || 'VERIFIED')}
-              hint="Identity verified"
-              icon={<ShieldCheck className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              valueColor="text-emerald-600"
-            />
-            <KpiItem
-              label="LOAN TENURE"
-              value={myActiveLoan ? `${myActiveLoan.tenureMonths || 24} Mos` : '24 Mos'}
-              hint="Scheduled installments"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-          </div>
-
-          {/* Main Loan Details & Actions */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Left 2 Cols: My Active Loan Facility */}
-            <div className={cn('lg:col-span-2 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">
-                      {myActiveLoan ? `Active Loan #${myActiveLoan.loanNo}` : 'Borrowing Facility'}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {myActiveLoan?.productName || 'Personal Loan'} · Disbursed on {myActiveLoan?.disbursementDate ? formatDate(myActiveLoan.disbursementDate) : 'Recently'}
-                    </p>
-                  </div>
-                  {myActiveLoan && <Badge status={myActiveLoan.status} />}
-                </div>
-
-                {myActiveLoan ? (
-                  <div className="space-y-4 pt-3">
-                    {/* Key Loan Metrics Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Sanctioned Amount</span>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white mt-0.5 block">{formatMoney(myActiveLoan.principal || 0)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Monthly EMI</span>
-                        <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5 block">{formatMoney(myActiveLoan.emiAmount || 0)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Tenure Period</span>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white mt-0.5 block">{myActiveLoan.tenureMonths || 24} Months</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Interest Rate</span>
-                        <span className="font-bold text-sm text-[#2563EB] dark:text-[#60A5FA] mt-0.5 block">{myActiveLoan.interestRate || '12.00'}% p.a.</span>
-                      </div>
-                    </div>
-
-                    {/* Next Due Banner */}
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-blue-50/80 dark:bg-[#060F1B] border border-blue-200/70 dark:border-[#2B3566]">
-                      <div className="flex items-center gap-2.5">
-                        <Clock className="w-4 h-4 text-[#2563EB]" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white">Next Monthly Installment Due: {myNextEmiAmount}</p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">Scheduled on {myNextDueDate}. Pay on time to ensure high credit score.</p>
-                        </div>
-                      </div>
-                      <Link href={`/loans/${myActiveLoan.id}`}>
-                        <Button size="sm" className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-sm">
-                          Submit Payment Proof →
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-slate-400 space-y-2">
-                    <p>No active loan account found under your profile.</p>
-                    <Link href="/loans">
-                      <Button size="sm" className="bg-[#2563EB] text-white">View Loan Accounts →</Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              {myActiveLoan && (
-                <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                  <Link href={`/loans/${myActiveLoan.id}`} className="flex-1">
-                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
-                      View 24-Month Amortization Schedule →
-                    </Button>
-                  </Link>
-                  <Link href="/payments">
-                    <Button size="sm" variant="ghost" className="text-xs">
-                      Payment Receipts →
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Right 1 Col: Borrower Profile & Shortcuts */}
-            <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">Borrower Information</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Your profile and registered details</p>
-
-                <div className="space-y-2.5 pt-3 text-xs">
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/60">
-                    <span className="text-[11px] text-slate-400">Borrower Name</span>
-                    <p className="font-bold text-slate-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">Email: {user.email}</p>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/60">
-                    <span className="text-[11px] text-slate-400">Destination Bank Account</span>
-                    <p className="font-bold text-slate-900 dark:text-white">
-                      {(myActiveLoan?.customer?.bankName || appsList[0]?.customer?.bankName || (user as any)?.customer?.bankName || 'Beneficiary Bank')}
-                    </p>
-                    <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-                      A/C: {(myActiveLoan?.customer?.bankAccountNo || appsList[0]?.customer?.bankAccountNo || (user as any)?.customer?.bankAccountNo || 'Recorded on File')} ({(myActiveLoan?.customer?.bankIfsc || appsList[0]?.customer?.bankIfsc || (user as any)?.customer?.bankIfsc || 'IFSC Verified')})
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                <Link href="/loans" className="block">
-                  <Button size="sm" variant="secondary" className="w-full text-xs">
-                    My Loan Accounts & Schedules →
-                  </Button>
-                </Link>
-                <Link href="/payments" className="block">
-                  <Button size="sm" variant="ghost" className="w-full text-xs">
-                    View Payment Ledger & Receipts →
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+        <BorrowerPortalShell />
       )}
     </div>
   );
@@ -1859,29 +2168,50 @@ function KpiItem({
     amber: isDark ? 'bg-[#060F1B] text-amber-400' : 'bg-amber-50 text-amber-600',
   };
 
+  const valLen = value ? value.length : 0;
+  const fontSizeClass =
+    valLen > 14
+      ? 'text-sm sm:text-base xl:text-sm 2xl:text-base'
+      : valLen > 10
+      ? 'text-base sm:text-lg xl:text-[15px] 2xl:text-lg'
+      : valLen > 7
+      ? 'text-lg sm:text-xl xl:text-lg 2xl:text-xl'
+      : 'text-2xl';
+
   return (
-    <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-        <div className={cn('flex h-8 w-8 items-center justify-center rounded-xl', iconBgMap[iconColor])}>
-          {icon}
+    <div className={cn('rounded-2xl border p-4 transition-all min-w-0 overflow-hidden flex flex-col justify-between', cardBgClass)}>
+      <div>
+        <div className="flex items-center justify-between gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate" title={label}>
+            {label}
+          </span>
+          <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-xl', iconBgMap[iconColor])}>
+            {icon}
+          </div>
         </div>
+        <p
+          className={cn(
+            'mt-2 font-bold tracking-tight truncate leading-tight',
+            fontSizeClass,
+            valueColor || (isDark ? 'text-white' : 'text-slate-900')
+          )}
+          title={value}
+        >
+          {value}
+        </p>
       </div>
-      <p className={cn('mt-2 text-2xl font-bold tracking-tight', valueColor || (isDark ? 'text-white' : 'text-slate-900'))}>
-        {value}
-      </p>
-      <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+      <div className="mt-2 flex items-center gap-1.5 text-[11px] min-w-0 overflow-hidden">
         {trend && (
-          <span className={cn('flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-bold', isDark ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-emerald-50 text-[#10B981]')}>
+          <span className={cn('flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-bold', isDark ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-emerald-50 text-[#10B981]')}>
             <ArrowUp className="h-3 w-3" /> {trend}
           </span>
         )}
         {highlightText && (
-          <span className={cn('font-bold', isDark ? 'text-amber-400' : 'text-amber-600')}>
+          <span className={cn('font-bold shrink-0', isDark ? 'text-amber-400' : 'text-amber-600')}>
             {highlightText}
           </span>
         )}
-        <span className="truncate text-slate-400 font-medium">{hint}</span>
+        <span className="truncate text-slate-400 font-medium" title={hint}>{hint}</span>
       </div>
     </div>
   );

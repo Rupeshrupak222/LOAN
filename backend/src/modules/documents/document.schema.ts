@@ -13,7 +13,7 @@ export const registerDocumentSchema = z.object({
 });
 
 export const verifyDocumentSchema = z.object({
-  status: z.enum(['VERIFIED', 'REJECTED', 'UNDER_REVIEW']),
+  status: z.enum(['VERIFIED', 'REJECTED', 'UNDER_REVIEW', 'REQUIRES_CORRECTION']),
   rejectionReason: z.string().optional(),
 });
 

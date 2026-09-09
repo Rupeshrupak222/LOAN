@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../common/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { Money } from '../finance/money';
 import { generatePaymentNo } from '../shared/codes';
@@ -8,11 +8,33 @@ import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import type { RecordPaymentInput } from './payment.schema';
 
-export async function listPayments(params: PageParams, loanId?: string, customerId?: string, userId?: string) {
+export interface PaymentActorContext {
+  id?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}
+
+export async function listPayments(
+  params: PageParams,
+  loanId?: string,
+  customerId?: string,
+  userId?: string,
+  actor?: PaymentActorContext
+) {
   const where: any = {};
   if (loanId) where.loanId = loanId;
   if (customerId) where.customerId = customerId;
   if (userId) where.customer = { userId };
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.tenantId = actor.tenantId;
+    }
+    if (actor.roles?.includes('BRANCH_MANAGER') && actor.branchId) {
+      where.loan = { ...where.loan, branchId: actor.branchId };
+    }
+  }
 
   if (params.search) {
     where.OR = [
@@ -58,10 +80,25 @@ export async function listPayments(params: PageParams, loanId?: string, customer
   };
 }
 
-export async function listTransactions(params: PageParams, type?: string, loanId?: string) {
+export async function listTransactions(
+  params: PageParams,
+  type?: string,
+  loanId?: string,
+  actor?: PaymentActorContext
+) {
   const where: any = {};
   if (type) where.type = type;
   if (loanId) where.loanId = loanId;
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.loan = { ...where.loan, tenantId: actor.tenantId };
+    }
+    if (actor.roles?.includes('BRANCH_MANAGER') && actor.branchId) {
+      where.loan = { ...where.loan, branchId: actor.branchId };
+    }
+  }
+
   if (params.search) {
     where.OR = [
       { reference: { contains: params.search, mode: 'insensitive' } },
@@ -109,7 +146,7 @@ export async function listTransactions(params: PageParams, type?: string, loanId
   };
 }
 
-export async function getPaymentDetail(id: string) {
+export async function getPaymentDetail(id: string, actor?: PaymentActorContext) {
   const payment = await prisma.payment.findUnique({
     where: { id },
     include: {
@@ -121,20 +158,52 @@ export async function getPaymentDetail(id: string) {
     },
   });
   if (!payment) throw new NotFoundError('Payment record not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && payment.tenantId && payment.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Payment record belongs to another institution');
+    }
+  }
+
   return payment;
 }
 
 export async function processPayment(
   input: RecordPaymentInput,
-  actorUserId?: string
+  actorUserId?: string,
+  actor?: PaymentActorContext
 ) {
+  if (Number(input.amount) <= 0) {
+    throw new BadRequestError('Payment amount must be greater than 0');
+  }
+
+  // Service-layer RBAC check: System Admin cannot post payments
+  if (actor?.roles && actor.roles.length > 0) {
+    const isStaff = actor.roles.some((r) =>
+      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+    if (isStaff) {
+      const isAuthorizedFinancialOperator = actor.roles.some((r) =>
+        ['FINANCE_OFFICER'].includes(r)
+      );
+      if (!isAuthorizedFinancialOperator) {
+        throw new ForbiddenError('Access forbidden: System Admin, Super Admin, Branch Manager, and unauthorized staff cannot post repayments or record collections');
+      }
+    }
+  }
+
   // 1. Idempotency Check
   if (input.idempotencyKey) {
     const existing = await prisma.payment.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
       include: { allocations: true },
     });
-    if (existing) return existing;
+    if (existing) {
+      if (actor && !actor.roles?.includes('SUPER_ADMIN') && actor.tenantId && existing.tenantId && existing.tenantId !== actor.tenantId) {
+        throw new ForbiddenError('Access forbidden: Payment record belongs to another institution');
+      }
+      return existing;
+    }
   }
 
   // 2. Fetch Loan & unpaid schedule items
@@ -150,6 +219,12 @@ export async function processPayment(
   });
   if (!loan) throw new NotFoundError('Loan account not found');
 
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && loan.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Loan account belongs to another institution');
+    }
+  }
+
   if (loan.status === 'CLOSED') {
     throw new BadRequestError('Loan is already closed with zero outstanding balance');
   }
@@ -158,12 +233,14 @@ export async function processPayment(
   const allocSetting = await prisma.systemSetting.findUnique({
     where: { key: 'payment_allocation_order' },
   });
-  const allocationBuckets: string[] = (allocSetting?.value as string[]) || [
+  const rawBuckets: string[] = (allocSetting?.value as string[]) || [
     'FEES',
     'PENALTY',
     'INTEREST',
     'PRINCIPAL',
   ];
+  // Canonical waterfall normalization: map PENALTIES -> PENALTY
+  const allocationBuckets = rawBuckets.map((b) => (b === 'PENALTIES' ? 'PENALTY' : b));
 
   let unallocated = new Decimal(input.amount);
   const paymentNo = generatePaymentNo();
@@ -252,8 +329,12 @@ export async function processPayment(
       orderBy: { emiNumber: 'asc' },
     });
 
+    const hasRemainingOverdue = await tx.repaymentScheduleItem.findFirst({
+      where: { loanId: loan.id, status: 'OVERDUE' },
+    });
+
     const isFullyPaid = newOutstandingPrincipal.isZero() && !nextUnpaid;
-    const newLoanStatus = isFullyPaid ? 'CLOSED' : loan.status === 'OVERDUE' ? 'ACTIVE' : loan.status;
+    const newLoanStatus = isFullyPaid ? 'CLOSED' : hasRemainingOverdue ? 'OVERDUE' : 'ACTIVE';
 
     await tx.loan.update({
       where: { id: loan.id },
@@ -273,6 +354,7 @@ export async function processPayment(
         paymentNo,
         loanId: loan.id,
         customerId: loan.customerId,
+        tenantId: loan.tenantId || actor?.tenantId,
         amount: Money.toDb(input.amount),
         method: input.method,
         reference: input.reference,
@@ -305,31 +387,56 @@ export async function processPayment(
 
     // 8. Update active collection case if any
     const activeCase = await tx.collectionCase.findFirst({
-      where: { loanId: loan.id, status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] } },
+      where: { loanId: loan.id, status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED'] } },
     });
     if (activeCase) {
       const remainingOverdue = Decimal.max(0, new Decimal(activeCase.overdueAmount).minus(input.amount));
+      const isCleared = remainingOverdue.isZero();
       await tx.collectionCase.update({
         where: { id: activeCase.id },
         data: {
           overdueAmount: Money.toDb(remainingOverdue),
-          status: remainingOverdue.isZero() ? 'RESOLVED' : activeCase.status,
+          status: isCleared ? 'RESOLVED' : activeCase.status,
+          dpd: isCleared ? 0 : activeCase.dpd,
         },
       });
+
+      if (isCleared) {
+        await tx.promiseToPay.updateMany({
+          where: { caseId: activeCase.id, status: 'PENDING' },
+          data: { status: 'KEPT' },
+        });
+      } else {
+        // Fulfill matching pending PTP if paid amount satisfies it
+        const matchingPtp = await tx.promiseToPay.findFirst({
+          where: {
+            caseId: activeCase.id,
+            status: 'PENDING',
+            promisedAmount: { lte: Money.toDb(input.amount) },
+          },
+          orderBy: { promisedDate: 'asc' },
+        });
+        if (matchingPtp) {
+          await tx.promiseToPay.update({
+            where: { id: matchingPtp.id },
+            data: { status: 'KEPT' },
+          });
+        }
+      }
 
       await tx.collectionActivity.create({
         data: {
           caseId: activeCase.id,
-          activityType: 'SMS',
-          outcome: 'PROMISE_TO_PAY',
-          notes: `Payment of ₹${input.amount} received. Remaining overdue: ₹${remainingOverdue.toFixed(2)}`,
-          performedBy: 'System',
+          activityType: 'CALL',
+          outcome: isCleared ? 'RESOLVED' : 'PROMISE_TO_PAY',
+          notes: `Repayment of ₹${Number(input.amount).toLocaleString('en-IN')} confirmed. Ref: ${input.reference || paymentNo}. Remaining overdue: ₹${remainingOverdue.toFixed(2)}`,
+          performedBy: actor?.email || 'System',
         },
       });
     }
 
     return createdPayment;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAudit({
     userId: actorUserId,

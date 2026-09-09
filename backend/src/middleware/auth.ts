@@ -1,11 +1,14 @@
 import { NextFunction, Request, Response } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../common/errors';
 import { verifyAccessToken } from '../modules/auth/tokens';
+import { securityService } from '../modules/security/security.service';
 
 export interface AuthUser {
   id: string;
   email: string;
   roles: string[];
+  tenantId?: string;
+  branchId?: string;
 }
 
 declare global {
@@ -13,6 +16,16 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      tenantId?: string;
+      branchId?: string;
+      tenant?: {
+        id: string;
+        tenantId: string;
+        code: string;
+        tenantCode: string;
+        name: string;
+        isPrimary: boolean;
+      };
     }
   }
 }
@@ -26,10 +39,19 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
     throw new UnauthorizedError();
   }
 
+  if (securityService.isTokenRevoked(token)) {
+    throw new UnauthorizedError('Token has been revoked or session invalidated.');
+  }
+
   try {
     const payload = verifyAccessToken(token);
     if (payload.type !== 'access') throw new UnauthorizedError('Invalid token type');
-    req.user = { id: payload.sub, email: payload.email, roles: payload.roles };
+    req.user = {
+      id: payload.sub,
+      email: payload.email,
+      roles: payload.roles,
+      tenantId: payload.tenantId || 'tenant-adyapan-default',
+    };
     next();
   } catch {
     throw new UnauthorizedError('Invalid or expired token');

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ClipboardCheck,
@@ -24,14 +25,61 @@ import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { useToast } from '@/lib/toast';
+import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 
 type TabKey = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export default function UnderwritingQueuePage() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const isBranchManagerOnly =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const isLoanOfficerOnly =
+    user?.roles?.includes('LOAN_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const isCreditAnalystOnly =
+    user?.roles?.includes('CREDIT_ANALYST') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const canSanction = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r)
+  );
+
+  const isFinanceOfficerOnly =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  const isCollectionOfficerOnly =
+    user?.roles?.includes('COLLECTION_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r));
+
+  useEffect(() => {
+    if (isBranchManagerOnly) {
+      toast.warning('Branch Managers do not have access to the Underwriter Verification Desk. Please use the Branch Management Desk.');
+      router.replace('/branch-review');
+    } else if (isCreditAnalystOnly) {
+      router.replace('/credit-assessment');
+    } else if (isLoanOfficerOnly) {
+      toast.warning('Loan Officers do not have access to the Underwriter Verification Desk.');
+      router.replace('/applications');
+    } else if (isFinanceOfficerOnly) {
+      toast.warning('Finance Officers do not have access to the Underwriting Desk. Please use the Disbursements Desk.');
+      router.replace('/disbursements');
+    } else if (isCollectionOfficerOnly) {
+      toast.warning('Collection Officers do not have access to the Underwriting Desk.');
+      router.replace('/collections');
+    }
+  }, [isBranchManagerOnly, isCreditAnalystOnly, isLoanOfficerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, router, toast]);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<TabKey>('ALL');
@@ -42,11 +90,16 @@ export default function UnderwritingQueuePage() {
   const [reason, setReason] = useState('');
   const [conditions, setConditions] = useState('');
 
+  const canDecide = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)
+  );
+
   const { data, isLoading } = useQuery({
     queryKey: ['underwriting-queue'],
+    enabled: !isCreditAnalystOnly && !isLoanOfficerOnly,
     queryFn: async () => {
       const res = await api.get('/underwriting/queue');
-      const rows = res.data?.data;
+      const rows = res.data?.data?.items ?? res.data?.data ?? [];
       return (Array.isArray(rows) ? rows : []) as any[];
     },
   });
@@ -62,23 +115,106 @@ export default function UnderwritingQueuePage() {
       });
     },
     onSuccess: () => {
+      toast.success(`Decision '${decision}' recorded successfully.`);
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setSelectedApp(null);
       setReason('');
       setConditions('');
     },
     onError: (err: any) => {
-      alert(apiErrorMessage(err));
+      toast.error(apiErrorMessage(err), { title: 'Underwriting Decision Notice' });
     },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isBranchManagerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Branch Applications Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Branch Managers review proposals and approve within delegated limits at the Branch Review Desk. Underwriting is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isLoanOfficerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Loan Applications...
+        </p>
+        <p className="text-xs text-slate-400">
+          Loan Officers handle application origination. Underwriting desk is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isCreditAnalystOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Credit Assessment Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Credit Analysts evaluate borrower repayment capacity and eligibility at the Credit Assessment Desk.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isFinanceOfficerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Disbursements Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Finance Officers manage fund payouts and ledger accounting. Underwriting sanction is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isCollectionOfficerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <Spinner size="md" />
+        </div>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Redirecting to Collections Desk...
+        </p>
+        <p className="text-xs text-slate-400">
+          Collection Officers handle post-disbursement recoveries. Underwriting is restricted to Underwriters.
+        </p>
+      </Card>
+    );
+  }
+
+  if (isLoading) return <TableSkeleton rows={6} cols={6} />;
 
   const allItems = Array.isArray(data) ? data : [];
 
@@ -189,7 +325,7 @@ export default function UnderwritingQueuePage() {
             >
               <span>Awaiting Decision</span>
               {pendingItems.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">
                   {pendingItems.length}
                 </span>
               )}
@@ -307,7 +443,7 @@ export default function UnderwritingQueuePage() {
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {isPending ? (
+                          {canSanction && isPending && (
                             <>
                               <Button
                                 size="sm"
@@ -337,11 +473,17 @@ export default function UnderwritingQueuePage() {
                                 Reject
                               </Button>
                             </>
-                          ) : (
+                          )}
+                          {canSanction && !isPending && (
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() => handleOpenDecision(app)}
+                              onClick={() => {
+                                setSelectedApp(app);
+                                setDecision(app.status === 'APPROVED' ? 'APPROVE' : 'REJECT');
+                                setReason('');
+                                setConditions('');
+                              }}
                               className="text-xs font-semibold cursor-pointer flex items-center gap-1.5 border border-slate-300 dark:border-[#2B3566]"
                             >
                               <RotateCcw className="w-3 h-3 text-amber-500" />
@@ -374,139 +516,12 @@ export default function UnderwritingQueuePage() {
         )}
       </Card>
 
-      {/* QUICK UNDERWRITING / RE-UNDERWRITING DECISION MODAL */}
-      {selectedApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div
-            className={cn(
-              'w-full max-w-lg rounded-2xl border shadow-2xl p-6 relative transition-all',
-              isDark ? 'bg-[#171B36] border-[#2B3566] text-white' : 'bg-white border-slate-200 text-slate-900'
-            )}
-          >
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#2B3566]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
-                  <FileCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base">
-                    {selectedApp.status === 'UNDERWRITING' ? 'Underwrite Loan Proposal' : 'Re-Underwrite / Modify Decision'}
-                  </h3>
-                  <p className="text-xs text-slate-400">Sanction, modify conditions, or decline proposal</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedApp(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 pt-4">
-              <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#1E2445] text-xs space-y-1.5 border border-slate-200/60 dark:border-[#2B3566]">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Application No:</span>
-                  <span className="font-mono font-bold text-blue-600">{selectedApp.applicationNo}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Borrower:</span>
-                  <span className="font-bold">
-                    {selectedApp.customer?.firstName} {selectedApp.customer?.lastName}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Requested Sanction:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                    {formatMoney(selectedApp.requestedAmount || 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">Current Status:</span>
-                  <Badge status={selectedApp.status} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
-                  Underwriting Decision Outcome *
-                </label>
-                <select
-                  className={cn(
-                    'h-9 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors focus:border-[#2563EB] focus:outline-none',
-                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-100' : 'border-slate-200 bg-white text-slate-900'
-                  )}
-                  value={decision}
-                  onChange={(e) => setDecision(e.target.value as any)}
-                >
-                  <option value="APPROVE">APPROVE (Sanction Loan & Move to Payout Queue)</option>
-                  <option value="APPROVE_WITH_CONDITIONS">APPROVE WITH CONDITIONS (Covenants required)</option>
-                  <option value="SEND_BACK">SEND BACK (Return to Credit Analyst for Review)</option>
-                  <option value="REJECT">REJECT (Decline Application)</option>
-                </select>
-              </div>
-
-              {decision === 'APPROVE_WITH_CONDITIONS' && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
-                    Conditions / Covenants Required *
-                  </label>
-                  <Input
-                    placeholder="e.g. Requires co-applicant guarantee, post-dated cheques"
-                    value={conditions}
-                    onChange={(e) => setConditions(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
-                  Sanction Rationale / Remarks *
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Detailed credit assessment remarks..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className={cn(
-                    'w-full rounded-xl border p-3 text-xs focus:border-[#2563EB] focus:outline-none',
-                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-white' : 'border-slate-300 bg-white text-slate-900'
-                  )}
-                  required
-                />
-              </div>
-
-              {decisionMutation.isError && (
-                <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 p-3 text-xs">
-                  {apiErrorMessage(decisionMutation.error)}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-[#2B3566]">
-                <Link
-                  href={`/applications/${selectedApp.id}`}
-                  className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline"
-                >
-                  Full Application Review →
-                </Link>
-
-                <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => setSelectedApp(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={!reason.trim() || decisionMutation.isPending}
-                    onClick={() => decisionMutation.mutate()}
-                    className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold"
-                  >
-                    {decisionMutation.isPending ? 'Committing...' : 'Commit Decision'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* STEP-BY-STEP UNDERWRITING VERIFICATION WIZARD MODAL */}
+      <UnderwritingVerificationWizard
+        application={selectedApp}
+        isOpen={Boolean(selectedApp)}
+        onClose={() => setSelectedApp(null)}
+      />
     </div>
   );
 }

@@ -2,8 +2,16 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { PageParams, buildPagination } from '../../common/pagination';
 
+export interface AuditActorContext {
+  id?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}
+
 export interface RecordAuditInput {
   userId?: string;
+  tenantId?: string;
   role?: string;
   action: string;
   entity: string;
@@ -19,6 +27,7 @@ export async function logAudit(input: RecordAuditInput) {
     return await prisma.auditLog.create({
       data: {
         userId: input.userId,
+        tenantId: input.tenantId,
         role: input.role,
         action: input.action,
         entity: input.entity,
@@ -29,17 +38,47 @@ export async function logAudit(input: RecordAuditInput) {
         correlationId: input.correlationId,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === 'P2003' && input.userId) {
+      try {
+        return await prisma.auditLog.create({
+          data: {
+            userId: undefined,
+            tenantId: input.tenantId,
+            role: input.role,
+            action: input.action,
+            entity: input.entity,
+            entityId: input.entityId,
+            previousValue: input.previousValue ?? Prisma.DbNull,
+            newValue: input.newValue ?? Prisma.DbNull,
+            ipAddress: input.ipAddress,
+            correlationId: input.correlationId,
+          },
+        });
+      } catch {
+        return null;
+      }
+    }
     // Non-blocking fallback so business flow is not interrupted if logging fails
     console.error('Audit logging failed:', err);
     return null;
   }
 }
 
-export async function listAuditLogs(params: PageParams, entity?: string, entityId?: string) {
+export async function listAuditLogs(
+  params: PageParams,
+  entity?: string,
+  entityId?: string,
+  actor?: AuditActorContext
+) {
   const where: Prisma.AuditLogWhereInput = {};
   if (entity) where.entity = entity;
   if (entityId) where.entityId = entityId;
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN') && actor.tenantId) {
+    where.tenantId = actor.tenantId;
+  }
+
   if (params.search) {
     where.OR = [
       { action: { contains: params.search, mode: 'insensitive' } },

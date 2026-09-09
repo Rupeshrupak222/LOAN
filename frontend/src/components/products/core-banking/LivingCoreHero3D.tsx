@@ -221,9 +221,42 @@ export const LivingCoreHero3D: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full min-h-[92vh] pt-28 pb-16 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center text-center overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EFF6FF]"
     >
-      {/* Background ambient radial lighting and mesh grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] [background-size:28px_28px] opacity-40 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-blue-400/15 via-indigo-500/10 to-teal-400/10 blur-[130px] rounded-full pointer-events-none" />
+      {/* ── UNIQUE 3D FINANCIAL VAULT LEDGER GRID BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric 3D Floor Grid */}
+        <div
+          className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[1800px] h-[900px] opacity-30"
+          style={{
+            transform: 'perspective(900px) rotateX(65deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(21, 94, 239, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(21, 94, 239, 0.25) 1px, transparent 1px)
+            `,
+            backgroundSize: '48px 48px',
+            maskImage: 'radial-gradient(ellipse 65% 60% at 50% 40%, black 25%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 65% 60% at 50% 40%, black 25%, transparent 80%)',
+          }}
+        />
+
+        {/* Dual Volumetric Light Cones */}
+        <div className="absolute top-0 left-1/4 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-br from-cyan-400/20 via-blue-500/10 to-transparent blur-[120px] rounded-full" />
+        <div className="absolute top-10 right-1/4 translate-x-1/2 w-[650px] h-[650px] bg-gradient-to-bl from-indigo-500/20 via-teal-400/10 to-transparent blur-[140px] rounded-full" />
+
+        {/* Floating 3D Ledger Micro-Cubes & Floating Currency Markers */}
+        <div className="absolute top-28 left-[10%] px-3 py-1.5 rounded-lg bg-white/80 border border-blue-200/80 backdrop-blur-md shadow-lg text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>DOUBLE_ENTRY_ACID // SYNC_OK</span>
+        </div>
+
+        <div className="absolute top-44 right-[12%] px-3 py-1.5 rounded-lg bg-white/80 border border-indigo-200/80 backdrop-blur-md shadow-lg text-[10px] font-mono text-indigo-700 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '8s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          <span>REALTIME_LEDGER_PARITY // 100%</span>
+        </div>
+
+        {/* Floating geometric diamond balance beacons */}
+        <div className="absolute bottom-32 left-[15%] w-6 h-6 border-2 border-emerald-400/40 rotate-45 animate-spin" style={{ animationDuration: '18s' }} />
+        <div className="absolute bottom-40 right-[18%] w-8 h-8 border-2 border-blue-400/30 rotate-12 animate-pulse" style={{ animationDuration: '4s' }} />
+      </div>
 
       {/* ── Top Narrative Eyebrow ── */}
       <div className="relative z-10 max-w-4xl mx-auto space-y-6 text-center animate-fade-in">

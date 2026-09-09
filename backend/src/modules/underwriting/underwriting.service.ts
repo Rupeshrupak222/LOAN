@@ -1,11 +1,14 @@
 import { ApplicationStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../common/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import type { UnderwritingDecisionInput } from './underwriting.schema';
 
-export async function getUnderwritingQueue(tab?: string) {
+export async function getUnderwritingQueue(
+  tab?: string,
+  actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
+) {
   let where: any = {};
   if (tab === 'PENDING') {
     where = { status: 'UNDERWRITING' };
@@ -22,6 +25,16 @@ export async function getUnderwritingQueue(tab?: string) {
         { status: { in: ['APPROVED', 'REJECTED'] } },
       ],
     };
+  }
+
+  // Multi-Tenant and Branch Data Isolation
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId) {
+      where.tenantId = actor.tenantId;
+    }
+    if ((actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) && actor.branchId) {
+      where.customer = { ...where.customer, branchId: actor.branchId };
+    }
   }
 
   return prisma.loanApplication.findMany({
@@ -41,15 +54,56 @@ export async function getUnderwritingQueue(tab?: string) {
 export async function submitUnderwritingDecision(
   applicationId: string,
   input: UnderwritingDecisionInput,
-  actor: { id: string; email: string; roles: string[] }
+  actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  // Service layer defense-in-depth: Credit Analysts, System Admins, Super Admins, Branch Managers, and non-deciders cannot commit underwriting decisions
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
+  const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
+  if (!isAuthorizedDecider) {
+    throw new ForbiddenError(
+      'Access forbidden: Only Underwriters and Administrators can commit final underwriting decisions.'
+    );
+  }
+
   const app = await prisma.loanApplication.findUnique({
     where: { id: applicationId },
     include: { product: true, customer: true },
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
-  // Verify approval limits from SystemSetting
+  // Multi-Tenant Isolation & IDOR Defense
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      app.customer?.branchId &&
+      app.customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
+  }
+
+  // Validate allowed application status for underwriting decision
+  const ALLOWED_UNDERWRITING_STATES = ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'];
+  if (!ALLOWED_UNDERWRITING_STATES.includes(app.status)) {
+    throw new BadRequestError(
+      `Cannot commit underwriting decision for application in '${app.status}' status. Application must be under review or in underwriting queue.`
+    );
+  }
+
+  const isApprovalDecision = input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS';
+
+  // KYC Prerequisite Gate: Cannot sanction proposals with REJECTED KYC status
+  if (isApprovalDecision && app.customer?.kycStatus === 'REJECTED') {
+    throw new BadRequestError(
+      'Cannot approve loan application with REJECTED borrower KYC status. KYC verification must be resolved prior to credit sanction.'
+    );
+  }
+
+  // Verify approval limits from SystemSetting (applies strictly to both APPROVE and APPROVE_WITH_CONDITIONS)
   const requestedAmount = Number(app.requestedAmount);
   const setting = await prisma.systemSetting.findUnique({ where: { key: 'approval_limits' } });
   const limits = (setting?.value as any[]) || [];
@@ -57,10 +111,9 @@ export async function submitUnderwritingDecision(
   const matchedTier = limits.find(
     (l) => l.maxAmount === null || requestedAmount <= Number(l.maxAmount)
   );
-  if (matchedTier && input.decision === 'APPROVE') {
+  if (matchedTier && isApprovalDecision) {
     const requiredRoles: string[] = matchedTier.chain || [];
-    const isSuper = actor.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'ADMIN');
-    const hasAuthority = isSuper || actor.roles?.some((r) => requiredRoles.includes(r));
+    const hasAuthority = actor.roles?.some((r) => requiredRoles.includes(r));
     if (!hasAuthority) {
       throw new BadRequestError(
         `Your role does not have approval limit authority for ₹${requestedAmount.toLocaleString(

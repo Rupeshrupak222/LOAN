@@ -5,12 +5,14 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   roles: string[];
+  tenantId?: string;
   type: 'access';
 }
 
 export interface RefreshTokenPayload {
   sub: string;
   tokenId: string;
+  tenantId?: string;
   type: 'refresh';
 }
 

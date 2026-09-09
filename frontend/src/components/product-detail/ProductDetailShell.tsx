@@ -92,57 +92,117 @@ export const ProductDetailShell: React.FC<ProductDetailShellProps> = ({ product 
 
         {/* ── Main Content Body ── */}
         <main className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 py-10 sm:py-16 space-y-16">
-          {/* ── Hero Section with Interactive 3D Visual ── */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 items-center">
-            {/* Left Column: Narrative Headline & Metrics */}
-            <div className="lg:col-span-6 space-y-6 text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200/80 text-xs font-bold text-[#155EEF] font-mono shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-[#155EEF] animate-pulse" />
-                <span>{product.category} · {product.tagline}</span>
-              </div>
+          {/* ── Hero Section with Domain-Specific 3D Background & Interactive Visual ── */}
+          <section className="relative rounded-3xl overflow-hidden p-6 sm:p-10 border border-slate-200/80 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F0F7FF] shadow-xs">
+            {/* Domain-Specific 3D Background Atmosphere */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {/* Isometric Perspective Grid */}
+              <div
+                className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1850px] h-[920px] opacity-30"
+                style={{
+                  transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+                  backgroundImage: product.slug === 'digilocker-ekyc'
+                    ? `
+                        linear-gradient(to right, rgba(16, 185, 129, 0.25) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(14, 165, 233, 0.22) 1px, transparent 1px)
+                      `
+                    : `
+                        linear-gradient(to right, rgba(139, 92, 246, 0.25) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(21, 94, 239, 0.22) 1px, transparent 1px)
+                      `,
+                  backgroundSize: '46px 46px',
+                  maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+                  WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+                }}
+              />
 
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-[#071A33] leading-[1.12]">
-                {product.headline}{' '}
-                <span className="bg-gradient-to-r from-[#155EEF] via-[#2563EB] to-indigo-700 bg-clip-text text-transparent">
-                  {product.highlightText}
-                </span>
-              </h1>
+              {/* Volumetric Glowing Cones */}
+              <div
+                className={`absolute top-0 left-1/3 -translate-x-1/2 w-[650px] h-[500px] blur-[140px] rounded-full ${
+                  product.slug === 'digilocker-ekyc'
+                    ? 'bg-gradient-to-br from-emerald-400/18 via-teal-500/12 to-transparent'
+                    : 'bg-gradient-to-br from-purple-500/18 via-blue-600/12 to-transparent'
+                }`}
+              />
+              <div className="absolute top-10 right-1/3 translate-x-1/2 w-[600px] h-[500px] bg-gradient-to-bl from-blue-600/15 via-indigo-500/10 to-transparent blur-[130px] rounded-full" />
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
-                {product.subheadline}
-              </p>
-
-              {/* Hero Metrics Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                {product.heroMetrics.map((m, i) => (
-                  <div key={i} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-                    <p className="text-lg sm:text-xl font-black text-[#071A33] font-mono">{m.value}</p>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{m.label}</p>
+              {/* Floating 3D Telemetry Badges */}
+              {product.slug === 'digilocker-ekyc' ? (
+                <>
+                  <div className="absolute top-8 left-[6%] px-3 py-1.5 rounded-lg bg-white/85 border border-emerald-200 backdrop-blur-md shadow-md text-[10px] font-mono text-emerald-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>UIDAI_EKYC // 256-BIT_XML_VERIFIED</span>
                   </div>
-                ))}
-              </div>
-
-              {/* Quick Action CTAs */}
-              <div className="flex flex-wrap items-center gap-3 pt-4">
-                <Link
-                  href="/login"
-                  className="px-6 py-3 rounded-xl bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-xs shadow-lg shadow-[#155EEF]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
-                >
-                  <span>Launch in LMS Workspace</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-                <a
-                  href="#specs"
-                  className="px-5 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs transition-all"
-                >
-                  Explore Enterprise Specs
-                </a>
-              </div>
+                  <div className="absolute top-16 right-[6%] px-3 py-1.5 rounded-lg bg-white/85 border border-teal-200 backdrop-blur-md shadow-md text-[10px] font-mono text-teal-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                    <span>PAN_VERIFICATION // INSTANT_MATCH</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="absolute top-8 left-[6%] px-3 py-1.5 rounded-lg bg-white/85 border border-purple-200 backdrop-blur-md shadow-md text-[10px] font-mono text-purple-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                    <span>4_PILLAR_NEURAL_ENGINE // CALIBRATED</span>
+                  </div>
+                  <div className="absolute top-16 right-[6%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-200 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span>BEHAVIORAL_RISK_SCORE // SUB_100MS</span>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Right Column: Interactive Product Simulator */}
-            <div className="lg:col-span-6">
-              <InteractiveHeroVisual product={product} />
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 items-center">
+              {/* Left Column: Narrative Headline & Metrics */}
+              <div className="lg:col-span-6 space-y-6 text-left">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200/80 text-xs font-bold text-[#155EEF] font-mono shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-[#155EEF] animate-pulse" />
+                  <span>{product.category} · {product.tagline}</span>
+                </div>
+
+                <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-[#071A33] leading-[1.12]">
+                  {product.headline}{' '}
+                  <span className="bg-gradient-to-r from-[#155EEF] via-[#2563EB] to-indigo-700 bg-clip-text text-transparent">
+                    {product.highlightText}
+                  </span>
+                </h1>
+
+                <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
+                  {product.subheadline}
+                </p>
+
+                {/* Hero Metrics Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  {product.heroMetrics.map((m, i) => (
+                    <div key={i} className="p-3.5 rounded-2xl bg-white/90 border border-slate-200 shadow-xs">
+                      <p className="text-lg sm:text-xl font-black text-[#071A33] font-mono">{m.value}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{m.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quick Action CTAs */}
+                <div className="flex flex-wrap items-center gap-3 pt-4">
+                  <Link
+                    href="/login"
+                    className="px-6 py-3 rounded-xl bg-[#155EEF] hover:bg-[#104ec8] text-white font-bold text-xs shadow-lg shadow-[#155EEF]/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                  >
+                    <span>Launch in LMS Workspace</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <a
+                    href="#specs"
+                    className="px-5 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs transition-all"
+                  >
+                    Explore Enterprise Specs
+                  </a>
+                </div>
+              </div>
+
+              {/* Right Column: Interactive Product Simulator */}
+              <div className="lg:col-span-6">
+                <InteractiveHeroVisual product={product} />
+              </div>
             </div>
           </section>
 

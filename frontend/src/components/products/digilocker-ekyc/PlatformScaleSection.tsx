@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -25,11 +26,10 @@ export const PlatformScaleSection: React.FC = () => {
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
           {/* Circular soft blue/white background */}
           <div
-            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${
-              isHovered
+            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${isHovered
                 ? 'bg-white shadow-lg text-[#155EEF]'
                 : 'bg-blue-50 border border-blue-100 text-[#155EEF]'
-            }`}
+              }`}
           >
             <svg viewBox="0 0 60 60" className="w-10 h-10 sm:w-12 sm:h-12" fill="none">
               {/* Rotating arrow ring */}
@@ -61,11 +61,10 @@ export const PlatformScaleSection: React.FC = () => {
       icon: (isHovered: boolean) => (
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
           <div
-            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${
-              isHovered
+            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${isHovered
                 ? 'bg-white shadow-lg text-[#155EEF]'
                 : 'bg-blue-50 border border-blue-100 text-[#155EEF]'
-            }`}
+              }`}
           >
             <svg viewBox="0 0 60 60" className="w-10 h-10 sm:w-12 sm:h-12" fill="none">
               {/* Outer Neural Nodes */}
@@ -112,11 +111,10 @@ export const PlatformScaleSection: React.FC = () => {
       icon: (isHovered: boolean) => (
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
           <div
-            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${
-              isHovered
+            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${isHovered
                 ? 'bg-white shadow-lg text-[#155EEF]'
                 : 'bg-blue-50 border border-blue-100 text-[#155EEF]'
-            }`}
+              }`}
           >
             <svg viewBox="0 0 60 60" className="w-10 h-10 sm:w-12 sm:h-12" fill="none">
               {/* 3D Blue Shield */}
@@ -148,11 +146,10 @@ export const PlatformScaleSection: React.FC = () => {
       icon: (isHovered: boolean) => (
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
           <div
-            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${
-              isHovered
+            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${isHovered
                 ? 'bg-white shadow-lg text-[#155EEF]'
                 : 'bg-blue-50 border border-blue-100 text-[#155EEF]'
-            }`}
+              }`}
           >
             <svg viewBox="0 0 60 60" className="w-10 h-10 sm:w-12 sm:h-12" fill="none">
               {/* Speedometer Arc */}
@@ -185,11 +182,10 @@ export const PlatformScaleSection: React.FC = () => {
       icon: (isHovered: boolean) => (
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
           <div
-            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${
-              isHovered
+            className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full transition-all duration-300 flex items-center justify-center ${isHovered
                 ? 'bg-white shadow-lg text-[#155EEF]'
                 : 'bg-blue-50 border border-blue-100 text-[#155EEF]'
-            }`}
+              }`}
           >
             <svg viewBox="0 0 60 60" className="w-10 h-10 sm:w-12 sm:h-12" fill="none">
               {/* 3D Padlock Body */}
@@ -277,11 +273,10 @@ export const PlatformScaleSection: React.FC = () => {
                 key={item.num}
                 onMouseEnter={() => setHoveredIdx(idx)}
                 onMouseLeave={() => setHoveredIdx(null)}
-                className={`group rounded-3xl p-6 sm:p-7 flex flex-col items-center text-center justify-between transition-all duration-300 ease-out cursor-pointer relative ${
-                  isHovered
+                className={`group rounded-3xl p-6 sm:p-7 flex flex-col items-center text-center justify-between transition-all duration-300 ease-out cursor-pointer relative ${isHovered
                     ? 'bg-[#155EEF] text-white border border-[#155EEF] shadow-2xl shadow-[#155EEF]/30 -translate-y-2.5 scale-[1.02]'
                     : 'bg-white border border-slate-200/90 hover:border-slate-300 shadow-md shadow-slate-200/50 hover:shadow-lg'
-                }`}
+                  }`}
                 style={{
                   minHeight: '390px',
                 }}
@@ -293,37 +288,33 @@ export const PlatformScaleSection: React.FC = () => {
 
                   {/* Circular Step Number Badge */}
                   <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-mono transition-colors duration-300 ${
-                      isHovered
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-mono transition-colors duration-300 ${isHovered
                         ? 'bg-white text-[#155EEF] shadow-md'
                         : 'bg-[#155EEF] text-white'
-                    }`}
+                      }`}
                   >
                     {item.num}
                   </div>
 
                   {/* Title */}
                   <h3
-                    className={`text-base sm:text-lg font-black tracking-tight leading-snug whitespace-pre-line transition-colors duration-300 ${
-                      isHovered ? 'text-white' : 'text-[#071A33]'
-                    }`}
+                    className={`text-base sm:text-lg font-black tracking-tight leading-snug whitespace-pre-line transition-colors duration-300 ${isHovered ? 'text-white' : 'text-[#071A33]'
+                      }`}
                   >
                     {item.title}
                   </h3>
 
                   {/* Small Divider */}
                   <div
-                    className={`w-8 h-0.5 rounded-full mx-auto transition-colors duration-300 ${
-                      isHovered ? 'bg-white/40' : 'bg-slate-200'
-                    }`}
+                    className={`w-8 h-0.5 rounded-full mx-auto transition-colors duration-300 ${isHovered ? 'bg-white/40' : 'bg-slate-200'
+                      }`}
                   />
                 </div>
 
                 {/* Bottom Half: Description */}
                 <p
-                  className={`text-xs leading-relaxed mt-4 transition-colors duration-300 ${
-                    isHovered ? 'text-blue-50' : 'text-slate-500'
-                  }`}
+                  className={`text-xs leading-relaxed mt-4 transition-colors duration-300 ${isHovered ? 'text-blue-50' : 'text-slate-500'
+                    }`}
                 >
                   {item.desc}
                 </p>

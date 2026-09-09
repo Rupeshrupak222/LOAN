@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { api, setAccessToken } from './api';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { api, setAccessToken, onAuthInvalidated } from './api';
 
 export interface AuthUser {
   id: string;
@@ -10,54 +10,109 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   roles: string[];
+  tenantId?: string;
+  branchId?: string;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (identifier: string, password: string) => Promise<void>;
+  register: (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const PUBLIC_PREFIXES = [
+  '/',
+  '/apply',
+  '/login',
+  '/about',
+  '/contact',
+  '/products',
+  '/resources',
+  '/forgot-password',
+];
+
+function isPublicRoute(path?: string | null): boolean {
+  if (!path || path === '/') return true;
+  return PUBLIC_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
+  // Restore session from token / refresh cookie on mount
   useEffect(() => {
-    // Attempt to restore session from an existing token/refresh cookie.
-    (async () => {
+    let isMounted = true;
+
+    async function checkAuth() {
       try {
         const res = await api.get('/auth/me');
-        setUser(res.data.data);
+        if (isMounted) {
+          setUser(res.data.data);
+        }
       } catch {
-        setUser(null);
+        if (isMounted) {
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    })();
-  }, []);
+    }
 
-  async function login(identifier: string, password: string) {
+    checkAuth();
+
+    // Subscribe to auth invalidation broadcast (e.g. from 401 interceptor)
+    const unsubscribe = onAuthInvalidated(() => {
+      if (isMounted) {
+        setUser(null);
+        setLoading(false);
+        // Only redirect if inside an authenticated app route
+        if (pathname && !isPublicRoute(pathname)) {
+          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [pathname, router]);
+
+  const login = useCallback(async (identifier: string, password: string) => {
     const res = await api.post('/auth/login', { identifier, password });
     setAccessToken(res.data.data.accessToken);
     setUser(res.data.data.user);
-  }
+  }, []);
 
-  async function logout() {
+  const register = useCallback(async (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => {
+    const res = await api.post('/auth/register', data);
+    setAccessToken(res.data.data.accessToken);
+    setUser(res.data.data.user);
+  }, []);
+
+  const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
+    } catch {
+      // Best-effort logout on backend
     } finally {
       setAccessToken(null);
       setUser(null);
       router.push('/login');
     }
-  }
+  }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

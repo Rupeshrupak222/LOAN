@@ -221,7 +221,7 @@ export function NotificationBell() {
       {isOpen && (
         <div
           className={cn(
-            'absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border shadow-2xl z-50 overflow-hidden backdrop-blur-xl animate-in fade-in-50 zoom-in-95 duration-150',
+            'absolute -right-2 sm:right-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-[380px] rounded-2xl border shadow-2xl z-50 overflow-hidden backdrop-blur-xl animate-in fade-in-50 zoom-in-95 duration-150',
             isDark
               ? 'border-[#2B3566] bg-[#0E152B]/95 text-slate-100 shadow-black/60'
               : 'border-slate-200/90 bg-white/95 text-slate-900 shadow-slate-300/50'

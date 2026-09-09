@@ -1,8 +1,5 @@
-import React from 'react';
-import { ALL_PRODUCTS } from '@/lib/productData';
-import { ProductDetailShell } from '@/components/product-detail/ProductDetailShell';
+import AiUnderwritingScorecardPage from '../ai-underwriting-scorecard/page';
 
 export default function AiUnderwritingPage() {
-  const product = ALL_PRODUCTS['ai-underwriting'];
-  return <ProductDetailShell product={product} />;
+  return <AiUnderwritingScorecardPage />;
 }

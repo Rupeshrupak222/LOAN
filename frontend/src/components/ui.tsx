@@ -131,17 +131,17 @@ export function KpiCard({
 
   return (
     <Card className="p-4 sm:p-5 flex flex-col justify-between hover:shadow-card-hover transition-all">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className={cn("text-[11px] font-bold uppercase tracking-wider", isDark ? "text-slate-400" : "text-slate-500")}>
+      <div className="flex items-start justify-between gap-3 min-w-0">
+        <div className="min-w-0 flex-1">
+          <p className={cn("text-[11px] font-bold uppercase tracking-wider truncate", isDark ? "text-slate-400" : "text-slate-500")}>
             {displayLabel}
           </p>
-          <p className={cn("mt-1.5 text-2xl font-bold tracking-tight", isDark ? "text-white" : "text-slate-900")}>
+          <p className={cn("mt-1.5 text-xl sm:text-2xl font-bold tracking-tight truncate", isDark ? "text-white" : "text-slate-900")} title={value}>
             {value}
           </p>
         </div>
         {IconOrElement && (
-          <div className={cn("flex h-9 w-9 flex-none items-center justify-center rounded-xl", iconBg)}>
+          <div className={cn("flex h-9 w-9 flex-none items-center justify-center rounded-xl shrink-0", iconBg)}>
             {isValidElement(IconOrElement) ? (
               IconOrElement
             ) : (

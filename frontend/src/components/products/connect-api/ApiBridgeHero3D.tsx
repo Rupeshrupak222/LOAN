@@ -131,9 +131,42 @@ export const ApiBridgeHero3D: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full min-h-[92vh] pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center text-center overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EFF6FF]"
     >
-      {/* Ambient background grid & lighting */}
-      <div className="absolute inset-0 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] [background-size:28px_28px] opacity-40 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[500px] bg-gradient-to-tr from-blue-400/20 via-indigo-500/15 to-emerald-400/10 blur-[140px] rounded-full pointer-events-none" />
+      {/* ── UNIQUE 3D CYBERNETIC FIBER-OPTIC MESH BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric Cybernetic Horizon Grid */}
+        <div
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1800px] h-[950px] opacity-35"
+          style={{
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-30px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(2, 132, 199, 0.3) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(2, 132, 199, 0.3) 1px, transparent 1px)
+            `,
+            backgroundSize: '40px 40px',
+            maskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, black 20%, transparent 80%)',
+          }}
+        />
+
+        {/* Ambient Pulsing Fiber Optic Cones */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[650px] h-[650px] bg-gradient-to-br from-cyan-500/15 via-blue-600/10 to-transparent blur-[130px] rounded-full animate-pulse" style={{ animationDuration: '7s' }} />
+        <div className="absolute top-20 right-1/3 translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-bl from-indigo-500/15 via-teal-400/10 to-transparent blur-[120px] rounded-full animate-pulse" style={{ animationDuration: '9s' }} />
+
+        {/* Floating 3D Protocol Telemetry Chips */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-cyan-300/80 backdrop-blur-md shadow-md text-[10px] font-mono text-cyan-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '5.5s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-ping" />
+          <span>gRPC_STREAM // 48,200 REQ/SEC</span>
+        </div>
+
+        <div className="absolute top-48 right-[10%] px-3 py-1.5 rounded-lg bg-white/85 border border-blue-300/80 backdrop-blur-md shadow-md text-[10px] font-mono text-[#155EEF] font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7.5s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>mTLS_ENCRYPTION // FIPS_140_ACTIVE</span>
+        </div>
+
+        {/* Floating isometric data nodes */}
+        <div className="absolute bottom-28 left-[12%] w-5 h-5 rounded border border-cyan-400/60 rotate-12 animate-pulse" style={{ animationDuration: '3s' }} />
+        <div className="absolute bottom-36 right-[14%] w-7 h-7 rounded border border-indigo-400/50 rotate-45 animate-spin" style={{ animationDuration: '24s' }} />
+      </div>
 
       {/* ── Top Narrative Eyebrow ── */}
       <div className="relative z-10 max-w-4xl mx-auto space-y-6 text-center animate-fade-in">

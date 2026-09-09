@@ -109,9 +109,42 @@ export const PurchaseObjectHero3D: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full min-h-[92vh] pt-10 sm:pt-14 pb-16 px-4 sm:px-8 lg:px-12 flex flex-col items-center justify-center text-center overflow-hidden bg-gradient-to-b from-[#FFFFFF] via-[#F8FAFC] to-[#EFF6FF]"
     >
-      {/* Ambient Grid Atmosphere */}
-      <div className="absolute inset-0 bg-[radial-gradient(#93C5FD_1px,transparent_1px)] [background-size:28px_28px] opacity-35 pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] bg-gradient-to-tr from-blue-300/20 via-sky-400/15 to-indigo-400/10 blur-[160px] rounded-full pointer-events-none" />
+      {/* ── UNIQUE 3D SPLIT-PAY OPTICAL PRISM BACKGROUND ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Isometric 3D Prism Grid */}
+        <div
+          className="absolute -bottom-28 left-1/2 -translate-x-1/2 w-[1850px] h-[920px] opacity-35"
+          style={{
+            transform: 'perspective(850px) rotateX(62deg) translateZ(-40px)',
+            backgroundImage: `
+              linear-gradient(to right, rgba(99, 102, 241, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(16, 185, 129, 0.25) 1px, transparent 1px)
+            `,
+            backgroundSize: '46px 46px',
+            maskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 70% 55% at 50% 45%, black 20%, transparent 80%)',
+          }}
+        />
+
+        {/* Volumetric Split Aura Flares */}
+        <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[550px] bg-gradient-to-br from-purple-500/16 via-blue-500/12 to-transparent blur-[140px] rounded-full" />
+        <div className="absolute top-10 right-1/3 translate-x-1/2 w-[650px] h-[550px] bg-gradient-to-bl from-emerald-400/16 via-teal-300/12 to-transparent blur-[130px] rounded-full" />
+
+        {/* Floating 3D Installment Prism Badges */}
+        <div className="absolute top-32 left-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-purple-200 backdrop-blur-md shadow-md text-[10px] font-mono text-purple-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '6s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+          <span>3_MONTH_EQUAL_SPLIT // 0%_APR</span>
+        </div>
+
+        <div className="absolute top-44 right-[8%] px-3 py-1.5 rounded-lg bg-white/85 border border-emerald-200 backdrop-blur-md shadow-md text-[10px] font-mono text-emerald-800 font-bold hidden lg:flex items-center gap-2 animate-bounce" style={{ animationDuration: '7s' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+          <span>ZERO_MARKUP // NO_HIDDEN_FEES</span>
+        </div>
+
+        {/* Floating Split Slice Prisms */}
+        <div className="absolute bottom-28 left-[14%] w-8 h-8 border border-purple-400/50 rotate-12 animate-pulse" />
+        <div className="absolute bottom-36 right-[15%] w-7 h-7 border border-emerald-400/50 -rotate-45 animate-spin" style={{ animationDuration: '18s' }} />
+      </div>
 
       {/* ── Top Narrative Eyebrow ── */}
       <div className="relative z-10 max-w-5xl mx-auto space-y-6 text-center animate-fade-in">

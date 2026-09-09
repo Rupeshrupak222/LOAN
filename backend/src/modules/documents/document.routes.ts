@@ -29,7 +29,12 @@ router.get(
       ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     const userIdFilter = isStaff ? undefined : req.user?.id;
-    const docs = await listDocuments(customerId, applicationId, userIdFilter);
+    const docs = await listDocuments(customerId, applicationId, userIdFilter, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(docs));
   })
 );
@@ -37,7 +42,12 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const doc = await getDocument(req.params.id);
+    const doc = await getDocument(req.params.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     const isStaff = req.user?.roles.some((r) =>
       ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
@@ -55,6 +65,10 @@ router.post(
   '/upload',
   upload.single('file'),
   asyncHandler(async (req, res) => {
+    if (req.user?.roles.includes('AUDITOR')) {
+      throw new ForbiddenError('Auditors have read-only access and cannot upload documents.');
+    }
+
     if (!req.file) {
       throw new BadRequestError('Please provide a file to upload in the "file" field');
     }
@@ -65,7 +79,7 @@ router.post(
     }
 
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: customerId } });
@@ -94,8 +108,12 @@ router.post(
   '/',
   validate(registerDocumentSchema),
   asyncHandler(async (req, res) => {
+    if (req.user?.roles.includes('AUDITOR')) {
+      throw new ForbiddenError('Auditors have read-only access and cannot create or register documents.');
+    }
+
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
     );
     if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: req.body.customerId } });
@@ -110,19 +128,29 @@ router.post(
 
 router.patch(
   '/:id/verify',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(verifyDocumentSchema),
   asyncHandler(async (req, res) => {
-    const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id);
+    const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(doc));
   })
 );
 
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
-    const result = await deleteDocument(req.params.id, req.user?.id);
+    const result = await deleteDocument(req.params.id, req.user?.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
     res.json(success(result));
   })
 );

@@ -30,12 +30,25 @@ import {
   Pencil,
   Eye,
   EyeOff,
+  Sparkles,
+  ShieldAlert,
+  Building2,
+  Send,
+  ClipboardCheck,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
+import { DetailPageSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { DocumentIntelligenceModal } from '@/components/DocumentIntelligenceModal';
+import { Customer360IntelligenceModal } from '@/components/Customer360IntelligenceModal';
+import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
+import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
+import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
+import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -49,10 +62,20 @@ export default function CustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
+  const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
+  const isUnderwriter = Boolean(user?.roles?.includes('UNDERWRITER'));
+  const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections'
+    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
   >('overview');
+
+  // Underwriter verification wizard state
+  const [selectedAppForWizard, setSelectedAppForWizard] = useState<any>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // KYC modal state
   const [kycModalOpen, setKycModalOpen] = useState(false);
@@ -83,7 +106,19 @@ export default function CustomerDetailPage() {
   const [accountHolderInput, setAccountHolderInput] = useState('');
   const [accountTypeInput, setAccountTypeInput] = useState<'SAVINGS' | 'CURRENT' | 'SALARY'>('SAVINGS');
   const [isPrimaryBankInput, setIsPrimaryBankInput] = useState(true);
+
+  // Address Modal State
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [addressTypeInput, setAddressTypeInput] = useState<'CURRENT' | 'PERMANENT' | 'OFFICE'>('CURRENT');
+  const [addressLineInput, setAddressLineInput] = useState('');
+  const [cityInput, setCityInput] = useState('');
+  const [stateInput, setStateInput] = useState('');
+  const [pincodeInput, setPincodeInput] = useState('');
+  const [isPrimaryAddressInput, setIsPrimaryAddressInput] = useState(true);
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [aiDocSelected, setAiDocSelected] = useState<any | null>(null);
+  const [customer360Open, setCustomer360Open] = useState(false);
 
   // Edit Customer Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -93,9 +128,9 @@ export default function CustomerDetailPage() {
     lastName: '',
     mobile: '',
     email: '',
-    password: '',
     dateOfBirth: '',
     gender: 'MALE',
+    password: '',
     addressLine: '',
     city: '',
     state: '',
@@ -113,50 +148,109 @@ export default function CustomerDetailPage() {
     queryFn: async () => (await api.get(`/customers/${params.id}`)).data.data,
   });
 
-  function openEditModal() {
+  const openEditModal = () => {
     if (!data) return;
-    const primaryAddr = data.addresses?.find((a: any) => a.isPrimary) || data.addresses?.[0];
-    const primaryBank = data.bankAccounts?.find((b: any) => b.isPrimary) || data.bankAccounts?.[0];
-    const primaryEmp = data.employmentDetails?.[0];
-
+    const primaryAddr = data.addresses?.[0] || {
+      addressLine: data.addressLine,
+      city: data.city,
+      state: data.state,
+      pincode: data.pincode,
+    };
+    const primaryBank = data.bankAccounts?.[0] || {
+      bankName: data.bankName,
+      accountNumber: data.bankAccountNo,
+      ifscCode: data.bankIfsc,
+    };
     setEditForm({
       firstName: data.firstName || '',
       lastName: data.lastName || '',
-      mobile: data.mobile || '',
+      mobile: data.mobile || data.phone || '',
       email: data.email || '',
-      password: '',
-      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
+      dateOfBirth: data.dateOfBirth ? String(data.dateOfBirth).split('T')[0] : '',
       gender: data.gender || 'MALE',
-      addressLine: data.addressLine || primaryAddr?.addressLine || '',
-      city: data.city || primaryAddr?.city || '',
-      state: data.state || primaryAddr?.state || '',
-      pincode: data.pincode || primaryAddr?.pincode || '',
-      employmentType: data.employmentType || primaryEmp?.employmentType || 'SALARIED',
-      employerName: data.employerName || primaryEmp?.employerName || '',
-      monthlyIncome: data.monthlyIncome ? String(data.monthlyIncome) : primaryEmp?.monthlyIncome ? String(primaryEmp.monthlyIncome) : '',
-      bankName: data.bankName || primaryBank?.bankName || '',
-      bankAccountNo: data.bankAccountNo || primaryBank?.accountNumber || '',
-      bankIfsc: data.bankIfsc || primaryBank?.ifscCode || '',
+      password: '',
+      addressLine: primaryAddr.addressLine || primaryAddr.addressLine1 || data.addressLine || '',
+      city: primaryAddr.city || data.city || '',
+      state: primaryAddr.state || data.state || '',
+      pincode: primaryAddr.pincode || primaryAddr.postalCode || data.pincode || '',
+      employmentType: data.employmentType || 'SALARIED',
+      employerName: data.employerName || '',
+      monthlyIncome: data.monthlyIncome ? String(data.monthlyIncome) : '',
+      bankName: primaryBank.bankName || data.bankName || '',
+      bankAccountNo: primaryBank.accountNumber || primaryBank.bankAccountNo || data.bankAccountNo || '',
+      bankIfsc: primaryBank.ifscCode || primaryBank.bankIfsc || data.bankIfsc || '',
     });
     setEditModalOpen(true);
-  }
+  };
 
   const updateCustomerMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        ...editForm,
+        firstName: editForm.firstName || undefined,
+        lastName: editForm.lastName || undefined,
         email: editForm.email || undefined,
-        password: editForm.password && editForm.password.trim().length >= 6 ? editForm.password.trim() : undefined,
-        dateOfBirth: editForm.dateOfBirth ? editForm.dateOfBirth : undefined,
+        mobile: editForm.mobile || undefined,
+        phone: editForm.mobile || undefined,
+        dateOfBirth: editForm.dateOfBirth ? new Date(editForm.dateOfBirth).toISOString() : undefined,
         gender: editForm.gender || undefined,
         monthlyIncome: editForm.monthlyIncome ? Number(editForm.monthlyIncome) : undefined,
+        employmentType: editForm.employmentType || undefined,
+        employerName: editForm.employerName || undefined,
+        addressLine: editForm.addressLine || undefined,
+        city: editForm.city || undefined,
+        state: editForm.state || undefined,
+        pincode: editForm.pincode || undefined,
+        address: editForm.addressLine ? {
+          addressLine: editForm.addressLine,
+          city: editForm.city,
+          state: editForm.state,
+          pincode: editForm.pincode,
+        } : undefined,
+        bankName: editForm.bankName || undefined,
+        bankAccountNo: editForm.bankAccountNo || undefined,
+        bankIfsc: editForm.bankIfsc || undefined,
+        bankAccount: editForm.bankAccountNo ? {
+          bankName: editForm.bankName,
+          accountNumber: editForm.bankAccountNo,
+          ifscCode: editForm.bankIfsc,
+        } : undefined,
       };
       return api.patch(`/customers/${params.id}`, payload);
     },
     onSuccess: () => {
+      toast.success('Customer profile updated.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setEditModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Update Notice' });
+    },
+  });
+
+  const addressMutation = useMutation({
+    mutationFn: async () => {
+      return api.post(`/customers/${params.id}/addresses`, {
+        addressType: addressTypeInput,
+        addressLine: addressLineInput.trim(),
+        city: cityInput.trim(),
+        state: stateInput.trim(),
+        pincode: pincodeInput.trim(),
+        isPrimary: isPrimaryAddressInput,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Address record added.');
+      queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setAddressModalOpen(false);
+      setAddressLineInput('');
+      setCityInput('');
+      setStateInput('');
+      setPincodeInput('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Address Registration Notice' });
     },
   });
 
@@ -172,6 +266,7 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success('Bank account registered.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setBankModalOpen(false);
@@ -179,6 +274,23 @@ export default function CustomerDetailPage() {
       setAccountNumberInput('');
       setIfscCodeInput('');
       setAccountHolderInput('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Bank Registration Notice' });
+    },
+  });
+
+  const deleteBankAccountMutation = useMutation({
+    mutationFn: async (bankAccountId: string) => {
+      return api.delete(`/customers/${params.id}/bank-accounts/${bankAccountId}`);
+    },
+    onSuccess: () => {
+      toast.success('Bank account record removed.');
+      queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Delete Bank Account Notice' });
     },
   });
 
@@ -191,11 +303,19 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success(`KYC status updated to ${kycStatusInput}.`);
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-underwriting-queue'] });
       setKycModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'KYC Update Notice' });
     },
   });
 
@@ -217,12 +337,20 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success('Document uploaded to cloud storage.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       setDocModalOpen(false);
       setSelectedFile(null);
       setFilePreview(null);
       setDocExpiry('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Upload Notice' });
     },
   });
 
@@ -231,8 +359,14 @@ export default function CustomerDetailPage() {
       return api.delete(`/customers/${params.id}`);
     },
     onSuccess: () => {
+      toast.success('Customer record removed.');
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['loans'] });
       router.push('/customers');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Delete Customer Notice' });
     },
   });
 
@@ -248,12 +382,20 @@ export default function CustomerDetailPage() {
       });
     },
     onSuccess: () => {
+      toast.success(`Document marked as ${docDecisionStatus}.`);
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
       setVerifyModalOpen(false);
       setSelectedDoc(null);
       setDocRejectionReason('');
       setDocVerifyRemarks('');
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Verification Notice' });
     },
   });
 
@@ -262,12 +404,19 @@ export default function CustomerDetailPage() {
       return api.delete(`/documents/${docId}`);
     },
     onSuccess: () => {
+      toast.success('Document removed.');
       queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Delete Notice' });
     },
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
       <div className="py-12 text-center space-y-3">
@@ -282,7 +431,20 @@ export default function CustomerDetailPage() {
 
   const addresses = Array.isArray(data.addresses) ? data.addresses : [];
   const documents = Array.isArray(data.documents) ? data.documents : [];
-  const bankAccounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
+  
+  // Deduplicate bank accounts in UI as a safeguard
+  const rawBankAccounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
+  const seenBankKeys = new Set<string>();
+  const bankAccounts: any[] = [];
+  const sortedBanks = [...rawBankAccounts].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+  for (const b of sortedBanks) {
+    const key = `${b.accountNumber?.trim()}_${b.ifscCode?.trim()}`;
+    if (!seenBankKeys.has(key)) {
+      seenBankKeys.add(key);
+      bankAccounts.push(b);
+    }
+  }
+
   const applications = Array.isArray(data.applications) ? data.applications : [];
   const loans = Array.isArray(data.loans) ? data.loans : [];
   const payments = Array.isArray(data.payments) ? data.payments : [];
@@ -297,6 +459,8 @@ export default function CustomerDetailPage() {
     { id: 'loans', label: `Loans (${loans.length})`, icon: Wallet },
     { id: 'payments', label: `Payments (${payments.length})`, icon: Receipt },
     { id: 'collections', label: `Collections (${collectionCases.length})`, icon: AlertCircle },
+    { id: 'bank_intelligence', label: 'Bank Statement Intelligence', icon: Building2 },
+    { id: 'fraud', label: 'Fraud & Anomaly', icon: ShieldAlert },
   ];
 
   return (
@@ -311,12 +475,19 @@ export default function CustomerDetailPage() {
             <Badge status={data.status} />
             <Badge status={data.kycStatus} />
             {data.riskCategory && <Badge status={data.riskCategory} />}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+            <Button
+              size="sm"
+              onClick={() => setCustomer360Open(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold shadow-md cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
+            </Button>
+            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -326,14 +497,14 @@ export default function CustomerDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
-              <Link href="/applications">
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
+              <Link href="/applications/new">
                 <Button size="sm" className="flex items-center gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> Originate Loan
                 </Button>
               </Link>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -374,6 +545,191 @@ export default function CustomerDetailPage() {
           icon={<ShieldCheck className="h-4 w-4 text-slate-600" />}
         />
       </div>
+
+      {/* Step-by-Step Borrower Intake & Underwriter Forwarding Stepper Banner */}
+      {data && (() => {
+        const completedSteps: number[] = [1];
+        if (data.kycStatus === 'VERIFIED') completedSteps.push(2);
+        if (data.bankAccounts?.some((b: any) => b.isVerified) || (data.kycStatus === 'VERIFIED' && data.bankAccounts?.length > 0)) completedSteps.push(3);
+        if ((data.applications?.length || 0) > 0) completedSteps.push(4);
+        if (data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))) completedSteps.push(5);
+
+        let stepperCurrentStep = 1;
+        if (data.applications?.some((a: any) => a.status === 'UNDERWRITING')) stepperCurrentStep = 5;
+        else if (!completedSteps.includes(2)) stepperCurrentStep = 2;
+        else if (!completedSteps.includes(3)) stepperCurrentStep = 3;
+        else if (!completedSteps.includes(4)) stepperCurrentStep = 4;
+        else if (!completedSteps.includes(5)) stepperCurrentStep = 5;
+        else stepperCurrentStep = 5;
+
+        const onboardingSteps: StepItem[] = [
+          {
+            id: 1,
+            label: '1. Profile Created',
+            shortLabel: 'Profile',
+            icon: User,
+            description: 'Identity & Customer Credentials Created',
+          },
+          {
+            id: 2,
+            label: '2. KYC & Photo Docs',
+            shortLabel: 'KYC Docs',
+            icon: FileText,
+            description: data.kycStatus === 'VERIFIED' ? 'Identity & Documents Verified ✓' : 'Awaiting Underwriter KYC Audit',
+          },
+          {
+            id: 3,
+            label: '3. Employment & Bank',
+            shortLabel: 'Bank & Income',
+            icon: Building2,
+            description: data.bankAccounts?.[0]?.bankName ? `Bank: ${data.bankAccounts[0].bankName}` : 'Awaiting Bank Verification',
+          },
+          {
+            id: 4,
+            label: '4. Loan Origination',
+            shortLabel: 'Loan Scheme',
+            icon: CreditCard,
+            description: (data.applications?.length || 0) > 0 ? `${data.applications.length} Loan Application(s) Originated` : 'Not Originated Yet',
+          },
+          {
+            id: 5,
+            label: '5. Underwriting Review',
+            shortLabel: 'Underwriting',
+            icon: ShieldCheck,
+            description: data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))
+              ? 'Sanctioned & Forwarded to Finance Queue'
+              : data.applications?.some((a: any) => a.status === 'UNDERWRITING')
+              ? 'Active in Underwriter Queue'
+              : 'Ready for Underwriting Verification',
+          },
+        ];
+
+        const handleStepClick = (stepId: number) => {
+          if (stepId === 1) setActiveTab('overview');
+          else if (stepId === 2) setActiveTab('kyc_docs');
+          else if (stepId === 3) setActiveTab('banking');
+          else if (stepId === 4) setActiveTab('applications');
+          else if (stepId === 5) {
+            setActiveTab('applications');
+            if (isUnderwriter || isAdmin) {
+              const targetApp = data.applications?.find((a: any) => ['UNDERWRITING', 'APPROVED', 'SUBMITTED'].includes(a.status));
+              if (targetApp) {
+                setSelectedAppForWizard({ ...targetApp, customer: data });
+                setWizardOpen(true);
+              }
+            }
+          }
+        };
+
+        const activeAppInUnderwriting = data.applications?.find((a: any) => a.status === 'UNDERWRITING');
+        const activeAppApproved = data.applications?.find((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status));
+        const activeAppPendingForward = data.applications?.find((a: any) => ['DRAFT', 'KYC_PENDING', 'KYC_VERIFIED'].includes(a.status));
+        const activeAppInReview = data.applications?.find((a: any) => ['SUBMITTED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(a.status));
+
+        return (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  {isLoanOfficer ? (
+                    <>
+                      <ClipboardCheck className="h-4 w-4 text-brand-600 dark:text-brand-400" /> Application Origination & Intake Progress
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Step-by-Step Customer Intake & Underwriting Progress
+                    </>
+                  )}
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {isLoanOfficer
+                    ? 'Originate customer profile, documents, and submit application dossier to Credit Analyst'
+                    : 'Underwriter verifies each step sequentially before sanctioning & forwarding dossier to Finance'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {(isUnderwriter || isAdmin) && activeAppInUnderwriting && (
+                  <Button
+                    size="sm"
+                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={() => {
+                      setSelectedAppForWizard({ ...activeAppInUnderwriting, customer: data });
+                      setWizardOpen(true);
+                    }}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" /> Launch Underwriter Desk →
+                  </Button>
+                )}
+                {(isUnderwriter || isAdmin) && !activeAppInUnderwriting && activeAppApproved && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs font-semibold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      onClick={async () => {
+                        try {
+                          await api.post(`/applications/${activeAppApproved.id}/transition`, {
+                            toStatus: 'UNDERWRITING',
+                            reason: 'Re-opened for Underwriter step-by-step verification test',
+                          });
+                          toast.success(`Application ${activeAppApproved.applicationNo || ''} reset to Underwriting Queue!`);
+                          queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+                        } catch (err: any) {
+                          toast.error(apiErrorMessage(err));
+                        }
+                      }}
+                    >
+                      ↺ Re-open Underwriting Queue (Test Flow)
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      onClick={() => {
+                        setSelectedAppForWizard({ ...activeAppApproved, customer: data });
+                        setWizardOpen(true);
+                      }}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" /> Review Verification Desk
+                    </Button>
+                  </div>
+                )}
+                {isLoanOfficer && activeAppPendingForward && (
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={async () => {
+                      try {
+                        await api.post(`/applications/${activeAppPendingForward.id}/transition`, {
+                          toStatus: 'SUBMITTED',
+                          reason: 'Originated and submitted by Loan Officer for Credit Analyst review.',
+                        });
+                        toast.success(`Application ${activeAppPendingForward.applicationNo || ''} submitted to Credit Analyst!`);
+                        queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+                      } catch (err: any) {
+                        toast.error(apiErrorMessage(err));
+                      }
+                    }}
+                  >
+                    <Send className="h-3.5 w-3.5" /> Submit to Credit Analyst →
+                  </Button>
+                )}
+                {isLoanOfficer && (activeAppInUnderwriting || activeAppInReview) && (
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-amber-600" /> In Review / Underwriting
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <CustomerOnboardingStepper
+              currentStep={stepperCurrentStep}
+              completedSteps={completedSteps}
+              steps={onboardingSteps}
+              onStepClick={handleStepClick}
+            />
+          </div>
+        );
+      })()}
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto gap-1">
@@ -430,9 +786,23 @@ export default function CustomerDetailPage() {
           </Card>
 
           <Card className="p-5 space-y-4">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Addresses on Record
-            </h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Addresses on Record
+                </h3>
+                <p className="text-xs text-slate-500">Verified residential and permanent addresses</p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs flex items-center gap-1 cursor-pointer"
+                onClick={() => setAddressModalOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Address
+              </Button>
+            </div>
+
             {addresses.length > 0 ? (
               <div className="space-y-3">
                 {addresses.map((addr: any) => (
@@ -455,7 +825,17 @@ export default function CustomerDetailPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 py-4">No structured address records found.</p>
+              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center space-y-2">
+                <p className="text-xs font-semibold text-slate-700">No structured address records found.</p>
+                <p className="text-[11px] text-slate-400">Add an address to keep customer residence and correspondence records updated.</p>
+                <Button
+                  size="sm"
+                  className="text-xs text-white mt-1 cursor-pointer"
+                  onClick={() => setAddressModalOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Address
+                </Button>
+              </div>
             )}
           </Card>
         </div>
@@ -472,12 +852,16 @@ export default function CustomerDetailPage() {
               <p className="text-xs text-slate-500">Identity proofs, income documents, bank statements, and signed mandates</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
-                + Upload Document
-              </Button>
-              <Button size="sm" onClick={() => setKycModalOpen(true)}>
-                Update KYC Status
-              </Button>
+              {(isLoanOfficer || isAdmin) && !isBranchManager && (
+                <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
+                  + Upload Document
+                </Button>
+              )}
+              {(isUnderwriter || isAdmin) && (
+                <Button size="sm" onClick={() => setKycModalOpen(true)}>
+                  Update KYC Status
+                </Button>
+              )}
             </div>
           </div>
 
@@ -559,30 +943,42 @@ export default function CustomerDetailPage() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="text-xs h-7 px-2.5"
-                            onClick={() => {
-                              setSelectedDoc(doc);
-                              const initialStatus = doc.status === 'REJECTED' ? 'REJECTED' : 'VERIFIED';
-                              setDocDecisionStatus(initialStatus);
-                              setDocRejectionReason(doc.rejectionReason || '');
-                              setDocVerifyRemarks(doc.rejectionReason || '');
-                              setVerifyModalOpen(true);
-                            }}
+                            className="text-xs h-7 px-2.5 gap-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            onClick={() => setAiDocSelected(doc)}
                           >
-                            {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
+                            <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
                           </Button>
-                          <button
-                            type="button"
-                            title="Delete Document"
-                            onClick={() => {
-                              if (confirm(`Delete document "${doc.fileName}" from database?`)) {
-                                docDeleteMutation.mutate(doc.id);
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)) && !isBranchManager && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="text-xs h-7 px-2.5"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                const initialStatus = doc.status === 'REJECTED' ? 'REJECTED' : 'VERIFIED';
+                                setDocDecisionStatus(initialStatus);
+                                setDocRejectionReason(doc.rejectionReason || '');
+                                setDocVerifyRemarks(doc.rejectionReason || '');
+                                setVerifyModalOpen(true);
+                              }}
+                            >
+                              {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              title="Delete Document"
+                              onClick={() => {
+                                if (confirm(`Delete document "${doc.fileName}" from database?`)) {
+                                  docDeleteMutation.mutate(doc.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -664,6 +1060,21 @@ export default function CustomerDetailPage() {
                           <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200 font-bold">
                             PENDING
                           </span>
+                        )}
+                        {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+                          <button
+                            type="button"
+                            title="Remove Bank Account"
+                            disabled={deleteBankAccountMutation.isPending}
+                            onClick={() => {
+                              if (confirm(`Remove bank account ${acc.accountNumber} (${acc.bankName})?`)) {
+                                deleteBankAccountMutation.mutate(acc.id);
+                              }
+                            }}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer ml-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         )}
                       </div>
                     </div>
@@ -888,6 +1299,16 @@ export default function CustomerDetailPage() {
             </p>
           )}
         </Card>
+      )}
+
+      {/* Tab 8: Bank Statement Intelligence */}
+      {activeTab === 'bank_intelligence' && (
+        <BankStatementIntelligenceCard customerId={params.id} />
+      )}
+
+      {/* Tab 9: Fraud & Anomaly Intelligence */}
+      {activeTab === 'fraud' && (
+        <FraudIntelligenceCard customerId={params.id} customerCode={data.customerCode} />
       )}
 
       {/* KYC Update Modal */}
@@ -1396,6 +1817,126 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
+      {/* Add Customer Address Modal */}
+      {addressModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2445] p-6 shadow-dropdown animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 font-bold">
+                  <Building className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Add Customer Address</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Record residence or permanent address</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Address Type *
+                </label>
+                <select
+                  value={addressTypeInput}
+                  onChange={(e) => setAddressTypeInput(e.target.value as any)}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-[#151932] p-2.5 text-xs text-slate-900 dark:text-white focus:border-brand-600 focus:outline-none"
+                >
+                  <option value="CURRENT">Current / Residential Address</option>
+                  <option value="PERMANENT">Permanent Address</option>
+                  <option value="OFFICE">Office / Work Address</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Street Address / House No. / Locality *
+                </label>
+                <Input
+                  placeholder="e.g. Flat 402, Green Valley Apartments, MG Road"
+                  value={addressLineInput}
+                  onChange={(e) => setAddressLineInput(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    City *
+                  </label>
+                  <Input
+                    placeholder="e.g. Pune"
+                    value={cityInput}
+                    onChange={(e) => setCityInput(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    State *
+                  </label>
+                  <Input
+                    placeholder="e.g. Maharashtra"
+                    value={stateInput}
+                    onChange={(e) => setStateInput(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Pincode *
+                </label>
+                <Input
+                  placeholder="e.g. 411001"
+                  value={pincodeInput}
+                  onChange={(e) => setPincodeInput(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="flex items-center pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={isPrimaryAddressInput}
+                    onChange={(e) => setIsPrimaryAddressInput(e.target.checked)}
+                    className="rounded text-brand-600 h-4 w-4"
+                  />
+                  <span>Set as Primary Address</span>
+                </label>
+              </div>
+
+              {addressMutation.isError && (
+                <p className="text-xs text-rose-600">{apiErrorMessage(addressMutation.error)}</p>
+              )}
+
+              <div className="flex gap-2.5 pt-2">
+                <Button
+                  onClick={() => addressMutation.mutate()}
+                  disabled={
+                    !addressLineInput.trim() ||
+                    !cityInput.trim() ||
+                    !stateInput.trim() ||
+                    !pincodeInput.trim() ||
+                    addressMutation.isPending
+                  }
+                  className="flex-1 text-white"
+                >
+                  {addressMutation.isPending ? 'Saving...' : 'Save Address'}
+                </Button>
+                <Button variant="secondary" onClick={() => setAddressModalOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Customer Confirmation Modal */}
       {deleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -1686,15 +2227,48 @@ export default function CustomerDetailPage() {
           </Card>
         </div>
       )}
+
+      {/* Document Intelligence Modal */}
+      {aiDocSelected && (
+        <DocumentIntelligenceModal
+          document={aiDocSelected}
+          isOpen={!!aiDocSelected}
+          onClose={() => setAiDocSelected(null)}
+        />
+      )}
+
+      {/* Customer 360 Intelligence Modal */}
+      {customer360Open && (
+        <Customer360IntelligenceModal
+          customerId={params.id}
+          customerCode={data.customerCode}
+          customerName={`${data.firstName} ${data.lastName}`}
+          isOpen={customer360Open}
+          onClose={() => setCustomer360Open(false)}
+        />
+      )}
+
+      {/* Underwriting Verification Desk Wizard Modal */}
+      {selectedAppForWizard && (isUnderwriter || isAdmin) && (
+        <UnderwritingVerificationWizard
+          application={selectedAppForWizard}
+          isOpen={wizardOpen}
+          onClose={() => {
+            setWizardOpen(false);
+            setSelectedAppForWizard(null);
+            queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2">
-      <dt className="text-slate-500 font-medium">{label}</dt>
-      <dd className="text-right font-medium text-slate-900">{value ?? '-'}</dd>
+    <div className="flex justify-between gap-3 py-2 min-w-0">
+      <dt className="text-slate-500 font-medium shrink-0">{label}</dt>
+      <dd className="text-right font-medium text-slate-900 dark:text-slate-200 min-w-0 break-words">{value ?? '-'}</dd>
     </div>
   );
 }
