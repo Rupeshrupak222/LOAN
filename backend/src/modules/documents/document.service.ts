@@ -222,7 +222,7 @@ export async function verifyDocument(
 ) {
   if (actor?.roles && actor.roles.length > 0) {
     const isAuthorized = actor.roles.some((r) =>
-      ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+      ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
     );
     if (!isAuthorized) {
       throw new ForbiddenError('Access forbidden: Only authorized staff can verify borrower documents');

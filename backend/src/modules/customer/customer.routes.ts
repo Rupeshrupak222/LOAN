@@ -25,6 +25,7 @@ import {
   addCustomerBankAccount,
   deleteCustomerBankAccount,
   deleteCustomer,
+  validateLoanOfficerOriginationEligibility,
 } from './customer.service';
 
 const router = Router();
@@ -179,6 +180,18 @@ router.get(
     }
 
     res.json(success(customer));
+  })
+);
+
+router.get(
+  '/:id/origination-eligibility',
+  asyncHandler(async (req, res) => {
+    const eligibility = await validateLoanOfficerOriginationEligibility(
+      req.params.id,
+      (req as any).tenantId || req.user?.tenantId,
+      req.user as any
+    );
+    res.json(success(eligibility));
   })
 );
 

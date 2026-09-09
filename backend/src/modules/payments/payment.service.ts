@@ -6,6 +6,7 @@ import { Money } from '../finance/money';
 import { generatePaymentNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type { RecordPaymentInput } from './payment.schema';
 
 export interface PaymentActorContext {
@@ -461,6 +462,20 @@ export async function processPayment(
     title: `Payment Received: ₹${Number(input.amount).toLocaleString('en-IN')}`,
     message: `Receipt #${paymentNo} recorded for Loan #${loan.loanNo}. Allocations: Principal ₹${bucketTotals.PRINCIPAL.toFixed(2)}, Interest ₹${bucketTotals.INTEREST.toFixed(2)}, Fees ₹${bucketTotals.FEES.toFixed(2)}.`,
   }).catch(() => {});
+
+  void communicationService.dispatchSystemEvent(
+    'PAYMENT_RECEIVED',
+    {
+      customerId: loan.customerId,
+      customerName: `${loan.customer?.firstName || 'Borrower'} ${loan.customer?.lastName || ''}`.trim(),
+      customerEmail: loan.customer?.email || undefined,
+      customerMobile: loan.customer?.mobile || undefined,
+      loanNo: loan.loanNo,
+      paidAmount: String(input.amount),
+      paymentReference: input.reference,
+    },
+    loan.tenantId || undefined
+  ).catch(() => {});
 
   return result;
 }
