@@ -156,7 +156,23 @@ export function CreditAssessmentSection({
 
   // Step 1: Start Credit Assessment
   const startAssessmentMutation = useMutation({
-    mutationFn: async () => api.post(`/credit/applications/${applicationId}/start-assessment`),
+    mutationFn: async () => {
+      try {
+        return await api.post(`/credit/applications/${applicationId}/start-assessment`);
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          try {
+            return await api.post(`/applications/${applicationId}/start-assessment`);
+          } catch {
+            return await api.post(`/applications/${applicationId}/transition`, {
+              toStatus: 'CREDIT_ASSESSMENT',
+              reason: 'Credit Analyst initiated formal credit assessment and underwriting review',
+            });
+          }
+        }
+        throw err;
+      }
+    },
     onSuccess: () => {
       toast.success('Credit Assessment initiated successfully.');
       refetch();

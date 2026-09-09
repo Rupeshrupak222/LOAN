@@ -535,41 +535,76 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
 
 /**
  * STEP 1: Starts Credit Assessment on an application
+ * Validates existence, CREDIT_ANALYST role, and SUBMITTED status before transitioning.
  */
 export async function startCreditAssessment(
   applicationId: string,
   actor: { id: string; email: string; roles: string[] }
 ) {
+  // 1. Validate application exists
   const app = await prisma.loanApplication.findUnique({
     where: { id: applicationId },
+    include: { customer: true },
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
-  if (app.status === 'SUBMITTED' || app.status === 'KYC_PENDING' || app.status === 'KYC_VERIFIED') {
-    await prisma.loanApplication.update({
+  // 2. Validate logged-in user has CREDIT_ANALYST (or admin) permission
+  const isAnalyst = actor.roles?.some((r) =>
+    ['CREDIT_ANALYST', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+  if (!isAnalyst) {
+    throw new ForbiddenError(
+      'Access forbidden: Only Credit Analysts can initiate credit assessment'
+    );
+  }
+
+  // If already in CREDIT_ASSESSMENT, return idempotent success
+  if (app.status === 'CREDIT_ASSESSMENT') {
+    return { success: true, newStatus: 'CREDIT_ASSESSMENT', alreadyActive: true };
+  }
+
+  // 3. Validate that the application is currently in SUBMITTED status
+  if (app.status !== 'SUBMITTED') {
+    throw new BadRequestError(
+      `Cannot start credit assessment: Application is in '${app.status}' status. Credit assessment can only be initiated on applications in 'SUBMITTED' status.`
+    );
+  }
+
+  // 4. Change application workflow status to CREDIT_ASSESSMENT
+  await prisma.$transaction(async (tx) => {
+    await tx.loanApplication.update({
       where: { id: applicationId },
       data: { status: 'CREDIT_ASSESSMENT' },
     });
 
-    await prisma.applicationStatusHistory.create({
+    await tx.applicationStatusHistory.create({
       data: {
         applicationId,
-        fromStatus: app.status,
+        fromStatus: 'SUBMITTED',
         toStatus: 'CREDIT_ASSESSMENT',
-        changedBy: actor.email,
+        changedBy: actor.email || actor.id,
         reason: 'Credit Analyst initiated formal credit assessment and underwriting review',
       },
     });
+  });
 
-    await logAudit({
-      userId: actor.id,
-      role: 'CREDIT_ANALYST',
-      action: 'CREDIT_ASSESSMENT_STARTED',
-      entity: 'LoanApplication',
-      entityId: applicationId,
-      newValue: { status: 'CREDIT_ASSESSMENT' },
-    });
-  }
+  await logAudit({
+    userId: actor.id,
+    role: 'CREDIT_ANALYST',
+    action: 'CREDIT_ASSESSMENT_STARTED',
+    entity: 'LoanApplication',
+    entityId: applicationId,
+    newValue: { status: 'CREDIT_ASSESSMENT' },
+  });
+
+  void sendNotification({
+    customerId: app.customerId,
+    channel: 'IN_APP',
+    type: 'INFO',
+    title: `Application ${app.applicationNo} in Credit Assessment`,
+    message: 'Credit Analyst has initiated formal review of your loan application.',
+    metadata: { applicationId, link: `/applications/${applicationId}` },
+  }).catch(() => {});
 
   return { success: true, newStatus: 'CREDIT_ASSESSMENT' };
 }
