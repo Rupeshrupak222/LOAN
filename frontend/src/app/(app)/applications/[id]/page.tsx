@@ -20,6 +20,7 @@ import {
   X,
   FileCheck,
   Layers,
+  Sliders,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -38,6 +39,7 @@ import { EarlyWarningWidget } from '@/components/EarlyWarningWidget';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
+import { CreditAssessmentWorkspace } from '@/components/CreditAssessmentWorkspace';
 import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
 
 export default function ApplicationDetailPage() {
@@ -55,6 +57,9 @@ export default function ApplicationDetailPage() {
   const [decision, setDecision] = useState<'APPROVE' | 'APPROVE_WITH_CONDITIONS' | 'SEND_BACK' | 'REJECT'>('APPROVE');
   const [reason, setReason] = useState('');
   const [conditions, setConditions] = useState('');
+
+  // Credit Analyst View Mode (7-step sequential workflow vs full workspace)
+  const [creditViewMode, setCreditViewMode] = useState<'7_STEP_WORKFLOW' | 'WORKSPACE'>('7_STEP_WORKFLOW');
 
   // Credit Analyst Action Modals
   const [forwardModalOpen, setForwardModalOpen] = useState(false);
@@ -241,6 +246,9 @@ export default function ApplicationDetailPage() {
   const isCreditAnalyst = user?.roles?.includes('CREDIT_ANALYST');
   const isUnderwriter = user?.roles?.includes('UNDERWRITER');
   const isSuperAdmin = user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN'].includes(r));
+  const isAdmin = Boolean(isSuperAdmin);
+  const isBranchManager = user?.roles?.includes('BRANCH_MANAGER');
+  const isBranchManagerOnly = Boolean(isBranchManager && !isAdmin && !isUnderwriter);
 
   // Segregation of Duties: Loan Officer is strictly restricted from credit appraisal tools & decisions
   const isOnlyLoanOfficer = Boolean(isLoanOfficer && !isCreditAnalyst && !isUnderwriter && !isSuperAdmin);
@@ -682,6 +690,78 @@ export default function ApplicationDetailPage() {
         ) : (
           /* FOR CREDIT ANALYST, UNDERWRITER & STAFF: Full Credit Appraisal and Intelligence Suite */
           <>
+            {/* View Switcher: 7-Step Sequential Workflow vs Full Workspace */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl border bg-slate-50/80 dark:bg-[#1E2445]/60 border-slate-200 dark:border-[#2B3566]">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-[#2563EB]" />
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+                    Credit Assessment Portal & Workflow
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Switch between the 7-step sequential workflow and the live testing workspace.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 p-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCreditViewMode('7_STEP_WORKFLOW')}
+                  className={cn(
+                    'px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5',
+                    creditViewMode === '7_STEP_WORKFLOW'
+                      ? 'bg-[#2563EB] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>7-Step Workflow</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreditViewMode('WORKSPACE')}
+                  className={cn(
+                    'px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5',
+                    creditViewMode === 'WORKSPACE'
+                      ? 'bg-[#2563EB] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  )}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Workspace & Testing Lab</span>
+                </button>
+              </div>
+            </div>
+
+            {creditViewMode === '7_STEP_WORKFLOW' ? (
+              <CreditAssessmentSection
+                applicationId={params.id}
+                applicationNo={data.applicationNo}
+                currentStatus={data.status}
+                customer={customer}
+                product={product}
+                isCreditAnalyst={Boolean(isCreditAnalyst || isSuperAdmin)}
+                onDecisionSubmitted={() => {
+                  queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+                  queryClient.invalidateQueries({ queryKey: ['applications'] });
+                  queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+                  queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
+                  queryClient.invalidateQueries({ queryKey: ['credit-assessment-queue'] });
+                }}
+              />
+            ) : (
+              <CreditAssessmentWorkspace
+                applicationId={params.id}
+                onForwardSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+                  queryClient.invalidateQueries({ queryKey: ['applications'] });
+                  queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+                  queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
+                  queryClient.invalidateQueries({ queryKey: ['credit-assessment-queue'] });
+                }}
+              />
+            )}
+
             {/* Credit Appraisal & Assessment Results Summary */}
             <div id="credit-appraisal-summary" className="scroll-mt-20">
               <Card className="p-5 space-y-4 border-2 border-indigo-100 dark:border-indigo-900/40 bg-gradient-to-br from-indigo-50/30 to-slate-50/50 dark:from-indigo-950/20 dark:to-slate-900/40">

@@ -966,6 +966,14 @@ export async function submitCreditDecision(
     analystUserId: actor.id,
     decisionDate: new Date().toISOString(),
     forwardedToUnderwritingAt: input.decision === 'ELIGIBLE' ? new Date().toISOString() : undefined,
+    recommendation: {
+      recommendation: input.decision === 'ELIGIBLE' ? 'RECOMMEND' : input.decision === 'FURTHER_REVIEW' ? 'SEND_BACK' : 'REJECT',
+      notes: input.reason,
+      recommendedBy: actor.email,
+      recommendedAt: new Date().toISOString(),
+      proposedAmount: Number(app.requestedAmount),
+      proposedTenure: app.tenureMonths,
+    },
   };
 
   // Determine application lifecycle state transition based on decision

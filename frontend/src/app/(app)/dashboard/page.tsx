@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   TrendingUp,
   Users,
@@ -123,138 +123,108 @@ export default function DashboardPage() {
   }, []);
 
   const primaryRole = (user?.roles?.[0] || 'CUSTOMER') as RoleName;
-  const isFinanceOfficer =
-    primaryRole === 'FINANCE_OFFICER' ||
-    (user?.roles?.includes('FINANCE_OFFICER') &&
-      !['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'COLLECTION_OFFICER', 'AUDITOR'].includes(primaryRole));
 
-  // Direct Repayment Modal State for Finance Officer
-  const [directPayModalOpen, setDirectPayModalOpen] = useState(false);
-  const [directLoanId, setDirectLoanId] = useState('');
-  const [directAmount, setDirectAmount] = useState('');
-  const [directMethod, setDirectMethod] = useState('UPI');
-  const [directRef, setDirectRef] = useState('');
-  const [directNotes, setDirectNotes] = useState('');
+  // Date filter parameters passed to live portfolio reports
+  const dateParams = {
+    dateFilter,
+    ...(dateFilter.includes('to') ? { startDate: customStart, endDate: customEnd } : {}),
+  };
 
-  const directPaymentMutation = useMutation({
-    mutationFn: async () =>
-      api.post('/payments', {
-        loanId: directLoanId,
-        amount: Number(directAmount),
-        method: directMethod,
-        reference: directRef || `MANUAL-${Date.now().toString().slice(-6)}`,
-        notes: directNotes || 'Direct repayment posted by Finance Officer from Dashboard',
-      }),
-    onSuccess: () => {
-      handleRefresh();
-      setDirectPayModalOpen(false);
-      setDirectLoanId('');
-      setDirectAmount('');
-      setDirectRef('');
-      setDirectNotes('');
-    },
-  });
-
-  // Live queries with automated 5s polling intervals
+  // Live queries
   const { data: reportsData } = useQuery({
-    queryKey: ['dashboard-reports', dateFilter, timeRange, customStart, customEnd],
-    queryFn: async () =>
-      (
-        await api.get('/reports/portfolio', {
-          params: {
-            filter: dateFilter,
-            range: timeRange,
-            start: customStart,
-            end: customEnd,
-          },
-        })
-      ).data.data,
+    queryKey: ['dashboard-reports', dateFilter, customStart, customEnd],
+    queryFn: async () => (await api.get('/reports/portfolio', { params: dateParams })).data.data,
     enabled: !!user && primaryRole !== 'CUSTOMER',
-    refetchInterval: 5000,
   });
 
   const { data: loansData } = useQuery({
     queryKey: ['dashboard-loans'],
-    queryFn: async () => (await api.get('/loans', { params: { pageSize: 50 } })).data.data,
+    queryFn: async () => (await api.get('/loans', { params: { pageSize: 10 } })).data.data,
     enabled: !!user,
-    refetchInterval: 5000,
   });
 
   const { data: appsData } = useQuery({
     queryKey: ['dashboard-apps'],
-    queryFn: async () => (await api.get('/applications', { params: { pageSize: 20 } })).data.data,
+    queryFn: async () => (await api.get('/applications', { params: { pageSize: 6 } })).data.data,
     enabled: !!user,
-    refetchInterval: 5000,
   });
 
   const { data: customersData } = useQuery({
     queryKey: ['dashboard-customers'],
-    queryFn: async () => (await api.get('/customers', { params: { pageSize: 20 } })).data.data,
+    queryFn: async () => (await api.get('/customers', { params: { pageSize: 6 } })).data.data,
     enabled: !!user && primaryRole !== 'CUSTOMER',
-    refetchInterval: 5000,
   });
 
   const { data: usersData } = useQuery({
     queryKey: ['dashboard-users'],
     queryFn: async () => (await api.get('/users')).data.data,
-    enabled: !!user && ['ADMIN', 'SUPER_ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
-    refetchInterval: 10000,
+    enabled: !!user && ['ADMIN', 'SUPER_ADMIN'].includes(primaryRole),
   });
 
   const { data: branchesData } = useQuery({
     queryKey: ['dashboard-branches'],
     queryFn: async () => (await api.get('/branches')).data.data,
     enabled: !!user && ['ADMIN', 'SUPER_ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
-    refetchInterval: 10000,
   });
 
   const { data: underwritingData } = useQuery({
     queryKey: ['dashboard-underwriting-queue'],
     queryFn: async () => (await api.get('/underwriting/queue')).data.data,
-    enabled: !!user && ['UNDERWRITER', 'CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
-    refetchInterval: 5000,
+    enabled: !!user && ['UNDERWRITER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: creditQueueData } = useQuery({
+    queryKey: ['dashboard-credit-queue'],
+    queryFn: async () => (await api.get('/credit/queue')).data.data,
+    enabled: !!user && ['CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: branchQueueData } = useQuery({
+    queryKey: ['dashboard-branch-queue'],
+    queryFn: async () => (await api.get('/branch-manager/queue')).data.data,
+    enabled: !!user && ['BRANCH_MANAGER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: disbursementsData } = useQuery({
     queryKey: ['dashboard-disbursements-queue'],
     queryFn: async () => (await api.get('/disbursements/queue')).data.data,
-    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
-    refetchInterval: 5000,
+    enabled: !!user && ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: collectionsData } = useQuery({
     queryKey: ['dashboard-collections'],
     queryFn: async () => (await api.get('/collections/dashboard')).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
-    refetchInterval: 5000,
+    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: casesData } = useQuery({
     queryKey: ['dashboard-collection-cases'],
-    queryFn: async () => (await api.get('/collections/cases', { params: { pageSize: 10 } })).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
-    refetchInterval: 5000,
+    queryFn: async () => (await api.get('/collections/cases', { params: { pageSize: 6 } })).data.data,
+    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: submissionsData } = useQuery({
     queryKey: ['dashboard-payment-submissions'],
-    queryFn: async () => (await api.get('/payments/submissions', { params: { pageSize: 15 } })).data.data,
-    enabled: !!user && (isFinanceOfficer || ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
-    refetchInterval: 5000,
+    queryFn: async () => (await api.get('/payments/submissions', { params: { pageSize: 6 } })).data.data,
+    enabled: !!user && ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
-  const { data: paymentsData } = useQuery({
-    queryKey: ['dashboard-payments-transactions'],
-    queryFn: async () => (await api.get('/payments/transactions', { params: { pageSize: 20 } })).data.data,
-    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
-    refetchInterval: 5000,
+  const { data: pendingSubmissionsData } = useQuery({
+    queryKey: ['dashboard-pending-submissions-count'],
+    queryFn: async () => (await api.get('/payments/submissions', { params: { status: 'PENDING_VERIFICATION', pageSize: 1 } })).data,
+    enabled: !!user && ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+  });
+
+  const { data: reconStats } = useQuery({
+    queryKey: ['dashboard-reconciliation-stats'],
+    queryFn: async () => (await api.get('/reconciliation/dashboard')).data.data,
+    enabled: !!user && ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
   });
 
   const { data: auditData } = useQuery({
     queryKey: ['dashboard-audit'],
-    queryFn: async () => (await api.get('/audit', { params: { pageSize: 10 } })).data.data,
+    queryFn: async () => (await api.get('/audit', { params: { pageSize: 6 } })).data.data,
     enabled: !!user && ['AUDITOR', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
-    refetchInterval: 8000,
   });
 
   async function handleRefresh() {
@@ -273,13 +243,9 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-collection-cases'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-payment-submissions'] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard-payments-transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-pending-submissions-count'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reconciliation-stats'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-audit'] }),
-      queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] }),
-      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] }),
-      queryClient.invalidateQueries({ queryKey: ['payments-transactions'] }),
-      queryClient.invalidateQueries({ queryKey: ['payments'] }),
-      queryClient.invalidateQueries({ queryKey: ['loans'] }),
     ]);
     setTimeout(() => setRefreshing(false), 500);
   }
@@ -438,37 +404,29 @@ export default function DashboardPage() {
     loansList.filter((l: any) => l.status === 'CLOSED' || l.status === 'SETTLED').length;
 
   const totalDisbursedValue =
-    Number(reportsData?.kpis?.totalDisbursed) ||
-    Number(reportsData?.totalPrincipalDisbursed) ||
-    Number(reportsData?.totalDisbursed) ||
+    reportsData?.kpis?.totalDisbursed ??
+    reportsData?.totalPrincipalDisbursed ??
+    reportsData?.totalDisbursed ??
     loansList.reduce((acc: number, l: any) => acc + Number(l.principal || 0), 0);
   const totalDisbursedFormatted = formatMoney(totalDisbursedValue);
 
-  const transactionsList: any[] = Array.isArray(paymentsData)
-    ? paymentsData
-    : Array.isArray(paymentsData?.data)
-    ? paymentsData.data
-    : [];
-
-  const rawTotalCollected =
+  const totalCollectedValue =
     reportsData?.kpis?.totalCollected ??
     reportsData?.totalCollections ??
     reportsData?.totalCollected ??
-    transactionsList.filter((t: any) => t.status === 'SUCCESS' || t.status === 'COMPLETED').reduce((acc: number, t: any) => acc + Number(t.amount || 0), 0);
-
-  const totalCollectedValue = Number(rawTotalCollected) || 0;
+    0;
   const totalCollectedFormatted = formatMoney(totalCollectedValue);
 
   const totalOverdueValue =
-    Number(reportsData?.kpis?.totalOverdue) ||
-    Number(reportsData?.totalOverdue) ||
+    reportsData?.kpis?.totalOverdue ??
+    reportsData?.totalOverdue ??
     0;
   const totalOverdueFormatted = formatMoney(totalOverdueValue);
 
   const totalOutstandingValue =
-    Number(reportsData?.kpis?.totalOutstanding) ||
-    Number(reportsData?.totalPrincipalOutstanding) ||
-    Number(reportsData?.totalOutstanding) ||
+    reportsData?.kpis?.totalOutstanding ??
+    reportsData?.totalPrincipalOutstanding ??
+    reportsData?.totalOutstanding ??
     loansList.reduce((acc: number, l: any) => acc + Number(l.outstandingPrincipal || 0), 0);
   const totalOutstandingFormatted = formatMoney(totalOutstandingValue);
 
@@ -493,9 +451,6 @@ export default function DashboardPage() {
     appsList.length;
 
   const draftAppsCount = appsList.filter((a: any) => a.status === 'DRAFT').length;
-  const submittedAppsCount = appsList.filter((a: any) =>
-    ['SUBMITTED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(a.status)
-  ).length;
   const approvedAppsCount = appsList.filter((a: any) =>
     ['APPROVED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(a.status)
   ).length;
@@ -770,23 +725,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Live Polling Sync Indicator */}
-          <div
-            className={cn(
-              'hidden sm:flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold select-none shadow-2xs',
-              isDark
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            )}
-            title="Real-time live synchronization active"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>Live Sync Active</span>
-          </div>
-
           {/* Refresh Button */}
           <button
             type="button"
@@ -799,7 +737,7 @@ export default function DashboardPage() {
             )}
           >
             <RefreshCw className={cn('h-3.5 w-3.5', isDark ? 'text-slate-400' : 'text-slate-500', refreshing ? 'animate-spin' : '')} />
-            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+            <span>Refresh</span>
           </button>
 
           {/* Export CSV Button (For staff) */}
@@ -837,8 +775,8 @@ export default function DashboardPage() {
             <KpiItem label="APPLICATIONS INTAKE" value={String(totalAppsCount)} hint="Total origination pool" icon={<FileText className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
             <KpiItem label="KYC PENDING" value={String(pendingKycCount)} hint="Action required" icon={<AlertCircle className="h-4 w-4" />} iconColor="amber" cardBgClass={cardBgClass} isDark={isDark} highlightText={pendingKycCount > 0 ? `${pendingKycCount} need docs` : undefined} />
             <KpiItem label="DRAFT PROPOSALS" value={String(draftAppsCount)} hint="Ready to submit" icon={<Clock className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="FORWARDED TO CREDIT" value={String(submittedAppsCount)} hint="In credit appraisal queue" icon={<Send className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
             <KpiItem label="PROPOSALS SANCTIONED" value={String(approvedAppsCount)} hint="Approved by underwriter" icon={<CheckCircle2 className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
+            <KpiItem label="DISBURSED LOANS" value={String(activeLoansCount)} hint={totalDisbursedFormatted} icon={<Wallet className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -1094,147 +1032,76 @@ export default function DashboardPage() {
       )}
 
       {/* E. FINANCE OFFICER WORKSPACE */}
-      {isFinanceOfficer && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="PENDING DISBURSEMENTS"
-              value={String(pendingPayoutCount)}
-              hint="Awaiting NEFT payout"
-              icon={<Wallet className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={pendingPayoutCount > 0 ? "Action Required" : undefined}
-            />
-            <KpiItem
-              label="DISBURSED VOLUME"
-              value={totalDisbursedFormatted}
-              hint={`${dateFilter} Released`}
-              icon={<Coins className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="COLLECTIONS RECOVERED"
-              value={totalCollectedFormatted}
-              hint={`${dateFilter} Payments`}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="PAYMENT INTIMATIONS"
-              value={String(Array.isArray(submissionsData) ? submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length : 0)}
-              hint="Borrower UTR proofs"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={
-                Array.isArray(submissionsData) && submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length > 0
-                  ? "Verify & Settle"
-                  : undefined
-              }
-            />
-            <KpiItem
-              label="NOC CLOSURES"
-              value={String(closedLoansCount)}
-              hint="Full clearance certificates"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="TREASURY & LEDGER"
-              value="HEALTHY"
-              hint="Double-entry in balance"
-              icon={<Building className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              valueColor="text-emerald-600"
-            />
-          </div>
+      {primaryRole === 'FINANCE_OFFICER' && (() => {
+        const totalPendingSubmissions =
+          pendingSubmissionsData?.pagination?.total ??
+          (Array.isArray(submissionsData)
+            ? submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length
+            : 0);
+        const reconHealth = reconStats?.reconciliationHealthPercent ?? 100;
+        const activeExceptions = reconStats?.totalActiveExceptions ?? 0;
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-8 space-y-6">
-              {/* Card 1: Disbursement Queue */}
-              <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">Electronic Disbursement Payout Queue (NEFT / RTGS)</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Approved loan sanctions ready for fund transfer release</p>
-                  </div>
-                  <Link href="/disbursements" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
-                    Disbursements Desk →
-                  </Link>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
-                  {Array.isArray(disbursementsData) && disbursementsData.length > 0 ? (
-                    disbursementsData.map((d: any) => {
-                      const custId = d.customerId || d.customer?.id || d.application?.customerId;
-                      const custName =
-                        d.customerName ||
-                        d.customer?.name ||
-                        (d.customer?.firstName ? `${d.customer.firstName} ${d.customer.lastName || ''}`.trim() : '') ||
-                        'Borrower';
-                      return (
-                        <div key={d.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-3.5 gap-2.5">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {custId ? (
-                                <Link
-                                  href={`/customers/${custId}`}
-                                  className="font-bold text-slate-900 dark:text-white hover:text-blue-600 hover:underline flex items-center gap-1"
-                                  title="Open Borrower Customer 360"
-                                >
-                                  <span>{custName}</span>
-                                  <span className="text-[10px] text-blue-500 font-normal">↗</span>
-                                </Link>
-                              ) : (
-                                <span className="font-bold text-slate-900 dark:text-white">{custName}</span>
-                              )}
-                              <span className="font-mono text-[11px] text-blue-500 font-bold">Loan #{d.loanAccountNo || d.id?.slice(0, 8)}</span>
-                            </div>
-                            <p className="text-slate-400 text-[11px] font-mono mt-0.5">
-                              Bank: <strong>{d.bankName || 'Verified Bank'}</strong> · IFSC: {d.ifscCode || '-'} {d.accountNumber ? `· A/C: ••••${String(d.accountNumber).slice(-4)}` : ''}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-bold text-[#2563EB] dark:text-[#60A5FA] text-sm">
-                              {formatMoney(d.amount || d.requestedAmount || 0)}
-                            </span>
-                            {custId && (
-                              <Link href={`/customers/${custId}`}>
-                                <Button size="sm" variant="ghost" className="text-xs text-slate-600 dark:text-slate-300">
-                                  View Profile
-                                </Button>
-                              </Link>
-                            )}
-                            <Link href="/disbursements">
-                              <Button size="sm" className="text-xs text-white bg-[#2563EB] hover:bg-blue-700">
-                                Execute NEFT Payout →
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="py-8 text-center text-xs text-slate-400 space-y-1.5">
-                      <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-full w-10 h-10 flex items-center justify-center mx-auto text-emerald-600">
-                        <CheckCircle2 className="w-5 h-5" />
-                      </div>
-                      <p className="font-semibold text-slate-700 dark:text-slate-300">All loan payouts have been executed.</p>
-                      <p className="text-[11px] text-slate-400">No loans currently awaiting disbursement release.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiItem
+                label="PENDING DISBURSEMENTS"
+                value={String(pendingPayoutCount)}
+                hint="Awaiting NEFT payout"
+                icon={<Wallet className="h-4 w-4" />}
+                iconColor="purple"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={pendingPayoutCount > 0 ? "Action Required" : undefined}
+              />
+              <KpiItem
+                label="DISBURSED VOLUME"
+                value={totalDisbursedFormatted}
+                hint={`${dateFilter} Released`}
+                icon={<Coins className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="COLLECTIONS RECOVERED"
+                value={totalCollectedFormatted}
+                hint={`${dateFilter} Payments`}
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PAYMENT INTIMATIONS"
+                value={String(totalPendingSubmissions)}
+                hint="Borrower UTR proofs"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={totalPendingSubmissions > 0 ? "Verify & Settle" : undefined}
+              />
+              <KpiItem
+                label="NOC CLOSURES"
+                value={String(closedLoansCount)}
+                hint="Full clearance certificates"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="TREASURY STATUS"
+                value={`${reconHealth}% RECON`}
+                hint={activeExceptions > 0 ? `${activeExceptions} exceptions flagged` : "Ledger 100% balanced"}
+                icon={<Building className="h-4 w-4" />}
+                iconColor={reconHealth >= 98 ? "emerald" : "amber"}
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                valueColor={reconHealth >= 98 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-500"}
+              />
+            </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               <div className="lg:col-span-8 space-y-6">
@@ -1280,132 +1147,149 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
-                  {Array.isArray(submissionsData) && submissionsData.length > 0 ? (
-                    submissionsData.slice(0, 5).map((sub: any) => (
-                      <div key={sub.id} className="py-3 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {sub.customerId || sub.loan?.customerId ? (
-                              <Link
-                                href={`/customers/${sub.customerId || sub.loan?.customerId}`}
-                                className="font-bold text-slate-900 dark:text-white hover:text-blue-600 hover:underline flex items-center gap-1"
-                                title="Open Borrower Customer 360"
-                              >
-                                <span>{sub.customerName || 'Borrower'}</span>
-                                <span className="text-[10px] text-blue-500 font-normal">↗</span>
-                              </Link>
-                            ) : (
+                {/* Card 2: Borrower Payment Submissions to Verify */}
+                <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                  <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                    <div>
+                      <h3 className="text-sm font-bold tracking-tight">Recorded Collections & Payment Submissions</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Verify UTR and settle into double-entry accounting ledger</p>
+                    </div>
+                    <Link href="/payments" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
+                      Verification Desk →
+                    </Link>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
+                    {Array.isArray(submissionsData) && submissionsData.length > 0 ? (
+                      submissionsData.slice(0, 4).map((sub: any) => (
+                        <div key={sub.id} className="py-3 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
                               <span className="font-bold text-slate-900 dark:text-white">{sub.customerName || 'Borrower'}</span>
-                            )}
-                            <span className="font-mono text-[10px] text-blue-500 font-bold">Loan #{sub.loanNo}</span>
-                            <span className="font-mono text-[10px] text-slate-400">Ref: {sub.reference}</span>
+                              <span className="font-mono text-[10px] text-blue-500 font-bold">Loan #{sub.loanNo}</span>
+                              <span className="font-mono text-[10px] text-slate-400">Ref: {sub.reference}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Mode: <strong>{sub.method}</strong> · Submitted: {sub.createdAt ? formatDate(sub.createdAt) : '-'}
+                              {sub.notes && <span className="ml-2 text-[10px] text-slate-500">({sub.notes})</span>}
+                            </p>
                           </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Mode: <strong>{sub.method}</strong> · Submitted: {sub.createdAt ? formatDate(sub.createdAt) : '-'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                            {formatMoney(sub.amount || 0)}
-                          </span>
-                          <Link href="/payments">
-                            <Button size="sm" variant="secondary" className="text-xs font-semibold">
-                              {sub.status === 'PENDING_VERIFICATION' ? 'Verify & Settle →' : 'View →'}
-                            </Button>
-                          </Link>
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                              {formatMoney(sub.amount || 0)}
+                            </span>
+                            <Link href="/payments">
+                              <Button size="sm" variant="secondary" className="text-xs">
+                                {sub.status === 'PENDING_VERIFICATION' ? 'Verify & Settle →' : 'View →'}
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
                       ))
                     ) : (
                       <div className="py-6 text-center text-xs text-slate-400">
                         No pending payment submissions requiring verification.
                       </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-center text-xs text-slate-400 space-y-1">
-                      <p className="font-medium text-slate-600 dark:text-slate-300">No pending borrower payment proofs.</p>
-                      <p className="text-[11px] text-slate-400">All submitted UTRs are settled in the general ledger.</p>
-                    </div>
-                  )}
-                </div>
-
-            <div className="lg:col-span-4 space-y-6">
-              {/* Card 3: Waterfall Allocation Hierarchy & Navigation */}
-              <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight">Waterfall Allocation Hierarchy</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Automated settlement priority rules</p>
-                  <div className="space-y-2 pt-3 text-xs">
-                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">1</span>
-                      <span className="font-medium">Late & Processing Fees</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">2</span>
-                      <span className="font-medium">Overdue Penalty Interest</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">3</span>
-                      <span className="font-medium">Regular EMI Interest</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">4</span>
-                      <span className="font-medium">Principal Reduction</span>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                  <Button
-                    size="sm"
-                    onClick={() => setDirectPayModalOpen(true)}
-                    className="w-full text-xs text-white bg-emerald-600 hover:bg-emerald-700 font-bold flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    + Record Direct EMI Repayment
-                  </Button>
-                  <Link href="/disbursements" className="block">
-                    <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700 font-semibold">
-                      Open Disbursements Desk →
-                    </Button>
-                  </Link>
-                  <Link href="/payments" className="block">
-                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
-                      Open Payments Ledger & Proofs →
-                    </Button>
-                  </Link>
-                  <Link href="/reconciliation" className="block">
-                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
-                      Open Accounting & Reconciliation →
-                    </Button>
-                  </Link>
-                  <Link href="/customers" className="block">
-                    <Button size="sm" variant="ghost" className="w-full text-xs text-[#2563EB] dark:text-[#60A5FA]">
-                      Browse Borrowers (Customer 360) →
-                    </Button>
-                  </Link>
+                {/* Card 4: Accounting, Reconciliation & Exceptions Summary */}
+                <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                  <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                    <div>
+                      <h3 className="text-sm font-bold tracking-tight">Accounting & 5-Pillar Ledger Reconciliation</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Automated detection of ledger discrepancies, duplicate transactions, and allocation mismatches</p>
+                    </div>
+                    <Link href="/reconciliation" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
+                      Accounting & Recon Desk →
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Reconciliation Health</p>
+                      <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                        {reconStats?.reconciliationHealthPercent ?? 100}%
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Across all 5 audit pillars</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Active Exceptions</p>
+                      <p className={cn("text-base font-bold mt-1", (reconStats?.totalActiveExceptions ?? 0) > 0 ? "text-amber-500" : "text-slate-700 dark:text-slate-200")}>
+                        {reconStats?.totalActiveExceptions ?? 0}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{reconStats?.criticalExceptionsCount ?? 0} critical severity</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Maker-Checker Adjustments</p>
+                      <p className="text-base font-bold text-slate-700 dark:text-slate-200 mt-1">
+                        {reconStats?.pendingAdjustmentsCount ?? 0}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Awaiting dual verification</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-100 dark:border-[#2B3566]">
+                      <p className="text-slate-400 font-medium text-[11px]">Total Discrepancy Volume</p>
+                      <p className="text-base font-bold text-slate-700 dark:text-slate-200 mt-1">
+                        {formatMoney(reconStats?.totalDiscrepancyAmount ?? 0)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Net variance flagged</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs">
+                    <span className="text-[11px] text-slate-400">
+                      Last reconciliation pass: {reconStats?.lastRunAt ? formatDate(reconStats.lastRunAt) : 'Recently executed'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Link href="/reconciliation">
+                        <Button size="sm" variant="secondary" className="text-xs">
+                          Inspect Exceptions ({reconStats?.totalActiveExceptions ?? 0})
+                        </Button>
+                      </Link>
+                      <Link href="/reconciliation">
+                        <Button size="sm" variant="secondary" className="text-xs">
+                          Review Adjustments
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Card 4: Treasury & Liquidity Overview */}
-              <div className={cn('rounded-2xl border p-5 space-y-3', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-2.5 border-slate-100 dark:border-[#2B3566]">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Treasury Health</h4>
-                  <Badge variant="success">Operational</Badge>
+              <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">Waterfall Allocation Hierarchy</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Automated settlement order</p>
+                  <div className="space-y-2 pt-3 text-xs">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">1</span>
+                      <span>Late & Processing Fees</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">2</span>
+                      <span>Overdue Penalty Interest</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">3</span>
+                      <span>Regular EMI Interest</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">4</span>
+                      <span>Principal Reduction</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Total Active Portfolio</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{totalOutstandingFormatted}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Cumulative Recoveries</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalCollectedFormatted}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Performing Accounts</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{activeLoansCount} / {totalLoansCount}</span>
-                  </div>
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#2B3566]">
+                  <Link href="/disbursements" className="block">
+                    <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700">Open Disbursements Desk</Button>
+                  </Link>
+                  <Link href="/payments" className="block">
+                    <Button size="sm" variant="secondary" className="w-full text-xs">Open Payments Ledger</Button>
+                  </Link>
+                  <Link href="/reconciliation" className="block">
+                    <Button size="sm" variant="secondary" className="w-full text-xs">Open Accounting & Recon</Button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -2242,165 +2126,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* DIRECT EMI REPAYMENT MODAL */}
-      {directPayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
-          <div
-            className={cn(
-              'w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-4 transition-all',
-              isDark ? 'bg-[#171B36] border-[#2B3566] text-slate-100' : 'bg-white border-slate-200 text-slate-900'
-            )}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2B3566]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className={cn('text-base font-bold', isDark ? 'text-white' : 'text-slate-900')}>
-                    Record Direct EMI Repayment
-                  </h3>
-                  <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                    Directly post borrower repayment and auto-allocate across loan schedule
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setDirectPayModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-xs">
-              {/* Select Loan */}
-              <div>
-                <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                  Select Active Loan Account *
-                </label>
-                <select
-                  value={directLoanId}
-                  onChange={(e) => {
-                    const lId = e.target.value;
-                    setDirectLoanId(lId);
-                    const chosen = loansList.find((l: any) => l.id === lId);
-                    if (chosen?.emiAmount && !directAmount) {
-                      setDirectAmount(String(chosen.emiAmount));
-                    }
-                  }}
-                  className={cn(
-                    'w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none',
-                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
-                  )}
-                  required
-                >
-                  <option value="">-- Select Active Loan Account --</option>
-                  {loansList
-                    .filter((l: any) => l.status === 'ACTIVE' || l.status === 'OVERDUE' || l.status === 'DISBURSED')
-                    .map((l: any) => {
-                      const cName =
-                        l.customerName ||
-                        l.customer?.name ||
-                        (l.customer?.firstName ? `${l.customer.firstName} ${l.customer.lastName || ''}`.trim() : '') ||
-                        'Borrower';
-                      return (
-                        <option key={l.id} value={l.id}>
-                          Loan #{l.loanNo} · {cName} (EMI: {formatMoney(l.emiAmount || 0)} · Outstanding: {formatMoney(l.outstandingPrincipal || 0)})
-                        </option>
-                      );
-                    })}
-                </select>
-              </div>
-
-              {/* Amount & Method */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                    Repayment Amount (₹) *
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={directAmount}
-                    onChange={(e) => setDirectAmount(e.target.value)}
-                    placeholder="e.g. 5000"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                    Payment Channel *
-                  </label>
-                  <select
-                    value={directMethod}
-                    onChange={(e) => setDirectMethod(e.target.value)}
-                    className={cn(
-                      'w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none',
-                      isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
-                    )}
-                  >
-                    <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
-                    <option value="NEFT">NEFT Bank Transfer</option>
-                    <option value="IMPS">IMPS Instant Transfer</option>
-                    <option value="CASH">Branch Cash Counter</option>
-                    <option value="CHEQUE">Cheque / DD</option>
-                    <option value="NET_BANKING">Net Banking</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Reference */}
-              <div>
-                <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                  Bank Transaction / UTR Reference
-                </label>
-                <Input
-                  value={directRef}
-                  onChange={(e) => setDirectRef(e.target.value)}
-                  placeholder="e.g. UPI-9988771122 or BANK-NEFT-5544"
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                  Audit Settlement Notes
-                </label>
-                <Input
-                  value={directNotes}
-                  onChange={(e) => setDirectNotes(e.target.value)}
-                  placeholder="e.g. Monthly installment paid via branch counter"
-                />
-              </div>
-
-              {/* Waterfall Info Banner */}
-              <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-[#1E2445] border border-blue-100 dark:border-[#2B3566] text-[11px] text-blue-900 dark:text-blue-200 space-y-1">
-                <p className="font-semibold flex items-center gap-1.5 text-blue-800 dark:text-blue-300">
-                  <Layers className="w-3.5 h-3.5" /> Automated Waterfall Hierarchy:
-                </p>
-                <p className="text-[10px] text-slate-600 dark:text-slate-400">
-                  Payment will settle automatically: <strong>1. Fees</strong> ➔ <strong>2. Penalty</strong> ➔ <strong>3. Interest</strong> ➔ <strong>4. Principal</strong>.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[#2B3566]">
-                <Button variant="ghost" size="sm" onClick={() => setDirectPayModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!directLoanId || !directAmount || directPaymentMutation.isPending}
-                  onClick={() => directPaymentMutation.mutate()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {directPaymentMutation.isPending ? 'Recording...' : 'Confirm & Post Repayment'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* I. BORROWER / CUSTOMER SELF-SERVICE WORKSPACE */}
+      {primaryRole === 'CUSTOMER' && (
+        <BorrowerPortalShell />
       )}
     </div>
   );
