@@ -60,6 +60,13 @@ export const recordRiskStepSchema = z.object({
   remarks: z.string().optional(),
 });
 
+export const returnToLoanOfficerSchema = z.object({
+  reason: z.string().min(3, 'Reason is required (at least 3 characters)'),
+  note: z.string().min(5, 'A detailed note for the loan officer is required (at least 5 characters)'),
+  destination: z.enum(['LOAN_OFFICER', 'CUSTOMER']).optional().default('LOAN_OFFICER'),
+});
+
+
 export type SubmitCreditDecisionInput = z.infer<typeof submitCreditDecisionSchema>;
 export type VerifyFinancialsInput = z.infer<typeof verifyFinancialsSchema>;
 export type VerifyKycStepInput = z.infer<typeof verifyKycStepSchema>;

@@ -11,6 +11,7 @@ import {
   batchVerifyDocumentsStepSchema,
   evaluateFinancialStepSchema,
   recordRiskStepSchema,
+  returnToLoanOfficerSchema,
 } from './credit.schema';
 import {
   getFinancialCapacity,
@@ -23,6 +24,7 @@ import {
   submitCreditDecision,
   verifyFinancials,
   getCreditQueue,
+  returnToLoanOfficer,
 } from './credit.service';
 
 const router = Router();
@@ -174,6 +176,24 @@ router.post(
   validate(verifyFinancialsSchema),
   asyncHandler(async (req, res) => {
     const result = await verifyFinancials(
+      req.params.id,
+      req.body,
+      req.user as any
+    );
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/credit/applications/:id/return-to-loan-officer
+ * Returns proposal to Loan Officer or Customer for correction
+ */
+router.post(
+  '/applications/:id/return-to-loan-officer',
+  authorize('SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
+  validate(returnToLoanOfficerSchema),
+  asyncHandler(async (req, res) => {
+    const result = await returnToLoanOfficer(
       req.params.id,
       req.body,
       req.user as any

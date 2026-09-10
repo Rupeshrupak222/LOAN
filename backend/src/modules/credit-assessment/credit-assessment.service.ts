@@ -348,12 +348,11 @@ export async function getAssessmentDetail(
 
   // 2. KYC & Document Checklist
   const docs = customer.documents || [];
-  const requiredCategories = ['IDENTITY_PROOF', 'APPLICANT_PHOTO'];
   const missingRequiredDocs: string[] = [];
 
   const hasIdentity = docs.some((d) =>
     ['IDENTITY_PROOF', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID'].includes(d.documentType || '')
+    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'Aadhar_CARD'].includes(d.documentType || '')
   );
   if (!hasIdentity) missingRequiredDocs.push('Identity Proof (PAN Card / Aadhaar)');
 
@@ -361,20 +360,79 @@ export async function getAssessmentDetail(
     ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
     ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO'].includes(d.documentType || '')
   );
-  if (!hasPhoto && docs.length < 2) missingRequiredDocs.push('Applicant Photo / Selfie');
+  if (!hasPhoto) missingRequiredDocs.push('Applicant Photo / Selfie');
+
+  const hasAddress = docs.some((d) =>
+    ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
+    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
+  );
+  if (!hasAddress) missingRequiredDocs.push('Address Proof (Electricity Bill / Passport / Rental Agreement)');
+
+  const hasIncome = docs.some((d) =>
+    ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
+    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
+  );
+  if (!hasIncome) missingRequiredDocs.push('Income Proof (Salary Slip / 3 Months Pay slips / ITR)');
+
+  const hasBank = docs.some((d) =>
+    ['BANK_STATEMENT'].includes(d.category) ||
+    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
+  );
+  if (!hasBank) missingRequiredDocs.push('Bank Statement (Latest 6 Months)');
 
   const unverifiedDocs = docs.filter((d) => !d.verified && d.status !== 'VERIFIED').map((d) => d.documentType || d.fileName);
   const verifiedDocs = docs.filter((d) => d.verified || d.status === 'VERIFIED');
 
-  const isKycComplete = customer.kycStatus === 'VERIFIED' && missingRequiredDocs.length === 0;
+  // Age calculation and policy verification
+  const calculateAge = (dobString?: Date | string | null): number | null => {
+    if (!dobString) return null;
+    const dob = new Date(dobString);
+    if (isNaN(dob.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const borrowerAge = calculateAge(customer.dateOfBirth);
+  const tenantEligibilityConfig = configurationService.getTenantConfig<any>(tenantId, 'ELIGIBILITY');
+  const minAge = Number(tenantEligibilityConfig?.minAge ?? 21);
+  const maxAge = Number(tenantEligibilityConfig?.maxAge ?? 60);
+
+  let ageError: string | null = null;
+  if (borrowerAge === null) {
+    ageError = 'Date of birth is missing or unverified on borrower profile';
+  } else if (borrowerAge < minAge) {
+    ageError = `Borrower age (${borrowerAge} yrs) is below minimum policy requirement (${minAge} yrs)`;
+  } else if (borrowerAge > maxAge) {
+    ageError = `Borrower age (${borrowerAge} yrs) exceeds maximum allowable age (${maxAge} yrs)`;
+  }
+  const isAgeValid = ageError === null;
+
+  const isKycComplete =
+    customer.kycStatus === 'VERIFIED' &&
+    missingRequiredDocs.length === 0 &&
+    unverifiedDocs.length === 0 &&
+    docs.length >= 5 &&
+    isAgeValid;
 
   const kycChecklist: KycDocumentChecklist = {
     isKycComplete,
-    totalRequired: 2,
+    totalRequired: 5,
     totalUploaded: docs.length,
     totalVerified: verifiedDocs.length,
     missingRequiredDocs,
     unverifiedDocs,
+    ageValidation: {
+      isValid: isAgeValid,
+      borrowerAge,
+      minAge,
+      maxAge,
+      error: ageError,
+    },
     documents: docs.map((d) => ({
       id: d.id,
       category: d.category,
@@ -719,7 +777,74 @@ export async function forwardToUnderwriting(
   // --- HARD MANDATORY GATES ---
   const blockers: string[] = [];
 
-  // Gate 1: Credit Risk Scoring Gate
+  // Gate 1: KYC Verification Gate
+  const docs = app.customer.documents || [];
+  const verifiedDocs = docs.filter((d) => d.verified || d.status === 'VERIFIED');
+  if (app.customer.kycStatus !== 'VERIFIED') {
+    blockers.push('Borrower identity verification (KYC) must be VERIFIED');
+  }
+
+  // Gate 2: All 5 Mandatory Documents Gate
+  const missingCategories: string[] = [];
+  const hasIdentityDoc = docs.some((d) =>
+    (['IDENTITY_PROOF', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
+    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'Aadhar_CARD'].includes(d.documentType || '')) &&
+    (d.status === 'VERIFIED' || d.verified)
+  );
+  if (!hasIdentityDoc) missingCategories.push('Identity Proof (PAN/Aadhaar)');
+
+  const hasPhotoDoc = docs.some((d) =>
+    (['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
+    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO'].includes(d.documentType || '')) &&
+    (d.status === 'VERIFIED' || d.verified)
+  );
+  if (!hasPhotoDoc) missingCategories.push('Applicant Photo / Selfie');
+
+  const hasAddressDoc = docs.some((d) =>
+    (['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
+    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')) &&
+    (d.status === 'VERIFIED' || d.verified)
+  );
+  if (!hasAddressDoc) missingCategories.push('Address Proof');
+
+  const hasIncomeDoc = docs.some((d) =>
+    (['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
+    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')) &&
+    (d.status === 'VERIFIED' || d.verified)
+  );
+  if (!hasIncomeDoc) missingCategories.push('Income Proof (Salary Slip / ITR)');
+
+  const hasBankDoc = docs.some((d) =>
+    (['BANK_STATEMENT'].includes(d.category) ||
+    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')) &&
+    (d.status === 'VERIFIED' || d.verified)
+  );
+  if (!hasBankDoc) missingCategories.push('Bank Statement (Latest 6 Months)');
+
+  if (missingCategories.length > 0) {
+    blockers.push(`Mandatory intake documents missing or unverified: ${missingCategories.join(', ')}`);
+  }
+
+  const unverifiedUploads = docs.filter((d) => !d.verified && d.status !== 'VERIFIED');
+  if (unverifiedUploads.length > 0) {
+    blockers.push(`${unverifiedUploads.length} uploaded document(s) are still pending inspection & verification`);
+  }
+
+  // Gate 2b: Borrower Age Gate
+  if (app.customer.dateOfBirth) {
+    const dob = new Date(app.customer.dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    if (age < 21 || age > 60) {
+      blockers.push(`Borrower age (${age} yrs) violates policy age range (21-60 years)`);
+    }
+  } else {
+    blockers.push('Borrower date of birth is missing or unverified on profile');
+  }
+
+  // Gate 3: Credit Risk Scoring Gate
   if (!app.riskAssessment || app.riskAssessment.score === null || app.riskAssessment.score === undefined) {
     blockers.push('Credit Risk Scoring assessment must be evaluated before Underwriter handoff');
   }

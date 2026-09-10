@@ -132,14 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;
   const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
   const accessibleNav = roleCfg.nav
-    .map((k) => {
-      const item = NAV_ITEMS[k];
-      if (!item) return null;
-      if (primaryRole === 'CREDIT_ANALYST' && k === 'underwriting') {
-        return { ...item, label: 'Credit Assessment' };
-      }
-      return item;
-    })
+    .map((k) => NAV_ITEMS[k])
     .filter(Boolean) as NavItemConfig[];
 
   const groupedNav: Record<string, NavItemConfig[]> = {
@@ -289,7 +282,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-20 bg-slate-900/40 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs lg:hidden"
           onClick={() => setOpen(false)}
         />
       )}
@@ -298,8 +291,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className={cn("flex flex-1 flex-col h-full min-w-0 overflow-y-auto overscroll-contain transition-colors", isDark ? "bg-[#060F1B]" : "bg-[#f8fafc]")}>
         {/* Top Header */}
         <header className={cn(
-          "sticky top-0 z-10 flex h-16 flex-none items-center justify-between border-b px-4 sm:px-6 backdrop-blur transition-colors",
-          isDark ? "border-[#1E2445] bg-[#060F1B]/95" : "border-slate-200/80 bg-white/95"
+          "sticky top-0 z-30 flex h-16 flex-none items-center justify-between border-b px-4 sm:px-6 backdrop-blur transition-colors",
+          isDark ? "border-[#1E2445] bg-[#060F1B]" : "border-slate-200/80 bg-white"
         )}>
           {/* Left: Mobile Menu + Breadcrumbs */}
           <div className="flex items-center gap-3">

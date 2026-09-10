@@ -67,7 +67,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
   applications: { key: 'applications', href: '/applications', label: 'Loan Applications', group: 'LENDING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
-  'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment Desk', group: 'LENDING' },
+  'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
   underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting Queue', group: 'LENDING' },
   loans: { key: 'loans', href: '/loans', label: 'Loan Accounts', group: 'LENDING' },

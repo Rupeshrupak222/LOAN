@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   ClipboardCheck,
@@ -27,6 +28,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
 import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { CreditAssessmentWorkspace } from '@/components/CreditAssessmentWorkspace';
 
 type TabKey =
   | 'ALL'
@@ -38,9 +40,13 @@ type TabKey =
   | 'ELIGIBLE'
   | 'NOT_ELIGIBLE';
 
-export default function CreditAssessmentQueuePage() {
+function CreditAssessmentQueueContent() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const selectedAppId = searchParams.get('applicationId');
   const [activeTab, setActiveTab] = useState<TabKey>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -50,7 +56,7 @@ export default function CreditAssessmentQueuePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['credit-queue', activeTab],
-    enabled: Boolean(isCreditAllowed),
+    enabled: Boolean(isCreditAllowed) && !selectedAppId,
     queryFn: async () => {
       const res = await api.get('/credit/queue', { params: { tab: activeTab } });
       return res.data?.data;
@@ -67,6 +73,17 @@ export default function CreditAssessmentQueuePage() {
           Credit assessment workspace is restricted to Credit Analysts and Reviewing Authorities.
         </p>
       </Card>
+    );
+  }
+
+  // If an application is selected, render the dedicated 7-step assessment workspace
+  if (selectedAppId) {
+    return (
+      <CreditAssessmentWorkspace
+        applicationId={selectedAppId}
+        onBack={() => router.push('/credit-assessment')}
+        onForwardSuccess={() => router.push('/credit-assessment')}
+      />
     );
   }
 
@@ -94,33 +111,30 @@ export default function CreditAssessmentQueuePage() {
     return appNo.includes(term) || name.includes(term) || code.includes(term) || product.includes(term);
   });
 
-  // Determines current workflow checkpoint for each application
+  // Determines current workflow checkpoint for each application (6-step flow)
   const getAppWorkflowStage = (app: any) => {
     if (app.status === 'UNDERWRITING' || (app.eligibility?.factors as any)?.decision === 'ELIGIBLE') {
-      return { label: 'Ready for Underwriter', color: 'emerald', step: 7 };
+      return { label: 'Ready for Underwriter', color: 'emerald', step: 6 };
     }
     if (app.eligibility?.result === 'NOT_ELIGIBLE' || app.status === 'REJECTED') {
-      return { label: 'Not Eligible', color: 'rose', step: 6 };
+      return { label: 'Not Eligible', color: 'rose', step: 5 };
     }
     if (app.eligibility?.result === 'FURTHER_REVIEW' || app.underwriting?.decision === 'SEND_BACK') {
-      return { label: 'Further Review', color: 'amber', step: 6 };
+      return { label: 'Further Review', color: 'amber', step: 5 };
     }
-    if (app.customer?.kycStatus !== 'VERIFIED') {
-      return { label: 'Step 2: KYC Pending', color: 'amber', step: 2 };
-    }
-    // Check if mandatory documents are verified
+    // Check if KYC and documents are verified
     const allDocs = [...(app.customer?.documents || []), ...(app.documents || [])];
     const hasUnverifiedDocs = allDocs.some((d: any) => !d.verified || d.status !== 'VERIFIED');
-    if (hasUnverifiedDocs || allDocs.length < 3) {
-      return { label: 'Step 3: Docs Pending', color: 'amber', step: 3 };
+    if (app.customer?.kycStatus !== 'VERIFIED' || hasUnverifiedDocs || allDocs.length === 0) {
+      return { label: 'Step 2: KYC & Docs Pending', color: 'amber', step: 2 };
     }
     if (!app.eligibility) {
-      return { label: 'Step 4: Financial Check', color: 'blue', step: 4 };
+      return { label: 'Step 3: Financial Check', color: 'blue', step: 3 };
     }
     if (!app.riskAssessment || app.status === 'CREDIT_ASSESSMENT') {
-      return { label: 'Step 5: Credit Risk Check', color: 'blue', step: 5 };
+      return { label: 'Step 4: Credit Risk Check', color: 'blue', step: 4 };
     }
-    return { label: 'Step 6: Decision Pending', color: 'purple', step: 6 };
+    return { label: 'Step 5: Decision Pending', color: 'purple', step: 5 };
   };
 
   return (
@@ -273,9 +287,12 @@ export default function CreditAssessmentQueuePage() {
                       className={cn('transition-colors', isDark ? 'hover:bg-[#16203D]/60' : 'hover:bg-slate-50/70')}
                     >
                       <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">
-                        <Link href={`/applications/${app.id}`} className="hover:underline">
+                        <button
+                          onClick={() => router.push(`/credit-assessment?applicationId=${app.id}`)}
+                          className="hover:underline cursor-pointer text-left"
+                        >
                           {app.applicationNo || 'N/A'}
-                        </Link>
+                        </button>
                       </td>
                       <td className="py-3 px-3">
                         <p className={cn('font-semibold leading-tight', isDark ? 'text-white' : 'text-slate-900')}>
@@ -336,49 +353,28 @@ export default function CreditAssessmentQueuePage() {
                         <Badge status={app.status} />
                       </td>
                       <td className="py-3 px-3 text-right">
-                        <Link href={`/applications/${app.id}`}>
-                          <Button
-                            size="sm"
-                            className={cn(
-                              'text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1 ml-auto',
-                              stage.step === 7
-                                ? 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-[#1E2445] dark:text-slate-200 dark:hover:bg-[#2B3566]'
-                                : 'bg-[#2563EB] hover:bg-blue-700 text-white'
-                            )}
-                          >
-                            {stage.step === 7 ? (
-                              <>
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>View Ledger</span>
-                              </>
-                            ) : stage.step === 2 ? (
-                              <>
-                                <UserCheck className="w-3.5 h-3.5" />
-                                <span>Verify KYC →</span>
-                              </>
-                            ) : stage.step === 3 ? (
-                              <>
-                                <FileCheck className="w-3.5 h-3.5" />
-                                <span>Verify Docs →</span>
-                              </>
-                            ) : stage.step === 4 ? (
-                              <>
-                                <Calculator className="w-3.5 h-3.5" />
-                                <span>Assess Capacity →</span>
-                              </>
-                            ) : stage.step === 5 ? (
-                              <>
-                                <ShieldCheck className="w-3.5 h-3.5" />
-                                <span>Assess Risk →</span>
-                              </>
-                            ) : (
-                              <>
-                                <Send className="w-3.5 h-3.5" />
-                                <span>Make Decision →</span>
-                              </>
-                            )}
-                          </Button>
-                        </Link>
+                        <Button
+                          size="sm"
+                          onClick={() => router.push(`/credit-assessment?applicationId=${app.id}`)}
+                          className={cn(
+                            'text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1 ml-auto',
+                            stage.step === 6
+                              ? 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-[#1E2445] dark:text-slate-200 dark:hover:bg-[#2B3566]'
+                              : 'bg-[#2563EB] hover:bg-blue-700 text-white'
+                          )}
+                        >
+                          {stage.step === 6 ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Handover Dossier →</span>
+                            </>
+                          ) : (
+                            <>
+                              <Calculator className="w-3.5 h-3.5" />
+                              <span>Assess Credit →</span>
+                            </>
+                          )}
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -389,5 +385,13 @@ export default function CreditAssessmentQueuePage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function CreditAssessmentQueuePage() {
+  return (
+    <Suspense fallback={<TableSkeleton rows={6} cols={8} />}>
+      <CreditAssessmentQueueContent />
+    </Suspense>
   );
 }

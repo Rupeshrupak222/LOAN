@@ -118,6 +118,13 @@ export interface KycDocumentChecklist {
   totalVerified: number;
   missingRequiredDocs: string[];
   unverifiedDocs: string[];
+  ageValidation?: {
+    isValid: boolean;
+    borrowerAge: number | null;
+    minAge: number;
+    maxAge: number;
+    error: string | null;
+  };
   documents: {
     id: string;
     category: string;

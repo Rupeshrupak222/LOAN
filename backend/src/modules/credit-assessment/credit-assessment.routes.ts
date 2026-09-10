@@ -12,7 +12,11 @@ import {
   submitCreditRecommendation,
   forwardToUnderwriting,
 } from './credit-assessment.service';
-import { startCreditAssessment } from '../credit/credit.service';
+import {
+  startCreditAssessment,
+  submitCreditDecision,
+  returnToLoanOfficer,
+} from '../credit/credit.service';
 
 const router = Router();
 
@@ -140,6 +144,63 @@ router.post(
         branchId: req.user?.branchId,
       }
     );
+    res.json(success(result));
+  })
+);
+
+// 6. Start Credit Assessment Alias (Step 1)
+router.post(
+  '/applications/:applicationId/start-assessment',
+  authorize(...CREDIT_STAFF),
+  asyncHandler(async (req, res) => {
+    const result = await startCreditAssessment(req.params.applicationId, req.user as any);
+    res.json(success(result));
+  })
+);
+
+router.post(
+  '/:applicationId/start-assessment',
+  authorize(...CREDIT_STAFF),
+  asyncHandler(async (req, res) => {
+    const result = await startCreditAssessment(req.params.applicationId, req.user as any);
+    res.json(success(result));
+  })
+);
+
+// 7. Return to Loan Officer Alias
+router.post(
+  '/applications/:applicationId/return-to-loan-officer',
+  authorize(...CREDIT_STAFF),
+  asyncHandler(async (req, res) => {
+    const result = await returnToLoanOfficer(req.params.applicationId, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+router.post(
+  '/:applicationId/return-to-loan-officer',
+  authorize(...CREDIT_STAFF),
+  asyncHandler(async (req, res) => {
+    const result = await returnToLoanOfficer(req.params.applicationId, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+// 8. Submit Decision Alias
+router.post(
+  '/applications/:applicationId/decision',
+  authorize(...CREDIT_STAFF),
+  asyncHandler(async (req, res) => {
+    const result = await submitCreditDecision(req.params.applicationId, req.body, req.user as any);
+    res.json(success(result));
+  })
+);
+
+router.post(
+  '/:applicationId/decision',
+  authorize(...CREDIT_STAFF),
+  asyncHandler(async (req, res) => {
+    const result = await submitCreditDecision(req.params.applicationId, req.body, req.user as any);
     res.json(success(result));
   })
 );
