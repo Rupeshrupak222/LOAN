@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Search, ShieldCheck, Phone, Trash2, CheckSquare, X, AlertTriangle } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
@@ -28,7 +29,9 @@ interface CustomerRow {
 }
 
 export default function CustomersPage() {
+  const { user } = useAuth();
   const { isDark } = useTheme();
+  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
   const toast = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -193,11 +196,13 @@ export default function CustomersPage() {
         title="Borrower Directory & KYC Profiles"
         subtitle="Manage customer registrations, identity verification status, and borrower credit histories"
         action={
-          <Link href="/customers/new">
-            <Button className="flex items-center gap-1.5 text-white">
-              <UserPlus className="h-4 w-4" /> Add Customer
-            </Button>
-          </Link>
+          !isUnderwriter ? (
+            <Link href="/customers/new">
+              <Button className="flex items-center gap-1.5 text-white">
+                <UserPlus className="h-4 w-4" /> Add Customer
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -280,9 +285,11 @@ export default function CustomersPage() {
         emptyTitle="No borrowers found"
         emptyDescription="Start by onboarding a new customer into the LMS."
         emptyAction={
-          <Link href="/customers/new">
-            <Button size="sm" className="text-white">+ Add Customer</Button>
-          </Link>
+          !isUnderwriter ? (
+            <Link href="/customers/new">
+              <Button size="sm" className="text-white">+ Add Customer</Button>
+            </Link>
+          ) : undefined
         }
       />
 

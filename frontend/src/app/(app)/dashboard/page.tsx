@@ -97,6 +97,7 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const { theme, isDark } = useTheme();
+  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
 
   const [timeRange, setTimeRange] = useState<'7D' | '30D' | '3M' | '6M' | '1Y'>('30D');
   const [dateFilter, setDateFilter] = useState('This Month');
@@ -750,11 +751,13 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-bold tracking-tight">Quick Intake Actions</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Start borrower origination or upload KYC</p>
                 <div className="space-y-3 pt-4">
-                  <Link href="/customers/new" className="block">
-                    <Button size="sm" className="w-full flex items-center justify-center gap-2 text-xs text-white">
-                      <Plus className="h-3.5 w-3.5" /> Onboard New Customer
-                    </Button>
-                  </Link>
+                  {!isUnderwriter && (
+                    <Link href="/customers/new" className="block">
+                      <Button size="sm" className="w-full flex items-center justify-center gap-2 text-xs text-white">
+                        <Plus className="h-3.5 w-3.5" /> Onboard New Customer
+                      </Button>
+                    </Link>
+                  )}
                   <Link href="/applications" className="block">
                     <Button size="sm" variant="secondary" className="w-full flex items-center justify-center gap-2 text-xs">
                       <FileText className="h-3.5 w-3.5" /> Create Loan Application

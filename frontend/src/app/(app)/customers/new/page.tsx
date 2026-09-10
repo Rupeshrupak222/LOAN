@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/lib/auth';
 import {
   ArrowLeft,
   User,
@@ -86,6 +87,15 @@ const STEPS: StepItem[] = [
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
+
+  useEffect(() => {
+    if (isUnderwriter) {
+      router.push('/customers');
+    }
+  }, [isUnderwriter, router]);
+
   const [currentStep, setCurrentStep] = useState(1);
 
   // Customer Form State
