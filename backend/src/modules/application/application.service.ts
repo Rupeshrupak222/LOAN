@@ -154,7 +154,8 @@ export async function createApplication(
   const eligibility = await validateLoanOfficerOriginationEligibility(
     input.customerId,
     effectiveTenantId,
-    actor as any
+    actor as any,
+    input.productId
   );
   if (!eligibility.eligible) {
     throw new BadRequestError(
@@ -267,7 +268,8 @@ export async function transition(
     const eligibility = await validateLoanOfficerOriginationEligibility(
       app.customerId,
       app.tenantId || undefined,
-      actor as any
+      actor as any,
+      app.productId || undefined
     );
     if (toStatus === 'SUBMITTED' && !eligibility.eligible) {
       throw new BadRequestError(

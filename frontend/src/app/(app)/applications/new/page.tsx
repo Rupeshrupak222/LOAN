@@ -85,10 +85,15 @@ export default function NewApplicationPage() {
     queryFn: async () => (await api.get('/loan-products')).data.data,
   });
 
-  // Fetch Customer Origination Eligibility
+  // Fetch Customer Origination Eligibility (Product-Aware)
   const { data: eligibilityData, isLoading: isCheckingEligibility } = useQuery({
-    queryKey: ['customer-origination-eligibility', customerId],
-    queryFn: async () => (await api.get(`/customers/${customerId}/origination-eligibility`)).data.data,
+    queryKey: ['customer-origination-eligibility', customerId, productId],
+    queryFn: async () => {
+      const url = productId
+        ? `/customers/${customerId}/origination-eligibility?productId=${productId}`
+        : `/customers/${customerId}/origination-eligibility`;
+      return (await api.get(url)).data.data;
+    },
     enabled: Boolean(customerId),
   });
 

@@ -76,6 +76,8 @@ export async function uploadAndRegisterDocument(
     applicationId?: string;
     category: string;
     documentType?: string;
+    documentName?: string;
+    description?: string;
     expiryDate?: string;
   },
   actorUserId?: string
@@ -98,7 +100,7 @@ export async function uploadAndRegisterDocument(
     : 'adyapan_lms/kyc_documents';
 
   const cleanCustCode = customer.customerCode || customer.id.slice(0, 8);
-  const cleanType = (metadata.documentType || metadata.category || 'DOC')
+  const cleanType = (metadata.documentName || metadata.documentType || metadata.category || 'DOC')
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '_');
   const publicId = `${cleanCustCode}_${cleanType}_${Date.now()}`;
@@ -138,13 +140,17 @@ export async function uploadAndRegisterDocument(
     fileStorageUrl = `/uploads/documents/${localFileName}`;
   }
 
+  const effectiveDocType = metadata.documentName
+    ? `OTHER: ${metadata.documentName}`
+    : metadata.documentType || metadata.category;
+
   // 4. Save to Database
   const doc = await prisma.document.create({
     data: {
       customerId: metadata.customerId,
       applicationId: metadata.applicationId || null,
       category: metadata.category,
-      documentType: metadata.documentType || metadata.category,
+      documentType: effectiveDocType,
       fileName: file.originalname,
       storageKey: fileStorageUrl,
       contentType: file.mimetype,

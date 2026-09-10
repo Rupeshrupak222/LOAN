@@ -196,7 +196,7 @@ router.get(
  */
 router.get(
   '/preferences/:customerId',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CUSTOMER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'FINANCE_OFFICER', 'COLLECTION_OFFICER', 'AUDITOR', 'CUSTOMER'),
   asyncHandler(async (req, res) => {
     const prefs = communicationService.getCustomerPreferences(req.params.customerId, (req.user as any).tenantId);
     res.json(success(prefs));
