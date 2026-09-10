@@ -24,7 +24,11 @@ prisma.$use(async (params, next) => {
         err?.message?.includes('closed') ||
         err?.message?.includes('connection') ||
         err?.message?.includes('EMAXCONNSESSION') ||
-        err?.message?.includes('max clients reached');
+        err?.message?.includes('max clients reached') ||
+        // Supabase PgBouncer: prepared statement dropped when pooler reassigns connection
+        err?.message?.includes('26000') ||
+        err?.message?.includes('prepared statement') ||
+        err?.message?.includes('does not exist');
 
       if (isConnError && attempt < maxRetries) {
         logger.warn(

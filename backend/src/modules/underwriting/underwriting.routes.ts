@@ -12,7 +12,7 @@ router.use(authenticate);
 
 router.get(
   '/queue',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const queue = await getUnderwritingQueue((req.query as any)?.tab, {
       id: req.user?.id,
@@ -26,7 +26,7 @@ router.get(
 
 router.post(
   '/:applicationId/decision',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'CREDIT_ANALYST', 'BRANCH_MANAGER'),
   validate(underwritingDecisionSchema),
   asyncHandler(async (req, res) => {
     const result = await submitUnderwritingDecision(

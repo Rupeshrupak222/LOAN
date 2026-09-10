@@ -88,7 +88,7 @@ export function CreditAssessmentWorkspace({ applicationId, onForwardSuccess }: C
   const gate = data?.assessmentGate;
   const existingRecommendation = data?.recommendation;
 
-  // Sync initial calculator values when data loads
+  // Sync initial calculator values & existing recommendation when data loads
   useEffect(() => {
     if (customer && app && product) {
       const inc = Number(customer.monthlyIncome || 0);
@@ -103,7 +103,14 @@ export function CreditAssessmentWorkspace({ applicationId, onForwardSuccess }: C
       setCalcTenure(ten);
       setCalcRate(r);
     }
-  }, [customer, app, product]);
+    if (existingRecommendation) {
+      if (existingRecommendation.recommendation) setRecommendation(existingRecommendation.recommendation);
+      if (existingRecommendation.proposedAmount) setProposedAmount(existingRecommendation.proposedAmount);
+      if (existingRecommendation.proposedTenure) setProposedTenure(existingRecommendation.proposedTenure);
+      if (existingRecommendation.conditions) setConditions(existingRecommendation.conditions);
+      if (existingRecommendation.notes) setNotes(existingRecommendation.notes);
+    }
+  }, [customer, app, product, existingRecommendation]);
 
   // Manual Test 1: Run Policy Eligibility Engine
   const runEligibilityMutation = useMutation({
@@ -134,6 +141,23 @@ export function CreditAssessmentWorkspace({ applicationId, onForwardSuccess }: C
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err), { title: 'Risk Engine Error' });
+    },
+  });
+
+  // Manual Test 2: Verify Document Mutation
+  const verifyDocMutation = useMutation({
+    mutationFn: async ({ docId, status }: { docId: string; status: 'VERIFIED' | 'REJECTED' }) => {
+      const res = await api.patch(`/documents/${docId}/verify`, { status });
+      return res.data?.data;
+    },
+    onSuccess: () => {
+      toast.success('Borrower document status updated to VERIFIED.');
+      queryClient.invalidateQueries({ queryKey: ['credit-assessment', applicationId] });
+      queryClient.invalidateQueries({ queryKey: ['application', applicationId] });
+      queryClient.invalidateQueries({ queryKey: ['customer'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Verification Notice' });
     },
   });
 
@@ -436,15 +460,32 @@ export function CreditAssessmentWorkspace({ applicationId, onForwardSuccess }: C
                         <p className="text-[10px] text-slate-400">{doc.fileName}</p>
                       </div>
                     </div>
-                    <div>
-                      {doc.verified ? (
+                    <div className="flex items-center gap-2">
+                      {doc.fileUrl && (
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                        >
+                          View ↗
+                        </a>
+                      )}
+                      {doc.verified || doc.status === 'VERIFIED' ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                          VERIFIED
+                          VERIFIED ✓
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                          {doc.status || 'PENDING'}
-                        </span>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={verifyDocMutation.isPending}
+                          onClick={() => verifyDocMutation.mutate({ docId: doc.id, status: 'VERIFIED' })}
+                          className="h-6 px-2 text-[10px] font-bold bg-amber-100 hover:bg-emerald-600 hover:text-white text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 transition-colors cursor-pointer"
+                          title="Mark document verified"
+                        >
+                          Verify ✓
+                        </Button>
                       )}
                     </div>
                   </div>

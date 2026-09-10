@@ -157,9 +157,11 @@ export default function ApplicationsPage() {
       align: 'right',
       className: 'min-w-[340px] text-right',
       render: (r) => {
+        const isUnderwriterUser = user?.roles?.includes('UNDERWRITER');
         const canForwardToUnderwriter =
           isCreditAnalystOrStaff &&
-          ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(r.status);
+          !isUnderwriterUser &&
+          ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(r.status);
         const canReject =
           isCreditAnalystOrStaff &&
           !['REJECTED', 'DISBURSED', 'CANCELLED', 'APPROVED'].includes(r.status);

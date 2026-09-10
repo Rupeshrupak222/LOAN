@@ -36,7 +36,6 @@ import {
   Layers,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Card, Input } from '@/components/ui';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
@@ -197,6 +196,7 @@ export default function NewCustomerPage() {
   );
 
   const [currentStep, setCurrentStep] = useState(1);
+  const [savedSteps, setSavedSteps] = useState<number[]>([]);
 
   // Form State
   const [form, setForm] = useState({
@@ -422,12 +422,7 @@ export default function NewCustomerPage() {
     form.bankAccountNo.trim() === form.confirmBankAccountNo.trim() &&
     /^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankIfsc.trim());
 
-  const completedSteps: number[] = [];
-  if (isStep1Done) completedSteps.push(1);
-  if (isStep2Done) completedSteps.push(2);
-  if (isStep3Done) completedSteps.push(3);
-  if (isStep4Done) completedSteps.push(4);
-  if (isStep5Done) completedSteps.push(5);
+  const completedSteps = savedSteps;
 
   // Field Validation for Current Step
   function validateCurrentStep(step: number): boolean {
@@ -558,6 +553,7 @@ export default function NewCustomerPage() {
   function nextStep() {
     setGeneralError(null);
     if (validateCurrentStep(currentStep)) {
+      setSavedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
       if (currentStep < 6) {
         setCurrentStep((s) => s + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
