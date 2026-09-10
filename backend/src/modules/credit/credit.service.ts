@@ -1332,3 +1332,88 @@ export async function getCreditQueue(tab?: string) {
     items,
   };
 }
+
+/**
+ * Returns an application to Loan Officer or Customer for correction
+ */
+export async function returnToLoanOfficer(
+  applicationId: string,
+  input: { reason: string; note: string; destination?: 'LOAN_OFFICER' | 'CUSTOMER' },
+  actor: { id: string; email: string; roles: string[] }
+) {
+  const app = await prisma.loanApplication.findUnique({
+    where: { id: applicationId },
+    include: { customer: true },
+  });
+  if (!app) throw new NotFoundError('Loan application not found');
+
+  if (!input.note || input.note.trim().length < 5) {
+    throw new BadRequestError('A return note/justification is mandatory (minimum 5 characters).');
+  }
+
+  // Update application status to SUBMITTED so Loan Officer receives it back
+  await prisma.loanApplication.update({
+    where: { id: applicationId },
+    data: { status: 'SUBMITTED' },
+  });
+
+  const destinationLabel = input.destination === 'CUSTOMER' ? 'Customer' : 'Loan Officer';
+  const historyReason = `Returned to ${destinationLabel} by Credit Analyst: ${input.reason}. Note: ${input.note}`;
+
+  await prisma.applicationStatusHistory.create({
+    data: {
+      applicationId,
+      fromStatus: app.status,
+      toStatus: 'SUBMITTED',
+      changedBy: actor.email,
+      reason: historyReason,
+    },
+  });
+
+  await prisma.underwritingDecision.upsert({
+    where: { applicationId },
+    update: {
+      decision: 'SEND_BACK',
+      reason: historyReason,
+      decidedBy: actor.email,
+    },
+    create: {
+      applicationId,
+      decision: 'SEND_BACK',
+      reason: historyReason,
+      decidedBy: actor.email,
+    },
+  });
+
+  await logAudit({
+    userId: actor.id,
+    role: 'CREDIT_ANALYST',
+    action: 'APPLICATION_RETURNED_TO_LOAN_OFFICER',
+    entity: 'LoanApplication',
+    entityId: applicationId,
+    newValue: { status: 'SUBMITTED', reason: input.reason, note: input.note, destination: input.destination },
+  });
+
+  try {
+    await sendNotification({
+      channel: 'IN_APP',
+      title: `Application #${app.applicationNo || applicationId} Returned by Credit Analyst`,
+      message: `Proposal for ${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''} was returned for corrections: ${input.reason}. Mandatory documents / corrections required.`,
+      type: 'ALERT',
+      metadata: {
+        targetRole: 'LOAN_OFFICER',
+        targetRoles: ['LOAN_OFFICER', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'],
+        applicationId,
+        customerId: app.customerId,
+        reason: input.reason,
+        note: input.note,
+        returnType: 'SEND_BACK',
+      },
+    });
+  } catch (notifErr) {
+    console.error('Failed to send return notification:', notifErr);
+  }
+
+  return { success: true, status: 'SUBMITTED', reason: input.reason, note: input.note };
+}
+

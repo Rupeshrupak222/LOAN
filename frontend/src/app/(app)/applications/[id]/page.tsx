@@ -20,6 +20,10 @@ import {
   X,
   FileCheck,
   Layers,
+  Lock,
+  FileUp,
+  AlertCircle,
+  Upload,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -87,6 +91,43 @@ export default function ApplicationDetailPage() {
     queryFn: async () => (await api.get(`/applications/${params.id}`)).data.data,
   });
 
+  // Missing documents direct upload state
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+  const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
+
+  const handleUploadDocument = async (category: string, documentType: string, file: File) => {
+    const custId = data?.customer?.id || data?.customerId;
+    if (!custId) {
+      toast.error('Customer ID not found for document upload.');
+      return;
+    }
+    setUploadingDocId(category);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('customerId', custId);
+      if (data.id) formData.append('applicationId', data.id);
+      formData.append('category', category);
+      formData.append('documentType', documentType);
+
+      await api.post('/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.success(`${file.name} uploaded successfully!`);
+      queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['customer', custId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    } catch (err: any) {
+      toast.error(apiErrorMessage(err), { title: 'Upload Failed' });
+    } finally {
+      setUploadingDocId(null);
+      setFileInputKey(Date.now());
+    }
+  };
+
   // Forward to Credit Analyst Mutation (Loan Officer)
   const submitToCreditAnalystMutation = useMutation({
     mutationFn: async () =>
@@ -99,6 +140,7 @@ export default function ApplicationDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setSubmitModalOpen(false);
     },
     onError: (err: any) => {
@@ -262,6 +304,131 @@ export default function ApplicationDetailPage() {
     ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COMPANY_ADMIN'].includes(r)
   );
 
+  // Extract consolidated documents
+  const customerDocs = Array.isArray(customer?.documents) ? customer.documents : [];
+  const appDocs = Array.isArray(data?.documents) ? data.documents : [];
+  const documentsMap = new Map<string, any>();
+  customerDocs.forEach((d: any) => documentsMap.set(d.id, d));
+  appDocs.forEach((d: any) => documentsMap.set(d.id, d));
+  const documents = Array.from(documentsMap.values());
+
+  // 5 Mandatory Document Verification Checks
+  const hasIdentity = documents.some((d) =>
+    ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
+    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
+  );
+  const hasPhoto = documents.some((d) =>
+    ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
+    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
+  );
+  const hasAddress = documents.some((d) =>
+    ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
+    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
+  );
+  const hasIncome = documents.some((d) =>
+    ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
+    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
+  );
+  const hasBank = documents.some((d) =>
+    ['BANK_STATEMENT'].includes(d.category) ||
+    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
+  );
+
+  // Calculate borrower age
+  const calculateAge = (dobString?: string | null): number | null => {
+    if (!dobString) return null;
+    const dob = new Date(dobString);
+    if (isNaN(dob.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const borrowerAge = calculateAge(customer?.dateOfBirth);
+  const minPolicyAge = product?.eligibilityRules?.minAge || 21;
+  const maxPolicyAge = product?.eligibilityRules?.maxAge || 60;
+
+  let ageError: string | null = null;
+  if (borrowerAge === null) {
+    ageError = 'Date of birth is missing or unverified on borrower profile';
+  } else if (borrowerAge < minPolicyAge) {
+    ageError = `Borrower age (${borrowerAge} yrs) is below policy minimum (${minPolicyAge} yrs)`;
+  } else if (borrowerAge > maxPolicyAge) {
+    ageError = `Borrower age (${borrowerAge} yrs) exceeds policy maximum (${maxPolicyAge} yrs)`;
+  }
+  const isAgeValid = ageError === null;
+
+  const mandatoryChecklist = [
+    {
+      id: 'IDENTITY_PROOF',
+      category: 'IDENTITY_PROOF',
+      defaultDocType: 'PAN_CARD',
+      title: 'Identity Proof',
+      desc: 'PAN Card / Aadhaar Card',
+      uploaded: hasIdentity,
+      doc: documents.find((d) =>
+        ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
+        ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
+      ),
+    },
+    {
+      id: 'APPLICANT_PHOTO',
+      category: 'APPLICANT_PHOTO',
+      defaultDocType: 'CUSTOMER_SELFIE_PHOTO',
+      title: 'Applicant Photo',
+      desc: 'Applicant Photograph / Selfie with clear face',
+      uploaded: hasPhoto,
+      doc: documents.find((d) =>
+        ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
+        ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
+      ),
+    },
+    {
+      id: 'ADDRESS_PROOF',
+      category: 'ADDRESS_PROOF',
+      defaultDocType: 'ELECTRICITY_BILL',
+      title: 'Address Proof',
+      desc: 'Utility / Electricity Bill / Passport / Rental Agreement',
+      uploaded: hasAddress,
+      doc: documents.find((d) =>
+        ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
+        ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
+      ),
+    },
+    {
+      id: 'INCOME_PROOF',
+      category: 'INCOME_PROOF',
+      defaultDocType: 'SALARY_SLIP',
+      title: 'Income Proof',
+      desc: 'Salary Slip / 3 Months Pay Slips / Form 16 / ITR',
+      uploaded: hasIncome,
+      doc: documents.find((d) =>
+        ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
+        ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
+      ),
+    },
+    {
+      id: 'BANK_STATEMENT',
+      category: 'BANK_STATEMENT',
+      defaultDocType: 'BANK_STATEMENT',
+      title: 'Bank Statement',
+      desc: 'Latest 6 Months Bank Statement / Passbook',
+      uploaded: hasBank,
+      doc: documents.find((d) =>
+        ['BANK_STATEMENT'].includes(d.category) ||
+        ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
+      ),
+    },
+  ];
+
+  const missingMandatoryDocs = mandatoryChecklist.filter((m) => !m.uploaded);
+  const isReturned = data.underwriting?.decision === 'SEND_BACK';
+  const hasDeficiencies = isReturned ? (missingMandatoryDocs.length > 0 || !isAgeValid) : false;
+
   const hasCreditScore = Boolean(
     data.riskAssessment &&
     data.riskAssessment.score !== null &&
@@ -283,11 +450,13 @@ export default function ApplicationDetailPage() {
   );
 
   const canForwardToUnderwriting =
+    !isCreditAnalyst &&
     !isOnlyLoanOfficer &&
     !isUnderwriter &&
     ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(data.status);
 
   const canReject =
+    !isCreditAnalyst &&
     !isOnlyLoanOfficer &&
     !['REJECTED', 'DISBURSED', 'CANCELLED'].includes(data.status);
 
@@ -436,6 +605,214 @@ export default function ApplicationDetailPage() {
         }
       />
 
+      {/* Returned for Corrections Actionable Alert & Resolution Panel */}
+      {isReturned && (
+        <div className={cn(
+          'p-5 rounded-2xl border space-y-4 shadow-sm animate-in fade-in transition-all',
+          hasDeficiencies
+            ? 'border-amber-300 bg-amber-50/90 dark:bg-amber-950/40 dark:border-amber-800/60'
+            : 'border-emerald-300 bg-emerald-50/90 dark:bg-emerald-950/40 dark:border-emerald-800/60'
+        )}>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={cn(
+                'p-2 rounded-xl shrink-0',
+                hasDeficiencies
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300'
+                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300'
+              )}>
+                {hasDeficiencies ? <RotateCcw className="w-5 h-5 text-amber-600" /> : <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className={cn(
+                    'text-sm font-bold',
+                    hasDeficiencies ? 'text-amber-950 dark:text-amber-200' : 'text-emerald-950 dark:text-emerald-200'
+                  )}>
+                    Application Returned by Credit Analyst for Corrections
+                  </h4>
+                  <span className={cn(
+                    'px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-tight',
+                    hasDeficiencies
+                      ? 'bg-amber-200 text-amber-900 dark:bg-amber-900/80 dark:text-amber-200'
+                      : 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/80 dark:text-emerald-200'
+                  )}>
+                    {hasDeficiencies
+                      ? `${missingMandatoryDocs.length} Missing Mandatory Document(s)`
+                      : 'All Deficiencies Resolved'}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900/90 dark:text-amber-300 mt-1 leading-relaxed bg-amber-100/60 dark:bg-amber-900/30 p-2.5 rounded-lg border border-amber-200 dark:border-amber-800/40">
+                  <span className="font-semibold">Credit Analyst Return Note:</span> {data.underwriting?.reason || 'Proposal has pending mandatory documents or borrower criteria discrepancies.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Button: Resend to Credit Analyst */}
+            {isOnlyLoanOfficer && canLoanOfficerReForward && (
+              <div className="flex flex-col items-end gap-1.5 shrink-0 w-full sm:w-auto">
+                <Button
+                  size="sm"
+                  disabled={hasDeficiencies}
+                  onClick={() => {
+                    if (hasDeficiencies) {
+                      toast.warning(`Cannot resend: Upload missing documents first (${missingMandatoryDocs.map((m) => m.title).join(', ')}).`);
+                      return;
+                    }
+                    setSubmitReason('All missing mandatory documents uploaded and verified by Loan Officer. Resubmitted for credit assessment.');
+                    setSubmitModalOpen(true);
+                  }}
+                  className={cn(
+                    'gap-1.5 font-semibold text-xs shadow-sm cursor-pointer shrink-0 w-full sm:w-auto justify-center transition-all',
+                    hasDeficiencies
+                      ? 'opacity-50 cursor-not-allowed bg-slate-400 hover:bg-slate-400 dark:bg-slate-700 text-slate-100'
+                      : 'bg-[#2563EB] hover:bg-blue-700 text-white shadow-md animate-pulse'
+                  )}
+                  title={
+                    hasDeficiencies
+                      ? `Upload all missing mandatory documents to enable resending`
+                      : 'Resend proposal to Credit Analyst queue'
+                  }
+                >
+                  {hasDeficiencies ? <Lock className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  {hasDeficiencies ? 'Resend to Credit Analyst (Locked)' : 'Resend to Credit Analyst →'}
+                </Button>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 text-right">
+                  {hasDeficiencies
+                    ? `Upload all missing documents below to unlock`
+                    : `All required documents present. Click to resend.`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Age Deficiency Alert if present */}
+          {!isAgeValid && (
+            <div className="p-3 rounded-xl bg-rose-100/80 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 font-medium">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span><strong>Borrower Age Issue:</strong> {ageError} (Borrower DOB: {customer.dateOfBirth ? formatDate(customer.dateOfBirth) : 'Missing'})</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setKycStatusInput(customer.kycStatus || 'VERIFIED');
+                  setRiskCategoryInput(customer.riskCategory || 'LOW');
+                  setKycRemarks('');
+                  setKycModalOpen(true);
+                }}
+                className="text-xs shrink-0 cursor-pointer border-rose-300 text-rose-700 hover:bg-rose-50"
+              >
+                <UserCheck className="w-3 h-3" /> Rectify KYC / DOB
+              </Button>
+            </div>
+          )}
+
+          {/* Mandatory Documents Checklist & Direct Upload Action Grid */}
+          <div className="pt-2">
+            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2.5 flex items-center gap-1.5">
+              <FileCheck className="w-4 h-4 text-brand-600" />
+              Mandatory Documents Checklist ({5 - missingMandatoryDocs.length} of 5 Ready)
+            </h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {mandatoryChecklist.map((item) => {
+                const isUploading = uploadingDocId === item.category;
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      'p-3 rounded-xl border flex flex-col justify-between gap-2.5 transition-all',
+                      item.uploaded
+                        ? 'bg-white/80 dark:bg-slate-900/80 border-emerald-300 dark:border-emerald-800/60'
+                        : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900/50'
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {item.title}
+                        </span>
+                        {item.uploaded ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shrink-0">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-900 flex items-center gap-1 shrink-0">
+                            <XCircle className="w-3 h-3 text-rose-600" /> Missing
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                        {item.desc}
+                      </p>
+                      {item.uploaded && item.doc && (
+                        <p className="text-[10px] font-mono text-slate-400 truncate">
+                          📄 {item.doc.fileName || item.doc.storageKey || 'Document on file'}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Upload / Replace Action Button */}
+                    <div className="pt-1 flex items-center gap-2">
+                      <label
+                        className={cn(
+                          'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs select-none',
+                          isUploading
+                            ? 'bg-slate-200 text-slate-500 cursor-wait dark:bg-slate-800 dark:text-slate-400'
+                            : item.uploaded
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            : 'bg-[#2563EB] hover:bg-blue-700 text-white'
+                        )}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Spinner size="sm" /> Uploading...
+                          </>
+                        ) : item.uploaded ? (
+                          <>
+                            <FileUp className="w-3 h-3 text-slate-500" /> Replace Document
+                          </>
+                        ) : (
+                          <>
+                            <FileUp className="w-3 h-3 text-white" /> + Upload {item.title}
+                          </>
+                        )}
+                        <input
+                          key={`${fileInputKey}-${item.id}`}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          disabled={isUploading}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleUploadDocument(item.category, item.defaultDocType, file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {item.uploaded && item.doc?.storageKey && (
+                        <a
+                          href={item.doc.storageKey}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2 py-1.5 rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 border border-transparent hover:border-blue-200"
+                          title="View document"
+                        >
+                          View
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Prominent Action & Workflow Control Bar (Always visible outside) */}
       <div className={cn(
         'p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs transition-colors',
@@ -458,11 +835,11 @@ export default function ApplicationDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Credit Assessment Desk Link (Credit Analysts / Staff only) */}
+          {/* Credit Assessment Link (Credit Analysts / Staff only) */}
           {canAssessCredit && (
-            <Link href="/underwriting">
-              <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/40 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 cursor-pointer shadow-2xs">
-                <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Credit Assessment Desk →
+            <Link href={`/credit-assessment?applicationId=${data.id}`}>
+              <Button size="sm" className="gap-1.5 text-xs font-semibold bg-[#2563EB] hover:bg-blue-700 text-white shadow-sm cursor-pointer">
+                <Calculator className="w-3.5 h-3.5" /> Open Credit Assessment
               </Button>
             </Link>
           )}
@@ -558,13 +935,24 @@ export default function ApplicationDetailPage() {
             ) : canLoanOfficerReForward ? (
               <Button
                 size="sm"
-                variant="secondary"
+                variant={hasDeficiencies ? 'outline' : 'secondary'}
+                disabled={hasDeficiencies}
                 onClick={() => {
+                  if (hasDeficiencies) {
+                    toast.warning(
+                      `Cannot resend: Upload missing mandatory documents first (${missingMandatoryDocs.map((m) => m.title).join(', ')}).`
+                    );
+                    return;
+                  }
                   checkPendingWorkAndForward(
                     'Loan Officer Intake',
                     'Credit Assessment Desk',
                     () => {
-                      setSubmitReason('Application re-forwarded to Credit Analyst queue for re-evaluation');
+                      setSubmitReason(
+                        isReturned
+                          ? 'All missing mandatory documents uploaded and verified by Loan Officer. Resubmitted for credit assessment.'
+                          : 'Application re-forwarded to Credit Analyst queue for re-evaluation'
+                      );
                       setSubmitModalOpen(true);
                     },
                     async () => {
@@ -572,9 +960,20 @@ export default function ApplicationDetailPage() {
                     }
                   );
                 }}
-                className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold text-xs cursor-pointer shadow-xs"
+                className={cn(
+                  'gap-1.5 font-semibold text-xs shadow-xs transition-all',
+                  hasDeficiencies
+                    ? 'opacity-60 cursor-not-allowed border-slate-300 text-slate-400 dark:border-slate-700 dark:text-slate-500'
+                    : 'text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 cursor-pointer'
+                )}
+                title={
+                  hasDeficiencies
+                    ? `Locked: Upload missing mandatory documents first (${missingMandatoryDocs.map((m) => m.title).join(', ')})`
+                    : 'Resend proposal to Credit Analyst queue'
+                }
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Resend to Credit Analyst
+                {hasDeficiencies ? <Lock className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                Resend to Credit Analyst {hasDeficiencies && '(Locked)'}
               </Button>
             ) : null
           )}
@@ -829,20 +1228,37 @@ export default function ApplicationDetailPage() {
                   <div className="space-y-0.5">
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Re-Forward Application Proposal?</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Proposal is in Credit Appraisal workflow. If documents or terms were revised, you can re-forward it to the analyst desk.
+                      {hasDeficiencies
+                        ? `Application was returned by Credit Analyst. Please upload missing mandatory documents (${missingMandatoryDocs.map((m) => m.title).join(', ')}) to unlock resubmission.`
+                        : 'Proposal is in Credit Appraisal workflow. All documents verified. You can re-forward it to the analyst desk.'}
                     </p>
                   </div>
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant={hasDeficiencies ? 'outline' : 'secondary'}
+                    disabled={hasDeficiencies}
                     onClick={() => {
-                      setSubmitReason('Application re-forwarded to Credit Analyst queue for re-evaluation');
+                      if (hasDeficiencies) {
+                        toast.warning(`Upload missing mandatory documents first.`);
+                        return;
+                      }
+                      setSubmitReason(
+                        isReturned
+                          ? 'All missing mandatory documents uploaded and verified by Loan Officer. Resubmitted for credit assessment.'
+                          : 'Application re-forwarded to Credit Analyst queue for re-evaluation'
+                      );
                       setSubmitModalOpen(true);
                     }}
-                    className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold text-xs shrink-0 cursor-pointer shadow-sm"
+                    className={cn(
+                      'gap-1.5 font-semibold text-xs shrink-0 shadow-sm transition-all',
+                      hasDeficiencies
+                        ? 'opacity-60 cursor-not-allowed border-slate-300 text-slate-400 dark:border-slate-700 dark:text-slate-500'
+                        : 'text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 cursor-pointer'
+                    )}
+                    title={hasDeficiencies ? 'Upload missing mandatory documents first' : 'Resend to Credit Analyst'}
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Resend to Credit Analyst
+                    {hasDeficiencies ? <Lock className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                    Resend to Credit Analyst {hasDeficiencies && '(Locked)'}
                   </Button>
                 </div>
               )}

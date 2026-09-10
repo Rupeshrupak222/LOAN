@@ -39,7 +39,7 @@ export function CustomerOnboardingStepper({
       {/* Connected Line Stepper Header (Matching Reference Design) */}
       <div className="relative w-full px-5 sm:px-14">
         {/* Progress Connecting Line Container (Bounded between center of Step 1 and Step N) */}
-        <div className="absolute top-5 sm:top-6 left-10 sm:left-20 right-10 sm:right-20 h-1 pointer-events-none">
+        <div className="absolute top-5 sm:top-6 left-10 sm:left-20 right-10 sm:right-20 h-1 pointer-events-none z-0">
           {/* Progress Background Connecting Line */}
           <div className="w-full h-full bg-slate-200 dark:bg-slate-800 rounded-full" />
           
@@ -53,7 +53,7 @@ export function CustomerOnboardingStepper({
         </div>
 
         {/* Step Nodes Row */}
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="relative z-1 flex items-center justify-between">
           {steps.map((s) => {
             const Icon = s.icon;
             const isActive = currentStep === s.id;

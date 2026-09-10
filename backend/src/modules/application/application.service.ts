@@ -98,6 +98,7 @@ export async function getApplication(id: string, actor?: ApplicationActorContext
           addresses: { orderBy: { createdAt: 'desc' } },
         },
       },
+      documents: { orderBy: { createdAt: 'desc' } },
       product: true,
       statusHistory: { orderBy: { createdAt: 'desc' } },
       eligibility: true,
@@ -214,7 +215,12 @@ export async function transition(
 ) {
   const app = await prisma.loanApplication.findUnique({
     where: { id },
-    include: { customer: { include: { documents: true } }, riskAssessment: true },
+    include: {
+      customer: { include: { documents: true } },
+      documents: true,
+      riskAssessment: true,
+      underwriting: true,
+    },
   });
   if (!app) throw new NotFoundError('Application not found');
 
@@ -350,6 +356,45 @@ export async function transition(
     throw new BadRequestError(`Cannot move application from ${app.status} to ${toStatus}`);
   }
 
+  const isResubmittingReturned = toStatus === 'SUBMITTED' && app.underwriting?.decision === 'SEND_BACK';
+
+  if (isResubmittingReturned) {
+    const allDocs = [...(app.customer?.documents || []), ...(app.documents || [])];
+    const hasIdentity = allDocs.some((d) =>
+      ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
+      ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
+    );
+    const hasPhoto = allDocs.some((d) =>
+      ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
+      ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
+    );
+    const hasAddress = allDocs.some((d) =>
+      ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
+      ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
+    );
+    const hasIncome = allDocs.some((d) =>
+      ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
+      ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
+    );
+    const hasBank = allDocs.some((d) =>
+      ['BANK_STATEMENT'].includes(d.category) ||
+      ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
+    );
+
+    const missingMandatory: string[] = [];
+    if (!hasIdentity) missingMandatory.push('Identity Proof (PAN Card / Aadhaar)');
+    if (!hasPhoto) missingMandatory.push('Applicant Photo / Selfie');
+    if (!hasAddress) missingMandatory.push('Address Proof (Electricity Bill / Passport)');
+    if (!hasIncome) missingMandatory.push('Income Proof (Salary Slip / 3 Months Pay slips / ITR)');
+    if (!hasBank) missingMandatory.push('Bank Statement (Latest 6 Months)');
+
+    if (missingMandatory.length > 0) {
+      throw new BadRequestError(
+        `Cannot resend application to Credit Analyst. The application was returned for corrections and is still missing mandatory documents: ${missingMandatory.join(', ')}. Please upload all mandatory documents before resubmitting.`
+      );
+    }
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.loanApplication.update({
       where: { id },
@@ -358,8 +403,32 @@ export async function transition(
     await tx.applicationStatusHistory.create({
       data: { applicationId: id, fromStatus: app.status, toStatus, changedBy, reason },
     });
+    if (isResubmittingReturned) {
+      await tx.underwritingDecision.deleteMany({
+        where: { applicationId: id, decision: 'SEND_BACK' },
+      });
+    }
     return updated;
   });
+
+  if (isResubmittingReturned) {
+    try {
+      void Promise.resolve(
+        sendNotification({
+          channel: 'IN_APP',
+          type: 'INFO',
+          title: `Application #${app.applicationNo} Resubmitted by Loan Officer`,
+          message: `Proposal for ${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''} has been rectified with mandatory documents and resubmitted for credit assessment.`,
+          metadata: {
+            targetRoles: ['CREDIT_ANALYST', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'],
+            targetRole: 'CREDIT_ANALYST',
+            applicationId: id,
+            customerId: app.customerId,
+          },
+        })
+      ).catch(() => {});
+    } catch {}
+  }
 
   // Async non-blocking notification to applicant
   try {

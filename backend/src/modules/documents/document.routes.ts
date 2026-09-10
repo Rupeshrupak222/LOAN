@@ -92,6 +92,15 @@ router.post(
       throw new ForbiddenError('Auditors have read-only access and cannot upload documents.');
     }
 
+    if (
+      req.user?.roles.includes('CREDIT_ANALYST') &&
+      !req.user?.roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Credit Analysts evaluate documents and cannot upload intake documents. Document intake is strictly reserved for Customers and Loan Officers.'
+      );
+    }
+
     if (!req.file) {
       throw new BadRequestError('Please provide a file to upload in the "file" field');
     }
@@ -102,7 +111,7 @@ router.post(
     }
 
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)
     );
     if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: customerId } });
@@ -137,8 +146,17 @@ router.post(
       throw new ForbiddenError('Auditors have read-only access and cannot create or register documents.');
     }
 
+    if (
+      req.user?.roles.includes('CREDIT_ANALYST') &&
+      !req.user?.roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Credit Analysts evaluate documents and cannot register intake documents. Document registration is strictly reserved for Customers and Loan Officers.'
+      );
+    }
+
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)
     );
     if (!isStaff) {
       const cust = await prisma.customer.findUnique({ where: { id: req.body.customerId } });
