@@ -6,6 +6,8 @@ services:
     image: postgres:15-alpine
     container_name: adyapan-postgres
     restart: always
+    env_file:
+      - ./backend/.env
     environment:
       POSTGRES_DB: adyapan_lms
       POSTGRES_USER: postgres
@@ -27,6 +29,8 @@ services:
     image: redis:7-alpine
     container_name: adyapan-redis
     restart: always
+    env_file:
+      - ./backend/.env
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-adyapan_redis_secure_pass_2026}
     ports:
       - "6379:6379"
@@ -47,14 +51,11 @@ services:
       dockerfile: Dockerfile
     container_name: adyapan-backend
     restart: always
+    env_file:
+      - ./backend/.env
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-adyapan_secure_prod_password_2026}@postgres:5432/adyapan_lms?schema=public
-      REDIS_URL: redis://:${REDIS_PASSWORD:-adyapan_redis_secure_pass_2026}@redis:6379
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-adyapan_prod_access_jwt_secret_min_32_chars_long}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-adyapan_prod_refresh_jwt_secret_min_32_chars_long}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     ports:
       - "4000:4000"
     depends_on:
@@ -77,10 +78,11 @@ services:
       dockerfile: Dockerfile
     container_name: adyapan-frontend
     restart: always
+    env_file:
+      - ./frontend/.env
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXT_PUBLIC_API_URL: http://backend:4000/api/v1
     ports:
       - "3000:3000"
     depends_on:
