@@ -34,6 +34,25 @@ export class RolePermissionService {
     { code: 'UNDERWRITING_APPROVE_EXCEPTION', category: 'UNDERWRITING', name: 'Approve Policy Exception', description: 'Authorize FOIR or risk score exception deviations', riskLevel: 'HIGH' },
     { code: 'UNDERWRITING_COMMITTEE_VOTE', category: 'UNDERWRITING', name: 'Credit Committee Vote', description: 'Cast vote in high-value loan approval committees', riskLevel: 'HIGH' },
 
+    // Credit Assessment
+    { code: 'CREDIT_ASSESSMENT_VIEW', category: 'APPLICATIONS', name: 'View Credit Assessment Desk', description: 'Access financial capacity, DTI, and FOIR records', riskLevel: 'LOW' },
+    { code: 'CREDIT_ASSESSMENT_EVALUATE', category: 'APPLICATIONS', name: 'Evaluate Repayment Capacity', description: 'Verify income, calculate FOIR and assign risk grades', riskLevel: 'MEDIUM' },
+    { code: 'CREDIT_ASSESSMENT_SUBMIT', category: 'APPLICATIONS', name: 'Submit Credit Recommendation', description: 'Record ELIGIBLE or NOT_ELIGIBLE recommendation with justification', riskLevel: 'MEDIUM' },
+    { code: 'CREDIT_ASSESSMENT_FORWARD', category: 'APPLICATIONS', name: 'Forward Assessment to Underwriting', description: 'Forward completed assessment to Branch Manager or Underwriter', riskLevel: 'LOW' },
+
+    // Branch Management
+    { code: 'VIEW_BRANCH_APPLICATIONS', category: 'BRANCH_MANAGEMENT', name: 'View Branch Applications', description: 'View loan applications assigned to authorized branch', riskLevel: 'LOW' },
+    { code: 'VIEW_CUSTOMER_DETAILS', category: 'BRANCH_MANAGEMENT', name: 'View Customer Details', description: 'Inspect borrower contact and demographic profile', riskLevel: 'LOW' },
+    { code: 'VIEW_DOCUMENTS', category: 'BRANCH_MANAGEMENT', name: 'View Documents', description: 'View and preview submitted borrower KYC and financial documents', riskLevel: 'LOW' },
+    { code: 'VIEW_CREDIT_ANALYST_REPORT', category: 'BRANCH_MANAGEMENT', name: 'View Credit Analyst Report', description: 'Inspect completed credit eligibility report and recommendation (read-only)', riskLevel: 'LOW' },
+    { code: 'VIEW_RISK_ASSESSMENT', category: 'BRANCH_MANAGEMENT', name: 'View Risk Assessment', description: 'Inspect credit bureau score and 4-pillar risk assessment (read-only)', riskLevel: 'LOW' },
+    { code: 'VIEW_REPAYMENT_ASSESSMENT', category: 'BRANCH_MANAGEMENT', name: 'View Repayment Assessment', description: 'Inspect borrower monthly income, liabilities, and FOIR calculation (read-only)', riskLevel: 'LOW' },
+    { code: 'REVIEW_APPLICATION', category: 'BRANCH_MANAGEMENT', name: 'Review Application', description: 'Conduct branch-level management review of loan proposals', riskLevel: 'MEDIUM' },
+    { code: 'APPROVE_WITHIN_DELEGATED_LIMIT', category: 'BRANCH_MANAGEMENT', name: 'Approve Within Delegated Limit', description: 'Record first-level management approval up to ₹5,00,000 threshold', riskLevel: 'HIGH' },
+    { code: 'SEND_BACK_FOR_CORRECTION', category: 'BRANCH_MANAGEMENT', name: 'Send Back for Correction', description: 'Return proposal to Loan Officer or Credit Analyst for correction', riskLevel: 'MEDIUM' },
+    { code: 'ESCALATE_TO_UNDERWRITER', category: 'BRANCH_MANAGEMENT', name: 'Escalate to Underwriter', description: 'Escalate high-value, high-risk, or policy-exception proposals to Underwriter', riskLevel: 'MEDIUM' },
+    { code: 'ADD_MANAGER_REMARKS', category: 'BRANCH_MANAGEMENT', name: 'Add Manager Remarks', description: 'Record management review comments and notes in application history', riskLevel: 'LOW' },
+
     // Disbursements
     { code: 'DISBURSEMENTS_INITIATE_PAYOUT', category: 'DISBURSEMENTS', name: 'Initiate Payout Batch (Maker)', description: 'Create disbursement payment order to bank account', riskLevel: 'HIGH' },
     { code: 'DISBURSEMENTS_APPROVE_MAKER_CHECKER', category: 'DISBURSEMENTS', name: 'Approve Payout Batch (Checker)', description: 'Secondary authorization of disbursement batches', riskLevel: 'CRITICAL' },
@@ -142,83 +161,71 @@ export class RolePermissionService {
       {
         code: 'SUPER_ADMIN',
         name: 'Platform Super Administrator',
-        description: 'Unrestricted system governance and institutional administration',
-        permissions: allPerms,
+        description: 'Full platform governance, administration, and unrestricted operations',
+        permissions: [...allPerms],
         scope: 'GLOBAL',
-        sanctionLimit: 100000000,
-        payoutLimit: 100000000,
+        sanctionLimit: 1000000000,
+        payoutLimit: 1000000000,
       },
       {
         code: 'COMPANY_ADMIN',
         name: 'Company / Institution Administrator',
-        description: 'Tenant management, staff provisioning, policy and integration management for own company',
-        permissions: [
-          'APPLICATIONS_VIEW',
-          'APPLICATIONS_ASSIGN',
-          'CONFIGURATION_VIEW_POLICIES',
-          'CONFIGURATION_DRAFT_POLICY',
-          'CONFIGURATION_PUBLISH_POLICY',
-          'CONFIGURATION_CONFIGURE_INTEGRATIONS',
-          'PRIVACY_VIEW_CONSENT_REGISTRY',
-          'AUDIT_VERIFY_CHAIN',
-          'TENANT_MANAGE_USERS',
-          'TENANT_ASSIGN_ROLES',
-          'TENANT_VIEW_OPERATIONS_CENTER',
-          'TENANT_CONFIGURE_BRANDING',
-        ],
+        description: 'Tenant management, staff provisioning, policy and operations for own company',
+        permissions: [...allPerms],
         scope: 'TENANT',
-        sanctionLimit: 50000000,
-        payoutLimit: 50000000,
+        sanctionLimit: 500000000,
+        payoutLimit: 500000000,
       },
       {
         code: 'ADMIN',
         name: 'Institutional Administrator',
-        description: 'Tenant management, user provisioning, policy and integration management',
-        permissions: [
-          'APPLICATIONS_VIEW',
-          'APPLICATIONS_ASSIGN',
-          'CONFIGURATION_VIEW_POLICIES',
-          'CONFIGURATION_DRAFT_POLICY',
-          'CONFIGURATION_PUBLISH_POLICY',
-          'CONFIGURATION_CONFIGURE_INTEGRATIONS',
-          'PRIVACY_VIEW_CONSENT_REGISTRY',
-          'AUDIT_VERIFY_CHAIN',
-          'TENANT_MANAGE_USERS',
-          'TENANT_ASSIGN_ROLES',
-          'TENANT_VIEW_OPERATIONS_CENTER',
-          'TENANT_CONFIGURE_BRANDING',
-        ],
+        description: 'Tenant management, user provisioning, policy and full operations',
+        permissions: [...allPerms],
         scope: 'TENANT',
-        sanctionLimit: 50000000,
-        payoutLimit: 50000000,
+        sanctionLimit: 500000000,
+        payoutLimit: 500000000,
       },
       {
         code: 'BRANCH_MANAGER',
         name: 'Branch Manager',
-        description: 'Branch-level operational oversight, staff management, and pipeline orchestration',
+        description: 'Branch-level operational oversight, management review, and approval within ₹5L delegated limit',
         permissions: [
-          'APPLICATIONS_CREATE',
+          'VIEW_BRANCH_APPLICATIONS',
+          'VIEW_CUSTOMER_DETAILS',
+          'VIEW_DOCUMENTS',
+          'VIEW_CREDIT_ANALYST_REPORT',
+          'VIEW_RISK_ASSESSMENT',
+          'VIEW_REPAYMENT_ASSESSMENT',
+          'REVIEW_APPLICATION',
+          'APPROVE_WITHIN_DELEGATED_LIMIT',
+          'SEND_BACK_FOR_CORRECTION',
+          'ESCALATE_TO_UNDERWRITER',
+          'ADD_MANAGER_REMARKS',
           'APPLICATIONS_VIEW',
           'APPLICATIONS_ASSIGN',
           'APPLICATIONS_REVIEW',
+          'COLLECTIONS_VIEW_DPD',
+          'COLLECTIONS_RECORD_PTP',
           'CONFIGURATION_VIEW_POLICIES',
-          'CONFIGURATION_DRAFT_POLICY',
           'PRIVACY_VIEW_CONSENT_REGISTRY',
-          'TENANT_VIEW_OPERATIONS_CENTER',
         ],
         scope: 'BRANCH',
-        sanctionLimit: 2500000,
-        payoutLimit: 2500000,
+        sanctionLimit: 500000, // ₹5 Lakh delegated authority limit
+        payoutLimit: 0, // Strictly no disbursement authority
       },
       {
         code: 'CREDIT_ANALYST',
         name: 'Credit & Risk Analyst',
-        description: 'Financial statement analysis, bureau review, risk scoring, and credit recommendation',
+        description: 'Financial statement analysis, bureau review, FOIR calculation, and credit eligibility recommendation',
         permissions: [
           'APPLICATIONS_VIEW',
           'APPLICATIONS_REVIEW',
           'UNDERWRITING_VIEW_BUREAU',
           'UNDERWRITING_RUN_AI_ASSIST',
+          'CREDIT_ASSESSMENT_VIEW',
+          'CREDIT_ASSESSMENT_EVALUATE',
+          'CREDIT_ASSESSMENT_SUBMIT',
+          'CREDIT_ASSESSMENT_FORWARD',
           'CONFIGURATION_VIEW_POLICIES',
           'PRIVACY_VIEW_CONSENT_REGISTRY',
         ],
@@ -311,9 +318,10 @@ export class RolePermissionService {
       {
         code: 'AUDITOR',
         name: 'Compliance & Regulatory Auditor',
-        description: 'Read-only evidence auditing, consent verification, and hash ledger checks',
+        description: 'Independent tenant-wide evidence auditing, consent verification, and ledger inspection',
         permissions: [
           'APPLICATIONS_VIEW',
+          'COLLECTIONS_VIEW_DPD',
           'CONFIGURATION_VIEW_POLICIES',
           'PRIVACY_VIEW_CONSENT_REGISTRY',
           'AUDIT_EXPORT_EVIDENCE_PACKAGE',
@@ -434,6 +442,11 @@ export class RolePermissionService {
       throw new ForbiddenError('Access forbidden: Only Administrators can create custom roles.');
     }
 
+    // System Admin cannot self-authorize SoD override
+    if (dto.allowSodOverride && !actor.roles.includes('SUPER_ADMIN')) {
+      throw new ForbiddenError('Privilege escalation denied: Only Super Admins can authorize Segregation of Duties (SoD) overrides.');
+    }
+
     const cleanCode = dto.code.toUpperCase().replace(/\s+/g, '_');
     const key = `${tenantId}:${cleanCode}`;
 
@@ -450,10 +463,10 @@ export class RolePermissionService {
 
     // Check Segregation of Duties conflicts
     const sodCheck = this.checkSodConflicts(finalPermissions);
-    if (sodCheck.hasCriticalBlock && !dto.allowSodOverride) {
+    if (sodCheck.hasCriticalBlock && (!dto.allowSodOverride || !actor.roles.includes('SUPER_ADMIN'))) {
       const conflictNames = sodCheck.conflicts.map((c) => c.ruleName).join(', ');
       throw new BadRequestError(
-        `Segregation of Duties (SoD) Conflict Detected: [${conflictNames}]. Banking regulations prohibit combining these permissions in a single role without dual Super Admin authorization.`
+        `Segregation of Duties (SoD) Conflict Detected: [${conflictNames}]. Banking regulations prohibit combining these permissions in a single role without Super Admin authorization.`
       );
     }
 
@@ -531,13 +544,21 @@ export class RolePermissionService {
       throw new NotFoundError(`Role '${roleId}' not found.`);
     }
 
-    if (targetRole.isSystemRole && targetRole.code === 'SUPER_ADMIN') {
-      throw new BadRequestError('Cannot modify platform Super Administrator system role.');
+    // Protection of built-in system roles
+    if (targetRole.isSystemRole) {
+      if (!actor.roles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenError(
+          `Cannot modify protected built-in system role '${targetRole.code}'. Built-in operational and governance roles cannot be altered by tenant administrators.`
+        );
+      }
+      if (targetRole.code === 'SUPER_ADMIN') {
+        throw new BadRequestError('Cannot modify platform Super Administrator system role.');
+      }
     }
 
     if (dto.permissions) {
       const sodCheck = this.checkSodConflicts(dto.permissions);
-      if (sodCheck.hasCriticalBlock) {
+      if (sodCheck.hasCriticalBlock && !actor.roles.includes('SUPER_ADMIN')) {
         throw new BadRequestError(
           `Segregation of Duties (SoD) Conflict Detected: [${sodCheck.conflicts.map((c) => c.ruleName).join(', ')}].`
         );
@@ -584,8 +605,8 @@ export class RolePermissionService {
     requiredPermission: PermissionCode,
     options?: { requiredSanctionAmount?: number }
   ): boolean {
-    if (user.roles.includes('SUPER_ADMIN')) {
-      return true; // Super Admin has universal permission bypass
+    if (user.roles?.includes('SUPER_ADMIN')) {
+      return true;
     }
 
     const tenantId = user.tenantId || 'tenant-adyapan-default';

@@ -5,6 +5,7 @@ import { Money } from '../finance/money';
 import { generateLoanNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type { ExecuteDisbursementInput } from './disbursement.schema';
 
 export async function getReadyForDisbursementQueue(actor?: {
@@ -82,11 +83,18 @@ export async function executeDisbursement(
   input: ExecuteDisbursementInput,
   actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
+  if (
+    actor.roles.includes('BRANCH_MANAGER') &&
+    !actor.roles.some((r) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r))
+  ) {
+    throw new ForbiddenError('Branch Manager role is strictly prohibited from releasing funds or executing loan disbursements.');
+  }
+
   const isAuthorized = actor.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
   if (!isAuthorized) {
-    throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans');
+    throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans.');
   }
 
   const app = await prisma.loanApplication.findUnique({
@@ -139,7 +147,7 @@ export async function executeDisbursement(
   const principalNum = Number(app.requestedAmount);
 
   // Enforce Payout Limits
-  const isSuperAdmin = actor.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'ADMIN' || r === 'COMPANY_ADMIN');
+  const isSuperAdmin = actor.roles?.some((r) => r === 'SUPER_ADMIN');
   if (!isSuperAdmin) {
     let payoutLimit = 10000000; // Default ₹1 Crore for Finance Officer
     if (actor.roles?.includes('DISBURSEMENT_OFFICER') && !actor.roles?.includes('FINANCE_OFFICER')) {
@@ -280,6 +288,22 @@ export async function executeDisbursement(
     title: `Loan #${loanNo} Disbursed Successfully`,
     message: `Principal amount of ₹${principalNum.toLocaleString('en-IN')} has been transferred via ${input.disbursementMethod}. Ref: ${input.referenceNumber}. First EMI is scheduled for ${firstDueDate.toLocaleDateString()}.`,
   }).catch(() => {});
+
+  void communicationService.dispatchSystemEvent(
+    'DISBURSEMENT_SUCCESSFUL',
+    {
+      customerId: app.customerId,
+      customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+      customerEmail: app.customer?.email || undefined,
+      customerMobile: app.customer?.mobile || undefined,
+      loanNo,
+      netDisbursedAmount: String(principalNum),
+      bankAccount: app.customer?.bankAccountNo || 'On Record',
+      utrNumber: input.referenceNumber,
+      emiAmount: String(loan.emiAmount || '0.00'),
+    },
+    app.tenantId || undefined
+  ).catch(() => {});
 
   return loan;
 }

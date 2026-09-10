@@ -33,6 +33,9 @@ import {
   Sparkles,
   ShieldAlert,
   Building2,
+  Send,
+  MessageSquare,
+  RotateCcw,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
@@ -45,6 +48,7 @@ import { DocumentIntelligenceModal } from '@/components/DocumentIntelligenceModa
 import { Customer360IntelligenceModal } from '@/components/Customer360IntelligenceModal';
 import { FraudIntelligenceCard } from '@/components/FraudIntelligenceCard';
 import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelligenceCard';
+import { CustomerCommunicationsCard } from '@/components/CustomerCommunicationsCard';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 
@@ -62,8 +66,13 @@ export default function CustomerDetailPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user } = useAuth();
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
+  const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+  const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
+  const isUnderwriter = Boolean(user?.roles?.includes('UNDERWRITER'));
+  const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'fraud' | 'bank_intelligence'
+    'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'communications' | 'bank_intelligence' | 'fraud'
   >('overview');
 
   // Underwriter verification wizard state
@@ -409,6 +418,26 @@ export default function CustomerDetailPage() {
     },
   });
 
+  const forwardAppMutation = useMutation({
+    mutationFn: async (appId: string) => {
+      return api.post(`/applications/${appId}/transition`, {
+        toStatus: 'SUBMITTED',
+        reason: 'Application forwarded to Credit Analyst from Customer 360',
+      });
+    },
+    onSuccess: () => {
+      toast.success('Application forwarded to Credit Analyst queue.');
+      queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['application'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Forward Application Notice' });
+    },
+  });
+
   if (isLoading) return <DetailPageSkeleton />;
   if (isError || !data) {
     return (
@@ -452,6 +481,7 @@ export default function CustomerDetailPage() {
     { id: 'loans', label: `Loans (${loans.length})`, icon: Wallet },
     { id: 'payments', label: `Payments (${payments.length})`, icon: Receipt },
     { id: 'collections', label: `Collections (${collectionCases.length})`, icon: AlertCircle },
+    { id: 'communications', label: 'Communications & Notices', icon: MessageSquare },
     { id: 'bank_intelligence', label: 'Bank Statement Intelligence', icon: Building2 },
     { id: 'fraud', label: 'Fraud & Anomaly', icon: ShieldAlert },
   ];
@@ -475,12 +505,12 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -490,14 +520,14 @@ export default function CustomerDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
-              <Link href="/applications">
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+              <Link href={`/applications/new?customerId=${params.id}`}>
                 <Button size="sm" className="flex items-center gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> Originate Loan
                 </Button>
               </Link>
             )}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button
                 size="sm"
                 variant="secondary"
@@ -539,21 +569,66 @@ export default function CustomerDetailPage() {
         />
       </div>
 
-      {/* Step-by-Step Borrower Intake & Underwriter Forwarding Stepper Banner */}
+      {/* Step-by-Step Borrower Intake & Progress Stepper Banner */}
       {data && (() => {
-        const completedSteps: number[] = [1];
-        if (data.kycStatus === 'VERIFIED') completedSteps.push(2);
-        if (data.bankAccounts?.some((b: any) => b.isVerified) || (data.kycStatus === 'VERIFIED' && data.bankAccounts?.length > 0)) completedSteps.push(3);
-        if ((data.applications?.length || 0) > 0) completedSteps.push(4);
-        if (data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))) completedSteps.push(5);
+        const hasProfile = Boolean(data.firstName && data.lastName && data.mobile);
+        const docs = Array.isArray(data.documents) ? data.documents : [];
+        const hasIdentityDoc = docs.some((d: any) =>
+          ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
+          ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType)
+        );
+        const hasPhotoDoc = docs.some((d: any) =>
+          ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
+          ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType)
+        );
+        const isKycDocsUploaded = (hasIdentityDoc && (hasPhotoDoc || docs.length >= 2)) || docs.length >= 2;
+        const isKycVerified = data.kycStatus === 'VERIFIED' || docs.some((d: any) => d.status === 'VERIFIED' || d.verified);
+
+        const hasEmployment = Boolean(
+          (data.employmentType && data.employmentType.trim()) ||
+          (data.employmentDetails && data.employmentDetails.length > 0)
+        );
+        const hasIncome = Boolean(
+          data.monthlyIncome ||
+          (data.employmentDetails && data.employmentDetails.some((e: any) => e.monthlyIncome))
+        );
+        const hasBank = Boolean(
+          (data.bankAccounts && data.bankAccounts.length > 0) ||
+          (data.bankName && data.bankAccountNo && data.bankIfsc)
+        );
+        const isEmploymentAndBankDone = hasEmployment && hasIncome && hasBank;
+
+        const hasApplications = Boolean(data.applications && data.applications.length > 0);
+        const hasUnderwritingApp = Boolean(
+          data.applications?.some((a: any) =>
+            ['UNDERWRITING', 'APPROVED', 'DISBURSED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'].includes(a.status)
+          )
+        );
+        const hasApprovedApp = Boolean(
+          data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))
+        );
+
+        const completedSteps: number[] = [];
+        if (hasProfile) completedSteps.push(1);
+        if (isKycDocsUploaded || isKycVerified) completedSteps.push(2);
+        if (isEmploymentAndBankDone) completedSteps.push(3);
+        if (hasApplications) completedSteps.push(4);
+        if (hasApprovedApp) completedSteps.push(5);
 
         let stepperCurrentStep = 1;
-        if (data.applications?.some((a: any) => a.status === 'UNDERWRITING')) stepperCurrentStep = 5;
+        if (!completedSteps.includes(1)) stepperCurrentStep = 1;
         else if (!completedSteps.includes(2)) stepperCurrentStep = 2;
         else if (!completedSteps.includes(3)) stepperCurrentStep = 3;
         else if (!completedSteps.includes(4)) stepperCurrentStep = 4;
-        else if (!completedSteps.includes(5)) stepperCurrentStep = 5;
-        else stepperCurrentStep = 5;
+        else if (hasUnderwritingApp || hasApprovedApp) stepperCurrentStep = 5;
+        else stepperCurrentStep = 4;
+
+        const primaryBankName = data.bankAccounts?.[0]?.bankName || data.bankName;
+        const incomeDisplay = data.monthlyIncome
+          ? `₹${Number(data.monthlyIncome).toLocaleString('en-IN')}/mo`
+          : data.employmentDetails?.[0]?.monthlyIncome
+          ? `₹${Number(data.employmentDetails[0].monthlyIncome).toLocaleString('en-IN')}/mo`
+          : '';
 
         const onboardingSteps: StepItem[] = [
           {
@@ -561,39 +636,55 @@ export default function CustomerDetailPage() {
             label: '1. Profile Created',
             shortLabel: 'Profile',
             icon: User,
-            description: 'Identity & Customer Credentials Created',
+            description: hasProfile
+              ? `${data.firstName} ${data.lastName} · ${data.mobile}`
+              : 'Awaiting Profile Information',
           },
           {
             id: 2,
             label: '2. KYC & Photo Docs',
             shortLabel: 'KYC Docs',
             icon: FileText,
-            description: data.kycStatus === 'VERIFIED' ? 'Identity & Documents Verified ✓' : 'Awaiting Underwriter KYC Audit',
+            description: isKycVerified
+              ? 'Identity & KYC Verified ✓'
+              : isKycDocsUploaded
+              ? `${docs.length} Document(s) Uploaded · Pending Verification`
+              : 'Awaiting Document Upload',
           },
           {
             id: 3,
             label: '3. Employment & Bank',
             shortLabel: 'Bank & Income',
             icon: Building2,
-            description: data.bankAccounts?.[0]?.bankName ? `Bank: ${data.bankAccounts[0].bankName}` : 'Awaiting Bank Verification',
+            description: isEmploymentAndBankDone
+              ? `${primaryBankName || 'Bank on file'} · ${incomeDisplay || 'Income set'}`
+              : hasBank
+              ? `${primaryBankName || 'Bank on file'} · Add Income Profile`
+              : 'Awaiting Bank & Employment Details',
           },
           {
             id: 4,
             label: '4. Loan Origination',
             shortLabel: 'Loan Scheme',
             icon: CreditCard,
-            description: (data.applications?.length || 0) > 0 ? `${data.applications.length} Loan Application(s) Originated` : 'Not Originated Yet',
+            description: hasApplications
+              ? `${data.applications.length} Application(s) Originated`
+              : isEmploymentAndBankDone && (isKycDocsUploaded || isKycVerified)
+              ? 'Ready for Loan Origination'
+              : 'Complete Steps 1-3 to Originate',
           },
           {
             id: 5,
             label: '5. Underwriting Review',
             shortLabel: 'Underwriting',
             icon: ShieldCheck,
-            description: data.applications?.some((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status))
-              ? 'Sanctioned & Forwarded to Finance Queue'
-              : data.applications?.some((a: any) => a.status === 'UNDERWRITING')
-              ? 'Active in Underwriter Queue'
-              : 'Ready for Underwriting Verification',
+            description: hasApprovedApp
+              ? 'Sanction Approved ✓'
+              : hasUnderwritingApp
+              ? 'Active in Underwriting Queue'
+              : data.applications?.some((a: any) => a.status === 'SUBMITTED' || a.status === 'CREDIT_ASSESSMENT')
+              ? 'Submitted to Credit Analyst'
+              : 'Pending Origination & Submission',
           },
         ];
 
@@ -605,7 +696,7 @@ export default function CustomerDetailPage() {
           else if (stepId === 5) {
             setActiveTab('applications');
             const targetApp = data.applications?.find((a: any) => ['UNDERWRITING', 'APPROVED', 'SUBMITTED'].includes(a.status));
-            if (targetApp) {
+            if (targetApp && user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'ADMIN'].includes(r))) {
               setSelectedAppForWizard({ ...targetApp, customer: data });
               setWizardOpen(true);
             }
@@ -613,20 +704,19 @@ export default function CustomerDetailPage() {
         };
 
         const activeAppInUnderwriting = data.applications?.find((a: any) => a.status === 'UNDERWRITING');
-        const activeAppApproved = data.applications?.find((a: any) => ['APPROVED', 'DISBURSED'].includes(a.status));
-        const activeAppPendingForward = data.applications?.find((a: any) => ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED'].includes(a.status));
+        const isUnderwriterUser = user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r));
 
         return (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <div>
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Step-by-Step Customer Intake & Underwriting Progress
+                  <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Customer Onboarding & Intake Progress
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Underwriter verifies each step sequentially before sanctioning & forwarding dossier to Finance</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Complete required customer profile, KYC documents, employment details and bank accounts</p>
               </div>
               <div className="flex items-center gap-2">
-                {activeAppInUnderwriting && (
+                {activeAppInUnderwriting && isUnderwriterUser && (
                   <Button
                     size="sm"
                     className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -636,59 +726,6 @@ export default function CustomerDetailPage() {
                     }}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" /> Launch Underwriter Desk →
-                  </Button>
-                )}
-                {!activeAppInUnderwriting && activeAppApproved && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs font-semibold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      onClick={async () => {
-                        try {
-                          await api.post(`/applications/${activeAppApproved.id}/transition`, {
-                            toStatus: 'UNDERWRITING',
-                            reason: 'Re-opened for Underwriter step-by-step verification test',
-                          });
-                          toast.success(`Application ${activeAppApproved.applicationNo || ''} reset to Underwriting Queue!`);
-                          queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
-                        } catch (err: any) {
-                          toast.error(apiErrorMessage(err));
-                        }
-                      }}
-                    >
-                      ↺ Re-open Underwriting Queue (Test Flow)
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                      onClick={() => {
-                        setSelectedAppForWizard({ ...activeAppApproved, customer: data });
-                        setWizardOpen(true);
-                      }}
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" /> Review Verification Desk
-                    </Button>
-                  </div>
-                )}
-                {activeAppPendingForward && (
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                    onClick={async () => {
-                      try {
-                        await api.post(`/applications/${activeAppPendingForward.id}/transition`, {
-                          toStatus: 'UNDERWRITING',
-                          reason: 'Forwarded by Loan Officer from Customer 360 profile',
-                        });
-                        toast.success(`Application ${activeAppPendingForward.applicationNo || ''} forwarded to Underwriter!`);
-                        queryClient.invalidateQueries({ queryKey: ['customer', params.id] });
-                      } catch (err: any) {
-                        toast.error(apiErrorMessage(err));
-                      }
-                    }}
-                  >
-                    <ArrowRight className="h-3.5 w-3.5" /> Forward to Underwriter →
                   </Button>
                 )}
               </div>
@@ -825,10 +862,12 @@ export default function CustomerDetailPage() {
               <p className="text-xs text-slate-500">Identity proofs, income documents, bank statements, and signed mandates</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
-                + Upload Document
-              </Button>
-              {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+              {(isLoanOfficer || isAdmin) && !isBranchManager && (
+                <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
+                  + Upload Document
+                </Button>
+              )}
+              {(isUnderwriter || isAdmin) && (
                 <Button size="sm" onClick={() => setKycModalOpen(true)}>
                   Update KYC Status
                 </Button>
@@ -919,7 +958,7 @@ export default function CustomerDetailPage() {
                           >
                             <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
                           </Button>
-                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) && (
+                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)) && !isBranchManager && (
                             <Button
                               size="sm"
                               variant="secondary"
@@ -936,18 +975,20 @@ export default function CustomerDetailPage() {
                               {doc.status === 'VERIFIED' ? 'Review' : doc.status === 'REJECTED' ? 'Re-verify' : 'Verify'}
                             </Button>
                           )}
-                          <button
-                            type="button"
-                            title="Delete Document"
-                            onClick={() => {
-                              if (confirm(`Delete document "${doc.fileName}" from database?`)) {
-                                docDeleteMutation.mutate(doc.id);
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              title="Delete Document"
+                              onClick={() => {
+                                if (confirm(`Delete document "${doc.fileName}" from database?`)) {
+                                  docDeleteMutation.mutate(doc.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1096,7 +1137,7 @@ export default function CustomerDetailPage() {
               </h3>
               <p className="text-xs text-slate-500">Track all origination and underwriting requests</p>
             </div>
-            <Link href="/applications/new">
+            <Link href={`/applications/new?customerId=${params.id}`}>
               <Button size="sm">+ New Application</Button>
             </Link>
           </div>
@@ -1123,11 +1164,42 @@ export default function CustomerDetailPage() {
                       <td className="py-3 px-3 text-slate-600 text-xs">{app.tenureMonths} Months</td>
                       <td className="py-3 px-3"><Badge status={app.status} /></td>
                       <td className="py-3 px-3 text-right">
-                        <Link href={`/applications/${app.id}`}>
-                          <Button size="sm" variant="secondary" className="text-xs">
-                            View 360 →
-                          </Button>
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/applications/${app.id}`}>
+                            <Button size="sm" variant="secondary" className="text-xs">
+                              Review 360 →
+                            </Button>
+                          </Link>
+                          {app.status === 'DRAFT' ? (
+                            <Button
+                              size="sm"
+                              disabled={forwardAppMutation.isPending}
+                              onClick={() => {
+                                if (confirm(`Forward Application #${app.applicationNo} to Credit Analyst for appraisal?`)) {
+                                  forwardAppMutation.mutate(app.id);
+                                }
+                              }}
+                              className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+                            >
+                              <Send className="w-3 h-3" /> Forward
+                            </Button>
+                          ) : ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={forwardAppMutation.isPending}
+                              onClick={() => {
+                                if (confirm(`Re-Forward Application #${app.applicationNo} to Credit Analyst queue?`)) {
+                                  forwardAppMutation.mutate(app.id);
+                                }
+                              }}
+                              className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer"
+                              title="Re-forward this application to Credit Analyst queue"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Re-Forward
+                            </Button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1270,12 +1342,17 @@ export default function CustomerDetailPage() {
         </Card>
       )}
 
-      {/* Tab 8: Bank Statement Intelligence */}
+      {/* Tab 8: Omnichannel Communications */}
+      {activeTab === 'communications' && (
+        <CustomerCommunicationsCard customer={data} />
+      )}
+
+      {/* Tab 9: Bank Statement Intelligence */}
       {activeTab === 'bank_intelligence' && (
         <BankStatementIntelligenceCard customerId={params.id} />
       )}
 
-      {/* Tab 9: Fraud & Anomaly Intelligence */}
+      {/* Tab 10: Fraud & Anomaly Intelligence */}
       {activeTab === 'fraud' && (
         <FraudIntelligenceCard customerId={params.id} customerCode={data.customerCode} />
       )}
@@ -2218,7 +2295,7 @@ export default function CustomerDetailPage() {
       )}
 
       {/* Underwriting Verification Desk Wizard Modal */}
-      {selectedAppForWizard && (
+      {selectedAppForWizard && (isUnderwriter || isAdmin) && (
         <UnderwritingVerificationWizard
           application={selectedAppForWizard}
           isOpen={wizardOpen}

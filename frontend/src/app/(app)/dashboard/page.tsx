@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   TrendingUp,
   Users,
@@ -42,6 +42,7 @@ import {
   XCircle,
   History,
   Lock,
+  Scale,
 } from 'lucide-react';
 import {
   BarChart,
@@ -64,6 +65,7 @@ import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
 import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
+import { BorrowerPortalShell } from '@/components/borrower/BorrowerPortalShell';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -122,78 +124,152 @@ export default function DashboardPage() {
   }, []);
 
   const primaryRole = (user?.roles?.[0] || 'CUSTOMER') as RoleName;
+  const isFinanceOfficer =
+    primaryRole === 'FINANCE_OFFICER' ||
+    (user?.roles?.includes('FINANCE_OFFICER') &&
+      !['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'COLLECTION_OFFICER', 'AUDITOR'].includes(primaryRole));
 
-  // Live queries
+  // Direct Repayment Modal State for Finance Officer
+  const [directPayModalOpen, setDirectPayModalOpen] = useState(false);
+  const [directLoanId, setDirectLoanId] = useState('');
+  const [directAmount, setDirectAmount] = useState('');
+  const [directMethod, setDirectMethod] = useState('UPI');
+  const [directRef, setDirectRef] = useState('');
+  const [directNotes, setDirectNotes] = useState('');
+
+  const directPaymentMutation = useMutation({
+    mutationFn: async () =>
+      api.post('/payments', {
+        loanId: directLoanId,
+        amount: Number(directAmount),
+        method: directMethod,
+        reference: directRef || `MANUAL-${Date.now().toString().slice(-6)}`,
+        notes: directNotes || 'Direct repayment posted by Finance Officer from Dashboard',
+      }),
+    onSuccess: () => {
+      handleRefresh();
+      setDirectPayModalOpen(false);
+      setDirectLoanId('');
+      setDirectAmount('');
+      setDirectRef('');
+      setDirectNotes('');
+    },
+  });
+
+  // Live queries with automated 5s polling intervals
   const { data: reportsData } = useQuery({
-    queryKey: ['dashboard-reports'],
-    queryFn: async () => (await api.get('/reports/portfolio')).data.data,
+    queryKey: ['dashboard-reports', dateFilter, timeRange, customStart, customEnd],
+    queryFn: async () =>
+      (
+        await api.get('/reports/portfolio', {
+          params: {
+            filter: dateFilter,
+            range: timeRange,
+            start: customStart,
+            end: customEnd,
+          },
+        })
+      ).data.data,
     enabled: !!user && primaryRole !== 'CUSTOMER',
+    refetchInterval: 5000,
   });
 
   const { data: loansData } = useQuery({
     queryKey: ['dashboard-loans'],
-    queryFn: async () => (await api.get('/loans', { params: { pageSize: 10 } })).data.data,
+    queryFn: async () => (await api.get('/loans', { params: { pageSize: 50 } })).data.data,
     enabled: !!user,
+    refetchInterval: 5000,
   });
 
   const { data: appsData } = useQuery({
     queryKey: ['dashboard-apps'],
-    queryFn: async () => (await api.get('/applications', { params: { pageSize: 6 } })).data.data,
+    queryFn: async () => (await api.get('/applications', { params: { pageSize: 20 } })).data.data,
     enabled: !!user,
+    refetchInterval: 5000,
   });
 
   const { data: customersData } = useQuery({
     queryKey: ['dashboard-customers'],
-    queryFn: async () => (await api.get('/customers', { params: { pageSize: 6 } })).data.data,
+    queryFn: async () => (await api.get('/customers', { params: { pageSize: 20 } })).data.data,
     enabled: !!user && primaryRole !== 'CUSTOMER',
+    refetchInterval: 5000,
   });
 
   const { data: usersData } = useQuery({
     queryKey: ['dashboard-users'],
     queryFn: async () => (await api.get('/users')).data.data,
     enabled: !!user && ['ADMIN', 'SUPER_ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    refetchInterval: 10000,
   });
 
   const { data: branchesData } = useQuery({
     queryKey: ['dashboard-branches'],
     queryFn: async () => (await api.get('/branches')).data.data,
     enabled: !!user && ['ADMIN', 'SUPER_ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    refetchInterval: 10000,
   });
 
   const { data: underwritingData } = useQuery({
     queryKey: ['dashboard-underwriting-queue'],
     queryFn: async () => (await api.get('/underwriting/queue')).data.data,
     enabled: !!user && ['UNDERWRITER', 'CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    refetchInterval: 5000,
   });
 
   const { data: disbursementsData } = useQuery({
     queryKey: ['dashboard-disbursements-queue'],
     queryFn: async () => (await api.get('/disbursements/queue')).data.data,
-    enabled: !!user && ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
+    refetchInterval: 5000,
   });
 
   const { data: collectionsData } = useQuery({
     queryKey: ['dashboard-collections'],
     queryFn: async () => (await api.get('/collections/dashboard')).data.data,
     enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    refetchInterval: 5000,
   });
 
   const { data: casesData } = useQuery({
     queryKey: ['dashboard-collection-cases'],
-    queryFn: async () => (await api.get('/collections/cases', { params: { pageSize: 6 } })).data.data,
+    queryFn: async () => (await api.get('/collections/cases', { params: { pageSize: 10 } })).data.data,
     enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    refetchInterval: 5000,
   });
 
   const { data: submissionsData } = useQuery({
     queryKey: ['dashboard-payment-submissions'],
-    queryFn: async () => (await api.get('/payments/submissions', { params: { pageSize: 6 } })).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    queryFn: async () => (await api.get('/payments/submissions', { params: { pageSize: 15 } })).data.data,
+    enabled: !!user && (isFinanceOfficer || ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
+    refetchInterval: 5000,
+  });
+
+  const { data: paymentsData } = useQuery({
+    queryKey: ['dashboard-payments-transactions'],
+    queryFn: async () => (await api.get('/payments/transactions', { params: { pageSize: 20 } })).data.data,
+    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
+    refetchInterval: 5000,
   });
 
   const { data: auditData } = useQuery({
     queryKey: ['dashboard-audit'],
-    queryFn: async () => (await api.get('/audit', { params: { pageSize: 6 } })).data.data,
+    queryFn: async () => (await api.get('/audit', { params: { pageSize: 10 } })).data.data,
     enabled: !!user && ['AUDITOR', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+    refetchInterval: 8000,
+  });
+
+  const { data: creditQueueData } = useQuery({
+    queryKey: ['dashboard-credit-queue'],
+    queryFn: async () => (await api.get('/credit/queue', { params: { tab: 'ALL' } })).data?.data,
+    enabled: !!user && ['CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    refetchInterval: 5000,
+  });
+
+  const { data: branchQueueData } = useQuery({
+    queryKey: ['dashboard-branch-queue'],
+    queryFn: async () => (await api.get('/branch-manager/queue', { params: { tab: 'ALL' } })).data?.data,
+    enabled: !!user && ['BRANCH_MANAGER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+    refetchInterval: 5000,
   });
 
   async function handleRefresh() {
@@ -206,11 +282,19 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-users'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-branches'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-underwriting-queue'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-credit-queue'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-branch-queue'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-queue'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-collections'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-collection-cases'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-payment-submissions'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-payments-transactions'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-audit'] }),
+      queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] }),
+      queryClient.invalidateQueries({ queryKey: ['payment-submissions'] }),
+      queryClient.invalidateQueries({ queryKey: ['payments-transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['payments'] }),
+      queryClient.invalidateQueries({ queryKey: ['loans'] }),
     ]);
     setTimeout(() => setRefreshing(false), 500);
   }
@@ -239,13 +323,25 @@ export default function DashboardPage() {
   async function exportReport() {
     try {
       setExporting(true);
-      const res = await api.get('/reports/export/loans', { responseType: 'blob' });
+      const exportType = primaryRole === 'FINANCE_OFFICER' ? 'payments' : 'loans';
+      const res = await api.get(`/reports/export/${exportType}`, {
+        params: {
+          dateFilter,
+          filter: dateFilter,
+          startDate: customStart,
+          endDate: customEnd,
+        },
+        responseType: 'blob',
+      });
       const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const cleanFilter = dateFilter.replace(/[^a-zA-Z0-9]/g, '_');
-      link.setAttribute('download', `Loan_Portfolio_Export_${cleanFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+      const filename = primaryRole === 'FINANCE_OFFICER'
+        ? `Finance_Ledger_Export_${cleanFilter}_${new Date().toISOString().split('T')[0]}.csv`
+        : `Loan_Portfolio_Export_${cleanFilter}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -362,29 +458,37 @@ export default function DashboardPage() {
     loansList.filter((l: any) => l.status === 'CLOSED' || l.status === 'SETTLED').length;
 
   const totalDisbursedValue =
-    reportsData?.kpis?.totalDisbursed ??
-    reportsData?.totalPrincipalDisbursed ??
-    reportsData?.totalDisbursed ??
+    Number(reportsData?.kpis?.totalDisbursed) ||
+    Number(reportsData?.totalPrincipalDisbursed) ||
+    Number(reportsData?.totalDisbursed) ||
     loansList.reduce((acc: number, l: any) => acc + Number(l.principal || 0), 0);
   const totalDisbursedFormatted = formatMoney(totalDisbursedValue);
 
-  const totalCollectedValue =
+  const transactionsList: any[] = Array.isArray(paymentsData)
+    ? paymentsData
+    : Array.isArray(paymentsData?.data)
+    ? paymentsData.data
+    : [];
+
+  const rawTotalCollected =
     reportsData?.kpis?.totalCollected ??
     reportsData?.totalCollections ??
     reportsData?.totalCollected ??
-    0;
+    transactionsList.filter((t: any) => t.status === 'SUCCESS' || t.status === 'COMPLETED').reduce((acc: number, t: any) => acc + Number(t.amount || 0), 0);
+
+  const totalCollectedValue = Number(rawTotalCollected) || 0;
   const totalCollectedFormatted = formatMoney(totalCollectedValue);
 
   const totalOverdueValue =
-    reportsData?.kpis?.totalOverdue ??
-    reportsData?.totalOverdue ??
+    Number(reportsData?.kpis?.totalOverdue) ||
+    Number(reportsData?.totalOverdue) ||
     0;
   const totalOverdueFormatted = formatMoney(totalOverdueValue);
 
   const totalOutstandingValue =
-    reportsData?.kpis?.totalOutstanding ??
-    reportsData?.totalPrincipalOutstanding ??
-    reportsData?.totalOutstanding ??
+    Number(reportsData?.kpis?.totalOutstanding) ||
+    Number(reportsData?.totalPrincipalOutstanding) ||
+    Number(reportsData?.totalOutstanding) ||
     loansList.reduce((acc: number, l: any) => acc + Number(l.outstandingPrincipal || 0), 0);
   const totalOutstandingFormatted = formatMoney(totalOutstandingValue);
 
@@ -409,6 +513,9 @@ export default function DashboardPage() {
     appsList.length;
 
   const draftAppsCount = appsList.filter((a: any) => a.status === 'DRAFT').length;
+  const submittedAppsCount = appsList.filter((a: any) =>
+    ['SUBMITTED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(a.status)
+  ).length;
   const approvedAppsCount = appsList.filter((a: any) =>
     ['APPROVED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(a.status)
   ).length;
@@ -683,6 +790,23 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {/* Live Polling Sync Indicator */}
+          <div
+            className={cn(
+              'hidden sm:flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold select-none shadow-2xs',
+              isDark
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            )}
+            title="Real-time live synchronization active"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Live Sync Active</span>
+          </div>
+
           {/* Refresh Button */}
           <button
             type="button"
@@ -695,7 +819,7 @@ export default function DashboardPage() {
             )}
           >
             <RefreshCw className={cn('h-3.5 w-3.5', isDark ? 'text-slate-400' : 'text-slate-500', refreshing ? 'animate-spin' : '')} />
-            <span>Refresh</span>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
           {/* Export CSV Button (For staff) */}
@@ -733,8 +857,8 @@ export default function DashboardPage() {
             <KpiItem label="APPLICATIONS INTAKE" value={String(totalAppsCount)} hint="Total origination pool" icon={<FileText className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
             <KpiItem label="KYC PENDING" value={String(pendingKycCount)} hint="Action required" icon={<AlertCircle className="h-4 w-4" />} iconColor="amber" cardBgClass={cardBgClass} isDark={isDark} highlightText={pendingKycCount > 0 ? `${pendingKycCount} need docs` : undefined} />
             <KpiItem label="DRAFT PROPOSALS" value={String(draftAppsCount)} hint="Ready to submit" icon={<Clock className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
+            <KpiItem label="FORWARDED TO CREDIT" value={String(submittedAppsCount)} hint="In credit appraisal queue" icon={<Send className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
             <KpiItem label="PROPOSALS SANCTIONED" value={String(approvedAppsCount)} hint="Approved by underwriter" icon={<CheckCircle2 className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="DISBURSED LOANS" value={String(activeLoansCount)} hint={totalDisbursedFormatted} icon={<Wallet className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -780,93 +904,131 @@ export default function DashboardPage() {
       )}
 
       {/* C. CREDIT ANALYST WORKSPACE */}
-      {primaryRole === 'CREDIT_ANALYST' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="AWAITING CREDIT ASSESSMENT"
-              value={String(creditAwaitingCount || (appsList.length > 0 && creditEvaluatedCount === 0 ? appsList.length : 0))}
-              hint="Action required"
-              icon={<Clock className="h-4 w-4" />}
-              iconColor="amber"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={creditAwaitingCount > 0 ? `${creditAwaitingCount} pending` : undefined}
-            />
-            <KpiItem
-              label="EVALUATED TODAY"
-              value={String(creditEvaluatedCount)}
-              hint="Assessed proposals"
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="TOTAL POOL APPLICATIONS"
-              value={String(totalAppsCount)}
-              hint="Application inflow"
-              icon={<FileText className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="LOW RISK PROFILES"
-              value={String(lowRiskCount)}
-              hint="Score 75+"
-              icon={<ShieldCheck className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="MEDIUM RISK PROFILES"
-              value={String(medRiskCount)}
-              hint="Score 50-74"
-              icon={<AlertTriangle className="h-4 w-4" />}
-              iconColor="amber"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="HIGH RISK REJECTIONS"
-              value={String(highRiskCount)}
-              hint="Declined applications"
-              icon={<XCircle className="h-4 w-4" />}
-              iconColor="rose"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-          </div>
+      {primaryRole === 'CREDIT_ANALYST' && (() => {
+        const m = creditQueueData?.metrics;
+        const pendingAssessmentsCount =
+          m?.pendingAssessments ??
+          ((m?.pendingCredit !== undefined || m?.pendingFinancial !== undefined || m?.pendingDocs !== undefined || m?.pendingKyc !== undefined)
+            ? ((m?.pendingCredit ?? 0) + (m?.pendingFinancial ?? 0) + (m?.pendingDocs ?? 0) + (m?.pendingKyc ?? 0))
+            : creditAwaitingCount);
+        const completedAssessmentsCount =
+          m?.assessmentsCompleted ??
+          ((m?.eligibleApplications !== undefined || m?.notEligibleApplications !== undefined)
+            ? ((m?.eligibleApplications ?? 0) + (m?.notEligibleApplications ?? 0) + (m?.furtherReview ?? 0))
+            : creditEvaluatedCount);
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className={cn('lg:col-span-8 rounded-2xl border p-5 space-y-4', cardBgClass)}>
-              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                <h3 className="text-sm font-bold tracking-tight">Credit Evaluation & Risk Assessment Queue</h3>
-                <Link href="/underwriting" className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline">Assessment Desk →</Link>
-              </div>
-              <ApplicationsTable items={appsList} isDark={isDark} actionLabel="Assess Credit →" />
+        const cqMetrics = {
+          applicationsAssigned: m?.applicationsAssigned ?? creditQueueData?.items?.length ?? appsList.length,
+          pendingAssessments: pendingAssessmentsCount,
+          assessmentsCompleted: completedAssessmentsCount,
+          eligibleApplications: m?.eligibleApplications ?? appsList.filter((a: any) => a.eligibility?.result === 'ELIGIBLE').length,
+          notEligibleApplications: m?.notEligibleApplications ?? appsList.filter((a: any) => a.eligibility?.result === 'NOT_ELIGIBLE').length,
+          pendingDocuments: m?.pendingDocs ?? m?.pendingDocuments ?? appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
+          highRiskCases: m?.highRiskCases ?? highRiskCount,
+        };
+
+        const creditProposals = creditQueueData?.items?.length ? creditQueueData.items : appsList;
+
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              <KpiItem
+                label="APPLICATIONS ASSIGNED"
+                value={String(cqMetrics.applicationsAssigned)}
+                hint="In assessment pool"
+                icon={<FileText className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PENDING ASSESSMENTS"
+                value={String(cqMetrics.pendingAssessments)}
+                hint="Awaiting capacity review"
+                icon={<Clock className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={cqMetrics.pendingAssessments > 0 ? `${cqMetrics.pendingAssessments} pending` : undefined}
+              />
+              <KpiItem
+                label="ASSESSMENTS COMPLETED"
+                value={String(cqMetrics.assessmentsCompleted)}
+                hint="Evaluated proposals"
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="ELIGIBLE APPLICATIONS"
+                value={String(cqMetrics.eligibleApplications)}
+                hint="Repayment verified"
+                icon={<ShieldCheck className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="NOT ELIGIBLE"
+                value={String(cqMetrics.notEligibleApplications)}
+                hint="Criteria / FOIR failed"
+                icon={<XCircle className="h-4 w-4" />}
+                iconColor="rose"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PENDING DOCUMENTS"
+                value={String(cqMetrics.pendingDocuments)}
+                hint="Missing KYC / income proofs"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="HIGH RISK CASES"
+                value={String(cqMetrics.highRiskCases)}
+                hint="Tier 3 / FOIR > 60%"
+                icon={<AlertTriangle className="h-4 w-4" />}
+                iconColor="rose"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
             </div>
 
-            <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">4-Pillar Risk Engine Breakdown</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Scoring weights allocation</p>
-                <div className="space-y-3 pt-3 text-xs">
-                  <div className="flex justify-between items-center"><span className="text-slate-400">1. Debt Service Capacity (DTI)</span><span className="font-bold">30%</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400">2. Credit & Bureau History</span><span className="font-bold">25%</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400">3. Employment & Vintage</span><span className="font-bold">25%</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400">4. Document Completeness</span><span className="font-bold">20%</span></div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className={cn('lg:col-span-8 rounded-2xl border p-5 space-y-4', cardBgClass)}>
+                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                  <div>
+                    <h3 className="text-sm font-bold tracking-tight">Credit Evaluation & Risk Assessment Queue</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Assess repayment capacity, calculate FOIR/DTI, and forward recommendation</p>
+                  </div>
+                  <Link href="/credit-assessment" className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline">Credit Assessment Desk →</Link>
+                </div>
+                <ApplicationsTable items={creditProposals} isDark={isDark} actionLabel="Assess Credit →" />
+              </div>
+
+              <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">4-Pillar Risk Engine Breakdown</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Scoring weights allocation</p>
+                  <div className="space-y-3 pt-3 text-xs">
+                    <div className="flex justify-between items-center"><span className="text-slate-400">1. Debt Service Capacity (DTI)</span><span className="font-bold">30%</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-400">2. Credit & Bureau History</span><span className="font-bold">25%</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-400">3. Employment & Vintage</span><span className="font-bold">25%</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-400">4. Document Completeness</span><span className="font-bold">20%</span></div>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <Link href="/credit-assessment" className="block"><Button size="sm" className="w-full text-xs text-white">Open Credit Assessment Desk</Button></Link>
                 </div>
               </div>
-              <div className="pt-2">
-                <Link href="/underwriting" className="block"><Button size="sm" className="w-full text-xs text-white">Open Credit Evaluation Desk</Button></Link>
-              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* D. UNDERWRITER WORKSPACE */}
       {primaryRole === 'UNDERWRITER' && (
@@ -966,12 +1128,37 @@ export default function DashboardPage() {
       )}
 
       {/* E. FINANCE OFFICER WORKSPACE */}
-      {primaryRole === 'FINANCE_OFFICER' && (
+      {isFinanceOfficer && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem label="PENDING DISBURSEMENTS" value={String(pendingPayoutCount)} hint="Awaiting NEFT payout" icon={<Wallet className="h-4 w-4" />} iconColor="purple" cardBgClass={cardBgClass} isDark={isDark} highlightText={pendingPayoutCount > 0 ? "Action Required" : undefined} />
-            <KpiItem label="DISBURSED VOLUME" value={totalDisbursedFormatted} hint={`${dateFilter} Released`} icon={<Coins className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="COLLECTIONS RECOVERED" value={totalCollectedFormatted} hint={`${dateFilter} Payments`} icon={<CheckCircle2 className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
+            <KpiItem
+              label="PENDING DISBURSEMENTS"
+              value={String(pendingPayoutCount)}
+              hint="Awaiting NEFT payout"
+              icon={<Wallet className="h-4 w-4" />}
+              iconColor="purple"
+              cardBgClass={cardBgClass}
+              isDark={isDark}
+              highlightText={pendingPayoutCount > 0 ? "Action Required" : undefined}
+            />
+            <KpiItem
+              label="DISBURSED VOLUME"
+              value={totalDisbursedFormatted}
+              hint={`${dateFilter} Released`}
+              icon={<Coins className="h-4 w-4" />}
+              iconColor="emerald"
+              cardBgClass={cardBgClass}
+              isDark={isDark}
+            />
+            <KpiItem
+              label="COLLECTIONS RECOVERED"
+              value={totalCollectedFormatted}
+              hint={`${dateFilter} Payments`}
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              iconColor="emerald"
+              cardBgClass={cardBgClass}
+              isDark={isDark}
+            />
             <KpiItem
               label="PAYMENT INTIMATIONS"
               value={String(Array.isArray(submissionsData) ? submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length : 0)}
@@ -986,8 +1173,25 @@ export default function DashboardPage() {
                   : undefined
               }
             />
-            <KpiItem label="NOC CLOSURES" value={String(closedLoansCount)} hint="Full clearance certificates" icon={<FileCheck className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="TREASURY STATUS" value="HEALTHY" hint="Liquidity buffer 100%" icon={<Building className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} valueColor="text-emerald-600" />
+            <KpiItem
+              label="NOC CLOSURES"
+              value={String(closedLoansCount)}
+              hint="Full clearance certificates"
+              icon={<FileCheck className="h-4 w-4" />}
+              iconColor="blue"
+              cardBgClass={cardBgClass}
+              isDark={isDark}
+            />
+            <KpiItem
+              label="TREASURY & LEDGER"
+              value="HEALTHY"
+              hint="Double-entry in balance"
+              icon={<Building className="h-4 w-4" />}
+              iconColor="emerald"
+              cardBgClass={cardBgClass}
+              isDark={isDark}
+              valueColor="text-emerald-600"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -995,48 +1199,106 @@ export default function DashboardPage() {
               {/* Card 1: Disbursement Queue */}
               <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
                 <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <h3 className="text-sm font-bold tracking-tight">Electronic Disbursement Payout Queue (NEFT / RTGS)</h3>
-                  <Link href="/disbursements" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">Disbursements Desk →</Link>
+                  <div>
+                    <h3 className="text-sm font-bold tracking-tight">Electronic Disbursement Payout Queue (NEFT / RTGS)</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Approved loan sanctions ready for fund transfer release</p>
+                  </div>
+                  <Link href="/disbursements" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
+                    Disbursements Desk →
+                  </Link>
                 </div>
                 <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
                   {Array.isArray(disbursementsData) && disbursementsData.length > 0 ? (
-                    disbursementsData.map((d: any) => (
-                      <div key={d.id} className="flex items-center justify-between py-3">
-                        <div>
-                          <p className="font-bold text-slate-900 dark:text-white">Loan #{d.loanAccountNo || d.id?.slice(0, 8)}</p>
-                          <p className="text-slate-400 text-[11px] font-mono">Bank: {d.bankName || 'Verified Account'} · IFSC: {d.ifscCode || '-'}</p>
+                    disbursementsData.map((d: any) => {
+                      const custId = d.customerId || d.customer?.id || d.application?.customerId;
+                      const custName =
+                        d.customerName ||
+                        d.customer?.name ||
+                        (d.customer?.firstName ? `${d.customer.firstName} ${d.customer.lastName || ''}`.trim() : '') ||
+                        'Borrower';
+                      return (
+                        <div key={d.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-3.5 gap-2.5">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {custId ? (
+                                <Link
+                                  href={`/customers/${custId}`}
+                                  className="font-bold text-slate-900 dark:text-white hover:text-blue-600 hover:underline flex items-center gap-1"
+                                  title="Open Borrower Customer 360"
+                                >
+                                  <span>{custName}</span>
+                                  <span className="text-[10px] text-blue-500 font-normal">↗</span>
+                                </Link>
+                              ) : (
+                                <span className="font-bold text-slate-900 dark:text-white">{custName}</span>
+                              )}
+                              <span className="font-mono text-[11px] text-blue-500 font-bold">Loan #{d.loanAccountNo || d.id?.slice(0, 8)}</span>
+                            </div>
+                            <p className="text-slate-400 text-[11px] font-mono mt-0.5">
+                              Bank: <strong>{d.bankName || 'Verified Bank'}</strong> · IFSC: {d.ifscCode || '-'} {d.accountNumber ? `· A/C: ••••${String(d.accountNumber).slice(-4)}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-bold text-[#2563EB] dark:text-[#60A5FA] text-sm">
+                              {formatMoney(d.amount || d.requestedAmount || 0)}
+                            </span>
+                            {custId && (
+                              <Link href={`/customers/${custId}`}>
+                                <Button size="sm" variant="ghost" className="text-xs text-slate-600 dark:text-slate-300">
+                                  View Profile
+                                </Button>
+                              </Link>
+                            )}
+                            <Link href="/disbursements">
+                              <Button size="sm" className="text-xs text-white bg-[#2563EB] hover:bg-blue-700">
+                                Execute NEFT Payout →
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-[#2563EB] dark:text-[#60A5FA]">{formatMoney(d.amount)}</span>
-                          <Link href="/disbursements"><Button size="sm" className="text-xs text-white bg-[#2563EB] hover:bg-blue-700">Execute NEFT Payout</Button></Link>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    <div className="py-8 text-center text-slate-400">No loans currently awaiting disbursement release.</div>
+                    <div className="py-8 text-center text-xs text-slate-400 space-y-1.5">
+                      <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-full w-10 h-10 flex items-center justify-center mx-auto text-emerald-600">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <p className="font-semibold text-slate-700 dark:text-slate-300">All loan payouts have been executed.</p>
+                      <p className="text-[11px] text-slate-400">No loans currently awaiting disbursement release.</p>
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Card 2: Borrower Payment Submissions to Verify */}
+              {/* Card 2: Pending Payment Submissions */}
               <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
                 <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
                   <div>
-                    <h3 className="text-sm font-bold tracking-tight">Borrower Payment Submissions to Settle</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Verify UTR and settle into double-entry accounting ledger</p>
+                    <h3 className="text-sm font-bold tracking-tight">Pending Payment Submissions & UTR Proofs</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Direct borrower repayments requiring manual verification</p>
                   </div>
                   <Link href="/payments" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
-                    Verification Desk →
+                    Payments Desk →
                   </Link>
                 </div>
-
                 <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
                   {Array.isArray(submissionsData) && submissionsData.length > 0 ? (
-                    submissionsData.slice(0, 4).map((sub: any) => (
+                    submissionsData.slice(0, 5).map((sub: any) => (
                       <div key={sub.id} className="py-3 flex items-center justify-between">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 dark:text-white">{sub.customerName || 'Borrower'}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {sub.customerId || sub.loan?.customerId ? (
+                              <Link
+                                href={`/customers/${sub.customerId || sub.loan?.customerId}`}
+                                className="font-bold text-slate-900 dark:text-white hover:text-blue-600 hover:underline flex items-center gap-1"
+                                title="Open Borrower Customer 360"
+                              >
+                                <span>{sub.customerName || 'Borrower'}</span>
+                                <span className="text-[10px] text-blue-500 font-normal">↗</span>
+                              </Link>
+                            ) : (
+                              <span className="font-bold text-slate-900 dark:text-white">{sub.customerName || 'Borrower'}</span>
+                            )}
                             <span className="font-mono text-[10px] text-blue-500 font-bold">Loan #{sub.loanNo}</span>
                             <span className="font-mono text-[10px] text-slate-400">Ref: {sub.reference}</span>
                           </div>
@@ -1049,7 +1311,7 @@ export default function DashboardPage() {
                             {formatMoney(sub.amount || 0)}
                           </span>
                           <Link href="/payments">
-                            <Button size="sm" variant="secondary" className="text-xs">
+                            <Button size="sm" variant="secondary" className="text-xs font-semibold">
                               {sub.status === 'PENDING_VERIFICATION' ? 'Verify & Settle →' : 'View →'}
                             </Button>
                           </Link>
@@ -1057,44 +1319,93 @@ export default function DashboardPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="py-6 text-center text-xs text-slate-400">
-                      No pending payment submissions requiring verification.
+                    <div className="py-6 text-center text-xs text-slate-400 space-y-1">
+                      <p className="font-medium text-slate-600 dark:text-slate-300">No pending borrower payment proofs.</p>
+                      <p className="text-[11px] text-slate-400">All submitted UTRs are settled in the general ledger.</p>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">Waterfall Allocation Hierarchy</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Automated settlement order</p>
-                <div className="space-y-2 pt-3 text-xs">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">1</span>
-                    <span>Late & Processing Fees</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">2</span>
-                    <span>Overdue Penalty Interest</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">3</span>
-                    <span>Regular EMI Interest</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">4</span>
-                    <span>Principal Reduction</span>
+            <div className="lg:col-span-4 space-y-6">
+              {/* Card 3: Waterfall Allocation Hierarchy & Navigation */}
+              <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">Waterfall Allocation Hierarchy</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Automated settlement priority rules</p>
+                  <div className="space-y-2 pt-3 text-xs">
+                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">1</span>
+                      <span className="font-medium">Late & Processing Fees</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">2</span>
+                      <span className="font-medium">Overdue Penalty Interest</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">3</span>
+                      <span className="font-medium">Regular EMI Interest</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-[#060F1B] border border-slate-100 dark:border-[#2B3566]">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-white font-bold text-[10px]">4</span>
+                      <span className="font-medium">Principal Reduction</span>
+                    </div>
                   </div>
                 </div>
+
+                <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
+                  <Button
+                    size="sm"
+                    onClick={() => setDirectPayModalOpen(true)}
+                    className="w-full text-xs text-white bg-emerald-600 hover:bg-emerald-700 font-bold flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    + Record Direct EMI Repayment
+                  </Button>
+                  <Link href="/disbursements" className="block">
+                    <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700 font-semibold">
+                      Open Disbursements Desk →
+                    </Button>
+                  </Link>
+                  <Link href="/payments" className="block">
+                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
+                      Open Payments Ledger & Proofs →
+                    </Button>
+                  </Link>
+                  <Link href="/reconciliation" className="block">
+                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
+                      Open Accounting & Reconciliation →
+                    </Button>
+                  </Link>
+                  <Link href="/customers" className="block">
+                    <Button size="sm" variant="ghost" className="w-full text-xs text-[#2563EB] dark:text-[#60A5FA]">
+                      Browse Borrowers (Customer 360) →
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#2B3566]">
-                <Link href="/disbursements" className="block">
-                  <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700">Open Disbursements Desk</Button>
-                </Link>
-                <Link href="/payments" className="block">
-                  <Button size="sm" variant="secondary" className="w-full text-xs">Open Payments Ledger</Button>
-                </Link>
+
+              {/* Card 4: Treasury & Liquidity Overview */}
+              <div className={cn('rounded-2xl border p-5 space-y-3', cardBgClass)}>
+                <div className="flex items-center justify-between border-b pb-2.5 border-slate-100 dark:border-[#2B3566]">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Treasury Health</h4>
+                  <Badge variant="success">Operational</Badge>
+                </div>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Total Active Portfolio</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{totalOutstandingFormatted}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Cumulative Recoveries</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalCollectedFormatted}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Performing Accounts</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{activeLoansCount} / {totalLoansCount}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1388,8 +1699,295 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* H. SYSTEM ADMIN / SUPER ADMIN / BRANCH MANAGER WORKSPACE */}
-      {['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) && (
+      {/* H. BRANCH MANAGER WORKSPACE */}
+      {primaryRole === 'BRANCH_MANAGER' && (() => {
+        const bmMetrics = branchQueueData?.metrics || {
+          totalBranchApplications: appsList.length,
+          pendingManagerReview: appsList.filter((a: any) => !!a.eligibility && ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(a.status)).length,
+          approvedWithinLimit: appsList.filter((a: any) => a.status === 'APPROVED').length,
+          sentBackForCorrection: 0,
+          escalatedToUnderwriter: 0,
+          awaitingDocuments: appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
+          awaitingCreditAssessment: appsList.filter((a: any) => !a.eligibility).length,
+          delegatedLimit: 500000,
+        };
+
+        const branchProposals = branchQueueData?.items?.length ? branchQueueData.items : appsList;
+
+        return (
+          <div className="space-y-6">
+            {/* Delegated Authority Banner */}
+            <div
+              className={cn(
+                'rounded-2xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors',
+                isDark ? 'bg-[#171B36] border-[#2B3566] text-slate-200' : 'bg-blue-50/70 border-blue-200 text-slate-800'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-[#2563EB]/10 text-[#2563EB]">
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm">Branch Manager Delegated Authority Limit:</span>
+                    <span className="font-mono font-extrabold text-[#2563EB] text-sm">
+                      {formatMoney(bmMetrics.delegatedLimit || 500000)} (₹5 Lakhs)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Authorized to approve loan proposals up to ₹5,00,000. Proposals exceeding limit must be escalated to Underwriting.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-semibold shrink-0">
+                <Link href="/branch-review">
+                  <Button size="sm" className="text-xs bg-[#2563EB] text-white hover:bg-blue-700">
+                    Open Branch Desk →
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* 7 Management-Level Metrics */}
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              <KpiItem
+                label="BRANCH APPLICATIONS"
+                value={String(bmMetrics.totalBranchApplications)}
+                hint="Total assigned"
+                icon={<FileText className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="PENDING REVIEW"
+                value={String(bmMetrics.pendingManagerReview)}
+                hint="Action required"
+                icon={<Clock className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+                highlightText={bmMetrics.pendingManagerReview > 0 ? `${bmMetrics.pendingManagerReview} pending` : undefined}
+              />
+              <KpiItem
+                label="APPROVED IN LIMIT"
+                value={String(bmMetrics.approvedWithinLimit)}
+                hint="≤ ₹5L limit approved"
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                iconColor="emerald"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="SENT BACK"
+                value={String(bmMetrics.sentBackForCorrection)}
+                hint="Corrections needed"
+                icon={<History className="h-4 w-4" />}
+                iconColor="blue"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="ESCALATED TO UW"
+                value={String(bmMetrics.escalatedToUnderwriter)}
+                hint="> ₹5L / High risk"
+                icon={<Send className="h-4 w-4" />}
+                iconColor="purple"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="AWAITING DOCS"
+                value={String(bmMetrics.awaitingDocuments)}
+                hint="KYC / proofs pending"
+                icon={<FileCheck className="h-4 w-4" />}
+                iconColor="amber"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+              <KpiItem
+                label="AWAITING CREDIT"
+                value={String(bmMetrics.awaitingCreditAssessment)}
+                hint="Analyst evaluation"
+                icon={<AlertCircle className="h-4 w-4" />}
+                iconColor="rose"
+                cardBgClass={cardBgClass}
+                isDark={isDark}
+              />
+            </div>
+
+            {/* Branch Delegated Authority Quick Matrix */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              <div className="p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-emerald-800 dark:text-emerald-300">Delegated Approval Limit</span>
+                  <span className="font-mono font-bold text-xs text-emerald-600">≤ ₹5,00,000</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Branch Manager can approve verified proposals directly after Credit Analyst assessment.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-purple-800 dark:text-purple-300">Underwriter Escalation</span>
+                  <span className="font-mono font-bold text-xs text-purple-600">&gt; ₹5,00,000</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Proposals above ₹5 Lakhs or with elevated risk must be escalated to Underwriter.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-blue-800 dark:text-blue-300">Correction Workflow</span>
+                  <span className="font-mono font-bold text-xs text-blue-600">Send Back</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Return proposals to Loan Officer or Credit Analyst for document or KYC corrections.
+                </p>
+              </div>
+            </div>
+
+            {/* Applications Waiting for Branch Manager Review */}
+            <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-3 border-slate-100 dark:border-[#2B3566]">
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">Applications Waiting for Branch Manager Review</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Proposals evaluated by Credit Analyst awaiting management approval, send-back, or escalation
+                  </p>
+                </div>
+                <Link href="/branch-review">
+                  <Button size="sm" variant="secondary" className="text-xs">
+                    Open Branch Applications Desk →
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className={cn('border-b text-[11px] font-bold uppercase tracking-wider', isDark ? 'border-[#2B3566] text-slate-400 bg-[#171B36]' : 'border-slate-200 text-slate-500 bg-slate-50/50')}>
+                      <th className="py-3 px-3">Application ID</th>
+                      <th className="py-3 px-3">Customer Name</th>
+                      <th className="py-3 px-3">Loan Product</th>
+                      <th className="py-3 px-3">Requested Amount</th>
+                      <th className="py-3 px-3">Credit Score</th>
+                      <th className="py-3 px-3">Risk Grade</th>
+                      <th className="py-3 px-3">FOIR / DTI</th>
+                      <th className="py-3 px-3">Credit Analyst Rec.</th>
+                      <th className="py-3 px-3">Current Status</th>
+                      <th className="py-3 px-3 text-right">Required Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className={cn('divide-y', isDark ? 'divide-[#2B3566]' : 'divide-slate-100')}>
+                    {branchProposals.length > 0 ? (
+                      branchProposals.map((app: any) => {
+                        const customer = app.customer || {};
+                        const score = app.creditScore || (app.riskAssessment?.score ? 500 + Math.round((app.riskAssessment.score / 100) * 350) : 750);
+                        const riskGrade = app.riskGrade || app.riskAssessment?.category || customer.riskCategory || 'LOW';
+                        const foirPct = app.foirPct != null ? app.foirPct : (customer.monthlyIncome > 0 ? Math.round((Number(customer.existingObligations || 0) / Number(customer.monthlyIncome)) * 100) : 0);
+                        const recommendation = app.creditAnalystRecommendation || app.eligibility?.recommendation || app.eligibility?.result || 'PENDING';
+                        const currentStatusText = app.reviewStatus || app.status;
+
+                        return (
+                          <tr key={app.id} className={cn('transition-colors', isDark ? 'hover:bg-[#1E2445]/50' : 'hover:bg-slate-50/80')}>
+                            <td className="py-3 px-3 font-mono font-bold text-[#2563EB] dark:text-blue-400">
+                              {app.applicationNo || app.id?.slice(0, 8)}
+                            </td>
+                            <td className="py-3 px-3">
+                              <p className="font-bold text-slate-900 dark:text-white">{customer.firstName} {customer.lastName}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{customer.customerCode || '-'}</p>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="font-semibold">{app.product?.name || 'Standard Loan'}</span>
+                              <div className="text-[10px] text-slate-400">{app.tenureMonths || 12} Mos</div>
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                              {formatMoney(app.requestedAmount || 0)}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{score} pts</span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <Badge status={riskGrade} />
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={cn('font-mono font-bold text-xs', foirPct <= 50 ? 'text-emerald-600' : 'text-amber-600')}>
+                                {foirPct}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <Badge
+                                status={
+                                  recommendation === 'ELIGIBLE' || String(recommendation).includes('Sanction')
+                                    ? 'APPROVED'
+                                    : recommendation === 'NOT_ELIGIBLE'
+                                    ? 'REJECTED'
+                                    : 'UNDER_REVIEW'
+                                }
+                              />
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={cn(
+                                'inline-block px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase',
+                                currentStatusText === 'PENDING_BRANCH_MANAGER_REVIEW'
+                                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                                  : currentStatusText === 'BRANCH_MANAGER_APPROVED'
+                                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                  : currentStatusText === 'RETURNED_FOR_CORRECTION'
+                                  ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                                  : currentStatusText === 'ESCALATED_TO_UNDERWRITER'
+                                  ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              )}>
+                                {String(currentStatusText).replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {(() => {
+                                const isFinished = ['APPROVED', 'DISBURSED', 'REJECTED', 'CANCELLED'].includes(app.status);
+                                return (
+                                  <Link href={`/applications/${app.id}`}>
+                                    <Button
+                                      size="sm"
+                                      variant={isFinished ? 'secondary' : 'primary'}
+                                      className={cn(
+                                        'text-xs gap-1 shadow-xs',
+                                        isFinished
+                                          ? 'text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#2B3566]'
+                                          : 'text-white bg-[#2563EB] hover:bg-blue-700'
+                                      )}
+                                    >
+                                      <span>{isFinished ? 'View Details' : 'Review Application'}</span>
+                                      <ArrowRight className="w-3 h-3" />
+                                    </Button>
+                                  </Link>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-xs text-slate-400">
+                          No applications currently waiting for Branch Manager review.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* I. SYSTEM ADMIN / SUPER ADMIN WORKSPACE */}
+      {['SUPER_ADMIN', 'ADMIN'].includes(primaryRole) && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <KpiItem
@@ -1643,186 +2241,161 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* I. BORROWER / CUSTOMER SELF-SERVICE WORKSPACE */}
-      {primaryRole === 'CUSTOMER' && (
-        <div className="space-y-6">
-          {/* Top 6 Borrower KPIs */}
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="ACTIVE LOANS"
-              value={String(customerLoans.filter((l: any) => l.status === 'ACTIVE').length)}
-              hint="Active borrowing accounts"
-              icon={<CreditCard className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="TOTAL BORROWED"
-              value={formatMoney(myTotalBorrowed)}
-              hint="Sanctioned principal"
-              icon={<Wallet className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="NEXT EMI DUE"
-              value={myNextEmiAmount}
-              hint={myNextDueDate}
-              icon={<Coins className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={myActiveLoan ? "Upcoming due" : undefined}
-            />
-            <KpiItem
-              label="OUTSTANDING PRINCIPAL"
-              value={formatMoney(myTotalOutstanding)}
-              hint="Current loan balance"
-              icon={<TrendingUp className="h-4 w-4" />}
-              iconColor="rose"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="KYC VERIFICATION"
-              value={(myActiveLoan?.customer?.kycStatus || appsList[0]?.customer?.kycStatus || (user as any)?.customer?.kycStatus || 'VERIFIED')}
-              hint="Identity verified"
-              icon={<ShieldCheck className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              valueColor="text-emerald-600"
-            />
-            <KpiItem
-              label="LOAN TENURE"
-              value={myActiveLoan ? `${myActiveLoan.tenureMonths || 24} Mos` : '24 Mos'}
-              hint="Scheduled installments"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-          </div>
-
-          {/* Main Loan Details & Actions */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Left 2 Cols: My Active Loan Facility */}
-            <div className={cn('lg:col-span-2 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">
-                      {myActiveLoan ? `Active Loan #${myActiveLoan.loanNo}` : 'Borrowing Facility'}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {myActiveLoan?.productName || 'Personal Loan'} · Disbursed on {myActiveLoan?.disbursementDate ? formatDate(myActiveLoan.disbursementDate) : 'Recently'}
-                    </p>
-                  </div>
-                  {myActiveLoan && <Badge status={myActiveLoan.status} />}
+      {/* DIRECT EMI REPAYMENT MODAL */}
+      {directPayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div
+            className={cn(
+              'w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-4 transition-all',
+              isDark ? 'bg-[#171B36] border-[#2B3566] text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2B3566]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <CreditCard className="w-5 h-5" />
                 </div>
-
-                {myActiveLoan ? (
-                  <div className="space-y-4 pt-3">
-                    {/* Key Loan Metrics Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Sanctioned Amount</span>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white mt-0.5 block">{formatMoney(myActiveLoan.principal || 0)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Monthly EMI</span>
-                        <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5 block">{formatMoney(myActiveLoan.emiAmount || 0)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Tenure Period</span>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white mt-0.5 block">{myActiveLoan.tenureMonths || 24} Months</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/60 dark:border-[#2B3566]">
-                        <span className="text-slate-400 block text-[11px]">Interest Rate</span>
-                        <span className="font-bold text-sm text-[#2563EB] dark:text-[#60A5FA] mt-0.5 block">{myActiveLoan.interestRate || '12.00'}% p.a.</span>
-                      </div>
-                    </div>
-
-                    {/* Next Due Banner */}
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-blue-50/80 dark:bg-[#060F1B] border border-blue-200/70 dark:border-[#2B3566]">
-                      <div className="flex items-center gap-2.5">
-                        <Clock className="w-4 h-4 text-[#2563EB]" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white">Next Monthly Installment Due: {myNextEmiAmount}</p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">Scheduled on {myNextDueDate}. Pay on time to ensure high credit score.</p>
-                        </div>
-                      </div>
-                      <Link href={`/loans/${myActiveLoan.id}`}>
-                        <Button size="sm" className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-sm">
-                          Submit Payment Proof →
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-slate-400 space-y-2">
-                    <p>No active loan account found under your profile.</p>
-                    <Link href="/loans">
-                      <Button size="sm" className="bg-[#2563EB] text-white">View Loan Accounts →</Button>
-                    </Link>
-                  </div>
-                )}
+                <div>
+                  <h3 className={cn('text-base font-bold', isDark ? 'text-white' : 'text-slate-900')}>
+                    Record Direct EMI Repayment
+                  </h3>
+                  <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                    Directly post borrower repayment and auto-allocate across loan schedule
+                  </p>
+                </div>
               </div>
-
-              {myActiveLoan && (
-                <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                  <Link href={`/loans/${myActiveLoan.id}`} className="flex-1">
-                    <Button size="sm" variant="secondary" className="w-full text-xs font-semibold">
-                      View 24-Month Amortization Schedule →
-                    </Button>
-                  </Link>
-                  <Link href="/payments">
-                    <Button size="sm" variant="ghost" className="text-xs">
-                      Payment Receipts →
-                    </Button>
-                  </Link>
-                </div>
-              )}
+              <button
+                onClick={() => setDirectPayModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Right 1 Col: Borrower Profile & Shortcuts */}
-            <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
+            <div className="space-y-3.5 text-xs">
+              {/* Select Loan */}
               <div>
-                <h3 className="text-sm font-bold tracking-tight">Borrower Information</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Your profile and registered details</p>
+                <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                  Select Active Loan Account *
+                </label>
+                <select
+                  value={directLoanId}
+                  onChange={(e) => {
+                    const lId = e.target.value;
+                    setDirectLoanId(lId);
+                    const chosen = loansList.find((l: any) => l.id === lId);
+                    if (chosen?.emiAmount && !directAmount) {
+                      setDirectAmount(String(chosen.emiAmount));
+                    }
+                  }}
+                  className={cn(
+                    'w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none',
+                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
+                  )}
+                  required
+                >
+                  <option value="">-- Select Active Loan Account --</option>
+                  {loansList
+                    .filter((l: any) => l.status === 'ACTIVE' || l.status === 'OVERDUE' || l.status === 'DISBURSED')
+                    .map((l: any) => {
+                      const cName =
+                        l.customerName ||
+                        l.customer?.name ||
+                        (l.customer?.firstName ? `${l.customer.firstName} ${l.customer.lastName || ''}`.trim() : '') ||
+                        'Borrower';
+                      return (
+                        <option key={l.id} value={l.id}>
+                          Loan #{l.loanNo} · {cName} (EMI: {formatMoney(l.emiAmount || 0)} · Outstanding: {formatMoney(l.outstandingPrincipal || 0)})
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
 
-                <div className="space-y-2.5 pt-3 text-xs">
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/60">
-                    <span className="text-[11px] text-slate-400">Borrower Name</span>
-                    <p className="font-bold text-slate-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">Email: {user.email}</p>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-slate-50/50 dark:bg-[#060F1B]/60">
-                    <span className="text-[11px] text-slate-400">Destination Bank Account</span>
-                    <p className="font-bold text-slate-900 dark:text-white">
-                      {(myActiveLoan?.customer?.bankName || appsList[0]?.customer?.bankName || (user as any)?.customer?.bankName || 'Beneficiary Bank')}
-                    </p>
-                    <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-                      A/C: {(myActiveLoan?.customer?.bankAccountNo || appsList[0]?.customer?.bankAccountNo || (user as any)?.customer?.bankAccountNo || 'Recorded on File')} ({(myActiveLoan?.customer?.bankIfsc || appsList[0]?.customer?.bankIfsc || (user as any)?.customer?.bankIfsc || 'IFSC Verified')})
-                    </p>
-                  </div>
+              {/* Amount & Method */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                    Repayment Amount (₹) *
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={directAmount}
+                    onChange={(e) => setDirectAmount(e.target.value)}
+                    placeholder="e.g. 5000"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                    Payment Channel *
+                  </label>
+                  <select
+                    value={directMethod}
+                    onChange={(e) => setDirectMethod(e.target.value)}
+                    className={cn(
+                      'w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none',
+                      isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
+                    )}
+                  >
+                    <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+                    <option value="NEFT">NEFT Bank Transfer</option>
+                    <option value="IMPS">IMPS Instant Transfer</option>
+                    <option value="CASH">Branch Cash Counter</option>
+                    <option value="CHEQUE">Cheque / DD</option>
+                    <option value="NET_BANKING">Net Banking</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                <Link href="/loans" className="block">
-                  <Button size="sm" variant="secondary" className="w-full text-xs">
-                    My Loan Accounts & Schedules →
-                  </Button>
-                </Link>
-                <Link href="/payments" className="block">
-                  <Button size="sm" variant="ghost" className="w-full text-xs">
-                    View Payment Ledger & Receipts →
-                  </Button>
-                </Link>
+              {/* Reference */}
+              <div>
+                <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                  Bank Transaction / UTR Reference
+                </label>
+                <Input
+                  value={directRef}
+                  onChange={(e) => setDirectRef(e.target.value)}
+                  placeholder="e.g. UPI-9988771122 or BANK-NEFT-5544"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className={cn('block font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                  Audit Settlement Notes
+                </label>
+                <Input
+                  value={directNotes}
+                  onChange={(e) => setDirectNotes(e.target.value)}
+                  placeholder="e.g. Monthly installment paid via branch counter"
+                />
+              </div>
+
+              {/* Waterfall Info Banner */}
+              <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-[#1E2445] border border-blue-100 dark:border-[#2B3566] text-[11px] text-blue-900 dark:text-blue-200 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5 text-blue-800 dark:text-blue-300">
+                  <Layers className="w-3.5 h-3.5" /> Automated Waterfall Hierarchy:
+                </p>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400">
+                  Payment will settle automatically: <strong>1. Fees</strong> ➔ <strong>2. Penalty</strong> ➔ <strong>3. Interest</strong> ➔ <strong>4. Principal</strong>.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[#2B3566]">
+                <Button variant="ghost" size="sm" onClick={() => setDirectPayModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!directLoanId || !directAmount || directPaymentMutation.isPending}
+                  onClick={() => directPaymentMutation.mutate()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {directPaymentMutation.isPending ? 'Recording...' : 'Confirm & Post Repayment'}
+                </Button>
               </div>
             </div>
           </div>

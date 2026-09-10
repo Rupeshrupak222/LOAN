@@ -220,6 +220,15 @@ export async function verifyDocument(
   actorUserId?: string,
   actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
 ) {
+  if (actor?.roles && actor.roles.length > 0) {
+    const isAuthorized = actor.roles.some((r) =>
+      ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+    );
+    if (!isAuthorized) {
+      throw new ForbiddenError('Access forbidden: Only authorized staff can verify borrower documents');
+    }
+  }
+
   const existing = await getDocument(id, actor);
   const isVerified = input.status === 'VERIFIED';
 
@@ -251,6 +260,10 @@ export async function deleteDocument(
   actorUserId?: string,
   actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
 ) {
+  if (actor?.roles && !actor.roles.includes('SUPER_ADMIN')) {
+    throw new ForbiddenError('Access forbidden: Only Super Administrators can delete compliance documents');
+  }
+
   const existing = await getDocument(id, actor);
   await prisma.document.delete({ where: { id } });
 

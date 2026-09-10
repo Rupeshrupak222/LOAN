@@ -53,6 +53,8 @@ const NAV_ICONS: Record<string, any> = {
   applications: FileText,
   products: Building2,
   'loan-products': Building2,
+  'credit-assessment': Calculator,
+  'branch-review': FileCheck,
   underwriting: FileCheck,
   loans: DollarSign,
   disbursements: Wallet,
@@ -129,7 +131,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;
   const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
-  const accessibleNav = roleCfg.nav.map((k) => NAV_ITEMS[k]).filter(Boolean);
+  const accessibleNav = roleCfg.nav
+    .map((k) => {
+      const item = NAV_ITEMS[k];
+      if (!item) return null;
+      if (primaryRole === 'CREDIT_ANALYST' && k === 'underwriting') {
+        return { ...item, label: 'Credit Assessment' };
+      }
+      return item;
+    })
+    .filter(Boolean) as NavItemConfig[];
 
   const groupedNav: Record<string, NavItemConfig[]> = {
     OVERVIEW: [],

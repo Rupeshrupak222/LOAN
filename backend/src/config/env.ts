@@ -38,25 +38,22 @@ export const env = {
   corsOrigin: rawCors,
   corsOrigins: parseCorsOrigins(rawCors),
 
-  databaseUrl: getEnv(
-    'DATABASE_URL',
-    ['postgresql://', 'postgres:', '[YOUR-PASSWORD]', '@db.kbwfydhyfjgnplmcrupq.supabase.co:5432/postgres'].join('')
-  ),
+  databaseUrl: getEnv('DATABASE_URL'),
   directUrl: process.env.DIRECT_URL,
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
 
   supabase: {
-    url: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://kbwfydhyfjgnplmcrupq.supabase.co',
+    url: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     anonKey:
       process.env.SUPABASE_ANON_KEY ??
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-      'sb_publishable_rU-FweQxTdJeyH6hxXVzYQ_jt3E9WwM',
+      '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   },
 
   jwt: {
-    accessSecret: getEnv('JWT_ACCESS_SECRET', 'change_me_access_secret_dev_only'),
-    refreshSecret: getEnv('JWT_REFRESH_SECRET', 'change_me_refresh_secret_dev_only'),
+    accessSecret: getEnv('JWT_ACCESS_SECRET', 'dev_jwt_access_secret'),
+    refreshSecret: getEnv('JWT_REFRESH_SECRET', 'dev_jwt_refresh_secret'),
     accessExpires: process.env.JWT_ACCESS_EXPIRES ?? '15m',
     refreshExpires: process.env.JWT_REFRESH_EXPIRES ?? '7d',
   },
@@ -69,15 +66,23 @@ export const env = {
   },
 
   cloudinary: {
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? 'smsoui35',
-    apiKey: process.env.CLOUDINARY_API_KEY ?? '571474773638931',
-    apiSecret: process.env.CLOUDINARY_API_SECRET ?? 'YPeOcsA_i8gKr8Gq0MP13s9Ba0I',
-    url: process.env.CLOUDINARY_URL ?? 'cloudinary://571474773638931:YPeOcsA_i8gKr8Gq0MP13s9Ba0I@smsoui35',
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',
+    apiKey: process.env.CLOUDINARY_API_KEY ?? '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET ?? '',
+    url: process.env.CLOUDINARY_URL ?? '',
   },
 
   gemini: {
     apiKey: process.env.GEMINI_API_KEY ?? '',
-    model: process.env.GEMINI_MODEL ?? 'gemma-4-31b-it',
+    model: process.env.GEMINI_MODEL ?? 'gemini-3.5-flash',
+  },
+
+  smtp: {
+    host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    fromEmail: process.env.SMTP_FROM_EMAIL ?? '',
   },
 } as const;
 

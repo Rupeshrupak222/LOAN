@@ -28,7 +28,7 @@ export default function LoansPage() {
   const [reference, setReference] = useState('');
 
   const canExecutePayout = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
 
   const { data: loansData, isLoading: loansLoading } = useQuery({
@@ -44,6 +44,7 @@ export default function LoansPage() {
 
   const { data: disbursementsData, isLoading: disbLoading } = useQuery({
     queryKey: ['disbursements-queue'],
+    enabled: canExecutePayout,
     queryFn: async () => {
       const res = await api.get('/disbursements/queue');
       const rows = res.data?.data;
@@ -201,15 +202,21 @@ export default function LoansPage() {
       render: (r: any) =>
         r.isPendingDisbursement ? (
           <div className="flex items-center justify-end gap-1.5">
-            <Link href="/disbursements">
-              <Button
-                size="sm"
-                className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1.5"
-              >
-                <Wallet className="w-3.5 h-3.5" />
-                Disbursements →
-              </Button>
-            </Link>
+            {canExecutePayout ? (
+              <Link href="/disbursements">
+                <Button
+                  size="sm"
+                  className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  Disbursements →
+                </Button>
+              </Link>
+            ) : (
+              <span className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+                Awaiting Finance Payout
+              </span>
+            )}
           </div>
         ) : (
           <Link href={`/loans/${r.id}`}>
@@ -222,6 +229,7 @@ export default function LoansPage() {
   ];
 
   const handleOpenPayoutModal = (app: any) => {
+    if (!canExecutePayout) return;
     setSelectedDisbursementApp(app);
     setMethod('NEFT_BANK_TRANSFER');
     setReference(`CMS-NEFT-${Math.floor(100000000 + Math.random() * 900000000)}`);
@@ -234,14 +242,16 @@ export default function LoansPage() {
       <PageHeader
         breadcrumb="Lending / Loans"
         title="Loan Accounts & Servicing Portfolio"
-        subtitle="Manage active borrowing accounts, release funds for approved proposals, and track amortized schedules"
+        subtitle="Manage active borrowing accounts and track amortized schedules"
         action={
-          <Link href="/disbursements">
-            <Button variant="secondary" size="md" className="flex items-center gap-1.5">
-              <Wallet className="w-4 h-4" />
-              Disbursement Queue {pendingDisbursements.length > 0 && `(${pendingDisbursements.length})`}
-            </Button>
-          </Link>
+          canExecutePayout ? (
+            <Link href="/disbursements">
+              <Button variant="secondary" size="md" className="flex items-center gap-1.5">
+                <Wallet className="w-4 h-4" />
+                Disbursement Queue {pendingDisbursements.length > 0 && `(${pendingDisbursements.length})`}
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -293,7 +303,7 @@ export default function LoansPage() {
       />
 
       {/* DIRECT DISBURSEMENT EXECUTION MODAL */}
-      {selectedDisbursementApp && (
+      {canExecutePayout && selectedDisbursementApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
           <div
             className={cn(

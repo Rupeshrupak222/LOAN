@@ -9,7 +9,105 @@ export interface ReportActorContext {
   branchId?: string;
 }
 
-export async function getPortfolioOverview(actor?: ReportActorContext) {
+export interface ReportFilterOptions {
+  dateFilter?: string;
+  startDate?: string;
+  endDate?: string;
+  filter?: string;
+  start?: string;
+  end?: string;
+  range?: string;
+}
+
+export function resolveDateRange(
+  dateFilter?: string,
+  startDate?: string,
+  endDate?: string
+): { from?: Date; to?: Date } {
+  if (startDate && endDate) {
+    const from = new Date(startDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(endDate);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+
+  const rawFilter = (dateFilter || '').trim();
+  if (!rawFilter || rawFilter.toLowerCase() === 'all' || rawFilter.toLowerCase() === 'all time') {
+    return {};
+  }
+
+  const now = new Date();
+  const f = rawFilter.toLowerCase();
+
+  if (f === 'today') {
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (f === 'this week') {
+    const from = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(now);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (f === 'this month') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (f === 'last month') {
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+    const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (f === 'this quarter') {
+    const qMonth = Math.floor(now.getMonth() / 3) * 3;
+    const from = new Date(now.getFullYear(), qMonth, 1, 0, 0, 0);
+    const to = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  if (f === 'this financial year') {
+    const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const from = new Date(fyYear, 3, 1, 0, 0, 0);
+    const to = new Date(fyYear + 1, 2, 31, 23, 59, 59, 999);
+    return { from, to };
+  }
+
+  const monthMatch = rawFilter.match(/^([A-Za-z]{3})\s+(\d{4})$/i);
+  if (monthMatch) {
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const monthIdx = monthNames.indexOf(monthMatch[1].toLowerCase());
+    if (monthIdx !== -1) {
+      const year = parseInt(monthMatch[2], 10);
+      const from = new Date(year, monthIdx, 1, 0, 0, 0);
+      const to = new Date(year, monthIdx + 1, 0, 23, 59, 59, 999);
+      return { from, to };
+    }
+  }
+
+  const rangeMatch = rawFilter.match(/^(\d{4}-\d{2}-\d{2})\s+(?:to|-)\s+(\d{4}-\d{2}-\d{2})$/);
+  if (rangeMatch) {
+    const from = new Date(rangeMatch[1]);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(rangeMatch[2]);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }
+
+  return {};
+}
+
+export async function getPortfolioOverview(
+  actor?: ReportActorContext,
+  options?: ReportFilterOptions
+) {
   const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
   const isCompanyAdmin = actor?.roles?.includes('COMPANY_ADMIN') || actor?.roles?.includes('ADMIN');
 
@@ -20,6 +118,30 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     ...tenantFilter,
     ...branchFilter,
   };
+
+  const { from: startDate, to: endDate } = resolveDateRange(
+    options?.dateFilter || options?.filter || options?.range,
+    options?.startDate || options?.start,
+    options?.endDate || options?.end
+  );
+
+  const paymentDateFilter = startDate && endDate
+    ? {
+        OR: [
+          { createdAt: { gte: startDate, lte: endDate } },
+          { paidAt: { gte: startDate, lte: endDate } },
+        ],
+      }
+    : {};
+
+  const disbursementDateFilter = startDate && endDate
+    ? {
+        OR: [
+          { createdAt: { gte: startDate, lte: endDate } },
+          { disbursedAt: { gte: startDate, lte: endDate } },
+        ],
+      }
+    : {};
 
   const [loans, payments, disbursements, products, branches, collectionCases] = await Promise.all([
     prisma.loan.findMany({
@@ -32,6 +154,7 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     prisma.payment.findMany({
       where: {
         status: 'SUCCESS',
+        ...paymentDateFilter,
         ...(tenantFilter.tenantId ? { tenantId: tenantFilter.tenantId } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -39,6 +162,7 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
     prisma.disbursement.findMany({
       where: {
         status: 'COMPLETED',
+        ...disbursementDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -184,7 +308,8 @@ export async function getPortfolioOverview(actor?: ReportActorContext) {
 
 export async function generateCsvReport(
   type: 'loans' | 'disbursements' | 'payments' | 'collections' | 'applications',
-  actor?: ReportActorContext
+  actor?: ReportActorContext,
+  options?: ReportFilterOptions
 ) {
   const BOM = '\uFEFF'; // Excel UTF-8 BOM
   const isSuperAdmin = actor?.roles?.includes('SUPER_ADMIN');
@@ -193,11 +318,26 @@ export async function generateCsvReport(
   const tenantFilter: any = !isSuperAdmin && actor?.tenantId ? { tenantId: actor.tenantId } : {};
   const branchFilter: any = !isSuperAdmin && !isCompanyAdmin && actor?.branchId ? { branchId: actor.branchId } : {};
 
+  const { from, to } = resolveDateRange(options?.dateFilter, options?.startDate, options?.endDate);
+  const createdDateFilter = from || to ? {
+    createdAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
+  const paymentDateFilter = from || to ? {
+    paidAt: {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    },
+  } : {};
+
   if (type === 'loans') {
     const loans = await prisma.loan.findMany({
       where: {
         ...tenantFilter,
         ...branchFilter,
+        ...createdDateFilter,
       },
       include: {
         customer: { select: { firstName: true, lastName: true, customerCode: true, mobile: true, email: true } },
@@ -249,6 +389,7 @@ export async function generateCsvReport(
   if (type === 'disbursements') {
     const disbursements = await prisma.disbursement.findMany({
       where: {
+        ...createdDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -295,6 +436,7 @@ export async function generateCsvReport(
   if (type === 'payments') {
     const payments = await prisma.payment.findMany({
       where: {
+        ...paymentDateFilter,
         ...(tenantFilter.tenantId ? { tenantId: tenantFilter.tenantId } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
@@ -333,16 +475,26 @@ export async function generateCsvReport(
   }
 
   if (type === 'collections') {
+    const caseDateFilter = from || to ? {
+      OR: [
+        { updatedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+        { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+      ],
+    } : {};
+
     const cases = await prisma.collectionCase.findMany({
       where: {
+        ...caseDateFilter,
         ...(tenantFilter.tenantId ? { loan: { tenantId: tenantFilter.tenantId } } : {}),
         ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
       },
       include: {
         customer: { select: { firstName: true, lastName: true, customerCode: true, mobile: true } },
-        loan: { select: { loanNo: true } },
+        loan: { select: { loanNo: true, emiAmount: true } },
+        promises: { take: 1, orderBy: { createdAt: 'desc' } },
+        activities: { take: 1, orderBy: { createdAt: 'desc' } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { dpd: 'desc' },
     });
 
     const headers = [
@@ -351,11 +503,17 @@ export async function generateCsvReport(
       'Customer ID',
       'Borrower Name',
       'Mobile',
+      'EMI Amount (INR)',
       'Overdue Amount (INR)',
       'DPD (Days Past Due)',
       'Aging Bucket',
       'Priority',
       'Case Status',
+      'PTP Promised Date',
+      'PTP Amount (INR)',
+      'PTP Status',
+      'Last Follow-Up Date',
+      'Next Follow-Up Date',
       'Last Updated',
     ];
 
@@ -365,11 +523,17 @@ export async function generateCsvReport(
       c.customer?.customerCode || '-',
       `"${c.customer?.firstName || ''} ${c.customer?.lastName || ''}"`,
       `"${c.customer?.mobile || ''}"`,
+      c.loan?.emiAmount ? Number(c.loan.emiAmount).toFixed(2) : '0.00',
       c.overdueAmount.toFixed(2),
       c.dpd,
       c.agingBucket,
       c.priority,
       c.status,
+      c.promises[0]?.promisedDate ? c.promises[0].promisedDate.toISOString().split('T')[0] : 'N/A',
+      c.promises[0]?.promisedAmount ? Number(c.promises[0].promisedAmount).toFixed(2) : '0.00',
+      c.promises[0]?.status || 'NONE',
+      c.activities[0]?.createdAt ? c.activities[0].createdAt.toISOString().split('T')[0] : 'N/A',
+      c.activities[0]?.nextFollowUpDate ? c.activities[0].nextFollowUpDate.toISOString().split('T')[0] : 'N/A',
       c.updatedAt.toISOString().split('T')[0],
     ]);
 

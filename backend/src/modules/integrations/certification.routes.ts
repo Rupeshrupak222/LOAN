@@ -46,44 +46,52 @@ router.get('/connectors', (req: Request, res: Response) => {
  * POST /api/v1/integrations/certification/audit-health
  * Executes live health check audit across all connectors.
  */
-router.post('/audit-health', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
-    const audited = await integrationCertificationService.runHealthAudit(tenantId, req.user as any);
+router.post(
+  '/audit-health',
+  authorize('SUPER_ADMIN', 'ADMIN'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const audited = await integrationCertificationService.runHealthAudit(tenantId, req.user as any);
 
-    res.json({
-      success: true,
-      message: `Health audit completed for ${audited.length} connectors.`,
-      data: audited,
-    });
-  } catch (err) {
-    next(err);
+      res.json({
+        success: true,
+        message: `Health audit completed for ${audited.length} connectors.`,
+        data: audited,
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 /**
  * POST /api/v1/integrations/certification/test-failover
  * Simulates primary connector outage and validates seamless failover to secondary provider.
  */
-router.post('/test-failover', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
-    const { connectorId } = req.body;
+router.post(
+  '/test-failover',
+  authorize('SUPER_ADMIN', 'ADMIN'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tenantId = req.tenant?.tenantId || 'tenant-adyapan-default';
+      const { connectorId } = req.body;
 
-    if (!connectorId) {
-      throw new BadRequestError('connectorId is required.');
+      if (!connectorId) {
+        throw new BadRequestError('connectorId is required.');
+      }
+
+      const result = await integrationCertificationService.testConnectorFailover(tenantId, connectorId, req.user as any);
+
+      res.json({
+        success: true,
+        message: `Failover test completed for connector '${connectorId}'. Fallback to '${result.fallbackProvider}' succeeded.`,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
     }
-
-    const result = await integrationCertificationService.testConnectorFailover(tenantId, connectorId, req.user as any);
-
-    res.json({
-      success: true,
-      message: `Failover test completed for connector '${connectorId}'. Fallback to '${result.fallbackProvider}' succeeded.`,
-      data: result,
-    });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 export const certificationRoutes = router;

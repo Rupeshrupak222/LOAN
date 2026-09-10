@@ -30,9 +30,17 @@ async function resolveActor(req: any) {
   if (!branchId && req.user?.id) {
     const dbUser = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { branchId: true },
+      select: { branchId: true, branch: { select: { code: true } } },
     });
-    branchId = dbUser?.branchId || undefined;
+    branchId = dbUser?.branch?.code === 'HO' ? undefined : (dbUser?.branchId || undefined);
+  } else if (branchId) {
+    const dbBranch = await prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { code: true },
+    });
+    if (dbBranch?.code === 'HO') {
+      branchId = undefined;
+    }
   }
   return {
     id: req.user!.id,
@@ -47,7 +55,8 @@ router.get(
   '/portfolio',
   asyncHandler(async (req, res) => {
     const actor = await resolveActor(req);
-    const data = await getPortfolioOverview(actor);
+    const { filter, start, end, range } = req.query as any;
+    const data = await getPortfolioOverview(actor, { filter, start, end, range });
     res.json(success(data));
   })
 );
@@ -57,7 +66,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const type = req.params.type as any;
     const actor = await resolveActor(req);
-    const csvData = await generateCsvReport(type, actor);
+    const options = {
+      dateFilter: req.query.dateFilter as string | undefined,
+      startDate: req.query.startDate as string | undefined,
+      endDate: req.query.endDate as string | undefined,
+    };
+    const csvData = await generateCsvReport(type, actor, options);
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${type}_report_${Date.now()}.csv"`);
     res.send(csvData);

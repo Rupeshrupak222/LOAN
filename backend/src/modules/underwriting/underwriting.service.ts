@@ -3,6 +3,7 @@ import { prisma } from '../../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type { UnderwritingDecisionInput } from './underwriting.schema';
 
 export async function getUnderwritingQueue(
@@ -56,12 +57,12 @@ export async function submitUnderwritingDecision(
   input: UnderwritingDecisionInput,
   actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
-  // Service layer defense-in-depth: Credit Analysts and non-deciders cannot commit underwriting decisions
-  const DECISION_MAKER_ROLES = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'];
+  // Service layer defense-in-depth: Credit Analysts, System Admins, Super Admins, Branch Managers, and non-deciders cannot commit underwriting decisions
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
   const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
   if (!isAuthorizedDecider) {
     throw new ForbiddenError(
-      'Access forbidden: Credit Analysts and unauthorized roles cannot commit final underwriting decisions. Only Underwriters, Branch Managers, or Administrators can sanction or reject proposals.'
+      'Access forbidden: Only Underwriters and Administrators can commit final underwriting decisions.'
     );
   }
 
@@ -113,8 +114,7 @@ export async function submitUnderwritingDecision(
   );
   if (matchedTier && isApprovalDecision) {
     const requiredRoles: string[] = matchedTier.chain || [];
-    const isSuper = actor.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'ADMIN');
-    const hasAuthority = isSuper || actor.roles?.some((r) => requiredRoles.includes(r));
+    const hasAuthority = actor.roles?.some((r) => requiredRoles.includes(r));
     if (!hasAuthority) {
       throw new BadRequestError(
         `Your role does not have approval limit authority for ₹${requestedAmount.toLocaleString(
@@ -197,6 +197,37 @@ export async function submitUnderwritingDecision(
     title: `Loan Application #${app.applicationNo} Update: ${nextStatus}`,
     message: `Your credit proposal has been updated to ${nextStatus}. Decision: ${input.decision}. ${input.reason ? `Remarks: ${input.reason}` : ''}`,
   }).catch(() => {});
+
+  if (nextStatus === 'APPROVED') {
+    void communicationService.dispatchSystemEvent(
+      'LOAN_APPROVED',
+      {
+        customerId: app.customerId,
+        customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+        customerEmail: app.customer?.email || undefined,
+        customerMobile: app.customer?.mobile || undefined,
+        applicationNo: app.applicationNo,
+        sanctionedAmount: String(app.requestedAmount),
+        tenureMonths: app.tenureMonths,
+        interestRate: Number((app.product as any)?.interestRate || 12.0),
+        emiAmount: String(app.requestedAmount ? Math.round(Number(app.requestedAmount) / (app.tenureMonths || 12)) : '4730'),
+      },
+      app.tenantId || undefined
+    ).catch(() => {});
+  } else if (nextStatus === 'REJECTED') {
+    void communicationService.dispatchSystemEvent(
+      'LOAN_REJECTED',
+      {
+        customerId: app.customerId,
+        customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+        customerEmail: app.customer?.email || undefined,
+        customerMobile: app.customer?.mobile || undefined,
+        applicationNo: app.applicationNo,
+        rejectionReason: input.reason || 'Credit policy threshold criteria not met',
+      },
+      app.tenantId || undefined
+    ).catch(() => {});
+  }
 
   return result;
 }

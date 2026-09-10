@@ -19,6 +19,7 @@ import {
   RotateCcw,
   X,
   FileCheck,
+  Layers,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -36,6 +37,8 @@ import { AdvancedDecisionIntelligenceCard } from '@/components/AdvancedDecisionI
 import { EarlyWarningWidget } from '@/components/EarlyWarningWidget';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
+import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
+import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -57,6 +60,10 @@ export default function ApplicationDetailPage() {
   const [forwardModalOpen, setForwardModalOpen] = useState(false);
   const [forwardReason, setForwardReason] = useState('Credit assessment verified & recommended for underwriting sanction');
 
+  // Loan Officer Submission Modal State
+  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [submitReason, setSubmitReason] = useState('Borrower intake & KYC documents completed. Submitted for credit appraisal.');
+
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -69,6 +76,25 @@ export default function ApplicationDetailPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['application', params.id],
     queryFn: async () => (await api.get(`/applications/${params.id}`)).data.data,
+  });
+
+  // Forward to Credit Analyst Mutation (Loan Officer)
+  const submitToCreditAnalystMutation = useMutation({
+    mutationFn: async () =>
+      api.post(`/applications/${params.id}/transition`, {
+        toStatus: 'SUBMITTED',
+        reason: submitReason.trim() || 'Submitted to Credit Analyst by Loan Officer',
+      }),
+    onSuccess: () => {
+      toast.success('Application submitted to Credit Analyst queue.');
+      queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      setSubmitModalOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Submission Notice' });
+    },
   });
 
   // Borrower KYC Update Mutation
@@ -211,24 +237,52 @@ export default function ApplicationDetailPage() {
   const eligibility = data.eligibility;
   const riskAssessment = data.riskAssessment;
 
-  const isStaff = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'LOAN_OFFICER'].includes(r)
+  const isLoanOfficer = user?.roles?.includes('LOAN_OFFICER');
+  const isCreditAnalyst = user?.roles?.includes('CREDIT_ANALYST');
+  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
+  const isSuperAdmin = user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN'].includes(r));
+  const isAdmin = isSuperAdmin;
+  const isBranchManager = user?.roles?.includes('BRANCH_MANAGER');
+  const isBranchManagerOnly = Boolean(isBranchManager && !isSuperAdmin && !isUnderwriter);
+
+  // Segregation of Duties: Loan Officer is strictly restricted from credit appraisal tools & decisions
+  const isOnlyLoanOfficer = Boolean(isLoanOfficer && !isCreditAnalyst && !isUnderwriter && !isSuperAdmin);
+
+  const isCreditAnalystOrHigher = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COMPANY_ADMIN'].includes(r)
   );
 
-  const canAssessCredit = user?.roles?.some((r: string) =>
+  const hasCreditScore = Boolean(
+    data.riskAssessment &&
+    data.riskAssessment.score !== null &&
+    data.riskAssessment.score !== undefined
+  );
+
+  const isForwardedToUnderwriting = ['UNDERWRITING', 'APPROVED', 'REJECTED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(data.status);
+
+  const canLoanOfficerSubmit =
+    isLoanOfficer &&
+    ['DRAFT'].includes(data.status);
+
+  const canLoanOfficerReForward =
+    (isLoanOfficer || isCreditAnalystOrHigher) &&
+    ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
+
+  const canAssessCredit = !isOnlyLoanOfficer && user?.roles?.some((r: string) =>
     ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
   );
 
   const canForwardToUnderwriting =
-    isStaff &&
-    ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(data.status);
+    !isOnlyLoanOfficer &&
+    ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(data.status);
 
   const canReject =
-    isStaff &&
-    ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(data.status);
+    !isOnlyLoanOfficer &&
+    !['REJECTED', 'DISBURSED', 'CANCELLED'].includes(data.status);
 
   const canMakeUnderwritingDecision =
-    user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)) &&
+    (user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) &&
+    !isBranchManagerOnly &&
     ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
 
   return (
@@ -239,80 +293,192 @@ export default function ApplicationDetailPage() {
         title={`Application #${data.applicationNo || 'N/A'}`}
         subtitle={`Submitted on ${data.createdAt ? formatDate(data.createdAt) : 'N/A'} · Loan Product: ${product.name || 'General Loan'}`}
         action={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <Badge status={data.status} />
+            {(customer.id || data.customerId) && (
+              <Link href={`/customers/${customer.id || data.customerId}`}>
+                <Button size="sm" variant="secondary" className="gap-1.5 font-semibold text-xs cursor-pointer">
+                  <User className="w-3.5 h-3.5 text-brand-600" /> Borrower 360
+                </Button>
+              </Link>
+            )}
+          </div>
+        }
+      />
 
-            {/* 1. Forward to Underwriting Button (Credit Analyst / Staff) */}
-            {canForwardToUnderwriting && (
+      {/* Prominent Action & Workflow Control Bar (Always visible outside) */}
+      <div className={cn(
+        'p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs transition-colors',
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+      )}>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className="text-xs font-semibold text-slate-500">Proposal Controls:</span>
+          <Badge status={data.status} />
+          {!isOnlyLoanOfficer && (
+            hasCreditScore ? (
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Credit Risk Score: {data.riskAssessment.score}/100 ({data.riskAssessment?.category || 'LOW'} Risk)
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Credit Risk Score Pending
+              </span>
+            )
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Credit Assessment Desk Link (Credit Analysts / Staff only) */}
+          {canAssessCredit && (
+            <Link href="/underwriting">
+              <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/40 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 cursor-pointer shadow-2xs">
+                <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Credit Assessment Desk →
+              </Button>
+            </Link>
+          )}
+
+          {/* Button 1: Forward / Re-Forward to Underwriting (Credit Analysts only) */}
+          {canForwardToUnderwriting && (
+            <Button
+              size="sm"
+              disabled={!hasCreditScore}
+              onClick={() => {
+                if (!hasCreditScore) {
+                  toast.warning('Credit risk score must be evaluated in Credit Assessment Desk before forwarding to Underwriter.');
+                  return;
+                }
+                setForwardReason(
+                  isForwardedToUnderwriting
+                    ? 'Application re-forwarded to Underwriting queue for re-appraisal'
+                    : 'Credit assessment verified & recommended for underwriting sanction'
+                );
+                setForwardModalOpen(true);
+              }}
+              className={cn(
+                'gap-1.5 font-semibold text-xs shadow-sm cursor-pointer transition-all',
+                !hasCreditScore
+                  ? 'opacity-60 cursor-not-allowed bg-slate-400 dark:bg-slate-700 text-slate-200'
+                  : 'bg-[#2563EB] hover:bg-blue-700 text-white'
+              )}
+              title={
+                !hasCreditScore
+                  ? 'Credit risk score must be evaluated before forwarding to Underwriter'
+                  : isForwardedToUnderwriting
+                  ? 'Proposal already forwarded. Click to re-forward / resend.'
+                  : 'Forward proposal to Underwriting queue'
+              }
+            >
+              {isForwardedToUnderwriting ? (
+                <>
+                  <RotateCcw className="w-3.5 h-3.5" /> Re-Forward to Underwriter
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" /> Forward to Underwriter
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Button 2: Reject Application (Credit Analysts only) */}
+          {canReject && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
+            <Button
+              size="sm"
+              variant="outline-danger"
+              onClick={() => {
+                setRejectReason('');
+                setRejectModalOpen(true);
+              }}
+              className="gap-1.5 font-semibold text-xs cursor-pointer border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              title="Reject this loan application proposal"
+            >
+              <XCircle className="w-3.5 h-3.5 text-rose-500" /> Reject Application
+            </Button>
+          )}
+
+          {/* Loan Officer Forward / Resend Button */}
+          {isOnlyLoanOfficer && (
+            canLoanOfficerSubmit ? (
               <Button
                 size="sm"
-                onClick={() => setForwardModalOpen(true)}
+                onClick={() => {
+                  setSubmitReason('Initial completed intake submitted for credit appraisal');
+                  setSubmitModalOpen(true);
+                }}
                 className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" />
-                Forward to Underwriting
+                <Send className="w-3.5 h-3.5" /> Forward to Credit Analyst
               </Button>
-            )}
-
-            {/* 2. Direct Underwriter Decision Actions (Step-by-Step Verification & Decision) */}
-            {canMakeUnderwritingDecision && (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => setUwWizardOpen(true)}
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Step-by-Step Verification Desk →
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline-danger"
-                  onClick={() => {
-                    setDecision('REJECT');
-                    setReason('');
-                    setConditions('');
-                    setDecisionModalOpen(true);
-                  }}
-                  className="gap-1.5 cursor-pointer"
-                >
-                  <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                  Reject Loan
-                </Button>
-              </>
-            )}
-
-            {/* 3. If already Approved/Rejected, allow Underwriter to Modify */}
-            {['APPROVED', 'REJECTED'].includes(data.status) && canMakeUnderwritingDecision && (
+            ) : canLoanOfficerReForward ? (
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={() => {
-                  setDecision(data.status === 'APPROVED' ? 'APPROVE' : 'REJECT');
-                  setReason(data.underwriting?.reason || '');
+                  setSubmitReason('Application re-forwarded to Credit Analyst queue for re-evaluation');
+                  setSubmitModalOpen(true);
+                }}
+                className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold text-xs cursor-pointer shadow-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Resend to Credit Analyst
+              </Button>
+            ) : null
+          )}
+
+          {/* Direct Underwriter Decision Actions */}
+          {canMakeUnderwritingDecision && (
+            <>
+              <Button
+                size="sm"
+                onClick={() => setUwWizardOpen(true)}
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" /> Step-by-Step Verification Desk →
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline-danger"
+                onClick={() => {
+                  setDecision('REJECT');
+                  setReason('');
                   setConditions('');
                   setDecisionModalOpen(true);
                 }}
-                className="gap-1.5 text-xs cursor-pointer flex items-center"
+                className="gap-1.5 cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
-                Modify Decision
+                <XCircle className="w-3.5 h-3.5 text-rose-500" /> Reject Loan
               </Button>
-            )}
+            </>
+          )}
 
-            {/* 4. Proceed to Payout (Finance Officer / Admin) */}
-            {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)) &&
-              data.status === 'APPROVED' && (
-                <Link href="/disbursements">
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5">
-                    Proceed to Payout →
-                  </Button>
-                </Link>
-              )}
-          </div>
-        }
-      />
+          {/* Underwriter Modify */}
+          {['APPROVED', 'REJECTED'].includes(data.status) && canMakeUnderwritingDecision && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setDecision(data.status === 'APPROVED' ? 'APPROVE' : 'REJECT');
+                setReason(data.underwriting?.reason || '');
+                setConditions('');
+                setDecisionModalOpen(true);
+              }}
+              className="gap-1.5 text-xs cursor-pointer flex items-center"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-500" /> Modify Decision
+            </Button>
+          )}
+
+          {/* Proceed to Payout */}
+          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'FINANCE_OFFICER'].includes(r)) &&
+            data.status === 'APPROVED' && (
+              <Link href="/disbursements">
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5">
+                  Proceed to Payout →
+                </Button>
+              </Link>
+            )}
+        </div>
+      </div>
 
       {/* Overview KPIs */}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -328,7 +494,7 @@ export default function ApplicationDetailPage() {
           hint={`ID: ${customer.customerCode || 'N/A'}`}
           icon={<User className="h-4 w-4" />}
         />
-        {canAssessCredit ? (
+        {!isOnlyLoanOfficer && canAssessCredit ? (
           <>
             <KpiCard
               label="Eligibility Assessment"
@@ -361,284 +527,79 @@ export default function ApplicationDetailPage() {
         )}
       </div>
 
-      {canAssessCredit ? (
-        <div className="space-y-6">
-          {/* Top Row: Borrower Profile & Loan Product Terms (Side-by-side) */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Borrower Profile Card */}
-            <Card className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Borrower Profile</h3>
-                <button
-                  onClick={() => {
-                    setKycStatusInput(customer.kycStatus || 'VERIFIED');
-                    setRiskCategoryInput(customer.riskCategory || 'LOW');
-                    setKycRemarks('');
-                    setKycModalOpen(true);
-                  }}
-                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer flex items-center gap-1"
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  Update KYC
-                </button>
-              </div>
-              <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
-                <Row label="Customer ID" value={<span className="font-mono font-bold text-blue-600">{customer.customerCode}</span>} />
-                <Row label="Mobile" value={customer.mobile} />
-                <Row label="Email" value={customer.email || '-'} />
-                <Row label="Monthly Income" value={customer.monthlyIncome ? formatMoney(customer.monthlyIncome) : '-'} />
-                <Row label="Existing Debt" value={customer.existingObligations ? formatMoney(customer.existingObligations) : '₹0.00'} />
-                <Row label="KYC Status" value={<Badge status={customer.kycStatus || 'NOT_STARTED'} />} />
-                <Row label="Risk Category" value={<Badge status={customer.riskCategory || 'PENDING'} />} />
-              </dl>
-              <div className="pt-2 flex flex-col sm:flex-row gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setKycStatusInput(customer.kycStatus || 'VERIFIED');
-                    setRiskCategoryInput(customer.riskCategory || 'LOW');
-                    setKycRemarks('');
-                    setKycModalOpen(true);
-                  }}
-                  className="flex-1 text-xs gap-1.5 cursor-pointer text-blue-600 dark:text-blue-400 font-semibold"
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  Verify / Update KYC
-                </Button>
-                <Link href={`/customers/${customer.id}`} className="flex-1">
-                  <Button size="sm" variant="ghost" className="w-full text-xs">View Customer 360 →</Button>
-                </Link>
-              </div>
-            </Card>
-
-            {/* Loan Product Terms Card */}
-            <Card className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Loan Product Terms</h3>
-              <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
-                <Row label="Product Name" value={product.name || 'General Loan'} />
-                <Row label="Product Code" value={<span className="font-mono">{product.code || '-'}</span>} />
-                <Row label="Interest Rate" value={`${product.interestRate || '14.5'}% p.a.`} />
-                <Row label="Tenure Boundaries" value={`${product.minTenureMonths || 6} - ${product.maxTenureMonths || 60} mos`} />
-                <Row label="Method" value={product.interestMethod || 'REDUCING'} />
-                <Row label="Processing Fee" value={`${product.processingFeePct || 0}%`} />
-                <Row label="Purpose" value={data.purpose || 'General Financing'} />
-              </dl>
-            </Card>
-          </div>
-
-          {/* Active Early Warning Surveillance Banner (Full Width) */}
-          <EarlyWarningWidget applicationId={params.id} customerId={data?.customerId} />
-
-          {/* Advanced Decision Intelligence Cockpit (Full Width) */}
-          <AdvancedDecisionIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
-
-          {/* Balanced 2-Column Grid for Credit & Underwriting Intelligence Engines */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
-            {/* Left Column: Credit Intelligence, Eligibility Rule Engine & Simulator */}
-            <div className="space-y-6">
-              {/* AI Credit Intelligence & Decision Support Card */}
-              <CreditIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
-
-              {/* 1. Rule-Based Eligibility Engine Card */}
-              <Card className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold">Rule-Based Eligibility Engine</h3>
-                    <p className="text-xs text-slate-400">Automated policy checks: Age, DTI, Income threshold, and Bureau history</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={eligibilityMutation.isPending}
-                    onClick={() => eligibilityMutation.mutate()}
-                    className="cursor-pointer text-xs"
-                  >
-                    {eligibilityMutation.isPending ? 'Evaluating...' : eligibility ? 'Re-Run Eligibility' : 'Run Eligibility Check'}
-                  </Button>
-                </div>
-
-                {eligibility ? (
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-500">ENGINE RESULT:</span>
-                      <Badge status={eligibility.result} />
-                    </div>
-
-                    <div className="space-y-2">
-                      {Array.isArray(eligibility.factors) &&
-                        eligibility.factors.map((f: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className={cn(
-                              'flex items-start gap-3 rounded-xl border p-3 text-xs',
-                              f.status === 'PASS'
-                                ? 'border-emerald-200 bg-emerald-50/50 text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300'
-                                : f.status === 'WARNING'
-                                ? 'border-amber-200 bg-amber-50/50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'
-                                : 'border-rose-200 bg-rose-50/50 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'
-                            )}
-                          >
-                            {f.status === 'PASS' && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />}
-                            {f.status === 'WARNING' && <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />}
-                            {f.status === 'FAIL' && <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />}
-                            <div>
-                              <p className="font-bold">{f.factor}</p>
-                              <p className="text-slate-600 dark:text-slate-300 mt-0.5">{f.detail}</p>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-[#2B3566]">
-                    Click &quot;Run Eligibility Check&quot; to execute automated policy criteria against borrower attributes.
-                  </div>
-                )}
-              </Card>
-
-              {/* Decision Simulator & What-If Credit Modeler */}
-              {product && (
-                <DecisionSimulatorCard
-                  applicationId={params.id}
-                  applicationNo={data.applicationNo}
-                  baseAmount={Number(data.requestedAmount)}
-                  baseTenure={data.tenureMonths}
-                  baseRate={Number(product.interestRate)}
-                  baseIncome={Number(data.customer?.monthlyIncome || 0)}
-                  baseObligations={Number(data.customer?.existingObligations || 0)}
-                />
-              )}
-
-              {/* AI Bank Statement Intelligence Card */}
-              {data?.customerId && (
-                <BankStatementIntelligenceCard customerId={data.customerId} applicationId={params.id} />
-              )}
-            </div>
-
-            {/* Right Column: Underwriting Briefing, 4-Pillar Scoring, Fraud Intelligence & Audit Trail */}
-            <div className="space-y-6">
-              {/* AI Underwriting Decision Support Briefing */}
-              <UnderwritingIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
-
-              {/* 2. 4-Pillar Credit Risk Scoring Engine */}
-              <Card className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold">4-Pillar Credit Risk Scoring Model</h3>
-                    <p className="text-xs text-slate-400">Vintage (25%), DTI Capacity (30%), Document KYC (20%), and Bureau Performance (25%)</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={riskMutation.isPending}
-                    onClick={() => riskMutation.mutate()}
-                    className="cursor-pointer text-xs"
-                  >
-                    {riskMutation.isPending ? 'Calculating...' : riskAssessment ? 'Re-Score Risk' : 'Calculate Risk Score'}
-                  </Button>
-                </div>
-
-                {riskAssessment ? (
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-2xl font-extrabold text-[#2563EB]">{riskAssessment.score}</span>
-                        <span className="text-xs font-semibold text-slate-400">/ 100</span>
-                      </div>
-                      <Badge status={riskAssessment.category} />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      {Array.isArray(riskAssessment.factors) &&
-                        riskAssessment.factors.map((rf: any, idx: number) => (
-                          <div key={idx} className="rounded-xl border border-slate-100 p-3 text-xs dark:border-[#2B3566] dark:bg-[#1E2445]/50">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-slate-700 dark:text-slate-200">{rf.name}</span>
-                              <span className="font-mono font-bold text-blue-600">{rf.score} pts</span>
-                            </div>
-                            <p className="text-[11px] text-slate-400">{rf.remarks}</p>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-[#2B3566]">
-                    Click &quot;Calculate Risk Score&quot; to generate automated score and risk tier categorization.
-                  </div>
-                )}
-              </Card>
-
-              {/* AI Fraud & Anomaly Intelligence Card */}
-              <FraudIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
-
-              {/* 3. Status History Inspection Trail */}
-              <Card className="space-y-3">
-                <h3 className="text-sm font-bold">Lifecycle Audit Trail</h3>
-                <div className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
-                  {Array.isArray(data.statusHistory) && data.statusHistory.length > 0 ? (
-                    data.statusHistory.map((h: any) => (
-                      <div key={h.id} className="py-2.5 flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <Badge status={h.toStatus} />
-                            <span className="text-slate-400">by {h.changedBy || 'System Engine'}</span>
-                          </div>
-                          {h.reason && <p className="text-[11px] text-slate-600 dark:text-slate-300 italic">{h.reason}</p>}
-                        </div>
-                        <span className="text-[11px] text-slate-400 font-mono">{formatDate(h.createdAt)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-400 py-2">No lifecycle events recorded yet.</p>
-                  )}
-                </div>
-              </Card>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Proposal Intake Overview & Origination Layout for Loan Officers */
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
-          {/* Left Column: Borrower Profile & Loan Product Terms */}
-          <div className="space-y-6">
-            <Card className="space-y-4">
+      {/* Main Application Details & Intelligence Sections */}
+      <div className="space-y-6">
+        {/* Top Row: Borrower Profile & Loan Product Terms (Side-by-side) */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Borrower Profile Card */}
+          <Card className="space-y-4">
+            <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Borrower Profile</h3>
-              <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
-                <Row label="Customer ID" value={<span className="font-mono font-bold text-blue-600">{customer.customerCode}</span>} />
-                <Row label="Mobile" value={customer.mobile} />
-                <Row label="Email" value={customer.email || '-'} />
-                <Row label="Monthly Income" value={customer.monthlyIncome ? formatMoney(customer.monthlyIncome) : '-'} />
-                <Row label="Existing Debt" value={customer.existingObligations ? formatMoney(customer.existingObligations) : '₹0.00'} />
-                <Row label="KYC Status" value={<Badge status={customer.kycStatus || 'NOT_STARTED'} />} />
-                <Row label="Risk Category" value={<Badge status={customer.riskCategory || 'PENDING'} />} />
-              </dl>
-              <div className="pt-2">
-                <Link href={`/customers/${customer.id}`}>
-                  <Button size="sm" variant="ghost" className="w-full text-xs">View Customer 360 →</Button>
-                </Link>
-              </div>
-            </Card>
+              <button
+                onClick={() => {
+                  setKycStatusInput(customer.kycStatus || 'VERIFIED');
+                  setRiskCategoryInput(customer.riskCategory || 'LOW');
+                  setKycRemarks('');
+                  setKycModalOpen(true);
+                }}
+                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Update KYC
+              </button>
+            </div>
+            <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
+              <Row label="Customer ID" value={<span className="font-mono font-bold text-blue-600">{customer.customerCode}</span>} />
+              <Row label="Mobile" value={customer.mobile} />
+              <Row label="Email" value={customer.email || '-'} />
+              <Row label="Monthly Income" value={customer.monthlyIncome ? formatMoney(customer.monthlyIncome) : '-'} />
+              <Row label="Existing Debt" value={customer.existingObligations ? formatMoney(customer.existingObligations) : '₹0.00'} />
+              <Row label="KYC Status" value={<Badge status={customer.kycStatus || 'NOT_STARTED'} />} />
+              <Row label="Risk Category" value={<Badge status={customer.riskCategory || 'PENDING'} />} />
+            </dl>
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setKycStatusInput(customer.kycStatus || 'VERIFIED');
+                  setRiskCategoryInput(customer.riskCategory || 'LOW');
+                  setKycRemarks('');
+                  setKycModalOpen(true);
+                }}
+                className="flex-1 text-xs gap-1.5 cursor-pointer text-blue-600 dark:text-blue-400 font-semibold"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Verify / Update KYC
+              </Button>
+              <Link href={`/customers/${customer.id}`} className="flex-1">
+                <Button size="sm" variant="ghost" className="w-full text-xs">View Customer 360 →</Button>
+              </Link>
+            </div>
+          </Card>
 
-            <Card className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Loan Product Terms</h3>
-              <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
-                <Row label="Product Name" value={product.name || 'General Loan'} />
-                <Row label="Product Code" value={<span className="font-mono">{product.code || '-'}</span>} />
-                <Row label="Interest Rate" value={`${product.interestRate || '14.5'}% p.a.`} />
-                <Row label="Tenure Boundaries" value={`${product.minTenureMonths || 6} - ${product.maxTenureMonths || 60} mos`} />
-                <Row label="Method" value={product.interestMethod || 'REDUCING'} />
-                <Row label="Processing Fee" value={`${product.processingFeePct || 0}%`} />
-              </dl>
-            </Card>
-          </div>
+          {/* Loan Product Terms Card */}
+          <Card className="space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Loan Product Terms</h3>
+            <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
+              <Row label="Product Name" value={product.name || 'General Loan'} />
+              <Row label="Product Code" value={<span className="font-mono">{product.code || '-'}</span>} />
+              <Row label="Interest Rate" value={`${product.interestRate || '14.5'}% p.a.`} />
+              <Row label="Tenure Boundaries" value={`${product.minTenureMonths || 6} - ${product.maxTenureMonths || 60} mos`} />
+              <Row label="Method" value={product.interestMethod || 'REDUCING'} />
+              <Row label="Processing Fee" value={`${product.processingFeePct || 0}%`} />
+              <Row label="Purpose" value={data.purpose || 'General Financing'} />
+            </dl>
+          </Card>
+        </div>
 
-          {/* Right Column: Proposal Intake Summary & Lifecycle Audit Trail */}
-          <div className="space-y-6">
+        {/* FOR LOAN OFFICER: Show strictly Proposal Intake Details & Lifecycle Audit Trail */}
+        {isOnlyLoanOfficer ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
             <Card className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-[#2B3566]">
                 <div>
-                  <h3 className="text-sm font-bold">Proposal Intake Overview</h3>
+                  <h3 className="text-sm font-bold">Proposal Intake Details</h3>
                   <p className="text-xs text-slate-400">Origination submission details and branch processing notes</p>
                 </div>
                 <Badge status={data.status} />
@@ -653,21 +614,47 @@ export default function ApplicationDetailPage() {
                 <Row label="Purpose" value={data.purpose || 'General Financing'} />
               </dl>
 
-              {canForwardToUnderwriting && (
+              {canLoanOfficerSubmit && (
                 <div className="mt-4 rounded-xl bg-blue-50/60 dark:bg-[#1E2445] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-blue-100 dark:border-blue-900/30">
                   <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Ready for Credit Underwriting?</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Ready for Credit Assessment?</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Forward this proposal to the Underwriting desk for policy evaluation and risk assessment.
+                      Forward this proposal to the Credit Analyst desk for appraisal and eligibility verification.
                     </p>
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => setForwardModalOpen(true)}
+                    onClick={() => {
+                      setSubmitReason('Initial completed intake submitted for credit appraisal');
+                      setSubmitModalOpen(true);
+                    }}
                     className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shrink-0 cursor-pointer shadow-sm"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    Forward to Underwriting
+                    Forward to Credit Analyst
+                  </Button>
+                </div>
+              )}
+
+              {canLoanOfficerReForward && (
+                <div className="mt-4 rounded-xl bg-blue-50/60 dark:bg-[#1E2445] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-blue-100 dark:border-blue-900/30">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Re-Forward Application Proposal?</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Proposal is in Credit Appraisal workflow. If documents or terms were revised, you can re-forward it to the analyst desk.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setSubmitReason('Application re-forwarded to Credit Analyst queue for re-evaluation');
+                      setSubmitModalOpen(true);
+                    }}
+                    className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold text-xs shrink-0 cursor-pointer shadow-sm"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Resend to Credit Analyst
                   </Button>
                 </div>
               )}
@@ -694,6 +681,428 @@ export default function ApplicationDetailPage() {
                 )}
               </div>
             </Card>
+          </div>
+        ) : (
+          /* FOR CREDIT ANALYST, UNDERWRITER & STAFF: Full Credit Appraisal and Intelligence Suite */
+          <>
+            {/* Credit Appraisal & Assessment Results Summary */}
+            <div id="credit-appraisal-summary" className="scroll-mt-20">
+              <Card className="p-5 space-y-4 border-2 border-indigo-100 dark:border-indigo-900/40 bg-gradient-to-br from-indigo-50/30 to-slate-50/50 dark:from-indigo-950/20 dark:to-slate-900/40">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100 dark:border-indigo-900/40">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                        Credit Appraisal & Assessment Results Summary
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Consolidated FOIR capacity, eligibility verdict, 4-pillar risk scoring, and credit analyst recommendations
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge status={data.status} />
+                    <Link href="/underwriting">
+                      <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold">
+                        <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Open Assessment Desk
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Eligibility Engine:</span>
+                    <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                      {data.eligibility?.result || 'PENDING'}
+                    </p>
+                    <p className="text-[10px] text-slate-400">Policy rules evaluated</p>
+                  </div>
+
+                  <div className={cn(
+                    "p-3 rounded-xl border space-y-1",
+                    hasCreditScore
+                      ? "bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800"
+                      : "bg-amber-50/80 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40"
+                  )}>
+                    <span className="text-slate-400 text-[11px]">4-Pillar Risk Score:</span>
+                    <p className={cn(
+                      "font-bold text-sm",
+                      hasCreditScore ? "text-slate-800 dark:text-slate-100" : "text-amber-600 dark:text-amber-400"
+                    )}>
+                      {hasCreditScore ? `${data.riskAssessment.score}/100` : 'NOT EVALUATED'}
+                    </p>
+                    <p className={cn(
+                      "text-[10px] font-semibold",
+                      hasCreditScore ? "text-emerald-600" : "text-amber-600"
+                    )}>
+                      {hasCreditScore ? `${data.riskAssessment?.category || customer?.riskCategory || 'LOW'} Risk Tier` : 'Required for Underwriter'}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Borrower KYC Status:</span>
+                    <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                      {customer.kycStatus || 'NOT_STARTED'}
+                    </p>
+                    <p className="text-[10px] text-slate-400">Identity & documents check</p>
+                  </div>
+
+                  <div className="p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Credit Recommendation:</span>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                      {(data.eligibility?.factors as any)?.recommendation?.recommendation || 'PENDING'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      {(data.eligibility?.factors as any)?.recommendation?.notes || 'Awaiting recommendation'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Recommendation Notes Display */}
+                {(data.eligibility?.factors as any)?.recommendation?.notes && (
+                  <div className="p-3 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
+                    <span className="font-bold text-[11px] uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                      Credit Analyst Assessment Rationale & Stipulations:
+                    </span>
+                    <p className="text-xs italic">
+                      &ldquo;{(data.eligibility?.factors as any).recommendation.notes}&rdquo;
+                    </p>
+                    {(data.eligibility?.factors as any).recommendation.conditions && (
+                      <p className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 pt-1">
+                        Sanction Conditions: {(data.eligibility?.factors as any).recommendation.conditions}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Forward to Underwriter Section / Blocker Alert */}
+                {!hasCreditScore ? (
+                  <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <div>
+                        <p className="font-bold text-amber-800 dark:text-amber-200">
+                          Credit Risk Score Evaluation Pending
+                        </p>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                          Proposal cannot be forwarded to Underwriting until the 4-pillar credit risk score is evaluated.
+                        </p>
+                      </div>
+                    </div>
+                    <Link href="/underwriting">
+                      <Button size="sm" className="gap-1.5 font-semibold text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0">
+                        <Calculator className="w-3.5 h-3.5" /> Run Credit Score in Desk →
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div className="text-xs space-y-0.5">
+                      <p className="font-bold text-slate-700 dark:text-slate-200">
+                        {isForwardedToUnderwriting ? 'Proposal in Underwriting Workflow' : 'Credit Assessment Complete — Ready for Underwriter'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {isForwardedToUnderwriting
+                          ? 'Proposal has been forwarded. You can re-forward if updated or decline if invalid.'
+                          : 'All credit scores and recommendations are recorded. Forward proposal to Underwriting committee or reject.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {canReject && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          onClick={() => {
+                            setRejectReason('');
+                            setRejectModalOpen(true);
+                          }}
+                          className="gap-1.5 font-semibold text-xs border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-rose-500" /> Reject Application
+                        </Button>
+                      )}
+                      {canForwardToUnderwriting && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setForwardReason(
+                              isForwardedToUnderwriting
+                                ? 'Application re-forwarded to Underwriting queue for re-appraisal'
+                                : 'Credit assessment verified & recommended for underwriting sanction'
+                            );
+                            setForwardModalOpen(true);
+                          }}
+                          className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0"
+                        >
+                          {isForwardedToUnderwriting ? (
+                            <>
+                              <RotateCcw className="w-3.5 h-3.5" /> Re-Forward to Underwriter
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5" /> Forward to Underwriter
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            {/* Active Early Warning Surveillance Banner (Full Width) */}
+            <EarlyWarningWidget applicationId={params.id} customerId={data?.customerId} />
+
+            {/* Advanced Decision Intelligence Cockpit (Full Width) */}
+            <AdvancedDecisionIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+            {/* Balanced 2-Column Grid for Credit & Underwriting Intelligence Engines */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
+              {/* Left Column: Credit Intelligence, Eligibility Rule Engine & Simulator */}
+              <div className="space-y-6">
+                {/* AI Credit Intelligence & Decision Support Card */}
+                <CreditIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+                {/* 1. Rule-Based Eligibility Engine Card */}
+                <Card className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold">Rule-Based Eligibility Engine</h3>
+                      <p className="text-xs text-slate-400">Automated policy checks: Age, DTI, Income threshold, and Bureau history</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={eligibilityMutation.isPending}
+                      onClick={() => eligibilityMutation.mutate()}
+                      className="cursor-pointer text-xs"
+                    >
+                      {eligibilityMutation.isPending ? 'Evaluating...' : eligibility ? 'Re-Run Eligibility' : 'Run Eligibility Check'}
+                    </Button>
+                  </div>
+
+                  {eligibility ? (
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500">ENGINE RESULT:</span>
+                        <Badge status={eligibility.result} />
+                      </div>
+
+                      <div className="space-y-2">
+                        {Array.isArray(eligibility.factors) &&
+                          eligibility.factors.map((f: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className={cn(
+                                'flex items-start gap-3 rounded-xl border p-3 text-xs',
+                                f.status === 'PASS'
+                                  ? 'border-emerald-200 bg-emerald-50/50 text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300'
+                                  : f.status === 'WARNING'
+                                  ? 'border-amber-200 bg-amber-50/50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'
+                                  : 'border-rose-200 bg-rose-50/50 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'
+                              )}
+                            >
+                              {f.status === 'PASS' && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />}
+                              {f.status === 'WARNING' && <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />}
+                              {f.status === 'FAIL' && <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />}
+                              <div>
+                                <p className="font-bold">{f.factor}</p>
+                                <p className="text-slate-600 dark:text-slate-300 mt-0.5">{f.detail}</p>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-[#2B3566]">
+                      Click &quot;Run Eligibility Check&quot; to execute automated policy criteria against borrower attributes.
+                    </div>
+                  )}
+                </Card>
+
+                {/* Decision Simulator & What-If Credit Modeler */}
+                {product && (
+                  <DecisionSimulatorCard
+                    applicationId={params.id}
+                    applicationNo={data.applicationNo}
+                    baseAmount={Number(data.requestedAmount)}
+                    baseTenure={data.tenureMonths}
+                    baseRate={Number(product.interestRate)}
+                    baseIncome={Number(data.customer?.monthlyIncome || 0)}
+                    baseObligations={Number(data.customer?.existingObligations || 0)}
+                  />
+                )}
+
+                {/* AI Bank Statement Intelligence Card */}
+                {data?.customerId && (
+                  <BankStatementIntelligenceCard customerId={data.customerId} applicationId={params.id} />
+                )}
+              </div>
+
+              {/* Right Column: Underwriting Briefing, 4-Pillar Scoring, Fraud Intelligence & Audit Trail */}
+              <div className="space-y-6">
+                {/* AI Underwriting Decision Support Briefing */}
+                <UnderwritingIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+                {/* 2. 4-Pillar Credit Risk Scoring Engine */}
+                <Card className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold">4-Pillar Credit Risk Scoring Model</h3>
+                      <p className="text-xs text-slate-400">Vintage (25%), DTI Capacity (30%), Document KYC (20%), and Bureau Performance (25%)</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={riskMutation.isPending}
+                      onClick={() => riskMutation.mutate()}
+                      className="cursor-pointer text-xs"
+                    >
+                      {riskMutation.isPending ? 'Calculating...' : riskAssessment ? 'Re-Score Risk' : 'Calculate Risk Score'}
+                    </Button>
+                  </div>
+
+                  {riskAssessment ? (
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl font-extrabold text-[#2563EB]">{riskAssessment.score}</span>
+                          <span className="text-xs font-semibold text-slate-400">/ 100</span>
+                        </div>
+                        <Badge status={riskAssessment.category} />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        {Array.isArray(riskAssessment.factors) &&
+                          riskAssessment.factors.map((rf: any, idx: number) => (
+                            <div key={idx} className="rounded-xl border border-slate-100 p-3 text-xs dark:border-[#2B3566] dark:bg-[#1E2445]/50">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-bold text-slate-700 dark:text-slate-200">{rf.name}</span>
+                                <span className="font-mono font-bold text-blue-600">{rf.score} pts</span>
+                              </div>
+                              <p className="text-[11px] text-slate-400">{rf.remarks}</p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-[#2B3566]">
+                      Click &quot;Calculate Risk Score&quot; to generate automated score and risk tier categorization.
+                    </div>
+                  )}
+                </Card>
+
+                {/* AI Fraud & Anomaly Intelligence Card */}
+                <FraudIntelligenceCard applicationId={params.id} applicationNo={data.applicationNo} />
+
+                {/* 3. Status History Inspection Trail */}
+                <Card className="space-y-3">
+                  <h3 className="text-sm font-bold">Lifecycle Audit Trail</h3>
+                  <div className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
+                    {Array.isArray(data.statusHistory) && data.statusHistory.length > 0 ? (
+                      data.statusHistory.map((h: any) => (
+                        <div key={h.id} className="py-2.5 flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <Badge status={h.toStatus} />
+                              <span className="text-slate-400">by {h.changedBy || 'System Engine'}</span>
+                            </div>
+                            {h.reason && <p className="text-[11px] text-slate-600 dark:text-slate-300 italic">{h.reason}</p>}
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono">{formatDate(h.createdAt)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 py-2">No lifecycle events recorded yet.</p>
+                    )}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* MODAL 0: FORWARD TO CREDIT ANALYST MODAL (LOAN OFFICER) */}
+      {submitModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div
+            className={cn(
+              'w-full max-w-md rounded-2xl border shadow-2xl p-6 relative transition-all',
+              isDark ? 'bg-[#171B36] border-[#2B3566] text-white' : 'bg-white border-slate-200 text-slate-900'
+            )}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#2B3566]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">
+                    {data.status === 'DRAFT' ? 'Forward to Credit Analyst' : 'Re-Forward to Credit Analyst'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {data.status === 'DRAFT'
+                      ? 'Submit completed intake for credit appraisal'
+                      : 'Re-submit application to Credit Analyst queue'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSubmitModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 pt-4">
+              <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-[#1E2445] text-xs space-y-1">
+                <p className="font-semibold text-slate-700 dark:text-slate-200">
+                  Application: <span className="font-mono text-blue-600 font-bold">{data.applicationNo}</span>
+                </p>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Borrower: {customer.firstName} {customer.lastName} ({formatMoney(data.requestedAmount)})
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
+                  Intake & Field Verification Note *
+                </label>
+                <textarea
+                  rows={3}
+                  value={submitReason}
+                  onChange={(e) => setSubmitReason(e.target.value)}
+                  className={cn(
+                    'w-full rounded-xl border p-3 text-xs focus:border-[#2563EB] focus:outline-none',
+                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-white' : 'border-slate-300 bg-white text-slate-900'
+                  )}
+                  placeholder="Enter notes for Credit Analyst..."
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[#2B3566]">
+                <Button variant="ghost" onClick={() => setSubmitModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!submitReason.trim() || submitToCreditAnalystMutation.isPending}
+                  onClick={() => submitToCreditAnalystMutation.mutate()}
+                  className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold gap-1.5"
+                >
+                  {data.status === 'DRAFT' ? <Send className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  {submitToCreditAnalystMutation.isPending
+                    ? 'Submitting...'
+                    : data.status === 'DRAFT'
+                    ? 'Confirm & Forward to Credit Analyst'
+                    : 'Confirm & Re-Forward to Credit Analyst'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -934,11 +1343,13 @@ export default function ApplicationDetailPage() {
       )}
 
       {/* Underwriter Step-by-Step Verification Wizard */}
-      <UnderwritingVerificationWizard
-        application={data}
-        isOpen={uwWizardOpen}
-        onClose={() => setUwWizardOpen(false)}
-      />
+      {(isUnderwriter || isAdmin) && (
+        <UnderwritingVerificationWizard
+          application={data}
+          isOpen={uwWizardOpen}
+          onClose={() => setUwWizardOpen(false)}
+        />
+      )}
 
       {/* MODAL 4: KYC VERIFICATION & COMPLIANCE MODAL */}
       {kycModalOpen && (

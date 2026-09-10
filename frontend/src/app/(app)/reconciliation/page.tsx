@@ -23,6 +23,10 @@ import {
   Check,
   X,
   Lock,
+  ExternalLink,
+  Zap,
+  HelpCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api, apiErrorMessage } from '@/lib/api';
@@ -30,13 +34,18 @@ import { PageHeader } from '@/components/PageHeader';
 import { Badge, Card, KpiCard, Spinner, Button, Input } from '@/components/ui';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-
+import { useTheme } from '@/lib/theme';
 import { useToast } from '@/lib/toast';
 
 export default function ReconciliationPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const toast = useToast();
+
+  const isReconciliationAuthorized = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'].includes(r)
+  );
 
   const [activeTab, setActiveTab] = useState<'EXCEPTIONS' | 'ADJUSTMENTS' | 'PILLARS'>('EXCEPTIONS');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -58,12 +67,14 @@ export default function ReconciliationPage() {
   // 1. Fetch Dashboard Stats
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['reconciliation-dashboard'],
+    enabled: !!user && isReconciliationAuthorized,
     queryFn: async () => (await api.get('/reconciliation/dashboard')).data.data,
   });
 
   // 2. Fetch Exceptions
   const { data: exceptions = [], isLoading: exceptionsLoading } = useQuery({
     queryKey: ['reconciliation-exceptions', severityFilter, statusFilter],
+    enabled: !!user && isReconciliationAuthorized,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (severityFilter !== 'ALL') params.set('severity', severityFilter);
@@ -76,6 +87,7 @@ export default function ReconciliationPage() {
   // 3. Fetch Adjustments
   const { data: adjustments = [], isLoading: adjustmentsLoading } = useQuery({
     queryKey: ['reconciliation-adjustments'],
+    enabled: !!user && isReconciliationAuthorized,
     queryFn: async () => (await api.get('/reconciliation/adjustments')).data.data,
   });
 
@@ -83,12 +95,12 @@ export default function ReconciliationPage() {
   const runMutation = useMutation({
     mutationFn: async () => (await api.post('/reconciliation/run')).data.data,
     onSuccess: (data) => {
-      toast.success('Reconciliation Engine Completed', `Scanned ${data.scannedCount} items, found ${data.exceptionsFound} exceptions.`);
+      toast.success('Reconciliation Check Completed', `Scanned ${data.scannedCount} items, found ${data.exceptionsFound} discrepancies.`);
       queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['reconciliation-exceptions'] });
     },
     onError: (err: any) => {
-      toast.error('Reconciliation Run Failed', apiErrorMessage(err));
+      toast.error('Reconciliation Check Failed', apiErrorMessage(err));
     },
   });
 
@@ -157,173 +169,241 @@ export default function ReconciliationPage() {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
-      e.whatHappened.toLowerCase().includes(q) ||
+      (e.whatHappened && e.whatHappened.toLowerCase().includes(q)) ||
       (e.loanNo && e.loanNo.toLowerCase().includes(q)) ||
-      (e.reference && e.reference.toLowerCase().includes(q))
+      (e.reference && e.reference.toLowerCase().includes(q)) ||
+      (e.type && e.type.toLowerCase().includes(q))
     );
   });
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case 'CRITICAL':
-        return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200';
+        return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800';
       case 'HIGH':
-        return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200';
+        return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800';
       case 'MEDIUM':
-        return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-200';
+        return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800';
       default:
-        return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200';
+        return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
     }
   };
 
   const willRequireApproval = adjAmount >= 5000 || adjType === 'REVERSAL' || adjType === 'LEDGER_CORRECTION';
 
+  if (user && !isReconciliationAuthorized) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Servicing / Reconciliation"
+          title="Financial Reconciliation & Ledger Balancing"
+          subtitle="Access Restricted"
+        />
+        <div className="max-w-2xl mx-auto rounded-2xl border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#171B36] p-8 text-center space-y-5 my-8 shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Accounting & Reconciliation Access Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Financial reconciliation, 5-pillar ledger balancing, and accounting adjustments are restricted exclusively to Finance Officers, Branch Managers, and authorized Compliance Auditors.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, Collection Officers record customer repayments in the field, while Finance Officers perform secondary verification, ledger reconciliation, and settlement.
+            </p>
+          </div>
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/loans">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                View Loan Accounts
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="md" variant="secondary">
+                Return to Dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* PAGE HEADER */}
       <PageHeader
         breadcrumb="Servicing / Accounting & Reconciliation"
-        title="Advanced Accounting & Reconciliation"
-        subtitle="Automated 5-pillar ledger reconciliation, mismatch exception tracking, and Maker-Checker financial adjustment controls"
+        title="Bank Reconciliation & Ledger Audit Desk"
+        subtitle="Detect bank-to-ledger mismatches, resolve payment discrepancies, and approve financial adjustments"
         action={
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
-              size="sm"
+              size="md"
               onClick={() => setShowProposeModal(true)}
-              className="text-xs flex items-center gap-1.5 cursor-pointer"
+              className="text-xs flex items-center gap-1.5 font-semibold cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5" /> Propose Adjustment
+              <Plus className="h-3.5 w-3.5" /> Propose Ledger Adjustment
             </Button>
             <Button
-              variant="primary"
-              size="sm"
+              size="md"
               disabled={runMutation.isPending}
               onClick={() => runMutation.mutate()}
-              className="text-xs flex items-center gap-1.5 cursor-pointer"
+              className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs flex items-center gap-1.5 font-semibold cursor-pointer shadow-sm"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', runMutation.isPending && 'animate-spin')} />
-              {runMutation.isPending ? 'Reconciling...' : 'Run Reconciliation Engine'}
+              {runMutation.isPending ? 'Auditing Ledgers...' : 'Run Audit Check'}
             </Button>
           </div>
         }
       />
 
-      {/* Top Level KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+      {/* TOP 4 KPI CARDS */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          title="Recon Health"
+          label="Reconciliation Health"
           value={`${stats?.reconciliationHealthPercent ?? 100}%`}
-          subtext="Volume match rate"
-          icon={<ShieldCheck className="h-5 w-5 text-emerald-600" />}
+          hint="Volume match rate across all loans"
+          icon={<ShieldCheck className="h-4 w-4 text-emerald-600" />}
         />
         <KpiCard
-          title="Reconciled Volume"
-          value={`₹${(stats?.totalReconciledVolume ?? 0).toLocaleString('en-IN')}`}
-          subtext="Total successful payments"
-          icon={<DollarSign className="h-5 w-5 text-blue-600" />}
-        />
-        <KpiCard
-          title="Active Exceptions"
+          label="Active Discrepancies"
           value={String(stats?.totalActiveExceptions ?? 0)}
-          subtext={`${stats?.criticalExceptionsCount ?? 0} critical mismatches`}
-          icon={<AlertTriangle className="h-5 w-5 text-rose-600" />}
+          hint={
+            stats?.criticalExceptionsCount && stats.criticalExceptionsCount > 0
+              ? `${stats.criticalExceptionsCount} critical mismatch(es)`
+              : 'All records balanced'
+          }
+          icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
         />
         <KpiCard
-          title="Pending Approvals"
-          value={String(stats?.pendingAdjustmentsCount ?? 0)}
-          subtext="Maker-Checker queue"
-          icon={<UserCheck className="h-5 w-5 text-amber-600" />}
-        />
-        <KpiCard
-          title="Discrepancy Volume"
+          label="Discrepancy Value"
           value={`₹${(stats?.totalDiscrepancyAmount ?? 0).toLocaleString('en-IN')}`}
-          subtext="Unreconciled delta"
-          icon={<Scale className="h-5 w-5 text-purple-600" />}
+          hint="Unreconciled delta balance"
+          icon={<Scale className="h-4 w-4 text-rose-500" />}
+        />
+        <KpiCard
+          label="Pending Approvals"
+          value={String(stats?.pendingAdjustmentsCount ?? 0)}
+          hint="Maker-Checker dual control queue"
+          icon={<UserCheck className="h-4 w-4 text-blue-600" />}
         />
       </div>
 
-      {/* Tabs Toolbar */}
-      <Card className="p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1E2445] pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto text-xs">
-            <button
-              type="button"
-              onClick={() => setActiveTab('EXCEPTIONS')}
-              className={cn(
-                'px-3.5 py-1.5 font-bold rounded-lg transition-colors cursor-pointer',
-                activeTab === 'EXCEPTIONS'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-[#1E2445] dark:text-slate-400'
-              )}
-            >
-              Financial Exceptions Queue ({exceptions.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('ADJUSTMENTS')}
-              className={cn(
-                'px-3.5 py-1.5 font-bold rounded-lg transition-colors cursor-pointer',
-                activeTab === 'ADJUSTMENTS'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-[#1E2445] dark:text-slate-400'
-              )}
-            >
-              Adjustments & Maker-Checker ({adjustments.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('PILLARS')}
-              className={cn(
-                'px-3.5 py-1.5 font-bold rounded-lg transition-colors cursor-pointer',
-                activeTab === 'PILLARS'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-[#1E2445] dark:text-slate-400'
-              )}
-            >
-              5-Pillar Ledger Verifiers
-            </button>
-          </div>
-
-          {activeTab === 'EXCEPTIONS' && (
-            <div className="flex items-center gap-2 shrink-0">
-              <select
-                value={severityFilter}
-                onChange={(e) => setSeverityFilter(e.target.value)}
-                className="text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-transparent px-2.5 py-1.5 text-slate-700 dark:text-slate-200 font-medium focus:outline-none"
-              >
-                <option value="ALL">All Severities</option>
-                <option value="CRITICAL">Critical</option>
-                <option value="HIGH">High</option>
-                <option value="MEDIUM">Medium</option>
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-transparent px-2.5 py-1.5 text-slate-700 dark:text-slate-200 font-medium focus:outline-none"
-              >
-                <option value="OPEN">Open Exceptions</option>
-                <option value="ADJUSTED">Adjusted</option>
-                <option value="DISMISSED">Dismissed</option>
-                <option value="ALL">All Statuses</option>
-              </select>
-            </div>
+      {/* TABS HEADER */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-[#2B3566] pb-2">
+        <button
+          onClick={() => setActiveTab('EXCEPTIONS')}
+          className={cn(
+            'px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2',
+            activeTab === 'EXCEPTIONS'
+              ? 'bg-[#2563EB] text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
           )}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          1. Discrepancy & Mismatch Exceptions ({exceptions.length})
+          {stats?.totalActiveExceptions > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold">
+              {stats.totalActiveExceptions}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ADJUSTMENTS')}
+          className={cn(
+            'px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2',
+            activeTab === 'ADJUSTMENTS'
+              ? 'bg-[#2563EB] text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          )}
+        >
+          <UserCheck className="w-3.5 h-3.5" />
+          2. Maker-Checker Adjustments Queue ({adjustments.length})
+          {stats?.pendingAdjustmentsCount > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-400 text-slate-950 font-extrabold">
+              {stats.pendingAdjustmentsCount} Pending
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('PILLARS')}
+          className={cn(
+            'px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2',
+            activeTab === 'PILLARS'
+              ? 'bg-[#2563EB] text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          )}
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          3. Automated 5-Pillar Audit Rules
+        </button>
+      </div>
+
+      {/* CONTEXTUAL HELPER BANNER */}
+      <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#1E2445]/60 border border-slate-200/60 dark:border-[#2B3566] text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            {activeTab === 'EXCEPTIONS' && <AlertTriangle className="w-4 h-4" />}
+            {activeTab === 'ADJUSTMENTS' && <UserCheck className="w-4 h-4" />}
+            {activeTab === 'PILLARS' && <ShieldCheck className="w-4 h-4" />}
+          </div>
+          <div>
+            <p className="font-bold text-slate-800 dark:text-slate-100">
+              {activeTab === 'EXCEPTIONS' && 'Financial Discrepancy & Exception Queue'}
+              {activeTab === 'ADJUSTMENTS' && 'Maker-Checker Financial Adjustment Approval Queue'}
+              {activeTab === 'PILLARS' && '5 Continuous Financial Integrity Verification Engines'}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {activeTab === 'EXCEPTIONS' && 'Shows mismatches between bank UTRs, loan amortization schedules, and double-entry accounts. Click "Propose Remedial Adjustment" to resolve.'}
+              {activeTab === 'ADJUSTMENTS' && 'Dual-authorization controls for fee waivers, payment reversals, and balance adjustments exceeding standard authority thresholds.'}
+              {activeTab === 'PILLARS' && 'Active system audit rules monitoring allocation consistency, duplicate debits, amortization sync, and payout clearances.'}
+            </p>
+          </div>
         </div>
 
         {activeTab === 'EXCEPTIONS' && (
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search exceptions by loan #, reference, UTR, or description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 text-xs"
-            />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className="text-xs rounded-xl border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#1E2445] px-2.5 py-1.5 text-slate-700 dark:text-slate-200 font-semibold focus:outline-none"
+            >
+              <option value="ALL">All Severities</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="text-xs rounded-xl border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#1E2445] px-2.5 py-1.5 text-slate-700 dark:text-slate-200 font-semibold focus:outline-none"
+            >
+              <option value="OPEN">Open Only</option>
+              <option value="ADJUSTED">Adjusted</option>
+              <option value="DISMISSED">Dismissed</option>
+              <option value="ALL">All Statuses</option>
+            </select>
           </div>
         )}
-      </Card>
+      </div>
+
+      {/* SEARCH BAR (FOR EXCEPTIONS) */}
+      {activeTab === 'EXCEPTIONS' && (
+        <div className="max-w-sm">
+          <Input
+            placeholder="Search exceptions by loan #, UTR, or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      )}
 
       {/* TAB 1: FINANCIAL EXCEPTIONS QUEUE */}
       {activeTab === 'EXCEPTIONS' && (
@@ -331,28 +411,40 @@ export default function ReconciliationPage() {
           {exceptionsLoading ? (
             <Card className="p-8 text-center space-y-2">
               <Spinner />
-              <p className="text-xs text-slate-400">Loading reconciliation exceptions...</p>
+              <p className="text-xs text-slate-400">Scanning ledger reconciliation exceptions...</p>
             </Card>
           ) : filteredExceptions.length === 0 ? (
-            <Card className="p-12 text-center space-y-2">
-              <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+            <Card className="p-12 text-center space-y-3">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-full w-14 h-14 flex items-center justify-center mx-auto text-emerald-600">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
                 Zero Financial Exceptions
               </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                All payment allocations, amortization schedules, gateway submissions, and disbursement instructions reconcile cleanly against core ledger balances.
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                All payment allocations, amortization schedules, gateway UTR proofs, and electronic disbursements reconcile cleanly against core ledger balances.
               </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => runMutation.mutate()}
+                disabled={runMutation.isPending}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', runMutation.isPending && 'animate-spin')} />
+                Re-Run Verification
+              </Button>
             </Card>
           ) : (
             filteredExceptions.map((exc: any) => (
               <Card
                 key={exc.exceptionId}
                 className={cn(
-                  'p-4.5 space-y-3 border transition-all',
-                  exc.severity === 'CRITICAL' && 'border-rose-300 dark:border-rose-900/60 bg-rose-50/10'
+                  'p-5 space-y-3.5 border transition-all',
+                  exc.severity === 'CRITICAL' ? 'border-rose-300 dark:border-rose-900/60 bg-rose-50/10' : ''
                 )}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-[#1E2445] pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-[#2B3566] pb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className={cn(
@@ -362,7 +454,7 @@ export default function ReconciliationPage() {
                     >
                       {exc.severity}
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 font-semibold">
                       {exc.type}
                     </span>
                     {exc.loanNo && (
@@ -370,7 +462,7 @@ export default function ReconciliationPage() {
                         href={`/loans/${exc.loanId}`}
                         className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono"
                       >
-                        Loan #{exc.loanNo} <ArrowRight className="h-3 w-3" />
+                        Loan #{exc.loanNo} <ExternalLink className="h-3 w-3" />
                       </Link>
                     )}
                   </div>
@@ -398,23 +490,22 @@ export default function ReconciliationPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5 text-xs">
-                  <p className="text-slate-800 dark:text-slate-200 font-medium">
+                <div className="space-y-2 text-xs">
+                  <p className="text-slate-800 dark:text-slate-200 font-semibold text-sm">
                     {exc.whatHappened}
                   </p>
-                  <p className="text-slate-600 dark:text-slate-400 text-[11px]">
-                    <strong>Evidence:</strong> {exc.evidence} (Source: {exc.source})
+                  <p className="text-slate-600 dark:text-slate-400 text-xs">
+                    <strong>Evidence / Trace:</strong> {exc.evidence} (Source: {exc.source})
                   </p>
-                  <div className="p-2.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-[11px] text-blue-900 dark:text-blue-200">
-                    <strong>Recommended Action:</strong> {exc.recommendedAction}
+                  <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-xs text-blue-900 dark:text-blue-200">
+                    <strong>Recommended Remedial Action:</strong> {exc.recommendedAction}
                   </div>
                 </div>
 
                 {exc.status === 'OPEN' && (
-                  <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-[#1E2445]">
+                  <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-[#2B3566]">
                     <Button
                       size="sm"
-                      variant="primary"
                       onClick={() => {
                         setAdjLoanId(exc.loanId || '');
                         setAdjExceptionId(exc.exceptionId);
@@ -422,7 +513,7 @@ export default function ReconciliationPage() {
                         setAdjReason(`Resolution for ${exc.type}: ${exc.evidence}`);
                         setShowProposeModal(true);
                       }}
-                      className="text-xs flex items-center gap-1 cursor-pointer"
+                      className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
                       <Plus className="h-3.5 w-3.5" /> Propose Remedial Adjustment
                     </Button>
@@ -440,32 +531,45 @@ export default function ReconciliationPage() {
           {adjustmentsLoading ? (
             <Card className="p-8 text-center space-y-2">
               <Spinner />
-              <p className="text-xs text-slate-400">Loading ledger adjustments...</p>
+              <p className="text-xs text-slate-400">Loading ledger adjustment requests...</p>
             </Card>
           ) : adjustments.length === 0 ? (
-            <Card className="p-12 text-center space-y-2">
-              <FileCheck className="h-10 w-10 text-slate-400 mx-auto" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Zero Ledger Adjustments
+            <Card className="p-12 text-center space-y-3">
+              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full w-14 h-14 flex items-center justify-center mx-auto text-slate-500">
+                <FileCheck className="h-8 w-8" />
+              </div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                Zero Pending Adjustments
               </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                No manual ledger corrections or Maker-Checker adjustment requests have been recorded yet.
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                No manual ledger corrections or Maker-Checker adjustment requests are currently in the approval queue.
               </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowProposeModal(true)}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" /> Propose New Adjustment
+              </Button>
             </Card>
           ) : (
             adjustments.map((adj: any) => (
-              <Card key={adj.adjustmentId} className="p-4.5 space-y-3 border">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-[#1E2445] pb-3">
-                  <div className="flex items-center gap-2">
+              <Card key={adj.adjustmentId} className="p-5 space-y-3.5 border">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-[#2B3566] pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 border border-blue-200 dark:border-blue-800 font-bold">
                       {adj.type}
                     </span>
                     <span className="text-xs font-bold text-slate-900 dark:text-white font-mono">
                       #{adj.adjustmentId}
                     </span>
-                    <span className="text-xs text-slate-500 font-mono">
-                      Loan #{adj.loanNo}
-                    </span>
+                    <Link
+                      href={`/loans/${adj.loanId}`}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono font-semibold flex items-center gap-1"
+                    >
+                      Loan #{adj.loanNo} <ExternalLink className="h-3 w-3" />
+                    </Link>
                   </div>
 
                   <div className="flex items-center gap-3 text-xs">
@@ -476,10 +580,10 @@ export default function ReconciliationPage() {
                       className={cn(
                         'text-[10px] font-bold px-2 py-0.5 rounded-full border',
                         adj.status === 'APPROVED'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
                           : adj.status === 'REJECTED'
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
+                          : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
                       )}
                     >
                       {adj.status}
@@ -489,9 +593,9 @@ export default function ReconciliationPage() {
 
                 <div className="space-y-1.5 text-xs">
                   <p className="text-slate-700 dark:text-slate-300">
-                    <strong>Rationale:</strong> {adj.reason}
+                    <strong>Adjustment Rationale:</strong> {adj.reason}
                   </p>
-                  <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400 text-[11px]">
+                  <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400 text-[11px] flex-wrap">
                     <span>Proposed by: <strong className="text-slate-700 dark:text-slate-300">{adj.proposedBy}</strong></span>
                     <span>Proposed at: {formatDateTime(adj.proposedAt)}</span>
                     {adj.approvedBy && (
@@ -508,7 +612,7 @@ export default function ReconciliationPage() {
                 </div>
 
                 {adj.status === 'PENDING_APPROVAL' && (
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#1E2445]">
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#2B3566]">
                     <Button
                       size="sm"
                       variant="secondary"
@@ -519,12 +623,12 @@ export default function ReconciliationPage() {
                     </Button>
                     <Button
                       size="sm"
-                      variant="primary"
                       disabled={approveMutation.isPending}
                       onClick={() => approveMutation.mutate(adj.adjustmentId)}
-                      className="text-xs flex items-center gap-1 cursor-pointer"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
-                      <Check className="h-3.5 w-3.5" /> Approve & Apply to Ledger
+                      <Check className="h-3.5 w-3.5" />
+                      {approveMutation.isPending ? 'Applying...' : 'Approve & Apply to Ledger'}
                     </Button>
                   </div>
                 )}
@@ -537,63 +641,88 @@ export default function ReconciliationPage() {
       {/* TAB 3: 5-PILLAR RECONCILIATION OVERVIEW */}
       {activeTab === 'PILLARS' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card className="p-4.5 space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                1. Repayment Allocation Consistency
-              </h4>
+          <Card className="p-5 space-y-2.5 border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  1. Repayment Allocation Consistency
+                </h4>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
+              </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Verifies that the sum of payment allocation buckets (Principal, Interest, Fees, Penalty) precisely equals the captured transaction amount on every payment record.
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Verifies that the sum of payment allocation buckets (Principal, Interest, Fees, Penalty) precisely equals the captured transaction amount on every single payment record.
             </p>
           </Card>
 
-          <Card className="p-4.5 space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                2. Outstanding Balance Consistency
-              </h4>
+          <Card className="p-5 space-y-2.5 border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  2. Outstanding Balance Consistency
+                </h4>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
+              </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               Cross-validates that the Loan Master total outstanding principal matches the exact sum of remaining unpaid principal installments across the amortization schedule.
             </p>
           </Card>
 
-          <Card className="p-4.5 space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                3. Gateway / Submission Reconciliation
-              </h4>
+          <Card className="p-5 space-y-2.5 border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  3. Gateway & UTR Proof Reconciliation
+                </h4>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
+              </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Scans verified borrower payment submissions and digital gateway webhooks to verify that every verified customer transfer has a corresponding ledger payment.
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Scans verified borrower payment submissions and digital gateway webhooks to verify that every verified customer transfer has a corresponding ledger payment record.
             </p>
           </Card>
 
-          <Card className="p-4.5 space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                4. Duplicate Transaction Detection
-              </h4>
+          <Card className="p-5 space-y-2.5 border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  4. Duplicate Transaction Detection
+                </h4>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
+              </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               Continuously scans for multiple successful payments that share identical bank references or UTR strings, preventing accidental double-credits or accounting inflation.
             </p>
           </Card>
 
-          <Card className="p-4.5 space-y-2 sm:col-span-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                5. Disbursement Instruction vs Bank Status
-              </h4>
+          <Card className="p-5 space-y-2.5 border sm:col-span-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  5. Disbursement Instruction vs Banking Rails
+                </h4>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
+              </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Ensures that all loans marked ACTIVE or OVERDUE in the lending portfolio have an electronic fund release instruction verified as COMPLETED by the banking gateway.
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Ensures that all loans marked ACTIVE or OVERDUE in the lending portfolio have an electronic fund release instruction verified as COMPLETED by the core banking gateway.
             </p>
           </Card>
         </div>
@@ -601,30 +730,42 @@ export default function ReconciliationPage() {
 
       {/* MODAL 1: PROPOSE ADJUSTMENT */}
       {showProposeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0E1528] p-6 shadow-dropdown space-y-4 border border-slate-200 dark:border-[#1E2445]">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#1E2445]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Propose Controlled Ledger Adjustment
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div
+            className={cn(
+              'w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-4 transition-all',
+              isDark ? 'bg-[#171B36] border-[#2B3566] text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2B3566]">
+              <div>
+                <h3 className={cn('text-base font-bold', isDark ? 'text-white' : 'text-slate-900')}>
+                  Propose Controlled Ledger Adjustment
+                </h3>
+                <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                  Submit balance re-allocation, fee waiver, or payment reversal request
+                </p>
+              </div>
               <button
-                type="button"
                 onClick={() => setShowProposeModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Adjustment Type
+                <label className={cn('block text-xs font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                  Adjustment Type *
                 </label>
                 <select
                   value={adjType}
                   onChange={(e) => setAdjType(e.target.value as any)}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-transparent text-xs"
+                  className={cn(
+                    'w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none',
+                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
+                  )}
                 >
                   <option value="REALLOCATION">Bucket Reallocation (Principal vs Interest)</option>
                   <option value="REVERSAL">Payment Reversal (Refund / Double Debit)</option>
@@ -634,33 +775,31 @@ export default function ReconciliationPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className={cn('block text-xs font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
                   Target Loan ID *
                 </label>
                 <Input
                   value={adjLoanId}
                   onChange={(e) => setAdjLoanId(e.target.value)}
-                  placeholder="e.g. loan-uuid-string"
-                  className="text-xs"
+                  placeholder="e.g. loan UUID or account string"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className={cn('block text-xs font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
                   Adjustment Amount (₹) *
                 </label>
                 <Input
                   type="number"
                   value={adjAmount}
                   onChange={(e) => setAdjAmount(Number(e.target.value))}
-                  className="text-xs"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className={cn('block text-xs font-semibold mb-1', isDark ? 'text-slate-300' : 'text-slate-700')}>
                   Mandatory Audit Rationale *
                 </label>
                 <textarea
@@ -668,14 +807,17 @@ export default function ReconciliationPage() {
                   value={adjReason}
                   onChange={(e) => setAdjReason(e.target.value)}
                   placeholder="Detail the accounting reason and documentary proof for this adjustment..."
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs bg-transparent focus:outline-none focus:border-blue-500"
+                  className={cn(
+                    'w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none',
+                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-white' : 'border-slate-300 bg-white text-slate-900'
+                  )}
                   required
                 />
               </div>
 
               <div
                 className={cn(
-                  'p-2.5 rounded-lg border text-[11px]',
+                  'p-3 rounded-xl border text-[11px]',
                   willRequireApproval
                     ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/40'
                     : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900/40'
@@ -683,28 +825,26 @@ export default function ReconciliationPage() {
               >
                 {willRequireApproval ? (
                   <span>
-                    <strong>Maker-Checker Control:</strong> This adjustment exceeds ₹5,000 or is a reversal/correction, and will require formal approval by a Finance Officer or Admin.
+                    <strong>Maker-Checker Dual Control:</strong> This adjustment exceeds ₹5,000 or is a reversal/correction, and will require formal dual-approval by another Finance Officer or Admin.
                   </span>
                 ) : (
                   <span>
-                    <strong>Auto-Approve Threshold:</strong> Standard adjustments below ₹5,000 are recorded and applied directly under delegated authority.
+                    <strong>Delegated Authority:</strong> Standard adjustments below ₹5,000 are recorded and applied directly to the ledger.
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#1E2445]">
-              <Button variant="secondary" size="sm" onClick={() => setShowProposeModal(false)}>
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200 dark:border-[#2B3566]">
+              <Button variant="ghost" onClick={() => setShowProposeModal(false)}>
                 Cancel
               </Button>
               <Button
-                variant="primary"
-                size="sm"
                 disabled={!adjLoanId.trim() || adjReason.trim().length < 5 || proposeMutation.isPending}
                 onClick={() => proposeMutation.mutate()}
-                className="text-xs cursor-pointer"
+                className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold"
               >
-                {proposeMutation.isPending ? 'Submitting...' : 'Submit Adjustment'}
+                {proposeMutation.isPending ? 'Submitting...' : 'Submit Adjustment Request'}
               </Button>
             </div>
           </div>
@@ -713,48 +853,33 @@ export default function ReconciliationPage() {
 
       {/* MODAL 2: REJECT ADJUSTMENT */}
       {rejectModalAdj && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0E1528] p-6 shadow-dropdown space-y-4 border border-slate-200 dark:border-[#1E2445]">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#1E2445]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Reject Ledger Adjustment
-              </h3>
-              <button
-                type="button"
-                onClick={() => setRejectModalAdj(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-              >
-                ✕
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div
+            className={cn(
+              'w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-4',
+              isDark ? 'bg-[#171B36] border-[#2B3566] text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+            )}
+          >
+            <h3 className="text-base font-bold">Reject Ledger Adjustment</h3>
+            <p className="text-xs text-slate-400">
+              Reject adjustment #{rejectModalAdj.adjustmentId} for ₹{Number(rejectModalAdj.amount).toLocaleString('en-IN')}.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1">Rejection Reason *</label>
+              <Input
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="State the audit / financial reason for rejection..."
+                required
+              />
             </div>
 
-            <div className="space-y-2 text-xs">
-              <p className="text-slate-600 dark:text-slate-400">
-                Reject adjustment #{rejectModalAdj.adjustmentId} for ₹{Number(rejectModalAdj.amount).toLocaleString('en-IN')}.
-              </p>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Rejection Reason *
-                </label>
-                <textarea
-                  rows={3}
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="State the audit / financial reason for rejection..."
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs bg-transparent focus:outline-none focus:border-blue-500"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#1E2445]">
-              <Button variant="secondary" size="sm" onClick={() => setRejectModalAdj(null)}>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-[#2B3566]">
+              <Button variant="ghost" onClick={() => setRejectModalAdj(null)}>
                 Cancel
               </Button>
               <Button
-                variant="secondary"
-                size="sm"
                 disabled={!rejectionReason.trim() || rejectMutation.isPending}
                 onClick={() =>
                   rejectMutation.mutate({
@@ -762,7 +887,7 @@ export default function ReconciliationPage() {
                     reason: rejectionReason,
                   })
                 }
-                className="text-xs cursor-pointer text-rose-600"
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
               >
                 {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
               </Button>

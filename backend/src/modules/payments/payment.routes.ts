@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../common/asyncHandler';
-import { ForbiddenError } from '../../common/errors';
+import { BadRequestError, ForbiddenError } from '../../common/errors';
 import { parsePagination } from '../../common/pagination';
 import { success } from '../../common/response';
 import { validate } from '../../middleware/validate';
@@ -21,10 +21,87 @@ const router = Router();
 router.use(authenticate);
 router.use(tenantContext);
 
+/**
+ * POST /payments/collect
+ * Dedicated endpoint for Collection Officers to record borrower repayments.
+ * Submits repayment collection for Finance verification & reconciliation.
+ */
+router.post(
+  '/collect',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'COLLECTION_OFFICER'),
+  asyncHandler(async (req, res) => {
+    // Explicit SoD guard: Finance Officers are not authorized to perform customer repayment collection
+    if (
+      req.user?.roles?.includes('FINANCE_OFFICER') &&
+      !req.user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Finance Officers are not authorized to collect repayments. Repayment collection must be performed by Collection Officers.'
+      );
+    }
+
+    const { loanId, amount, method, reference, notes, payerMobile, paidAt } = req.body || {};
+    if (!loanId) {
+      throw new BadRequestError('Loan ID is required');
+    }
+    if (!amount || Number(amount) <= 0) {
+      throw new BadRequestError('Valid collection amount is required');
+    }
+    if (!reference || !String(reference).trim()) {
+      throw new BadRequestError('Transaction reference / UTR number is required');
+    }
+
+    const validMethods = ['UPI', 'NEFT', 'IMPS', 'CASH', 'CHEQUE', 'NET_BANKING', 'DEBIT_CARD', 'OTHER'];
+    const chosenMethod = method && validMethods.includes(String(method).toUpperCase())
+      ? String(method).toUpperCase()
+      : 'UPI';
+
+    const submissionNotes = notes
+      ? `[Recorded by Collection Officer: ${req.user?.email}] ${notes}`
+      : `[Recorded by Collection Officer: ${req.user?.email}]`;
+
+    const submission = await createPaymentSubmission(
+      {
+        loanId,
+        amount: Number(amount),
+        method: chosenMethod,
+        reference: String(reference).trim(),
+        payerMobile,
+        paidAt: paidAt ? new Date(paidAt) : new Date(),
+        notes: submissionNotes,
+      },
+      {
+        id: req.user!.id,
+        roles: req.user!.roles,
+        email: req.user!.email,
+        tenantId: req.tenantId || req.user?.tenantId,
+        branchId: req.user?.branchId,
+      }
+    );
+
+    res.status(201).json(
+      success({
+        ...submission,
+        message: 'Repayment collection recorded successfully. Awaiting Finance verification and reconciliation.',
+      })
+    );
+  })
+);
+
 // Submissions Endpoints
 router.post(
   '/submissions',
   asyncHandler(async (req, res) => {
+    // Explicit guard: Finance Officers are not authorized to record collections
+    if (
+      req.user?.roles?.includes('FINANCE_OFFICER') &&
+      !req.user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Finance Officers are not authorized to record customer repayment collections.'
+      );
+    }
+
     const submission = await createPaymentSubmission(req.body, {
       id: req.user!.id,
       roles: req.user!.roles,
@@ -60,8 +137,16 @@ router.get(
 
 router.post(
   '/submissions/:id/verify',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
+    if (
+      req.user?.roles?.includes('COLLECTION_OFFICER') &&
+      !req.user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Collection Officers cannot perform financial verification or ledger reconciliation.'
+      );
+    }
     const result = await verifyPaymentSubmission(req.params.id, {
       id: req.user!.id,
       roles: req.user!.roles,
@@ -75,8 +160,16 @@ router.post(
 
 router.post(
   '/submissions/:id/reject',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
+    if (
+      req.user?.roles?.includes('COLLECTION_OFFICER') &&
+      !req.user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Collection Officers cannot perform exception handling or reject payment submissions.'
+      );
+    }
     const reason = req.body.reason ? String(req.body.reason) : 'Payment details could not be verified with banking records';
     const result = await rejectPaymentSubmission(req.params.id, reason, {
       id: req.user!.id,
@@ -131,11 +224,21 @@ router.get(
 
 router.post(
   '/',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'CUSTOMER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CUSTOMER'),
   validate(recordPaymentSchema),
   asyncHandler(async (req, res) => {
+    // Explicit SoD guard: Collection Officers cannot directly modify accounting ledger entries
+    if (
+      req.user?.roles?.includes('COLLECTION_OFFICER') &&
+      !req.user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))
+    ) {
+      throw new ForbiddenError(
+        'Access forbidden: Collection Officers cannot directly modify accounting ledger entries. Repayments must be recorded and submitted for Finance verification and reconciliation.'
+      );
+    }
+
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'].includes(r)
+      ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
     );
     if (!isStaff) {
       const targetLoan = await prisma.loan.findUnique({

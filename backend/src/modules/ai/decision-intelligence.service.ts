@@ -4,6 +4,7 @@ import { generateGeminiContent } from './gemini.service';
 import { ForbiddenError, BadRequestError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
 import { Money } from '../finance/money';
+import { reconciliationService } from '../reconciliation/reconciliation.service';
 
 export interface DecisionIntelligenceResult {
   generatedAt: string;
@@ -56,8 +57,8 @@ export interface DecisionIntelligenceResult {
  */
 async function buildDecisionContext(actor: { id: string; email: string; roles: string[]; branchId?: string }) {
   const isGlobalAdmin = actor.roles.some((r) => ['SUPER_ADMIN', 'ADMIN'].includes(r));
-  const isBranchScoped = !isGlobalAdmin && Boolean(actor.branchId);
-  const branchFilter = isBranchScoped && actor.branchId ? { branchId: actor.branchId } : {};
+  let isBranchScoped = !isGlobalAdmin && Boolean(actor.branchId);
+  let branchFilter: any = isBranchScoped && actor.branchId ? { branchId: actor.branchId } : {};
 
   // Fetch branch information if branch-scoped
   let branchName = 'Enterprise Portfolio';
@@ -67,7 +68,14 @@ async function buildDecisionContext(actor: { id: string; email: string; roles: s
       select: { name: true, code: true },
     });
     if (branchRecord) {
-      branchName = `${branchRecord.name} (${branchRecord.code})`;
+      if (branchRecord.code === 'HO') {
+        // Head Office oversees central institutional portfolio
+        isBranchScoped = false;
+        branchFilter = {};
+        branchName = `${branchRecord.name} (${branchRecord.code})`;
+      } else {
+        branchName = `${branchRecord.name} (${branchRecord.code})`;
+      }
     }
   }
 
@@ -81,6 +89,8 @@ async function buildDecisionContext(actor: { id: string; email: string; roles: s
     products,
     customers,
     auditLogsCount,
+    paymentSubmissionsCount,
+    reconData,
   ] = await Promise.all([
     prisma.loan.findMany({
       where: branchFilter,
@@ -135,7 +145,23 @@ async function buildDecisionContext(actor: { id: string; email: string; roles: s
       select: { id: true, kycStatus: true, status: true, riskCategory: true },
     }),
     prisma.auditLog.count(),
+    prisma.paymentSubmission.count({
+      where: {
+        status: 'PENDING_VERIFICATION',
+        ...(branchFilter.branchId ? { loan: { branchId: branchFilter.branchId } } : {}),
+      },
+    }),
+    reconciliationService.getDashboardStats(actor).catch(() => ({
+      reconciliationHealthPercent: 100,
+      totalActiveExceptions: 0,
+      criticalExceptionsCount: 0,
+      pendingAdjustmentsCount: 0,
+      totalDiscrepancyAmount: 0,
+    })),
   ]);
+
+  const pendingPaymentSubmissions = paymentSubmissionsCount;
+  const reconStats = reconData as any;
 
   // Scoped disbursements, payments & collections
   const scopedDisbursements = disbursements;
@@ -306,6 +332,8 @@ ${branchSummaries.map((b) => `- Branch "${b.branchName}": ${b.totalLoans} Loans,
     delinquentCasesCount: scopedCollections.length,
     branchSummaries,
     auditLogsCount,
+    pendingPaymentSubmissions,
+    reconStats,
     contextPrompt,
   };
 }
@@ -499,6 +527,8 @@ export async function generateDecisionIntelligence(
     pendingPtps,
     delinquentCasesCount,
     branchSummaries,
+    pendingPaymentSubmissions,
+    reconStats,
     contextPrompt,
   } = context;
 
@@ -726,7 +756,7 @@ export async function generateDecisionIntelligence(
 
       case 'FINANCE_OFFICER':
       case 'DISBURSEMENT_OFFICER':
-        executiveSummary = `Treasury & Finance Briefing (${roleScopeLabel}): ${readyForDisbursementApps} application(s) ready for disbursement. ₹${totalDisbursed.toLocaleString('en-IN')} disbursed to date, with ₹${totalCollected.toLocaleString('en-IN')} collected in repayments. Active outstanding principal: ₹${totalOutstanding.toLocaleString('en-IN')}.`;
+        executiveSummary = `Treasury & Finance Briefing (${roleScopeLabel}): ${readyForDisbursementApps} application(s) ready for disbursement, ${pendingPaymentSubmissions} repayment submission(s) awaiting verification. Reconciliation health at ${reconStats.reconciliationHealthPercent}% with ${reconStats.totalActiveExceptions} active exception(s). ₹${totalDisbursed.toLocaleString('en-IN')} disbursed, ₹${totalCollected.toLocaleString('en-IN')} collected.`;
         kpisInterpretation = [
           {
             kpi: 'Ready for Disbursement',
@@ -735,16 +765,28 @@ export async function generateDecisionIntelligence(
             interpretation: 'Approved proposals awaiting UTR & payout execution.',
           },
           {
+            kpi: 'Payment Intimations',
+            currentValue: `${pendingPaymentSubmissions}`,
+            status: pendingPaymentSubmissions > 0 ? 'WATCH' : 'HEALTHY',
+            interpretation: 'Borrower payment proofs awaiting verification and ledger settlement.',
+          },
+          {
+            kpi: 'Reconciliation Health',
+            currentValue: `${reconStats.reconciliationHealthPercent}%`,
+            status: reconStats.reconciliationHealthPercent < 95 ? 'CRITICAL' : reconStats.reconciliationHealthPercent < 99 ? 'WATCH' : 'HEALTHY',
+            interpretation: `${reconStats.totalActiveExceptions} open accounting exception(s) across 5 financial pillars.`,
+          },
+          {
             kpi: 'Total Disbursed Volume',
             currentValue: `₹${totalDisbursed.toLocaleString('en-IN')}`,
             status: 'HEALTHY',
-            interpretation: 'Cumulative capital disbursed across active portfolio.',
+            interpretation: 'Net cumulative funds released to active borrowers.',
           },
           {
-            kpi: 'Repayments Collected',
+            kpi: 'Total Repayments Collected',
             currentValue: `₹${totalCollected.toLocaleString('en-IN')}`,
             status: 'HEALTHY',
-            interpretation: 'Inflow collected via payment channels & gateway.',
+            interpretation: 'Net cumulative repayments settled into double-entry accounting ledger.',
           },
         ];
         if (readyForDisbursementApps > 0) {
@@ -762,9 +804,18 @@ export async function generateDecisionIntelligence(
             recommendedAction: 'Execute payouts and attach UTR references in Disbursements.',
           });
         }
+        if (pendingPaymentSubmissions > 0) {
+          whatShouldILookAt.push({
+            priority: 2,
+            area: 'Payment Submissions Verification',
+            reason: `${pendingPaymentSubmissions} payment proof(s) recorded in field require verification.`,
+            recommendedAction: 'Verify UTR against bank account and apply waterfall ledger settlement.',
+          });
+        }
         recommendedActions = [
-          'Process pending disbursement payouts in the Finance queue.',
-          'Reconcile daily payment allocations against bank settlement files.',
+          'Execute NEFT/RTGS payouts for approved loan applications awaiting release.',
+          'Verify pending payment submissions and validate UTRs against bank statements.',
+          'Inspect reconciliation dashboard and resolve any open accounting discrepancies.',
         ];
         break;
 

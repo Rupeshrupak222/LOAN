@@ -5,7 +5,7 @@ import { success } from '../../common/response';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { authenticate, authorize } from '../../middleware/auth';
 import { verifyGeminiConnection, generateGeminiContent } from './gemini.service';
-import { handleCopilotChat } from './copilot.service';
+import { handleCopilotChat, getDynamicCopilotSuggestions } from './copilot.service';
 import { generateCreditIntelligence } from './credit-intelligence.service';
 import { generateUnderwritingIntelligence } from './underwriting-intelligence.service';
 import { analyzeDocumentIntelligence } from './document-intelligence.service';
@@ -20,6 +20,24 @@ const router = Router();
 
 // Require authentication for all AI routes
 router.use(authenticate);
+
+/**
+ * GET /api/v1/ai/copilot/suggestions
+ * Returns live database-synchronized prompt suggestions tailored to role and real DB records.
+ */
+router.get(
+  '/copilot/suggestions',
+  asyncHandler(async (req, res) => {
+    const suggestions = await getDynamicCopilotSuggestions({
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
+    res.json(success(suggestions));
+  })
+);
 
 /**
  * GET /api/v1/ai/test

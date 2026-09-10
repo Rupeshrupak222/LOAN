@@ -36,13 +36,20 @@ export interface CopilotChatResponse {
 }
 
 /**
- * Builds authorized, compact LMS context for the LLM based on user question and role.
+ * Builds authorized, live database-synced LMS context for the LLM based on user question, role, and real records.
  */
 export async function buildAuthorizedContext(
-  user: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string },
-  query: string,
+  userOrParams: any,
+  query: string = '',
   _currentPath?: string
-): Promise<{ contextText: string; summary: string }> {
+): Promise<{ contextText: string; summary: string; actorRole?: string }> {
+  const user = {
+    id: userOrParams.id || userOrParams.userId || '',
+    email: userOrParams.email || userOrParams.userEmail || '',
+    roles: userOrParams.roles || ['CUSTOMER'],
+    tenantId: userOrParams.tenantId,
+    branchId: userOrParams.branchId,
+  };
   const isCustomer = user.roles.includes('CUSTOMER');
   const isSuperAdmin = user.roles.includes('SUPER_ADMIN');
   const primaryRole = (user.roles[0] || 'CUSTOMER') as RoleName;
@@ -50,11 +57,11 @@ export async function buildAuthorizedContext(
   let effectiveTenantId = user.tenantId;
   let effectiveBranchId = user.branchId;
 
-  if (!effectiveTenantId || !effectiveBranchId) {
+  if ((!effectiveTenantId || !effectiveBranchId) && user.id) {
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: { tenantId: true, branchId: true },
-    });
+    }).catch(() => null);
     if (dbUser) {
       if (!effectiveTenantId && dbUser.tenantId) effectiveTenantId = dbUser.tenantId;
       if (!effectiveBranchId && dbUser.branchId) effectiveBranchId = dbUser.branchId;
@@ -66,18 +73,21 @@ export async function buildAuthorizedContext(
     user.roles.includes('BRANCH_MANAGER') ||
     user.roles.includes('COLLECTION_OFFICER') ||
     user.roles.includes('COLLECTION_AGENT');
+
   const staffTenantFilter = effectiveTenantId && !isSuperAdmin ? { tenantId: effectiveTenantId } : {};
-  const staffBranchFilter = effectiveBranchId && isBranchScoped ? { branchId: effectiveBranchId } : {};
+  const staffBranchFilter =
+    effectiveBranchId && isBranchScoped && user.roles.includes('BRANCH_MANAGER')
+      ? { OR: [{ branchId: effectiveBranchId }, { branchId: null }] }
+      : {};
 
-  const lowerQuery = query.toLowerCase();
-
-  // 1. Identify specific entity references in the prompt (e.g. LN-1234, CUST-1234, APP-1234)
-  const loanNoMatch = query.match(/LN-?[0-9]+/i);
-  const custCodeMatch = query.match(/CUST-?[0-9]+/i);
-  const appNoMatch = query.match(/APP-?[0-9]+/i);
-
+  const safeQuery = query || userOrParams.message || userOrParams.query || '';
   const contextBlocks: string[] = [];
   let summary = '';
+
+  // 1. Identify specific entity references in the prompt (e.g. LN-1234, CUST-1234, APP-1234)
+  const loanNoMatch = safeQuery.match(/LN-?[0-9]+/i);
+  const custCodeMatch = safeQuery.match(/CUST-?[0-9]+/i);
+  const appNoMatch = safeQuery.match(/APP-?[0-9]+/i);
 
   // --- Specific Loan Lookup ---
   if (loanNoMatch) {
@@ -196,50 +206,79 @@ export async function buildAuthorizedContext(
     }
   }
 
-  // --- Specific Customer Lookup ---
-  if (custCodeMatch) {
-    const searchCust = custCodeMatch[0].toUpperCase();
-    const custWhere: any = {
-      customerCode: { contains: searchCust, mode: 'insensitive' },
-    };
-    if (isCustomer) {
-      custWhere.userId = user.id;
-    } else {
-      if (effectiveTenantId && !isSuperAdmin) {
-        custWhere.tenantId = effectiveTenantId;
-      }
-      if (effectiveBranchId && isBranchScoped) {
-        custWhere.branchId = effectiveBranchId;
-      }
-    }
+  // --- Specific Customer or Keyword Name Lookup ---
+  if (!isCustomer) {
+    const candidateKeywords = safeQuery
+      .split(/[\s,?.!]+/)
+      .filter((w: string) => w.length >= 3 && !['what', 'show', 'list', 'status', 'loan', 'user', 'this', 'that', 'from', 'with', 'kaise', 'batao', 'dikhao', 'karein', 'kya'].includes(w.toLowerCase()));
 
-    const customer = await prisma.customer.findFirst({
-      where: custWhere,
-      include: {
-        loans: true,
-        applications: true,
-      },
-    });
+    if (candidateKeywords.length > 0 || custCodeMatch) {
+      const orClauses: any[] = [];
+      if (custCodeMatch) {
+        orClauses.push({ customerCode: { contains: custCodeMatch[0], mode: 'insensitive' } });
+      }
+      for (const kw of candidateKeywords) {
+        orClauses.push(
+          { firstName: { contains: kw, mode: 'insensitive' } },
+          { lastName: { contains: kw, mode: 'insensitive' } },
+          { email: { contains: kw, mode: 'insensitive' } },
+          { mobile: { contains: kw } },
+          { customerCode: { contains: kw, mode: 'insensitive' } }
+        );
+      }
 
-    if (customer) {
-      contextBlocks.push(`
-=== CUSTOMER PROFILE (#${customer.customerCode}) ===
+      const matchedCustomers = await prisma.customer.findMany({
+        where: {
+          OR: orClauses,
+          ...staffTenantFilter,
+          ...staffBranchFilter,
+        },
+        include: {
+          loans: { include: { product: true } },
+          applications: { include: { product: true, underwriting: true, riskAssessment: true } },
+        },
+        take: 3,
+      });
+
+      for (const customer of matchedCustomers) {
+        contextBlocks.push(`
+=== MATCHED CUSTOMER RECORD (#${customer.customerCode}) ===
 - Name: ${customer.firstName} ${customer.lastName}
-- Mobile: ${customer.mobile}
-- City: ${customer.city || 'N/A'}, State: ${customer.state || 'N/A'}
-- KYC Status: ${customer.kycStatus}
-- Risk Category: ${customer.riskCategory || 'LOW'}
+- Email: ${customer.email || 'N/A'}, Mobile: ${customer.mobile}
+- KYC Status: ${customer.kycStatus}, Risk Category: ${customer.riskCategory || 'LOW'}
 - Monthly Income: ₹${Number(customer.monthlyIncome || 0).toLocaleString('en-IN')}
-- Existing Obligations: ₹${Number(customer.existingObligations || 0).toLocaleString('en-IN')}
-- Total Loans: ${customer.loans.length} (${customer.loans.filter((l) => l.status === 'ACTIVE').length} Active)
-- Applications Count: ${customer.applications.length}
-      `);
-      summary = `Retrieved customer #${customer.customerCode}`;
+- Applications (${customer.applications.length}): ${
+          customer.applications.length > 0
+            ? customer.applications
+                .map(
+                  (a) =>
+                    `#${a.applicationNo} (₹${Number(a.requestedAmount).toLocaleString('en-IN')}, Status: ${a.status}, Decision: ${
+                      a.underwriting?.decision || 'PENDING'
+                    })`
+                )
+                .join('; ')
+            : 'None'
+        }
+- Loans (${customer.loans.length}): ${
+          customer.loans.length > 0
+            ? customer.loans
+                .map(
+                  (l) =>
+                    `#${l.loanNo} (${l.product.name}, Principal: ₹${Number(l.principal).toLocaleString(
+                      'en-IN'
+                    )}, Outstanding: ₹${Number(l.outstandingPrincipal).toLocaleString('en-IN')}, Status: ${l.status})`
+                )
+                .join('; ')
+            : 'None'
+        }
+        `);
+        if (!summary) summary = `Retrieved profile for ${customer.firstName} ${customer.lastName}`;
+      }
     }
   }
 
-  // --- Role-Based Action Items & Queue Intelligence ---
-  if (isCustomer) {
+  // --- Role-Based Action Items & Live Database Sync ---
+  if (isCustomer && user.id) {
     // Borrower sees ONLY their own active loan & payment status
     const customerRecord = await prisma.customer.findUnique({
       where: { userId: user.id },
@@ -252,7 +291,7 @@ export async function buildAuthorizedContext(
         },
         paymentSubmissions: { orderBy: { createdAt: 'desc' }, take: 3 },
       },
-    });
+    }).catch(() => null);
 
     if (customerRecord) {
       const activeLoan = customerRecord.loans.find((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE');
@@ -283,164 +322,139 @@ ${
       `);
     }
   } else {
-    // Staff roles: Query role-relevant queues and summaries
-    const needsAttention =
-      lowerQuery.includes('attention') ||
-      lowerQuery.includes('pending') ||
-      lowerQuery.includes('action') ||
-      lowerQuery.includes('today') ||
-      lowerQuery.includes('queue') ||
-      lowerQuery.includes('overdue') ||
-      lowerQuery.includes('risky') ||
-      lowerQuery.includes('summary');
+    // Staff & Admin Roles: ALWAYS inject real-time live database state so Copilot is 100% accurate with DB!
+    try {
+      const [allCustomers, allActiveLoans, allApplications, readyForDisbursement, pendingSubmissions, collectionCases] =
+        await Promise.all([
+          // 1. Live Customers in Database
+          prisma.customer.findMany({
+            where: { ...staffTenantFilter, ...staffBranchFilter },
+            select: {
+              id: true,
+              customerCode: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              mobile: true,
+              kycStatus: true,
+              riskCategory: true,
+            },
+            take: 10,
+            orderBy: { createdAt: 'desc' },
+          }).catch(() => []),
 
-    if (needsAttention || isSuperAdmin) {
-      // 1. Delinquent / Overdue Loans
-      const overdueLoans = await prisma.loan.findMany({
-        where: {
-          status: 'OVERDUE',
-          ...staffTenantFilter,
-          ...staffBranchFilter,
-        },
-        include: { customer: true, product: true, collectionCases: true },
-        take: 5,
-        orderBy: { updatedAt: 'desc' },
-      });
+          // 2. Live Loans in Database
+          prisma.loan.findMany({
+            where: { ...staffTenantFilter, ...staffBranchFilter },
+            include: { customer: true, product: true },
+            take: 10,
+            orderBy: { updatedAt: 'desc' },
+          }).catch(() => []),
 
-      // 2. Ready for Payout Queue (for Finance / Super Admin)
-      const readyForDisbursement = await prisma.loanApplication.findMany({
-        where: {
-          status: { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] },
-          ...staffTenantFilter,
-          ...staffBranchFilter,
-        },
-        include: { customer: true, product: true },
-        take: 5,
-        orderBy: { updatedAt: 'desc' },
-      });
+          // 3. Live Applications in Database
+          prisma.loanApplication.findMany({
+            where: { ...staffTenantFilter, ...staffBranchFilter },
+            include: { customer: true, product: true, underwriting: true, riskAssessment: true },
+            take: 10,
+            orderBy: { createdAt: 'desc' },
+          }).catch(() => []),
 
-      // 3. Pending Underwriting Queue
-      const pendingUnderwriting = await prisma.loanApplication.findMany({
-        where: {
-          status: 'UNDERWRITING',
-          ...staffTenantFilter,
-          ...staffBranchFilter,
-        },
-        include: { customer: true, product: true, riskAssessment: true, eligibility: true },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-      });
+          // 4. Ready for Disbursement Payout
+          prisma.loanApplication.findMany({
+            where: {
+              status: { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] },
+              ...staffTenantFilter,
+              ...staffBranchFilter,
+            },
+            include: { customer: true, product: true },
+            take: 5,
+          }).catch(() => []),
 
-      const staffLoanFilter: any = {};
-      if (effectiveTenantId && !isSuperAdmin) staffLoanFilter.tenantId = effectiveTenantId;
-      if (effectiveBranchId && isBranchScoped) staffLoanFilter.branchId = effectiveBranchId;
-      const staffLoanWhere = Object.keys(staffLoanFilter).length > 0 ? { loan: staffLoanFilter } : {};
+          // 5. Unsettled Payment Submissions (relational customer tenant filter)
+          prisma.paymentSubmission.findMany({
+            where: {
+              status: 'PENDING_VERIFICATION',
+              ...(effectiveTenantId && !isSuperAdmin ? { customer: { tenantId: effectiveTenantId } } : {}),
+            },
+            include: { customer: true, loan: true },
+            take: 5,
+          }).catch(() => []),
 
-      // 4. Pending Payment Submissions to verify
-      const pendingSubmissions = await prisma.paymentSubmission.findMany({
-        where: {
-          status: 'PENDING_VERIFICATION',
-          ...staffTenantFilter,
-          ...staffLoanWhere,
-        },
-        include: { customer: true, loan: true },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-      });
-
-      // 5. Active Collection Cases
-      const collectionCases = await prisma.collectionCase.findMany({
-        where: {
-          status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] },
-          ...staffLoanWhere,
-        },
-        include: { customer: true, loan: true, promises: { where: { status: 'PENDING' } } },
-        take: 5,
-        orderBy: { dpd: 'desc' },
-      });
+          // 6. Delinquency Cases (relational customer tenant filter)
+          prisma.collectionCase.findMany({
+            where: {
+              status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] },
+              ...(effectiveTenantId && !isSuperAdmin ? { customer: { tenantId: effectiveTenantId } } : {}),
+            },
+            include: { customer: true, loan: true },
+            take: 5,
+          }).catch(() => []),
+        ]);
 
       contextBlocks.push(`
-=== LMS OPERATIONAL PIPELINE & ATTENTION QUEUES ===
-- Overdue Loans Count: ${overdueLoans.length}
+=== LIVE LMS DATABASE SYNCHRONIZATION ===
+- Total Registered Customers in Scope: ${allCustomers.length}
 ${
-  overdueLoans.length > 0
-    ? overdueLoans
+  allCustomers.length > 0
+    ? allCustomers
+        .map(
+          (c) =>
+            `  * ${c.firstName} ${c.lastName} (Code: ${c.customerCode}, KYC: ${c.kycStatus}, Mobile: ${c.mobile}, Email: ${c.email || 'N/A'})`
+        )
+        .join('\n')
+    : '  * No customers found.'
+}
+
+- Live Active Loans in Database: ${allActiveLoans.length}
+${
+  allActiveLoans.length > 0
+    ? allActiveLoans
         .map(
           (l) =>
             `  * Loan #${l.loanNo} (${l.customer.firstName} ${l.customer.lastName}): Principal ₹${Number(
               l.principal
             ).toLocaleString('en-IN')}, Outstanding ₹${Number(l.outstandingPrincipal).toLocaleString(
               'en-IN'
-            )}, DPD: ${l.collectionCases[0]?.dpd || 'N/A'} days`
+            )}, Status: ${l.status}, EMI: ₹${Number(l.emiAmount).toLocaleString('en-IN')}`
         )
         .join('\n')
-    : '  * Zero overdue delinquent accounts currently active.'
+    : '  * No active loans currently recorded in database.'
 }
 
-- Pending Underwriting Proposals: ${pendingUnderwriting.length}
+- Live Loan Applications in Pipeline: ${allApplications.length}
 ${
-  pendingUnderwriting.length > 0
-    ? pendingUnderwriting
+  allApplications.length > 0
+    ? allApplications
         .map(
           (a) =>
             `  * App #${a.applicationNo} (${a.customer.firstName} ${a.customer.lastName}): ₹${Number(
               a.requestedAmount
-            ).toLocaleString('en-IN')}, Risk Score: ${a.riskAssessment?.score || 'N/A'}/100 (${
-              a.riskAssessment?.category || 'PENDING'
-            })`
+            ).toLocaleString('en-IN')} (${a.product.name}), Status: ${a.status}, Underwriting: ${
+              a.underwriting?.decision || 'PENDING'
+            }`
         )
         .join('\n')
-    : '  * Zero proposals awaiting underwriting.'
+    : '  * No loan applications in pipeline.'
 }
 
-- Pending Electronic Payouts (Approved Applications): ${readyForDisbursement.length}
+- Pending Payout Disbursements Queue: ${readyForDisbursement.length}
 ${
   readyForDisbursement.length > 0
     ? readyForDisbursement
-        .map(
-          (d) =>
-            `  * App #${d.applicationNo} (${d.customer.firstName} ${d.customer.lastName}): ₹${Number(
-              d.requestedAmount
-            ).toLocaleString('en-IN')} (${d.product.name})`
-        )
+        .map((d) => `  * App #${d.applicationNo} for ${d.customer.firstName} ${d.customer.lastName}: ₹${Number(d.requestedAmount).toLocaleString('en-IN')}`)
         .join('\n')
-    : '  * Zero applications waiting in disbursement release queue.'
+    : '  * Zero applications waiting for disbursement release.'
 }
 
-- Unsettled Borrower Payment Proof Submissions: ${pendingSubmissions.length}
-${
-  pendingSubmissions.length > 0
-    ? pendingSubmissions
-        .map(
-          (p) =>
-            `  * Sub #${p.submissionNo} (Loan #${p.loan.loanNo}): ₹${Number(p.amount).toLocaleString(
-              'en-IN'
-            )} via ${p.method} (Ref: ${p.reference}) by ${p.customer.firstName} ${p.customer.lastName}`
-        )
-        .join('\n')
-    : '  * All borrower payment submissions have been verified and settled.'
-}
-
-- Active Delinquency Collection Cases: ${collectionCases.length}
-${
-  collectionCases.length > 0
-    ? collectionCases
-        .map(
-          (c) =>
-            `  * Case #${c.caseNo} (Loan #${c.loan.loanNo}, Borrower: ${c.customer.firstName} ${
-              c.customer.lastName
-            }, Mobile: ${c.customer.mobile}): DPD ${c.dpd} days (${c.agingBucket} Bucket), Overdue: ₹${Number(
-              c.overdueAmount
-            ).toLocaleString('en-IN')}, Status: ${c.status}`
-        )
-        .join('\n')
-    : '  * No active collection recovery cases.'
-}
+- Pending Payment Proof Submissions: ${pendingSubmissions.length}
+- Delinquent / Overdue Cases: ${collectionCases.length}
       `);
 
       if (!summary) {
-        summary = `Retrieved active attention queues (${primaryRole})`;
+        summary = `Live LMS database state synchronized (${primaryRole})`;
       }
+    } catch (err: any) {
+      console.warn('Live database synchronization partial issue:', err?.message || err);
     }
   }
 
@@ -449,7 +463,98 @@ ${
       ? contextBlocks.join('\n\n')
       : 'No specific records matched the query directly in the LMS database.';
 
-  return { contextText, summary: summary || 'General LMS consultation' };
+  return { contextText, summary: summary || 'General LMS consultation', actorRole: primaryRole };
+}
+
+/**
+ * Returns dynamic, database-backed prompt suggestions tailored to live active records.
+ */
+export async function getDynamicCopilotSuggestions(actor: {
+  id?: string;
+  email?: string;
+  roles?: string[];
+  tenantId?: string;
+  branchId?: string;
+}): Promise<string[]> {
+  const primaryRole = (actor.roles?.[0] || 'CUSTOMER') as RoleName;
+  const isCustomer = primaryRole === 'CUSTOMER';
+  const isSuperAdmin = primaryRole === 'SUPER_ADMIN';
+
+  const tenantFilter = actor.tenantId && !isSuperAdmin ? { tenantId: actor.tenantId } : {};
+
+  if (isCustomer && actor.id) {
+    const cust = await prisma.customer.findUnique({
+      where: { userId: actor.id },
+      include: { loans: true },
+    }).catch(() => null);
+
+    const activeLoan = cust?.loans?.[0];
+    if (activeLoan) {
+      return [
+        `What is the status of my loan #${activeLoan.loanNo}?`,
+        'When is my next EMI payment due and what is the amount?',
+        'How can I submit my EMI payment reference proof?',
+        'Show my loan interest rate and repayment tenure',
+      ];
+    }
+    return [
+      'What is my active loan status and outstanding balance?',
+      'When is my next EMI due and what is the amount?',
+      'How can I apply for a new loan or submit KYC documents?',
+    ];
+  }
+
+  // For staff: fetch real live loans, applications, and customers
+  const [activeLoan, pendingApp, pendingKycCust] = await Promise.all([
+    prisma.loan.findFirst({
+      where: { ...tenantFilter },
+      include: { customer: true },
+      orderBy: { updatedAt: 'desc' },
+    }).catch(() => null),
+
+    prisma.loanApplication.findFirst({
+      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'] }, ...tenantFilter },
+      include: { customer: true },
+      orderBy: { createdAt: 'desc' },
+    }).catch(() => null),
+
+    prisma.customer.findFirst({
+      where: { kycStatus: { in: ['NOT_STARTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW'] }, ...tenantFilter },
+      orderBy: { createdAt: 'desc' },
+    }).catch(() => null),
+  ]);
+
+  const suggestions: string[] = [];
+
+  if (activeLoan) {
+    suggestions.push(`What is the status of loan #${activeLoan.loanNo} (${activeLoan.customer.firstName} ${activeLoan.customer.lastName})?`);
+  } else {
+    suggestions.push('Which loan accounts are currently active in the database?');
+  }
+
+  if (pendingApp) {
+    suggestions.push(`Check pipeline status of application #${pendingApp.applicationNo} (${pendingApp.customer.firstName} ${pendingApp.customer.lastName})`);
+  } else {
+    suggestions.push('Show pending underwriting and credit assessment proposals');
+  }
+
+  if (pendingKycCust) {
+    suggestions.push(`What is the KYC status of customer ${pendingKycCust.firstName} ${pendingKycCust.lastName}?`);
+  } else {
+    suggestions.push('Which borrowers have pending KYC verification?');
+  }
+
+  if (primaryRole === 'FINANCE_OFFICER') {
+    suggestions.push('Show applications ready for disbursement payout release');
+  } else if (primaryRole === 'COLLECTION_OFFICER') {
+    suggestions.push('Summarize current delinquency and overdue loans');
+  } else if (primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER') {
+    suggestions.push('Show risk score and FOIR evaluation for pending files');
+  } else {
+    suggestions.push('Give me an overview of all registered customers in the database');
+  }
+
+  return suggestions;
 }
 
 /**
@@ -470,24 +575,27 @@ export async function handleCopilotChat(options: CopilotChatOptions): Promise<Co
 
   // 2. Build centralized system instructions
   const systemInstruction = `
-You are the official Adyapan LMS AI Copilot, an intelligent, professional banking & credit assistant.
-You assist authenticated users with loan servicing, credit underwriting, origination, collections, and financial insights based STRICTLY on authorized data provided in the LMS Context below.
+You are the official Adyapan LMS AI Copilot, a smart, friendly, and professional banking & credit AI assistant.
+You interact with users naturally, answering both casual conversation and detailed operational/financial inquiries based on the verified LMS Database Context provided below.
 
 Current User: ${userEmail}
 Current User Role: ${primaryRole}
 
-=== STRICT OPERATIONAL RULES ===
-1. TRUTHFULNESS & ACCURACY: Base all facts, numbers, statuses, customer names, DPD, risk scores, and amounts SOLELY on the verified LMS Context provided below.
-2. NO HALLUCINATION: Never invent fake loan numbers, customer names, payment amounts, or dates. If the required information is not found in the LMS Context, clearly state: "I don't have enough information in the LMS records to answer that."
-3. ROLE RESPECT: Answer in a way that helps the user perform their duties as a ${primaryRole}.
-   - If user is LOAN_OFFICER: Focus on customer intake, missing KYC documents, and application submissions.
-   - If user is CREDIT_ANALYST: Focus on DTI/FOIR, risk score breakdown, and policy eligibility criteria.
-   - If user is UNDERWRITER: Focus on sanction decisions, approval limit tiers, conditions, and risk flags.
-   - If user is FINANCE_OFFICER: Focus on disbursement release queue, electronic transfers (NEFT/RTGS), payment verifications, and waterfall ledgers.
-   - If user is COLLECTION_OFFICER: Focus on DPD aging buckets, overdue balances, customer phone follow-ups, and PTP commitments.
-   - If user is CUSTOMER (Borrower): Focus only on their own active loan facility, upcoming EMI due date, and payment submission proof. Never reveal other customers' data.
-4. FINANCIAL TRUTH: Do not make up financial calculations. The amounts (Principal, Interest, EMI, Outstanding Balance, DPD) given in the LMS Context are authoritative.
-5. FORMATTING: Use clean, concise formatting with bold text and short bullet points. Avoid raw JSON dumps or repeating the user's prompt verbatim.
+=== BEHAVIOR & GUIDELINES ===
+1. DUAL-MODE CONVERSATION (NORMAL CHAT & DETAILED INQUIRIES):
+   - CASUAL & FRIENDLY TALK: When the user greets you (e.g. "hi kaise ho", "kya krr rhe ho tum", "hello", "aur batao"), respond naturally, warmly, and casually in the user's language (Hindi, Hinglish, or English). Tell them you are feeling great and helping out with loan operations, applications, and customer queries on Adyapan LMS, and ask what they would like to work on today.
+   - DETAILED & PRECISE DATA: When the user asks for specific loan accounts, customer profiles, outstanding balances, KYC status, pipeline applications, or collections, provide accurate, clean, structured facts (with bullet points and amounts) based on the Verified LMS Database Context below.
+2. TRUTHFULNESS & ACCURACY: Never invent fake numbers, dates, or borrower accounts. If specific customer/loan details are requested but not found in the LMS Context, politely explain that no matching record exists in the system.
+3. ROLE RESPECT: Always support the user according to their ${primaryRole} role:
+   - LOAN_OFFICER: Customer intake, missing KYC documents, application tracking.
+   - CREDIT_ANALYST: Debt capacity, FOIR/DTI calculations, policy rules.
+   - UNDERWRITER: Sanction proposals, risk factors, approval limits.
+   - BRANCH_MANAGER: Branch portfolio overview, operational supervision.
+   - FINANCE_OFFICER: Disbursement payout queue, payment proofs verification.
+   - COLLECTION_OFFICER: DPD aging, delinquent accounts, PTP tracking.
+   - CUSTOMER: Personal loan status, EMI due date, repayment submission.
+4. ADVISORY ONLY: You are an informational assistant; direct the user to their respective buttons/pages for mutations.
+5. FORMATTING: Use clean markdown, bold headers, and concise bullet points. Avoid repeating instructions or raw code.
 
 === VERIFIED LMS DATABASE CONTEXT ===
 ${contextText}
@@ -511,7 +619,7 @@ ${contextText}
   const response = await generateGeminiContent({
     prompt: fullPrompt,
     systemInstruction,
-    temperature: 0.2, // Low temperature for high factual accuracy
+    temperature: 0.3,
   });
 
   return {

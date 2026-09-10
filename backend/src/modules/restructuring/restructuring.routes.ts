@@ -20,7 +20,7 @@ router.use(authenticate);
 
 router.post(
   '/restructure',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(proposeRestructureSchema),
   asyncHandler(async (req, res) => {
     const result = await restructureLoan(req.body, {
@@ -36,7 +36,7 @@ router.post(
 
 router.post(
   '/settlement',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SETTLEMENT_OFFICER', 'RECOVERY_HEAD', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(proposeSettlementSchema),
   asyncHandler(async (req, res) => {
     const result = await executeSettlement(req.body, {
@@ -52,7 +52,7 @@ router.post(
 
 router.post(
   '/closure',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(executeClosureSchema),
   asyncHandler(async (req, res) => {
     const result = await closeLoanAndIssueNoc(req.body, {

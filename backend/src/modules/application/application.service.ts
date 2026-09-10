@@ -5,6 +5,8 @@ import { PageParams, buildPagination } from '../../common/pagination';
 import { generateApplicationNo } from '../shared/codes';
 import { Money } from '../finance/money';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
+import { validateLoanOfficerOriginationEligibility } from '../customer/customer.service';
 import type { CreateApplicationInput } from './application.schema';
 
 export interface ApplicationActorContext {
@@ -17,12 +19,12 @@ export interface ApplicationActorContext {
 // Allowed status transitions (guards the loan lifecycle).
 const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   DRAFT: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'REJECTED', 'CANCELLED'],
-  SUBMITTED: ['KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'REJECTED', 'CANCELLED'],
-  KYC_PENDING: ['KYC_VERIFIED', 'REJECTED', 'CANCELLED'],
-  KYC_VERIFIED: ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'REJECTED', 'CANCELLED'],
-  UNDER_REVIEW: ['CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
-  CREDIT_ASSESSMENT: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
-  UNDERWRITING: ['APPROVED', 'REJECTED', 'SUBMITTED', 'CANCELLED'],
+  SUBMITTED: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'REJECTED', 'CANCELLED'],
+  KYC_PENDING: ['KYC_VERIFIED', 'SUBMITTED', 'REJECTED', 'CANCELLED'],
+  KYC_VERIFIED: ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'SUBMITTED', 'REJECTED', 'CANCELLED'],
+  UNDER_REVIEW: ['CREDIT_ASSESSMENT', 'UNDERWRITING', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED'],
+  CREDIT_ASSESSMENT: ['SUBMITTED', 'UNDERWRITING', 'APPROVED', 'REJECTED', 'CANCELLED'],
+  UNDERWRITING: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'SUBMITTED', 'CREDIT_ASSESSMENT', 'CANCELLED'],
   APPROVED: ['AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'UNDERWRITING', 'SUBMITTED', 'CANCELLED'],
   REJECTED: [],
   AGREEMENT_PENDING: ['READY_FOR_DISBURSEMENT', 'CANCELLED'],
@@ -101,6 +103,7 @@ export async function getApplication(id: string, actor?: ApplicationActorContext
       eligibility: true,
       riskAssessment: true,
       underwriting: true,
+      approvals: { orderBy: { createdAt: 'desc' } },
     },
   });
   if (!app) throw new NotFoundError('Application not found');
@@ -145,6 +148,18 @@ export async function createApplication(
     ) {
       throw new ForbiddenError('Access forbidden: Customer belongs to another branch');
     }
+  }
+
+  // Server-side prerequisite validation: Profile, KYC Docs, Employment/Income & Bank details must be complete
+  const eligibility = await validateLoanOfficerOriginationEligibility(
+    input.customerId,
+    effectiveTenantId,
+    actor as any
+  );
+  if (!eligibility.eligible) {
+    throw new BadRequestError(
+      `Customer onboarding is incomplete. Please complete all required KYC, employment, income and bank details before originating the application. Missing: ${eligibility.missing.join(', ')}. ${eligibility.reasons.join(' ')}`
+    );
   }
 
   let product = input.productId
@@ -198,7 +213,7 @@ export async function transition(
 ) {
   const app = await prisma.loanApplication.findUnique({
     where: { id },
-    include: { customer: true },
+    include: { customer: true, riskAssessment: true },
   });
   if (!app) throw new NotFoundError('Application not found');
 
@@ -216,28 +231,58 @@ export async function transition(
     }
   }
 
-  // Role-state authorization: Loan Officer, Credit Analyst, and Underwriter transition boundaries
-  const isPrivilegedAdmin = actor?.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
-  );
-  const isPrivilegedDecider = actor?.roles?.some((r) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
-  );
-  if (actor?.roles?.includes('LOAN_OFFICER') && !isPrivilegedDecider) {
-    const allowedForLoanOfficer: ApplicationStatus[] = ['SUBMITTED', 'CANCELLED'];
-    if (!allowedForLoanOfficer.includes(toStatus)) {
+  // Role-state authorization: Loan Officer, Credit Analyst, Underwriter, and Branch Manager transition boundaries
+  if (actor?.roles?.includes('AUDITOR')) {
+    throw new ForbiddenError('Access forbidden: Auditors have read-only access and cannot transition application statuses');
+  }
+
+  // Branch Manager cannot force final credit approval, rejection, agreement pending, or disbursement states
+  if (actor?.roles?.includes('BRANCH_MANAGER')) {
+    const forbiddenForBranchManager: ApplicationStatus[] = [
+      'APPROVED',
+      'REJECTED',
+      'AGREEMENT_PENDING',
+      'READY_FOR_DISBURSEMENT',
+      'DISBURSED',
+    ];
+    if (forbiddenForBranchManager.includes(toStatus)) {
       throw new ForbiddenError(
-        `Access forbidden: Loan Officer can only submit or cancel applications, not transition to '${toStatus}'.`
+        `Access forbidden: Branch Manager cannot transition applications to '${toStatus}'. Credit decisions and financial disbursements require Underwriter and Finance Officer authorization.`
       );
     }
   }
 
-  if (actor?.roles?.includes('CREDIT_ANALYST') && !isPrivilegedDecider) {
+  if (actor?.roles?.includes('LOAN_OFFICER') && !actor.roles.some((r) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) {
+    if (toStatus === 'UNDERWRITING') {
+      throw new ForbiddenError(
+        'Access forbidden: Loan Officer applications must be forwarded to Credit Analyst first. Direct forwarding to Underwriter is prohibited.'
+      );
+    }
+    const allowedForLoanOfficer: ApplicationStatus[] = ['SUBMITTED', 'CANCELLED'];
+    if (!allowedForLoanOfficer.includes(toStatus)) {
+      throw new ForbiddenError(
+        `Access forbidden: Loan Officer can only forward applications to Credit Analyst ('SUBMITTED') or cancel, not transition to '${toStatus}'.`
+      );
+    }
+    const eligibility = await validateLoanOfficerOriginationEligibility(
+      app.customerId,
+      app.tenantId || undefined,
+      actor as any
+    );
+    if (toStatus === 'SUBMITTED' && !eligibility.eligible) {
+      throw new BadRequestError(
+        `Cannot forward application to Credit Analyst. Complete all required customer onboarding steps first. Missing: ${eligibility.missing.join(', ')}. ${eligibility.reasons.join(' ')}`
+      );
+    }
+  }
+
+  if (actor?.roles?.includes('CREDIT_ANALYST')) {
     const allowedForCreditAnalyst: ApplicationStatus[] = [
       'UNDER_REVIEW',
       'CREDIT_ASSESSMENT',
       'UNDERWRITING',
       'SUBMITTED',
+      'REJECTED',
     ];
     if (!allowedForCreditAnalyst.includes(toStatus)) {
       throw new ForbiddenError(
@@ -246,7 +291,13 @@ export async function transition(
     }
   }
 
-  if (actor?.roles?.includes('UNDERWRITER') && !isPrivilegedAdmin) {
+  if (toStatus === 'UNDERWRITING') {
+    if (!app.riskAssessment || app.riskAssessment.score === null || app.riskAssessment.score === undefined) {
+      throw new BadRequestError('Cannot forward application to Underwriting. Credit score evaluation is mandatory before Underwriter handoff.');
+    }
+  }
+
+  if (actor?.roles?.includes('UNDERWRITER')) {
     const forbiddenForUnderwriter: ApplicationStatus[] = [
       'DISBURSED',
       'READY_FOR_DISBURSEMENT',
@@ -257,6 +308,19 @@ export async function transition(
         `Access forbidden: Underwriters cannot transition applications to '${toStatus}'. Post-sanction agreement processing and disbursement execution must be conducted by authorized Finance Officers.`
       );
     }
+  }
+
+  const isPrivilegedAdmin = actor?.roles?.some((r) =>
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+
+  if (
+    (actor?.roles?.includes('COLLECTION_OFFICER') || actor?.roles?.includes('FINANCE_OFFICER')) &&
+    !isPrivilegedAdmin
+  ) {
+    throw new ForbiddenError(
+      'Access forbidden: Neither Collection Officers nor Finance Officers have authority to transition loan applications or modify credit/underwriting decisions.'
+    );
   }
 
   const allowed = TRANSITIONS[app.status] ?? [];
@@ -276,18 +340,41 @@ export async function transition(
   });
 
   // Async non-blocking notification to applicant
-  void sendNotification({
-    customerId: app.customerId,
-    channel: 'IN_APP',
-    type: ['APPROVED', 'DISBURSED'].includes(toStatus)
-      ? 'SUCCESS'
-      : toStatus === 'REJECTED'
-      ? 'ALERT'
-      : 'INFO',
-    title: `Application ${app.applicationNo} Status: ${toStatus}`,
-    message: reason || `Your loan application has progressed to ${toStatus}.`,
-    metadata: { applicationId: id, link: `/applications/${id}` },
-  }).catch(() => {});
+  try {
+    void Promise.resolve(
+      sendNotification({
+        customerId: app.customerId,
+        channel: 'IN_APP',
+        type: ['APPROVED', 'DISBURSED'].includes(toStatus)
+          ? 'SUCCESS'
+          : toStatus === 'REJECTED'
+          ? 'ALERT'
+          : 'INFO',
+        title: `Application ${app.applicationNo} Status: ${toStatus}`,
+        message: reason || `Your loan application has progressed to ${toStatus}.`,
+        metadata: { applicationId: id, link: `/applications/${id}` },
+      })
+    ).catch(() => {});
+  } catch {}
+
+  if (toStatus === 'SUBMITTED') {
+    try {
+      void Promise.resolve(
+        communicationService.dispatchSystemEvent(
+          'APPLICATION_SUBMITTED',
+          {
+            customerId: app.customerId,
+            customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+            customerEmail: app.customer?.email || undefined,
+            customerMobile: app.customer?.mobile || undefined,
+            applicationNo: app.applicationNo,
+            requestedAmount: String(app.requestedAmount),
+          },
+          app.tenantId || undefined
+        )
+      ).catch(() => {});
+    } catch {}
+  }
 
   return result;
 }

@@ -35,7 +35,7 @@ export default function CollectionsPage() {
   const [aiCaseSelected, setAiCaseSelected] = useState<any | null>(null);
 
   const canManageCollections = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r)
   );
 
   // Modals

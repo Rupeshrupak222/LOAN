@@ -231,6 +231,13 @@ export async function verifyPaymentSubmission(
   submissionId: string,
   actorUser: SubmissionActorContext
 ) {
+  const isAuthorized = actorUser.roles?.some((r) =>
+    ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new BadRequestError('Access forbidden: You do not have permission to verify payment submissions.');
+  }
+
   const submission = await prisma.paymentSubmission.findUnique({
     where: { id: submissionId },
     include: {
@@ -313,6 +320,13 @@ export async function rejectPaymentSubmission(
   reason: string,
   actorUser: SubmissionActorContext
 ) {
+  const isAuthorized = actorUser.roles?.some((r) =>
+    ['FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
+  );
+  if (!isAuthorized) {
+    throw new BadRequestError('Access forbidden: You do not have permission to reject payment submissions.');
+  }
+
   const submission = await prisma.paymentSubmission.findUnique({
     where: { id: submissionId },
     include: {

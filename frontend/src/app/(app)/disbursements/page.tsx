@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, CheckCircle2, Building, ShieldCheck, ArrowRight, Wallet, CheckSquare, X, History, Clock, FileText, Sparkles } from 'lucide-react';
+import { Send, CheckCircle2, Building, ShieldCheck, ArrowRight, Wallet, CheckSquare, X, History, Clock, FileText, Sparkles, ExternalLink, User, Lock } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
@@ -25,11 +25,20 @@ export default function DisbursementsPage() {
   const [reference, setReference] = useState('');
 
   const canExecutePayout = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
   );
+
+  const isDisbursementAuthorized = user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'AUDITOR'].includes(r)
+  );
+
+  const isBranchManagerRestricted =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r));
 
   const { data: queueData, isLoading: queueLoading } = useQuery({
     queryKey: ['disbursements-queue'],
+    enabled: isDisbursementAuthorized && !isBranchManagerRestricted,
     queryFn: async () => {
       const res = await api.get('/disbursements/queue');
       const rows = res.data?.data;
@@ -39,6 +48,7 @@ export default function DisbursementsPage() {
 
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['disbursements-history'],
+    enabled: isDisbursementAuthorized && !isBranchManagerRestricted,
     queryFn: async () => {
       const res = await api.get('/disbursements/history');
       const rows = res.data?.data;
@@ -57,17 +67,18 @@ export default function DisbursementsPage() {
       toast.success('Loan disbursed successfully and active loan account initialized.');
       queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['disbursements-history'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-payment-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-payments-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['loans'] });
       queryClient.invalidateQueries({ queryKey: ['loan'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['application'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-loans'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-count'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setSelectedApp(null);
       setReference('');
@@ -77,6 +88,102 @@ export default function DisbursementsPage() {
       toast.error(apiErrorMessage(err), { title: 'Disbursement Release Notice' });
     },
   });
+
+  if (isBranchManagerRestricted) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Lending / Disbursements"
+          title="Disbursement & Fund Release"
+          subtitle="Electronic fund execution is restricted to Finance & Treasury Officers"
+        />
+
+        <div
+          className={cn(
+            "max-w-2xl mx-auto rounded-2xl border p-8 text-center space-y-5 my-8 shadow-sm transition-colors",
+            isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          )}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight">
+              Fund Release Authority Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Branch Managers do not have authority to release funds or execute loan disbursements. Your authority covers branch application review, credit report assessment, and management approvals up to <strong className="text-slate-900 dark:text-white">₹5,00,000</strong>.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, electronic fund transfers and disbursement queues are managed exclusively by Finance & Treasury officers.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/branch-review">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                Go to Branch Applications Desk →
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="md" variant="secondary">
+                Return to Dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && !isDisbursementAuthorized) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumb="Lending / Disbursements"
+          title="Disbursement & Fund Release"
+          subtitle="Access Restricted"
+        />
+
+        <div
+          className={cn(
+            "max-w-2xl mx-auto rounded-2xl border p-8 text-center space-y-5 my-8 shadow-sm transition-colors",
+            isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          )}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold tracking-tight">
+              Fund Release Authority Restricted
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
+              Collection Officers do not have authority to release funds or execute loan disbursements. Your role is dedicated to borrower follow-ups, delinquency recovery, and recording repayments after disbursement.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+              Per NBFC segregation-of-duties governance, electronic fund transfers and disbursement queues are managed exclusively by Finance & Treasury officers.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/collections">
+              <Button size="md" className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm">
+                Go to Collections Desk →
+              </Button>
+            </Link>
+            <Link href="/loans">
+              <Button size="md" variant="secondary">
+                View Loan Accounts
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (queueLoading || historyLoading) return <TableSkeleton rows={6} cols={5} />;
 
@@ -98,45 +205,44 @@ export default function DisbursementsPage() {
         <KpiCard
           label="Ready for Payout"
           value={String(queue.length)}
-          hint={queue.length > 0 ? "Awaiting fund release" : "All approvals processed"}
-          icon={<CheckSquare className="h-4 w-4 text-emerald-600 dark:text-[#10B981]" />}
+          hint={`${formatMoney(pendingPayoutAmount)} awaiting release`}
+          icon={<Clock className="h-4 w-4" />}
         />
         <KpiCard
-          label="Total Historical Disbursed"
-          value={formatMoney(totalDisbursedAmount)}
-          hint={`${history.length} completed loan release(s)`}
-          icon={<Wallet className="h-4 w-4 text-[#2563EB] dark:text-[#60A5FA]" />}
+          label="Total Payouts Released"
+          value={String(history.length)}
+          hint={`${formatMoney(totalDisbursedAmount)} disbursed`}
+          icon={<CheckCircle2 className="h-4 w-4" />}
         />
         <KpiCard
-          label="Payment Gateway Channel"
-          value="NEFT / RTGS"
-          hint="Core banking bridge active"
-          icon={<Send className="h-4 w-4 text-slate-600 dark:text-slate-400" />}
+          label="Payout Method"
+          value="Electronic Bank Transfer"
+          hint="NEFT / RTGS / IMPS"
+          icon={<Wallet className="h-4 w-4" />}
         />
       </div>
 
-      {/* Interactive Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#2B3566] pb-1">
+      {/* TABS */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#2B3566] pb-2">
         <button
           onClick={() => setActiveTab('QUEUE')}
           className={cn(
-            "px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2",
+            'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
             activeTab === 'QUEUE'
-              ? "bg-[#2563EB] text-white shadow-sm"
-              : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              ? 'bg-[#2563EB] text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
           )}
         >
           <Clock className="w-3.5 h-3.5" />
           Pending Payout Queue ({queue.length})
         </button>
-
         <button
           onClick={() => setActiveTab('HISTORY')}
           className={cn(
-            "px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2",
+            'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
             activeTab === 'HISTORY'
-              ? "bg-[#2563EB] text-white shadow-sm"
-              : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              ? 'bg-[#2563EB] text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
           )}
         >
           <History className="w-3.5 h-3.5" />
@@ -167,7 +273,7 @@ export default function DisbursementsPage() {
                 )}>
                   <tr>
                     <th className="py-2.5 px-3">Application</th>
-                    <th className="py-2.5 px-3">Borrower</th>
+                    <th className="py-2.5 px-3">Borrower Profile</th>
                     <th className="py-2.5 px-3">Product</th>
                     <th className="py-2.5 px-3">Sanctioned Amount</th>
                     <th className="py-2.5 px-3">Bank Details</th>
@@ -179,64 +285,112 @@ export default function DisbursementsPage() {
                   "divide-y text-xs",
                   isDark ? "divide-[#2B3566] text-slate-200" : "divide-slate-100 text-slate-700"
                 )}>
-                  {queue.map((app: any) => (
-                    <tr key={app.id} className={cn("transition-colors", isDark ? "hover:bg-[#16203D]/60" : "hover:bg-slate-50/70")}>
-                      <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">
-                        <Link href={`/applications/${app.id}`} className="hover:underline">
-                          {app.applicationNo || 'N/A'}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-3">
-                        <p className={cn("font-semibold leading-tight", isDark ? "text-white" : "text-slate-900")}>
-                          {app.customer?.firstName || 'Borrower'} {app.customer?.lastName || ''}
-                        </p>
-                        <p className="text-[11px] text-slate-400 font-mono">{app.customer?.customerCode || '-'}</p>
-                      </td>
-                      <td className={cn("py-3 px-3 font-medium", isDark ? "text-slate-300" : "text-slate-700")}>{app.product?.name || 'Loan'}</td>
-                      <td className="py-3 px-3 font-bold text-emerald-600 dark:text-[#10B981] text-sm">{formatMoney(app.requestedAmount || 0)}</td>
-                      <td className={cn("py-3 px-3 text-xs", isDark ? "text-slate-300" : "text-slate-600")}>
-                        {Array.isArray(app.customer?.bankAccounts) && app.customer.bankAccounts[0] ? (
-                          <>
-                            <span className={cn("font-semibold block", isDark ? "text-white" : "text-slate-900")}>{app.customer.bankAccounts[0].bankName}</span>
-                            <span className="font-mono text-[11px] text-slate-400">A/C: {app.customer.bankAccounts[0].accountNumber}</span>
-                          </>
-                        ) : app.customer?.bankAccountNo ? (
-                          <>
-                            <span className={cn("font-semibold block", isDark ? "text-white" : "text-slate-900")}>{app.customer.bankName || 'Beneficiary Bank'}</span>
-                            <span className="font-mono text-[11px] text-slate-400">A/C: {app.customer.bankAccountNo} ({app.customer.bankIfsc || 'IFSC'})</span>
-                          </>
-                        ) : (
-                          <span className="text-amber-600 dark:text-amber-400 font-semibold">No bank account on record</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3"><Badge status={app.customer?.kycStatus} /></td>
-                      <td className="py-3 px-3 text-right">
-                        {canExecutePayout ? (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedApp(app);
-                              setReference(`CMS-NEFT-${Math.floor(100000000 + Math.random() * 900000000)}`);
-                            }}
-                            className="bg-[#2563EB] hover:bg-blue-700 text-xs text-white font-semibold shadow-sm"
-                          >
-                            <Send className="h-3.5 w-3.5 mr-1" /> Execute Payout
-                          </Button>
-                        ) : (
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-[11px] font-semibold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                              Awaiting Finance Payout
-                            </span>
-                            <Link href={`/applications/${app.id}`}>
-                              <Button size="sm" variant="ghost" className="text-xs">
-                                View →
-                              </Button>
+                  {queue.map((app: any) => {
+                    const custId = app.customerId || app.customer?.id;
+                    return (
+                      <tr key={app.id} className={cn("transition-colors", isDark ? "hover:bg-[#16203D]/60" : "hover:bg-slate-50/70")}>
+                        <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">
+                          <Link href={`/applications/${app.id}`} className="hover:underline">
+                            {app.applicationNo || 'N/A'}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-3">
+                          {custId ? (
+                            <Link
+                              href={`/customers/${custId}`}
+                              className="group block hover:opacity-90"
+                              title="Click to view Customer 360 Profile"
+                            >
+                              <p className={cn("font-semibold leading-tight group-hover:underline text-[#2563EB] dark:text-[#60A5FA]")}>
+                                {app.customer?.firstName || 'Borrower'} {app.customer?.lastName || ''}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                {app.customer?.customerCode || '-'}
+                                <span className="text-[10px] text-blue-500 font-sans font-medium flex items-center gap-0.5">
+                                  360 <ExternalLink className="w-2.5 h-2.5 inline" />
+                                </span>
+                              </p>
                             </Link>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          ) : (
+                            <div>
+                              <p className={cn("font-semibold leading-tight", isDark ? "text-white" : "text-slate-900")}>
+                                {app.customer?.firstName || 'Borrower'} {app.customer?.lastName || ''}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-mono">{app.customer?.customerCode || '-'}</p>
+                            </div>
+                          )}
+                        </td>
+                        <td className={cn("py-3 px-3 font-medium", isDark ? "text-slate-300" : "text-slate-700")}>{app.product?.name || 'Loan'}</td>
+                        <td className="py-3 px-3 font-bold text-emerald-600 dark:text-[#10B981] text-sm">{formatMoney(app.requestedAmount || 0)}</td>
+                        <td className={cn("py-3 px-3 text-xs", isDark ? "text-slate-300" : "text-slate-600")}>
+                          {Array.isArray(app.customer?.bankAccounts) && app.customer.bankAccounts[0] ? (
+                            <>
+                              <span className={cn("font-semibold block", isDark ? "text-white" : "text-slate-900")}>{app.customer.bankAccounts[0].bankName}</span>
+                              <span className="font-mono text-[11px] text-slate-400">A/C: {app.customer.bankAccounts[0].accountNumber}</span>
+                            </>
+                          ) : app.customer?.bankAccountNo ? (
+                            <>
+                              <span className={cn("font-semibold block", isDark ? "text-white" : "text-slate-900")}>{app.customer.bankName || 'Beneficiary Bank'}</span>
+                              <span className="font-mono text-[11px] text-slate-400">A/C: {app.customer.bankAccountNo} ({app.customer.bankIfsc || 'IFSC'})</span>
+                            </>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400 font-semibold">No bank account on record</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3"><Badge status={app.customer?.kycStatus} /></td>
+                        <td className="py-3 px-3 text-right">
+                          {canExecutePayout ? (
+                            <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                              {custId && (
+                                <Link href={`/customers/${custId}`}>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="text-xs font-semibold gap-1.5 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 shadow-2xs"
+                                    title="View Borrower Customer 360 Profile"
+                                  >
+                                    <User className="h-3.5 w-3.5" /> View Profile
+                                  </Button>
+                                </Link>
+                              )}
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedApp(app);
+                                  setReference(`CMS-NEFT-${Math.floor(100000000 + Math.random() * 900000000)}`);
+                                }}
+                                className="bg-[#2563EB] hover:bg-blue-700 text-xs text-white font-semibold shadow-sm gap-1.5 cursor-pointer"
+                              >
+                                <Send className="h-3.5 w-3.5" /> Execute Payout
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                              {custId && (
+                                <Link href={`/customers/${custId}`}>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="text-xs font-semibold gap-1.5 cursor-pointer text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50"
+                                  >
+                                    <User className="h-3.5 w-3.5" /> View Profile
+                                  </Button>
+                                </Link>
+                              )}
+                              <span className="text-[11px] font-semibold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                                Awaiting Finance Payout
+                              </span>
+                              <Link href={`/applications/${app.id}`}>
+                                <Button size="sm" variant="ghost" className="text-xs">
+                                  View →
+                                </Button>
+                              </Link>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -251,12 +405,6 @@ export default function DisbursementsPage() {
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 All sanctioned loans have been disbursed to borrower bank accounts. Check the <strong>Disbursed Payout History</strong> tab to view completed electronic transfers.
               </p>
-              {history.length > 0 && (
-                <Button size="sm" onClick={() => setActiveTab('HISTORY')} className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs gap-1.5">
-                  <History className="w-3.5 h-3.5" />
-                  View Completed Disbursements ({history.length})
-                </Button>
-              )}
             </div>
           )}
         </Card>
@@ -267,9 +415,11 @@ export default function DisbursementsPage() {
         <Card noPadding className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-white" : "text-slate-900")}>
-              Completed Electronic Loan Disbursements
+              Disbursed Payout Audit Ledger
             </h3>
-            <span className="text-xs text-slate-400">Total Releases: {history.length}</span>
+            <span className="text-xs font-semibold text-slate-400">
+              {history.length} electronic fund transfer(s) completed
+            </span>
           </div>
 
           {history.length > 0 ? (
@@ -280,11 +430,11 @@ export default function DisbursementsPage() {
                   isDark ? "border-[#2B3566] bg-[#16203D] text-slate-400" : "border-slate-200 bg-slate-50/80 text-slate-500"
                 )}>
                   <tr>
-                    <th className="py-2.5 px-3">Loan Account #</th>
-                    <th className="py-2.5 px-3">Application #</th>
-                    <th className="py-2.5 px-3">Borrower</th>
-                    <th className="py-2.5 px-3">Amount Disbursed</th>
-                    <th className="py-2.5 px-3">Payment Channel</th>
+                    <th className="py-2.5 px-3">Loan Account</th>
+                    <th className="py-2.5 px-3">Origination App</th>
+                    <th className="py-2.5 px-3">Borrower Profile</th>
+                    <th className="py-2.5 px-3">Disbursed Principal</th>
+                    <th className="py-2.5 px-3">Channel</th>
                     <th className="py-2.5 px-3">Bank Reference / UTR</th>
                     <th className="py-2.5 px-3">Disbursed At</th>
                     <th className="py-2.5 px-3">Status</th>
@@ -295,50 +445,73 @@ export default function DisbursementsPage() {
                   "divide-y text-xs",
                   isDark ? "divide-[#2B3566] text-slate-200" : "divide-slate-100 text-slate-700"
                 )}>
-                  {history.map((d: any) => (
-                    <tr key={d.id} className={cn("transition-colors", isDark ? "hover:bg-[#16203D]/60" : "hover:bg-slate-50/70")}>
-                      <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">
-                        <Link href={`/loans/${d.loanId}`} className="hover:underline">
-                          {d.loan?.loanNo || '-'}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-3 font-mono text-xs">
-                        <Link href={`/applications/${d.loan?.application?.id}`} className="text-slate-500 hover:underline">
-                          {d.loan?.application?.applicationNo || '-'}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-3">
-                        <p className={cn("font-semibold leading-tight", isDark ? "text-white" : "text-slate-900")}>
-                          {d.loan?.customer?.firstName || 'Borrower'} {d.loan?.customer?.lastName || ''}
-                        </p>
-                        <p className="text-[11px] text-slate-400 font-mono">{d.loan?.customer?.customerCode || '-'}</p>
-                      </td>
-                      <td className="py-3 px-3 font-bold text-emerald-600 dark:text-[#10B981] text-sm">
-                        {formatMoney(d.amount || 0)}
-                      </td>
-                      <td className={cn("py-3 px-3 text-xs font-semibold", isDark ? "text-slate-300" : "text-slate-700")}>
-                        {d.method}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-xs text-[#2563EB] dark:text-[#60A5FA] font-bold">
-                        {d.reference}
-                      </td>
-                      <td className={cn("py-3 px-3 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>
-                        {d.createdAt ? formatDate(d.createdAt) : '-'}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          {d.status || 'COMPLETED'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <Link href={`/loans/${d.loanId}`}>
-                          <Button size="sm" variant="secondary" className="text-xs">
-                            View Account →
-                          </Button>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {history.map((d: any) => {
+                    const custId = d.loan?.customerId || d.loan?.customer?.id;
+                    return (
+                      <tr key={d.id} className={cn("transition-colors", isDark ? "hover:bg-[#16203D]/60" : "hover:bg-slate-50/70")}>
+                        <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">
+                          <Link href={`/loans/${d.loanId}`} className="hover:underline">
+                            {d.loan?.loanNo || '-'}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-xs">
+                          <Link href={`/applications/${d.loan?.application?.id}`} className="text-slate-500 hover:underline">
+                            {d.loan?.application?.applicationNo || '-'}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-3">
+                          {custId ? (
+                            <Link
+                              href={`/customers/${custId}`}
+                              className="group block hover:opacity-90"
+                              title="Click to view Customer 360 Profile"
+                            >
+                              <p className={cn("font-semibold leading-tight group-hover:underline text-[#2563EB] dark:text-[#60A5FA]")}>
+                                {d.loan?.customer?.firstName || 'Borrower'} {d.loan?.customer?.lastName || ''}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                {d.loan?.customer?.customerCode || '-'}
+                                <span className="text-[10px] text-blue-500 font-sans font-medium flex items-center gap-0.5">
+                                  360 <ExternalLink className="w-2.5 h-2.5 inline" />
+                                </span>
+                              </p>
+                            </Link>
+                          ) : (
+                            <div>
+                              <p className={cn("font-semibold leading-tight", isDark ? "text-white" : "text-slate-900")}>
+                                {d.loan?.customer?.firstName || 'Borrower'} {d.loan?.customer?.lastName || ''}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-mono">{d.loan?.customer?.customerCode || '-'}</p>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 font-bold text-emerald-600 dark:text-[#10B981] text-sm">
+                          {formatMoney(d.amount || 0)}
+                        </td>
+                        <td className={cn("py-3 px-3 text-xs font-semibold", isDark ? "text-slate-300" : "text-slate-700")}>
+                          {d.method}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-xs text-[#2563EB] dark:text-[#60A5FA] font-bold">
+                          {d.reference}
+                        </td>
+                        <td className={cn("py-3 px-3 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>
+                          {d.createdAt ? formatDate(d.createdAt) : '-'}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            {d.status || 'COMPLETED'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <Link href={`/loans/${d.loanId}`}>
+                            <Button size="sm" variant="secondary" className="text-xs">
+                              View Account →
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -390,10 +563,23 @@ export default function DisbursementsPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Borrower:</span>
-                <span className="font-bold">
-                  {selectedApp.customer?.firstName} {selectedApp.customer?.lastName}
-                </span>
+                <span className="text-slate-500 dark:text-slate-400">Borrower Profile:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">
+                    {selectedApp.customer?.firstName} {selectedApp.customer?.lastName}
+                  </span>
+                  {(selectedApp.customerId || selectedApp.customer?.id) && (
+                    <Link
+                      href={`/customers/${selectedApp.customerId || selectedApp.customer?.id}`}
+                      target="_blank"
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800"
+                      title="Inspect Borrower 360 Profile in new tab"
+                    >
+                      <span>Borrower 360</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  )}
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 dark:text-slate-400">Sanctioned Principal:</span>

@@ -26,8 +26,10 @@ import {
   Calendar,
   Send,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Card, Input } from '@/components/ui';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
@@ -53,7 +55,7 @@ const STEPS: StepItem[] = [
     shortLabel: '3. KYC Upload',
     label: 'Photo & KYC Docs',
     icon: Cloud,
-    description: 'Cloudinary selfie photo and primary identity proof',
+    description: 'Selfie photograph and primary identity proof',
   },
   {
     id: 4,
@@ -71,31 +73,37 @@ const STEPS: StepItem[] = [
   },
   {
     id: 6,
-    shortLabel: '6. Loan Terms',
-    label: 'Loan Terms & EMI',
-    icon: Calculator,
-    description: 'Loan amount, interest rate, tenure, and live EMI calculation',
-  },
-  {
-    id: 7,
-    shortLabel: '7. Underwriter',
-    label: 'Audit & Forward',
+    shortLabel: '6. Review & Save',
+    label: 'Audit & Open 360',
     icon: ShieldCheck,
-    description: 'Step-by-step checklist and transfer dossier to Underwriter',
+    description: 'Review intake data and open Customer 360 onboarding profile',
   },
 ];
 
 export default function NewCustomerPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
+  const { user, loading: authLoading } = useAuth();
+  const isBranchManagerOnly =
+    user?.roles?.includes('BRANCH_MANAGER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r));
+
+  const isFinanceOfficerOnly =
+    user?.roles?.includes('FINANCE_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
+
+  const isCollectionOfficerOnly =
+    user?.roles?.includes('COLLECTION_OFFICER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
 
   useEffect(() => {
-    if (isUnderwriter) {
-      router.push('/customers');
+    if (isBranchManagerOnly) {
+      router.replace('/branch-review');
+    } else if (isFinanceOfficerOnly || isCollectionOfficerOnly) {
+      router.replace('/dashboard');
     }
-  }, [isUnderwriter, router]);
+  }, [isBranchManagerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, router]);
 
+  const isLoanOfficer = Boolean(user?.roles?.includes('LOAN_OFFICER'));
   const [currentStep, setCurrentStep] = useState(1);
 
   // Customer Form State
@@ -144,7 +152,20 @@ export default function NewCustomerPage() {
   });
 
   function update(key: keyof typeof form, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  if (isBranchManagerOnly) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Access Restricted
+        </p>
+        <p className="text-xs text-slate-400">
+          Borrower profile creation is restricted to Loan Officers. Branch Managers review applications via the Branch Review Desk.
+        </p>
+      </Card>
+    );
   }
 
   // Live EMI Calculation (Reducing Balance Formula)
@@ -172,18 +193,18 @@ export default function NewCustomerPage() {
     setTenureMonths(p.minTenureMonths || 12);
   }
 
-  // Sequential Step Completion Logic (Only marks Done if previous steps are complete and current step is filled by Loan Officer)
+  // Sequential Step Completion Logic
   const isStep1Done =
     form.firstName.trim().length > 0 &&
     form.lastName.trim().length > 0 &&
-    form.mobile.trim().length > 0 &&
+    form.mobile.trim().length >= 10 &&
     form.email.trim().length > 0 &&
     form.dateOfBirth.length > 0 &&
     form.password.trim().length >= 6;
 
   const isStep2Done = isStep1Done && form.city.trim().length > 0 && form.state.trim().length > 0;
 
-  const isStep3Done = isStep2Done && Boolean((selectedPhoto || photoPreview) && selectedKycDoc);
+  const isStep3Done = isStep2Done && Boolean((selectedPhoto || photoPreview) || selectedKycDoc);
 
   const isStep4Done =
     isStep3Done &&
@@ -194,18 +215,8 @@ export default function NewCustomerPage() {
   const isStep5Done =
     isStep4Done &&
     form.bankName.trim().length > 0 &&
-    form.bankAccountNo.trim().length > 0 &&
+    form.bankAccountNo.trim().length >= 4 &&
     form.bankIfsc.trim().length >= 4;
-
-  const isStep6Done =
-    isStep5Done &&
-    Boolean(requestedAmount) &&
-    Number(requestedAmount) > 0 &&
-    Boolean(customInterestRate) &&
-    Number(customInterestRate) > 0 &&
-    Boolean(tenureMonths) &&
-    Number(tenureMonths) > 0 &&
-    purpose.trim().length > 0;
 
   const completedSteps: number[] = [];
   if (isStep1Done) completedSteps.push(1);
@@ -213,13 +224,12 @@ export default function NewCustomerPage() {
   if (isStep3Done) completedSteps.push(3);
   if (isStep4Done) completedSteps.push(4);
   if (isStep5Done) completedSteps.push(5);
-  if (isStep6Done) completedSteps.push(6);
 
   // Handle Step Advance
   function nextStep() {
     setError(null);
     if (currentStep === 1 && !isStep1Done) {
-      setError('Please complete all required personal information fields (including valid password min 6 chars).');
+      setError('Please complete all required personal information fields (valid mobile min 10 digits and password min 6 chars).');
       return;
     }
     if (currentStep === 2 && !isStep2Done) {
@@ -227,7 +237,7 @@ export default function NewCustomerPage() {
       return;
     }
     if (currentStep === 3 && !isStep3Done) {
-      setError('Please upload both the Applicant Photo and the Primary Identity Proof (PAN / Aadhaar / Passport / Voter ID) document (* Mandatory).');
+      setError('Please upload at least one KYC document (PAN / Aadhaar / Passport / Photo).');
       return;
     }
     if (currentStep === 4 && !isStep4Done) {
@@ -238,17 +248,13 @@ export default function NewCustomerPage() {
       setError('Please provide bank name, account number, and IFSC code.');
       return;
     }
-    if (currentStep === 6 && !isStep6Done) {
-      setError('Please specify valid loan amount, interest rate, and tenure.');
-      return;
-    }
-    if (currentStep < 7) {
+    if (currentStep < 6) {
       setCurrentStep((s) => s + 1);
     }
   }
 
-    // Final Submit & Forward to Underwriter
-  async function handleSubmitAndForward() {
+  // Final Submit & Open Customer 360
+  async function handleSaveCustomer() {
     setError(null);
     if (!isStep1Done) {
       setError('Please complete Step 1 (Personal Information) first.');
@@ -256,22 +262,6 @@ export default function NewCustomerPage() {
     }
     if (!isStep2Done) {
       setError('Please complete Step 2 (Geographic Location) first.');
-      return;
-    }
-    if (!isStep3Done) {
-      setError('Please return to Step 3 and upload both the mandatory Applicant Photo and Identity Proof document.');
-      return;
-    }
-    if (!isStep4Done) {
-      setError('Please complete Step 4 (Employment & Income Profile) first.');
-      return;
-    }
-    if (!isStep5Done) {
-      setError('Please complete Step 5 (Bank Account Details) first.');
-      return;
-    }
-    if (!isStep6Done) {
-      setError('Please complete Step 6 (Loan Scheme, Requested Amount, Interest Rate, Tenure, and Purpose) before forwarding to Underwriter.');
       return;
     }
     setSaving(true);
@@ -328,31 +318,60 @@ export default function NewCustomerPage() {
         }).catch((e) => console.warn('Bank account registration warning:', e));
       }
 
-      // 5. Originate Loan Application
-      const appRes = await api.post('/applications', {
-        customerId: newCustomerId,
-        productId: loanMode === 'PRESET' && productId ? productId : undefined,
-        productName: customLoanName.trim() || 'Custom Loan Scheme',
-        requestedAmount: principalNum,
-        interestRate: rateNum,
-        tenureMonths: tenureNum,
-        purpose,
-      });
-      const newAppId = appRes.data.data.id;
-
-      // 6. Forward Application directly to Underwriting Queue
-      await api.post(`/applications/${newAppId}/transition`, {
-        toStatus: 'UNDERWRITING',
-        reason: 'Forwarded by Loan Officer after complete step-by-step intake and document verification.',
-      }).catch((e) => console.warn('Underwriter transition warning:', e));
-
-      // Redirect to Application detail view in Underwriting
-      router.push(`/applications/${newAppId}`);
+      // 5. Automatically redirect to Customer 360
+      router.push(`/customers/${newCustomerId}`);
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
       setSaving(false);
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="max-w-3xl mx-auto py-12 flex items-center justify-center text-sm text-slate-500">
+        Loading authorization profile...
+      </div>
+    );
+  }
+
+  if (!isLoanOfficer) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 space-y-6">
+        <div>
+          <Link
+            href="/customers"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-white transition-colors group"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E2445] shadow-2xs group-hover:border-brand-500 group-hover:bg-brand-50 dark:group-hover:bg-brand-950/50 transition-all">
+              <ArrowLeft className="h-4 w-4" />
+            </span>
+            <span>Back to Customers Directory</span>
+          </Link>
+        </div>
+
+        <Card className="p-8 text-center space-y-4 border-amber-200 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
+            <Lock className="h-7 w-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Access Restricted to Loan Officers
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Only certified Loan Officers (<span className="font-mono font-bold text-amber-700 dark:text-amber-400">LOAN_OFFICER</span>) have authorization to register and onboard new borrowers into the LMS.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link href="/customers">
+              <Button variant="secondary" size="sm">
+                Return to Borrower Directory
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -371,8 +390,8 @@ export default function NewCustomerPage() {
 
       <PageHeader
         breadcrumb="Customers / Step-by-Step Onboarding"
-        title="Add Customer & Forward to Underwriter"
-        subtitle="Guided multi-step customer details intake, KYC document collection, and instant transfer to Underwriting"
+        title="Add Customer Profile & Onboarding"
+        subtitle="Guided multi-step customer details intake, KYC document collection, and seamless transition to Customer 360"
       />
 
       {/* Stepper Navigation Bar */}
@@ -751,277 +770,69 @@ export default function NewCustomerPage() {
         </Card>
       )}
 
-      {/* STEP 6: Loan Scheme, Terms & Live EMI Calculation */}
+      {/* STEP 6: Comprehensive Review & Save Customer 360 */}
       {currentStep === 6 && (
-        <Card className="p-6 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-brand-600" />
-                Step 6: Loan Scheme, Custom Terms & Live Financial Assessment
-              </h3>
-              <p className="text-xs text-slate-500">Configure requested loan amount, interest rate (% p.a.), tenure, and purpose</p>
-            </div>
-
-            {/* Mode Switcher */}
-            <div className="flex rounded-xl bg-slate-100 dark:bg-[#1E2445] p-1 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setLoanMode('CUSTOM')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer',
-                  loanMode === 'CUSTOM'
-                    ? 'bg-white dark:bg-brand-600 text-brand-700 dark:text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                )}
-              >
-                <Sparkles className="h-3.5 w-3.5" /> Custom Terms
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoanMode('PRESET')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer',
-                  loanMode === 'PRESET'
-                    ? 'bg-white dark:bg-brand-600 text-brand-700 dark:text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                )}
-              >
-                <Layers className="h-3.5 w-3.5" /> Preset Schemes
-              </button>
-            </div>
-          </div>
-
-          {/* Preset Schemes Selector */}
-          {loanMode === 'PRESET' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Select Standard Product Template (Click to apply & edit)
-              </label>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {productsData?.map((p: any) => {
-                  const selected = productId === p.id;
-                  return (
-                    <div
-                      key={p.id}
-                      onClick={() => handleSelectPreset(p)}
-                      className={cn(
-                        'cursor-pointer rounded-2xl border p-3.5 transition-all text-left',
-                        selected
-                          ? 'border-brand-600 bg-brand-50/80 dark:bg-brand-950/60 shadow-sm ring-2 ring-brand-600/30'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E2445] hover:border-slate-300'
-                      )}
-                    >
-                      <p className="font-bold text-slate-900 dark:text-white text-sm">{p.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {p.productType} · <span className="font-bold text-emerald-600">{p.interestRate}% p.a.</span>
-                      </p>
-                      <p className="text-xs text-brand-700 dark:text-brand-300 font-semibold mt-2">
-                        ₹{Number(p.minAmount).toLocaleString('en-IN')} - ₹{Number(p.maxAmount).toLocaleString('en-IN')}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Custom Editable Fields */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Loan Scheme / Product Title *
-              </label>
-              <Input
-                placeholder="e.g. Custom Personal Loan / Business Working Capital"
-                value={customLoanName}
-                onChange={(e) => setCustomLoanName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                  <IndianRupee className="h-3.5 w-3.5 text-brand-600" />
-                  <span>Principal Loan Amount (INR ₹) *</span>
-                </label>
-                <span className="font-mono font-bold text-brand-700 dark:text-brand-400 text-base">
-                  ₹{principalNum.toLocaleString('en-IN')}
-                </span>
-              </div>
-              <Input
-                type="number"
-                min={1000}
-                max={100000000}
-                step={5000}
-                placeholder="Enter custom loan amount (e.g. 250000)"
-                value={requestedAmount}
-                onChange={(e) => setRequestedAmount(e.target.value)}
-                required
-              />
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {[25000, 50000, 100000, 250000, 500000, 1000000].map((amt) => (
-                  <button
-                    type="button"
-                    key={amt}
-                    onClick={() => setRequestedAmount(amt)}
-                    className={cn(
-                      'text-[11px] px-2.5 py-1 rounded-lg border transition-colors cursor-pointer',
-                      principalNum === amt
-                        ? 'bg-brand-600 text-white border-brand-600 font-bold shadow-2xs'
-                        : 'border-slate-200 bg-white dark:bg-[#1E2445] text-slate-700 dark:text-slate-300 hover:bg-slate-50'
-                    )}
-                  >
-                    ₹{(amt / 1000).toFixed(0)}k
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <Percent className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Annual Interest Rate (% p.a.) *</span>
-                </label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  max="100"
-                  placeholder="e.g. 12.5"
-                  value={customInterestRate}
-                  onChange={(e) => setCustomInterestRate(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
-                  <span>Tenure Duration (Months) *</span>
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="360"
-                  placeholder="e.g. 24"
-                  value={tenureMonths}
-                  onChange={(e) => setTenureMonths(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Loan Purpose / Remarks *
-              </label>
-              <Input
-                placeholder="e.g. Home renovation / business expansion / medical requirement"
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Live Financial Calculation Box */}
-            <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50/60 to-emerald-50/40 dark:from-brand-950/40 dark:to-emerald-950/20 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-500">Monthly EMI</p>
-                <p className="text-lg font-bold text-brand-700 dark:text-brand-300">
-                  ₹{Number(emi).toLocaleString('en-IN')} / mo
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-500">Total Interest</p>
-                <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                  ₹{Number(totalInterest).toLocaleString('en-IN')}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-500">Total Payable</p>
-                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
-                  ₹{Number(totalRepayment).toLocaleString('en-IN')}
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* STEP 7: Comprehensive Review Audit & Forward to Underwriter */}
-      {currentStep === 7 && (
         <Card className="p-6 space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                Step 7: Verification Audit & Forward to Underwriter
+                Step 6: Review & Save Customer Profile
               </h3>
-              <p className="text-xs text-slate-500">Audit all completed steps and initiate transfer to Underwriter review queue</p>
+              <p className="text-xs text-slate-500">Review all captured details and open the Customer 360 onboarding profile</p>
             </div>
             <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-              Ready for Underwriting
+              Ready for Customer 360
             </span>
           </div>
 
           {/* Audit Summary Grid */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-              Step-by-Step Completion Status Checklist
+              Onboarding Intake Summary
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className={cn('p-3 rounded-xl border flex items-center justify-between', isStep1Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50')}>
                 <div>
-                  <p className="font-bold text-slate-900">1. Personal Info & Credentials</p>
-                  <p className="text-slate-600">{form.firstName} {form.lastName} · {form.mobile}</p>
+                  <p className="font-bold text-slate-900 dark:text-white">1. Personal Info & Credentials</p>
+                  <p className="text-slate-600 dark:text-slate-400">{form.firstName} {form.lastName} · {form.mobile}</p>
                 </div>
-                <span className="font-bold text-emerald-700">{isStep1Done ? '✓ Completed' : '⚠️ Pending'}</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">{isStep1Done ? '✓ Completed' : '⚠️ Pending'}</span>
               </div>
 
               <div className={cn('p-3 rounded-xl border flex items-center justify-between', isStep2Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50')}>
                 <div>
-                  <p className="font-bold text-slate-900">2. Location Details</p>
-                  <p className="text-slate-600">{form.city}, {form.state}</p>
+                  <p className="font-bold text-slate-900 dark:text-white">2. Location Details</p>
+                  <p className="text-slate-600 dark:text-slate-400">{form.city}, {form.state}</p>
                 </div>
-                <span className="font-bold text-emerald-700">{isStep2Done ? '✓ Completed' : '⚠️ Pending'}</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">{isStep2Done ? '✓ Completed' : '⚠️ Pending'}</span>
               </div>
 
               <div className={cn('p-3 rounded-xl border flex items-center justify-between', isStep3Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-amber-200 bg-amber-50/50')}>
                 <div>
-                  <p className="font-bold text-slate-900">3. Photo & KYC Uploads</p>
-                  <p className="text-slate-600">
-                    Photo: {selectedPhoto ? 'Selected' : 'Optional'} · Doc: {selectedKycDoc ? kycDocType : 'Optional'}
+                  <p className="font-bold text-slate-900 dark:text-white">3. Photo & KYC Uploads</p>
+                  <p className="text-slate-600 dark:text-slate-400">
+                    Photo: {selectedPhoto ? 'Selected' : 'Pending'} · Doc: {selectedKycDoc ? kycDocType : 'Pending'}
                   </p>
                 </div>
-                <span className="font-bold text-emerald-700">{isStep3Done ? '✓ Attached' : 'Optional'}</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">{isStep3Done ? '✓ Attached' : 'Pending in 360'}</span>
               </div>
 
               <div className={cn('p-3 rounded-xl border flex items-center justify-between', isStep4Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50')}>
                 <div>
-                  <p className="font-bold text-slate-900">4. Employment & Income</p>
-                  <p className="text-slate-600">{form.employmentType} · ₹{Number(form.monthlyIncome || 0).toLocaleString('en-IN')}/mo</p>
+                  <p className="font-bold text-slate-900 dark:text-white">4. Employment & Income</p>
+                  <p className="text-slate-600 dark:text-slate-400">{form.employmentType} · ₹{Number(form.monthlyIncome || 0).toLocaleString('en-IN')}/mo</p>
                 </div>
-                <span className="font-bold text-emerald-700">{isStep4Done ? '✓ Completed' : '⚠️ Pending'}</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">{isStep4Done ? '✓ Completed' : '⚠️ Pending'}</span>
               </div>
 
-              <div className={cn('p-3 rounded-xl border flex items-center justify-between', isStep5Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50')}>
+              <div className={cn('p-3 rounded-xl border flex items-center justify-between sm:col-span-2', isStep5Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-amber-200 bg-amber-50/50')}>
                 <div>
-                  <p className="font-bold text-slate-900">5. Bank Account Details</p>
-                  <p className="text-slate-600">{form.bankName} · Acc: {form.bankAccountNo}</p>
+                  <p className="font-bold text-slate-900 dark:text-white">5. Bank Account Details</p>
+                  <p className="text-slate-600 dark:text-slate-400">{form.bankName || 'Not added'} · Acc: {form.bankAccountNo || 'N/A'}</p>
                 </div>
-                <span className="font-bold text-emerald-700">{isStep5Done ? '✓ Linked' : '⚠️ Pending'}</span>
-              </div>
-
-              <div className={cn('p-3 rounded-xl border flex items-center justify-between', isStep6Done ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50')}>
-                <div>
-                  <p className="font-bold text-slate-900">6. Loan Terms & EMI</p>
-                  <p className="text-slate-600">₹{principalNum.toLocaleString('en-IN')} @ {rateNum}% ({tenureNum} mos)</p>
-                </div>
-                <span className="font-bold text-emerald-700">{isStep6Done ? '✓ Calculated' : '⚠️ Pending'}</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">{isStep5Done ? '✓ Linked' : 'Pending in 360'}</span>
               </div>
             </div>
           </div>
@@ -1029,25 +840,25 @@ export default function NewCustomerPage() {
           <div className="rounded-2xl border border-brand-300 bg-brand-50/80 dark:bg-brand-950/50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <p className="font-bold text-brand-900 dark:text-brand-100 text-sm">
-                Ready to forward dossier to Underwriting
+                Ready to save customer and open Customer 360
               </p>
               <p className="text-xs text-brand-700 dark:text-brand-300">
-                Submitting will create the customer profile, upload documents, register bank account, originate the loan application, and mark status as UNDERWRITING.
+                Saving will create the customer profile, upload documents, register bank details, and automatically open the full Customer 360 onboarding dossier.
               </p>
             </div>
             <Button
               type="button"
               disabled={saving}
-              onClick={handleSubmitAndForward}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md flex-none"
+              onClick={handleSaveCustomer}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md flex-none"
             >
               {saving ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Forwarding...
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" /> Forward to Underwriter →
+                  <ArrowRight className="h-4 w-4" /> Save & Open Customer 360 →
                 </>
               )}
             </Button>
@@ -1072,7 +883,7 @@ export default function NewCustomerPage() {
           ← Previous Step
         </Button>
 
-        {currentStep < 7 ? (
+        {currentStep < 6 ? (
           <Button
             type="button"
             disabled={saving}

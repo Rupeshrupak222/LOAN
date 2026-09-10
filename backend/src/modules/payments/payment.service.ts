@@ -6,10 +6,12 @@ import { Money } from '../finance/money';
 import { generatePaymentNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
+import { communicationService } from '../communication/communication.service';
 import type { RecordPaymentInput } from './payment.schema';
 
 export interface PaymentActorContext {
   id?: string;
+  email?: string;
   roles?: string[];
   tenantId?: string;
   branchId?: string;
@@ -177,6 +179,21 @@ export async function processPayment(
     throw new BadRequestError('Payment amount must be greater than 0');
   }
 
+  // Service-layer RBAC check: System Admin cannot post payments
+  if (actor?.roles && actor.roles.length > 0) {
+    const isStaff = actor.roles.some((r) =>
+      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+    );
+    if (isStaff) {
+      const isAuthorizedFinancialOperator = actor.roles.some((r) =>
+        ['FINANCE_OFFICER'].includes(r)
+      );
+      if (!isAuthorizedFinancialOperator) {
+        throw new ForbiddenError('Access forbidden: System Admin, Super Admin, Branch Manager, and unauthorized staff cannot post repayments or record collections');
+      }
+    }
+  }
+
   // 1. Idempotency Check
   if (input.idempotencyKey) {
     const existing = await prisma.payment.findUnique({
@@ -218,12 +235,14 @@ export async function processPayment(
   const allocSetting = await prisma.systemSetting.findUnique({
     where: { key: 'payment_allocation_order' },
   });
-  const allocationBuckets: string[] = (allocSetting?.value as string[]) || [
+  const rawBuckets: string[] = (allocSetting?.value as string[]) || [
     'FEES',
     'PENALTY',
     'INTEREST',
     'PRINCIPAL',
   ];
+  // Canonical waterfall normalization: map PENALTIES -> PENALTY
+  const allocationBuckets = rawBuckets.map((b) => (b === 'PENALTIES' ? 'PENALTY' : b));
 
   let unallocated = new Decimal(input.amount);
   const paymentNo = generatePaymentNo();
@@ -312,8 +331,12 @@ export async function processPayment(
       orderBy: { emiNumber: 'asc' },
     });
 
+    const hasRemainingOverdue = await tx.repaymentScheduleItem.findFirst({
+      where: { loanId: loan.id, status: 'OVERDUE' },
+    });
+
     const isFullyPaid = newOutstandingPrincipal.isZero() && !nextUnpaid;
-    const newLoanStatus = isFullyPaid ? 'CLOSED' : loan.status === 'OVERDUE' ? 'ACTIVE' : loan.status;
+    const newLoanStatus = isFullyPaid ? 'CLOSED' : hasRemainingOverdue ? 'OVERDUE' : 'ACTIVE';
 
     await tx.loan.update({
       where: { id: loan.id },
@@ -366,7 +389,7 @@ export async function processPayment(
 
     // 8. Update active collection case if any
     const activeCase = await tx.collectionCase.findFirst({
-      where: { loanId: loan.id, status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED'] } },
+      where: { loanId: loan.id, status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED'] } },
     });
     if (activeCase) {
       const remainingOverdue = Decimal.max(0, new Decimal(activeCase.overdueAmount).minus(input.amount));
@@ -385,15 +408,31 @@ export async function processPayment(
           where: { caseId: activeCase.id, status: 'PENDING' },
           data: { status: 'KEPT' },
         });
+      } else {
+        // Fulfill matching pending PTP if paid amount satisfies it
+        const matchingPtp = await tx.promiseToPay.findFirst({
+          where: {
+            caseId: activeCase.id,
+            status: 'PENDING',
+            promisedAmount: { lte: Money.toDb(input.amount) },
+          },
+          orderBy: { promisedDate: 'asc' },
+        });
+        if (matchingPtp) {
+          await tx.promiseToPay.update({
+            where: { id: matchingPtp.id },
+            data: { status: 'KEPT' },
+          });
+        }
       }
 
       await tx.collectionActivity.create({
         data: {
           caseId: activeCase.id,
-          activityType: 'SMS',
-          outcome: 'PROMISE_TO_PAY',
-          notes: `Payment of ₹${input.amount} received. Remaining overdue: ₹${remainingOverdue.toFixed(2)}`,
-          performedBy: 'System',
+          activityType: 'CALL',
+          outcome: isCleared ? 'RESOLVED' : 'PROMISE_TO_PAY',
+          notes: `Repayment of ₹${Number(input.amount).toLocaleString('en-IN')} confirmed. Ref: ${input.reference || paymentNo}. Remaining overdue: ₹${remainingOverdue.toFixed(2)}`,
+          performedBy: actor?.email || 'System',
         },
       });
     }
@@ -423,6 +462,20 @@ export async function processPayment(
     title: `Payment Received: ₹${Number(input.amount).toLocaleString('en-IN')}`,
     message: `Receipt #${paymentNo} recorded for Loan #${loan.loanNo}. Allocations: Principal ₹${bucketTotals.PRINCIPAL.toFixed(2)}, Interest ₹${bucketTotals.INTEREST.toFixed(2)}, Fees ₹${bucketTotals.FEES.toFixed(2)}.`,
   }).catch(() => {});
+
+  void communicationService.dispatchSystemEvent(
+    'PAYMENT_RECEIVED',
+    {
+      customerId: loan.customerId,
+      customerName: `${loan.customer?.firstName || 'Borrower'} ${loan.customer?.lastName || ''}`.trim(),
+      customerEmail: loan.customer?.email || undefined,
+      customerMobile: loan.customer?.mobile || undefined,
+      loanNo: loan.loanNo,
+      paidAmount: String(input.amount),
+      paymentReference: input.reference,
+    },
+    loan.tenantId || undefined
+  ).catch(() => {});
 
   return result;
 }

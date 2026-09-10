@@ -31,30 +31,30 @@ interface Message {
 
 const ROLE_PROMPT_SUGGESTIONS: Record<string, string[]> = {
   SUPER_ADMIN: [
-    'Which loans need my attention today and why?',
-    'What is the status of loan LN-26096694?',
+    'Give me a portfolio summary of all registered customers and loans',
+    'Which loan accounts have active delinquency or overdue payments?',
     'Show me pending underwriting and disbursement queues',
-    'Summarize current delinquency and overdue exposure',
+    'Summarize current collection and recovery performance',
   ],
   ADMIN: [
-    'Are there any pending staff or branch approvals?',
+    'Give me an overview of all active customers and branches',
     'Summarize platform operational queues',
-    'Which loan accounts have active delinquency?',
+    'Which loan accounts are currently active in the database?',
   ],
   LOAN_OFFICER: [
-    'What is the status of loan LN-26096694?',
-    'Which borrowers have pending KYC documents?',
-    'Show me recent application submissions',
+    'Which borrowers have pending KYC documents or verification?',
+    'Show me recent application submissions and pipeline status',
+    'Give me an overview of active customers in our branch',
   ],
   CREDIT_ANALYST: [
     'Which applications are awaiting credit assessment?',
-    'What are the risk factors for loan LN-26096694?',
+    'Show risk score breakdown and FOIR evaluation for pending files',
     'Summarize DTI and policy compliance across queue',
   ],
   UNDERWRITER: [
-    'Which proposals are in the underwriting queue?',
-    'Why is loan LN-26096694 considered low/high risk?',
+    'Which proposals are currently in the underwriting queue?',
     'Show applications ready for sanction decision',
+    'Which applications have high risk flags or exceptions?',
   ],
   FINANCE_OFFICER: [
     'Which loans are ready for electronic fund release?',
@@ -73,8 +73,8 @@ const ROLE_PROMPT_SUGGESTIONS: Record<string, string[]> = {
   ],
   AUDITOR: [
     'What recent compliance or security mutations occurred?',
-    'Verify audit status of loan LN-26096694',
     'Show ledger transaction trail for recent payments',
+    'Verify audit status of recent disbursed loans',
   ],
   CUSTOMER: [
     'What is my active loan status and outstanding balance?',
@@ -96,7 +96,7 @@ export function CopilotDrawer() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: `Hello ${user?.firstName || 'there'}! I am your **Adyapan AI Copilot**, powered by Google Gemini. How can I assist you with loans, underwriting, servicing, or collections today?`,
+      content: `Hello ${user?.firstName || 'there'}! I am your **Adyapan AI Copilot**, live-synchronized with the LMS database. How can I assist you with customer loans, underwriting, KYC, or operations today?`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -107,7 +107,21 @@ export function CopilotDrawer() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const primaryRole = (user?.roles?.[0] || 'CUSTOMER') as RoleName;
-  const suggestions = ROLE_PROMPT_SUGGESTIONS[primaryRole] || ROLE_PROMPT_SUGGESTIONS.CUSTOMER;
+  const defaultSuggestions = ROLE_PROMPT_SUGGESTIONS[primaryRole] || ROLE_PROMPT_SUGGESTIONS.CUSTOMER;
+  const [suggestions, setSuggestions] = useState<string[]>(defaultSuggestions);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      api
+        .get('/ai/copilot/suggestions')
+        .then((res) => {
+          if (Array.isArray(res.data?.data) && res.data.data.length > 0) {
+            setSuggestions(res.data.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, user]);
 
   useEffect(() => {
     setMounted(true);

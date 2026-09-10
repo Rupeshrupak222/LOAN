@@ -57,7 +57,7 @@ export async function processEmiReminders(targetDaysAhead = 3) {
       month: 'short',
       year: 'numeric',
     });
-    const formattedAmount = `₹${parseFloat(item.totalDue || item.emiAmount || '0').toLocaleString('en-IN')}`;
+    const formattedAmount = `₹${parseFloat(item.totalDue ? item.totalDue.toString() : '0').toLocaleString('en-IN')}`;
     const customerName = `${customer.firstName} ${customer.lastName}`.trim();
     const portalUrl = process.env.FRONTEND_URL || 'http://localhost:3000/customer/payments';
 
@@ -101,11 +101,11 @@ export async function processEmiReminders(targetDaysAhead = 3) {
     <div class="card">
       <div class="row">
         <span class="label">Loan Account Code</span>
-        <span class="value">${loan.loanCode}</span>
+        <span class="value">${loan.loanNo}</span>
       </div>
       <div class="row">
         <span class="label">Installment Number</span>
-        <span class="value">#${item.installmentNumber}</span>
+        <span class="value">#${item.emiNumber}</span>
       </div>
       <div class="row">
         <span class="label">Due Date</span>
@@ -113,11 +113,11 @@ export async function processEmiReminders(targetDaysAhead = 3) {
       </div>
       <div class="row">
         <span class="label">Principal Breakup</span>
-        <span class="value">₹${parseFloat(item.principalDue || '0').toLocaleString('en-IN')}</span>
+        <span class="value">₹${parseFloat(item.principal ? item.principal.toString() : '0').toLocaleString('en-IN')}</span>
       </div>
       <div class="row">
         <span class="label">Interest Breakup</span>
-        <span class="value">₹${parseFloat(item.interestDue || '0').toLocaleString('en-IN')}</span>
+        <span class="value">₹${parseFloat(item.interest ? item.interest.toString() : '0').toLocaleString('en-IN')}</span>
       </div>
       <div style="text-align: center; margin-top: 16px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1);">
         <div class="label">Total Amount Payable</div>
@@ -137,7 +137,7 @@ export async function processEmiReminders(targetDaysAhead = 3) {
     `;
 
     // Built-in Compliant SMS Text Template
-    const smsText = `Dear ${customerName}, your Adyapan Loan ${loan.loanCode} EMI of ${formattedAmount} is due on ${formattedDueDate}. Pay instantly at ${portalUrl} to keep your credit score pristine. Call 1800-ADYAPAN for assistance.`;
+    const smsText = `Dear ${customerName}, your Adyapan Loan ${loan.loanNo} EMI of ${formattedAmount} is due on ${formattedDueDate}. Pay instantly at ${portalUrl} to keep your credit score pristine. Call 1800-ADYAPAN for assistance.`;
 
     // Dispatch Notifications
     if (customer.email) {
@@ -163,14 +163,14 @@ export async function processEmiReminders(targetDaysAhead = 3) {
       customerId: customer.id,
       userId: customer.userId || undefined,
       title: `EMI Due Reminder: ${formattedAmount}`,
-      message: `Installment #${item.installmentNumber} for Loan ${loan.loanCode} is due on ${formattedDueDate}.`,
+      message: `Installment #${item.emiNumber} for Loan ${loan.loanNo} is due on ${formattedDueDate}.`,
       channel: 'EMAIL_AND_SMS',
       type: 'PAYMENT_DUE',
       metadata: { loanId: loan.id, installmentId: item.id, amount: item.totalDue, dueDate: item.dueDate },
     });
 
     dispatchedCount++;
-    results.push({ loanCode: loan.loanCode, customer: customerName, dueDate: formattedDueDate, amount: formattedAmount });
+    results.push({ loanCode: loan.loanNo, customer: customerName, dueDate: formattedDueDate, amount: formattedAmount });
   }
 
   logger.info(`[EMI-REMINDER-JOB] Completed. Dispatched ${dispatchedCount} reminders.`);
@@ -235,7 +235,7 @@ export async function processMidnightDelinquencyEngine() {
     else if (dpdDays > 30) bucket = '31-60 Days';
 
     const overdueAmount = Money.toDb(
-      Money.add(item.principalDue, item.interestDue)
+      Money.add(item.principal, item.interest)
     );
 
     // 3. Populate or Update Collection Case Queue
@@ -249,19 +249,20 @@ export async function processMidnightDelinquencyEngine() {
         data: {
           dpd: dpdDays,
           agingBucket: bucket,
-          outstandingAmount: overdueAmount,
+          overdueAmount,
           status: 'OPEN',
         },
       });
     } else {
+      const caseNo = `CC-${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
       await prisma.collectionCase.create({
         data: {
+          caseNo,
           loanId: item.loanId,
           customerId: item.loan.customerId,
-          tenantId: item.loan.tenantId,
           dpd: dpdDays,
           agingBucket: bucket,
-          outstandingAmount: overdueAmount,
+          overdueAmount,
           status: 'OPEN',
         },
       });
@@ -272,10 +273,10 @@ export async function processMidnightDelinquencyEngine() {
     const customer = item.loan.customer;
     if (customer) {
       const customerName = `${customer.firstName} ${customer.lastName}`.trim();
-      const amountStr = `₹${parseFloat(item.totalDue || item.emiAmount || '0').toLocaleString('en-IN')}`;
+      const amountStr = `₹${parseFloat(item.totalDue ? item.totalDue.toString() : '0').toLocaleString('en-IN')}`;
       const portalUrl = process.env.FRONTEND_URL || 'http://localhost:3000/customer/payments';
 
-      const alertMsg = `URGENT NOTICE: Your Adyapan Loan ${item.loan.loanCode} EMI of ${amountStr} is now ${dpdDays} day(s) overdue. Please clear immediately at ${portalUrl} to avoid late penalty charges and credit score impact.`;
+      const alertMsg = `URGENT NOTICE: Your Adyapan Loan ${item.loan.loanNo} EMI of ${amountStr} is now ${dpdDays} day(s) overdue. Please clear immediately at ${portalUrl} to avoid late penalty charges and credit score impact.`;
 
       if (customer.mobile) {
         await smsProvider.send({
@@ -289,7 +290,7 @@ export async function processMidnightDelinquencyEngine() {
       await sendNotification({
         customerId: customer.id,
         userId: customer.userId || undefined,
-        title: `OVERDUE ALERT: Installment #${item.installmentNumber}`,
+        title: `OVERDUE ALERT: Installment #${item.emiNumber}`,
         message: `Your payment of ${amountStr} is ${dpdDays} days overdue.`,
         channel: 'SMS_AND_IN_APP',
         type: 'OVERDUE_ALERT',
