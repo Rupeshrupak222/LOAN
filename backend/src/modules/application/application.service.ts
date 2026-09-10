@@ -214,7 +214,7 @@ export async function transition(
 ) {
   const app = await prisma.loanApplication.findUnique({
     where: { id },
-    include: { customer: true, riskAssessment: true },
+    include: { customer: { include: { documents: true } }, riskAssessment: true },
   });
   if (!app) throw new NotFoundError('Application not found');
 
@@ -290,6 +290,26 @@ export async function transition(
       throw new ForbiddenError(
         `Access forbidden: Credit Analysts cannot approve, reject, sanction, or disburse loans. Allowed transitions: ${allowedForCreditAnalyst.join(', ')}.`
       );
+    }
+  }
+
+  // ── Document Verification Gate ──────────────────────────────────────────────
+  // Every department forwarding step is hard-blocked until all uploaded
+  // documents for the borrower are staff-verified (verified = true OR status = 'VERIFIED').
+  const allDocs = app.customer?.documents || [];
+  if (allDocs.length > 0) {
+    const unverifiedDocs = allDocs.filter((d) => !d.verified && d.status !== 'VERIFIED');
+    if (unverifiedDocs.length > 0) {
+      // Only block forwarding transitions — don't block cancellations or rejections
+      const FORWARDING_STATUSES: ApplicationStatus[] = ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING'];
+      if (FORWARDING_STATUSES.includes(toStatus)) {
+        const docNames = unverifiedDocs
+          .map((d) => d.documentType || d.fileName || 'Document')
+          .join(', ');
+        throw new BadRequestError(
+          `Cannot forward application to the next department. ${unverifiedDocs.length} document(s) are pending verification: ${docNames}. All uploaded documents must be verified by staff before forwarding.`
+        );
+      }
     }
   }
 
