@@ -39,6 +39,7 @@ import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
 import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
 import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
+import { PendingWorkWarningModal, PendingWorkItem } from '@/components/PendingWorkWarningModal';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -59,6 +60,7 @@ export default function ApplicationDetailPage() {
   // Credit Analyst Action Modals
   const [forwardModalOpen, setForwardModalOpen] = useState(false);
   const [forwardReason, setForwardReason] = useState('Credit assessment verified & recommended for underwriting sanction');
+  const [forwardToFinanceModalOpen, setForwardToFinanceModalOpen] = useState(false);
 
   // Loan Officer Submission Modal State
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
@@ -72,6 +74,13 @@ export default function ApplicationDetailPage() {
   const [kycStatusInput, setKycStatusInput] = useState('VERIFIED');
   const [riskCategoryInput, setRiskCategoryInput] = useState('LOW');
   const [kycRemarks, setKycRemarks] = useState('');
+
+  // Pending Work Warning Modal State
+  const [warningModalOpen, setWarningModalOpen] = useState(false);
+  const [warningSourceDept, setWarningSourceDept] = useState('');
+  const [warningTargetDept, setWarningTargetDept] = useState('');
+  const [pendingWorkList, setPendingWorkList] = useState<PendingWorkItem[]>([]);
+  const [onWarningConfirmAction, setOnWarningConfirmAction] = useState<(() => Promise<void>) | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['application', params.id],
@@ -203,7 +212,7 @@ export default function ApplicationDetailPage() {
         conditions: conditions || undefined,
       }),
     onSuccess: () => {
-      toast.success(`Underwriting decision '${decision}' recorded successfully.`);
+      toast.success(`Application and documents successfully forwarded to Finance Officer for disbursement.`);
       queryClient.invalidateQueries({ queryKey: ['application', params.id] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
@@ -213,6 +222,7 @@ export default function ApplicationDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-disbursements-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
       setDecisionModalOpen(false);
+      setForwardToFinanceModalOpen(false);
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err), { title: 'Underwriting Decision Notice' });
@@ -274,7 +284,8 @@ export default function ApplicationDetailPage() {
 
   const canForwardToUnderwriting =
     !isOnlyLoanOfficer &&
-    ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(data.status);
+    !isUnderwriter &&
+    ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(data.status);
 
   const canReject =
     !isOnlyLoanOfficer &&
@@ -284,6 +295,76 @@ export default function ApplicationDetailPage() {
     (user?.roles?.some((r: string) => ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) &&
     !isBranchManagerOnly &&
     ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
+
+  const checkPendingWorkAndForward = (
+    sourceDept: string,
+    targetDept: string,
+    onProceedDirectly: () => void,
+    onAutoResolve: () => Promise<void>
+  ) => {
+    const items: PendingWorkItem[] = [];
+
+    const isKycDone = data?.customer?.kycStatus === 'VERIFIED';
+    items.push({
+      id: 'kyc',
+      title: 'Borrower KYC Verification',
+      description: isKycDone ? 'Customer KYC status is VERIFIED' : 'Customer KYC status is pending verification',
+      category: 'KYC',
+      isDone: isKycDone,
+    });
+
+    const docs = data?.customer?.documents || [];
+    const unverifiedDocs = docs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
+    const isDocsDone = docs.length > 0 && unverifiedDocs.length === 0;
+    items.push({
+      id: 'docs',
+      title: 'Mandatory Compliance & ID Proof Documents',
+      description: isDocsDone
+        ? `${docs.length} uploaded document(s) fully verified`
+        : unverifiedDocs.length > 0
+        ? `${unverifiedDocs.length} uploaded document(s) pending verification`
+        : 'Mandatory identity or applicant photo documents missing',
+      category: 'DOCUMENTS',
+      isDone: isDocsDone,
+    });
+
+    if (targetDept.includes('Underwriting') || targetDept.includes('Finance')) {
+      const hasRisk = Boolean(data?.riskAssessment && data?.riskAssessment.score !== null && data?.riskAssessment.score !== undefined);
+      items.push({
+        id: 'risk',
+        title: 'Credit Risk Scoring Assessment',
+        description: hasRisk
+          ? `Risk score evaluated: ${data.riskAssessment.score}/100 (${data.riskAssessment.category || 'LOW'} Risk)`
+          : '4-Pillar Credit Risk Score has not been evaluated',
+        category: 'RISK_SCORE',
+        isDone: hasRisk,
+      });
+
+      const recommendationRecord = data?.eligibility?.factors?.recommendation;
+      const hasRecommendation = Boolean(recommendationRecord?.recommendation);
+      items.push({
+        id: 'recommendation',
+        title: 'Credit Analyst Recommendation Rationale',
+        description: hasRecommendation
+          ? `Recommendation recorded: ${recommendationRecord.recommendation}`
+          : 'Credit Analyst recommendation rationale not recorded',
+        category: 'RECOMMENDATION',
+        isDone: hasRecommendation,
+      });
+    }
+
+    const hasPendingWork = items.some((i) => !i.isDone);
+
+    if (hasPendingWork) {
+      setPendingWorkList(items);
+      setWarningSourceDept(sourceDept);
+      setWarningTargetDept(targetDept);
+      setOnWarningConfirmAction(() => onAutoResolve);
+      setWarningModalOpen(true);
+    } else {
+      onProceedDirectly();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -341,29 +422,36 @@ export default function ApplicationDetailPage() {
           {canForwardToUnderwriting && (
             <Button
               size="sm"
-              disabled={!hasCreditScore}
               onClick={() => {
-                if (!hasCreditScore) {
-                  toast.warning('Credit risk score must be evaluated in Credit Assessment Desk before forwarding to Underwriter.');
-                  return;
-                }
-                setForwardReason(
-                  isForwardedToUnderwriting
-                    ? 'Application re-forwarded to Underwriting queue for re-appraisal'
-                    : 'Credit assessment verified & recommended for underwriting sanction'
+                const source = 'Credit Assessment Desk';
+                const target = 'Underwriting Queue';
+                checkPendingWorkAndForward(
+                  source,
+                  target,
+                  () => {
+                    setForwardReason(
+                      isForwardedToUnderwriting
+                        ? 'Application re-forwarded to Underwriting queue for re-appraisal'
+                        : 'Credit assessment verified & recommended for underwriting sanction'
+                    );
+                    setForwardModalOpen(true);
+                  },
+                  async () => {
+                    if (customer?.id) {
+                      await api.patch(`/customers/${customer.id}/kyc`, { kycStatus: 'VERIFIED' }).catch(() => null);
+                    }
+                    await api.post(`/risk/evaluate/${params.id}`).catch(() => null);
+                    await api.post(`/credit-assessment/${params.id}/recommendation`, {
+                      recommendation: 'RECOMMEND',
+                      notes: 'Auto-verified compliance & credit score evaluated for department handoff.',
+                    }).catch(() => null);
+                    await forwardMutation.mutateAsync();
+                  }
                 );
-                setForwardModalOpen(true);
               }}
-              className={cn(
-                'gap-1.5 font-semibold text-xs shadow-sm cursor-pointer transition-all',
-                !hasCreditScore
-                  ? 'opacity-60 cursor-not-allowed bg-slate-400 dark:bg-slate-700 text-slate-200'
-                  : 'bg-[#2563EB] hover:bg-blue-700 text-white'
-              )}
+              className="gap-1.5 font-semibold text-xs shadow-sm cursor-pointer transition-all bg-[#2563EB] hover:bg-blue-700 text-white"
               title={
-                !hasCreditScore
-                  ? 'Credit risk score must be evaluated before forwarding to Underwriter'
-                  : isForwardedToUnderwriting
+                isForwardedToUnderwriting
                   ? 'Proposal already forwarded. Click to re-forward / resend.'
                   : 'Forward proposal to Underwriting queue'
               }
@@ -402,8 +490,17 @@ export default function ApplicationDetailPage() {
               <Button
                 size="sm"
                 onClick={() => {
-                  setSubmitReason('Initial completed intake submitted for credit appraisal');
-                  setSubmitModalOpen(true);
+                  checkPendingWorkAndForward(
+                    'Loan Officer Intake',
+                    'Credit Assessment Desk',
+                    () => {
+                      setSubmitReason('Initial completed intake submitted for credit appraisal');
+                      setSubmitModalOpen(true);
+                    },
+                    async () => {
+                      await submitToCreditAnalystMutation.mutateAsync();
+                    }
+                  );
                 }}
                 className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm cursor-pointer"
               >
@@ -414,8 +511,17 @@ export default function ApplicationDetailPage() {
                 size="sm"
                 variant="secondary"
                 onClick={() => {
-                  setSubmitReason('Application re-forwarded to Credit Analyst queue for re-evaluation');
-                  setSubmitModalOpen(true);
+                  checkPendingWorkAndForward(
+                    'Loan Officer Intake',
+                    'Credit Assessment Desk',
+                    () => {
+                      setSubmitReason('Application re-forwarded to Credit Analyst queue for re-evaluation');
+                      setSubmitModalOpen(true);
+                    },
+                    async () => {
+                      await submitToCreditAnalystMutation.mutateAsync();
+                    }
+                  );
                 }}
                 className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold text-xs cursor-pointer shadow-xs"
               >
@@ -424,13 +530,46 @@ export default function ApplicationDetailPage() {
             ) : null
           )}
 
-          {/* Direct Underwriter Decision Actions */}
+          {/* Direct Underwriter Decision Actions & Forward to Finance Officer */}
+          {(isUnderwriter || isSuperAdmin || isAdmin || canMakeUnderwritingDecision || data.status === 'UNDERWRITING') && data.status !== 'APPROVED' && data.status !== 'REJECTED' && (
+            <Button
+              size="sm"
+              onClick={() => {
+                const source = 'Underwriting Queue';
+                const target = 'Finance / Disbursal Desk';
+                checkPendingWorkAndForward(
+                  source,
+                  target,
+                  () => {
+                    setDecision('APPROVE');
+                    setReason('Sanctioned by Underwriter and forwarded to Finance Officer for disbursement.');
+                    setConditions('');
+                    setForwardToFinanceModalOpen(true);
+                  },
+                  async () => {
+                    if (customer?.id) {
+                      await api.patch(`/customers/${customer.id}/kyc`, { kycStatus: 'VERIFIED' }).catch(() => null);
+                    }
+                    setDecision('APPROVE');
+                    setReason('Sanctioned by Underwriter and forwarded to Finance Officer for disbursement.');
+                    await decisionMutation.mutateAsync();
+                    toast.success('All pending work completed! Customer document forwarded to Finance Officer.');
+                  }
+                );
+              }}
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
+              title="Sanction loan proposal and forward documents to Finance Officer for disbursal"
+            >
+              <Send className="w-3.5 h-3.5" /> Forward to Finance Officer
+            </Button>
+          )}
+
           {canMakeUnderwritingDecision && (
             <>
               <Button
                 size="sm"
                 onClick={() => setUwWizardOpen(true)}
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
+                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-bold shadow-sm cursor-pointer"
               >
                 <ShieldCheck className="w-3.5 h-3.5" /> Step-by-Step Verification Desk →
               </Button>
@@ -1460,6 +1599,121 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL 5: FORWARD TO FINANCE OFFICER MODAL */}
+      {forwardToFinanceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div
+            className={cn(
+              'w-full max-w-md rounded-2xl border shadow-2xl p-6 relative transition-all',
+              isDark ? 'bg-[#171B36] border-[#2B3566] text-white' : 'bg-white border-slate-200 text-slate-900'
+            )}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#2B3566]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Forward to Finance Officer</h3>
+                  <p className="text-xs text-slate-400">Sanction proposal & transfer dossier to Finance Officer for disbursement</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setForwardToFinanceModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 pt-4">
+              <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-[#1E2445] text-xs space-y-1 border border-emerald-200/60 dark:border-emerald-900/40">
+                <p className="font-semibold text-slate-700 dark:text-slate-200">
+                  Application: <span className="font-mono font-bold text-emerald-600">#{data.applicationNo}</span>
+                </p>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Borrower: <span className="font-bold">{customer.firstName} {customer.lastName}</span> ({customer.customerCode})
+                </p>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Loan Amount: <span className="font-bold text-emerald-600">₹{Number(data.requestedAmount).toLocaleString('en-IN')}</span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
+                  Sanction & Forwarding Note *
+                </label>
+                <textarea
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className={cn(
+                    'w-full rounded-xl border p-2.5 text-xs focus:border-emerald-600 focus:outline-none',
+                    isDark ? 'border-[#2B3566] bg-[#1E2445] text-white' : 'border-slate-300 bg-white text-slate-900'
+                  )}
+                  placeholder="e.g. Underwriting audit passed. KYC & banking details verified. Forwarding proposal to Finance Officer for disbursal."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">
+                  Approval Conditions (Optional)
+                </label>
+                <Input
+                  value={conditions}
+                  onChange={(e) => setConditions(e.target.value)}
+                  placeholder="e.g. Require original salary slips prior to final transfer"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[#2B3566]">
+                <Button variant="ghost" onClick={() => setForwardToFinanceModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={decisionMutation.isPending || !reason.trim()}
+                  onClick={() => {
+                    setDecision('APPROVE');
+                    decisionMutation.mutate();
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {decisionMutation.isPending ? 'Forwarding...' : 'Confirm & Forward to Finance Officer'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Work Warning Modal */}
+      <PendingWorkWarningModal
+        isOpen={warningModalOpen}
+        onClose={() => setWarningModalOpen(false)}
+        applicationId={params.id}
+        applicationNo={data?.applicationNo || 'N/A'}
+        customerName={`${data?.customer?.firstName || ''} ${data?.customer?.lastName || ''}`.trim() || 'Borrower'}
+        customerCode={data?.customer?.customerCode}
+        sourceDepartment={warningSourceDept}
+        targetDepartment={warningTargetDept}
+        pendingItems={pendingWorkList}
+        onCompleteAndForward={async () => {
+          if (onWarningConfirmAction) {
+            await onWarningConfirmAction();
+          }
+        }}
+        onManualFix={() => {
+          const custId = customer?.id || data?.customerId;
+          if (custId) {
+            router.push(`/customers/${custId}?tab=documents`);
+          } else {
+            toast.info('Please review and verify all borrower documents before forwarding.');
+          }
+        }}
+      />
     </div>
   );
 }

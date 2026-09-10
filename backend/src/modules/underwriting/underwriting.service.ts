@@ -58,7 +58,7 @@ export async function submitUnderwritingDecision(
   actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
 ) {
   // Service layer defense-in-depth: Credit Analysts, System Admins, Super Admins, Branch Managers, and non-deciders cannot commit underwriting decisions
-  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'];
   const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
   if (!isAuthorizedDecider) {
     throw new ForbiddenError(
@@ -68,7 +68,7 @@ export async function submitUnderwritingDecision(
 
   const app = await prisma.loanApplication.findUnique({
     where: { id: applicationId },
-    include: { product: true, customer: true },
+    include: { product: true, customer: { include: { documents: true } } },
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
@@ -102,6 +102,18 @@ export async function submitUnderwritingDecision(
     throw new BadRequestError(
       'Cannot approve loan application with REJECTED borrower KYC status. KYC verification must be resolved prior to credit sanction.'
     );
+  }
+
+  // Mandatory Document Verification Check for Forwarding to Finance Officer
+  if (isApprovalDecision && app.customer?.documents) {
+    const unverifiedDocs = app.customer.documents.filter(
+      (d) => !d.verified && d.status !== 'VERIFIED'
+    );
+    if (unverifiedDocs.length > 0) {
+      throw new BadRequestError(
+        `Cannot approve & forward loan application to Finance Officer. ${unverifiedDocs.length} uploaded document(s) are pending verification. Please verify all borrower documents first.`
+      );
+    }
   }
 
   // Verify approval limits from SystemSetting (applies strictly to both APPROVE and APPROVE_WITH_CONDITIONS)

@@ -116,7 +116,17 @@ export async function analyzeDocumentIntelligence(
     }
   } else {
     const isStaff = actor.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR'].includes(r)
+      [
+        'SUPER_ADMIN',
+        'ADMIN',
+        'LOAN_OFFICER',
+        'CREDIT_ANALYST',
+        'UNDERWRITER',
+        'BRANCH_MANAGER',
+        'AUDITOR',
+        'FINANCE_OFFICER',
+        'DISBURSEMENT_OFFICER',
+      ].includes(r)
     );
     if (!isStaff) {
       throw new ForbiddenError('Access forbidden: Insufficient permissions for Document Intelligence');

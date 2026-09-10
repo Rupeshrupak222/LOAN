@@ -27,6 +27,8 @@ const CREDIT_STAFF = [
   'COMPANY_ADMIN',
   'ADMIN',
   'AUDITOR',
+  'FINANCE_OFFICER',
+  'DISBURSEMENT_OFFICER',
 ];
 
 // 1. Credit Assessment Dashboard Overview Metrics
@@ -83,7 +85,7 @@ router.get(
 // 4. Record Credit Analyst Recommendation
 router.post(
   '/:applicationId/recommendation',
-  authorize('CREDIT_ANALYST', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('CREDIT_ANALYST', 'BRANCH_MANAGER', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(creditRecommendationSchema),
   asyncHandler(async (req, res) => {
     const result = await submitCreditRecommendation(
@@ -104,7 +106,7 @@ router.post(
 // 5. Forward Completed Assessment to Underwriting
 router.post(
   '/:applicationId/forward-underwriting',
-  authorize('CREDIT_ANALYST', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('CREDIT_ANALYST', 'BRANCH_MANAGER', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(forwardUnderwritingSchema),
   asyncHandler(async (req, res) => {
     const result = await forwardToUnderwriting(
@@ -124,7 +126,7 @@ router.post(
 
 router.post(
   '/:applicationId/forward',
-  authorize('CREDIT_ANALYST', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('CREDIT_ANALYST', 'BRANCH_MANAGER', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(forwardUnderwritingSchema),
   asyncHandler(async (req, res) => {
     const result = await forwardToUnderwriting(
