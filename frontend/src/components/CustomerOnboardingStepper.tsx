@@ -57,8 +57,8 @@ export function CustomerOnboardingStepper({
           {steps.map((s) => {
             const Icon = s.icon;
             const isActive = currentStep === s.id;
-            const isDone = completedSteps.includes(s.id);
-            const isClickable = isDone || s.id <= Math.max(...completedSteps, 0) + 1 || s.id === 1;
+            const isDone = completedSteps.includes(s.id) && !isActive;
+            const isClickable = completedSteps.includes(s.id) || isDone || s.id <= Math.max(...completedSteps, 0) + 1 || s.id === 1;
 
             return (
               <div key={s.id} className="flex flex-col items-center group">

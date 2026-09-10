@@ -72,13 +72,13 @@ router.post(
 
 router.post(
   '/:id/transition',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'),
   validate({ body: transitionSchema }),
   asyncHandler(async (req, res) => {
     const toStatus = req.body.toStatus;
     if (toStatus === 'APPROVED' || toStatus === 'REJECTED') {
       const canSanction = req.user?.roles.some((r) =>
-        ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'].includes(r)
+        ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
       );
       if (!canSanction) {
         throw new ForbiddenError(

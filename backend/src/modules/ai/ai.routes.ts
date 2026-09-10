@@ -164,7 +164,7 @@ router.post(
   '/documents/:id/analyze',
   asyncHandler(async (req, res) => {
     const isStaff = req.user?.roles.some((r) =>
-      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER'].includes(r)
+      ['SUPER_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR', 'COLLECTION_OFFICER', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'].includes(r)
     );
 
     if (!isStaff) {
