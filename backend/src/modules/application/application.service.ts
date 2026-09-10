@@ -299,6 +299,26 @@ export async function transition(
     }
   }
 
+  // ── Document Verification Gate ──────────────────────────────────────────────
+  // Every department forwarding step is hard-blocked until all uploaded
+  // documents for the borrower are staff-verified (verified = true OR status = 'VERIFIED').
+  const allDocs = app.customer?.documents || [];
+  if (allDocs.length > 0) {
+    const unverifiedDocs = allDocs.filter((d) => !d.verified && d.status !== 'VERIFIED');
+    if (unverifiedDocs.length > 0) {
+      // Only block forwarding transitions — don't block cancellations or rejections
+      const FORWARDING_STATUSES: ApplicationStatus[] = ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING'];
+      if (FORWARDING_STATUSES.includes(toStatus)) {
+        const docNames = unverifiedDocs
+          .map((d) => d.documentType || d.fileName || 'Document')
+          .join(', ');
+        throw new BadRequestError(
+          `Cannot forward application to the next department. ${unverifiedDocs.length} document(s) are pending verification: ${docNames}. All uploaded documents must be verified by staff before forwarding.`
+        );
+      }
+    }
+  }
+
   if (toStatus === 'UNDERWRITING') {
     if (!app.riskAssessment || app.riskAssessment.score === null || app.riskAssessment.score === undefined) {
       throw new BadRequestError('Cannot forward application to Underwriting. Credit score evaluation is mandatory before Underwriter handoff.');

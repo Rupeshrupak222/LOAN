@@ -473,38 +473,77 @@ export default function ApplicationDetailPage() {
   ) => {
     const items: PendingWorkItem[] = [];
 
+    // ── 1. KYC Verification ──────────────────────────────────────────────
     const isKycDone = data?.customer?.kycStatus === 'VERIFIED';
     items.push({
       id: 'kyc',
       title: 'Borrower KYC Verification',
-      description: isKycDone ? 'Customer KYC status is VERIFIED' : 'Customer KYC status is pending verification',
+      description: isKycDone
+        ? 'Customer KYC status is VERIFIED'
+        : 'Customer KYC status is pending — must be set to VERIFIED before forwarding',
       category: 'KYC',
       isDone: isKycDone,
     });
 
+    // ── 2. Document Verification (each doc listed individually) ──────────
     const docs = data?.customer?.documents || [];
     const unverifiedDocs = docs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
-    const isDocsDone = docs.length > 0 && unverifiedDocs.length === 0;
-    items.push({
-      id: 'docs',
-      title: 'Mandatory Compliance & ID Proof Documents',
-      description: isDocsDone
-        ? `${docs.length} uploaded document(s) fully verified`
-        : unverifiedDocs.length > 0
-        ? `${unverifiedDocs.length} uploaded document(s) pending verification`
-        : 'Mandatory identity or applicant photo documents missing',
-      category: 'DOCUMENTS',
-      isDone: isDocsDone,
-    });
+    const verifiedDocs = docs.filter((d: any) => d.verified || d.status === 'VERIFIED');
 
+    if (docs.length === 0) {
+      items.push({
+        id: 'docs-missing',
+        title: 'No Documents Uploaded',
+        description: 'At least one verified identity document is required before forwarding',
+        category: 'DOCUMENTS',
+        isDone: false,
+      });
+    } else if (unverifiedDocs.length === 0) {
+      items.push({
+        id: 'docs',
+        title: `All Documents Verified (${verifiedDocs.length}/${docs.length})`,
+        description: `${docs.length} uploaded document(s) are fully verified and ready for handoff`,
+        category: 'DOCUMENTS',
+        isDone: true,
+      });
+    } else {
+      // List each unverified document individually
+      unverifiedDocs.forEach((d: any, i: number) => {
+        const docLabel = d.documentType || d.category || d.fileName || `Document #${i + 1}`;
+        items.push({
+          id: `doc-${d.id || i}`,
+          title: `Unverified: ${docLabel}`,
+          description: `File: ${d.fileName || 'N/A'} — Status: ${d.status || 'PENDING'}. Must be verified by staff before forwarding.`,
+          category: 'DOCUMENTS',
+          isDone: false,
+        });
+      });
+      // Show already-verified docs as done items
+      verifiedDocs.forEach((d: any, i: number) => {
+        const docLabel = d.documentType || d.category || d.fileName || `Document #${i + 1}`;
+        items.push({
+          id: `doc-verified-${d.id || i}`,
+          title: `Verified: ${docLabel}`,
+          description: `File: ${d.fileName || 'N/A'} — Verified by ${d.verifiedBy || 'Staff'}`,
+          category: 'DOCUMENTS',
+          isDone: true,
+        });
+      });
+    }
+
+    // ── 3. Risk Score & Recommendation (for underwriting/finance steps) ──
     if (targetDept.includes('Underwriting') || targetDept.includes('Finance')) {
-      const hasRisk = Boolean(data?.riskAssessment && data?.riskAssessment.score !== null && data?.riskAssessment.score !== undefined);
+      const hasRisk = Boolean(
+        data?.riskAssessment &&
+        data?.riskAssessment.score !== null &&
+        data?.riskAssessment.score !== undefined
+      );
       items.push({
         id: 'risk',
         title: 'Credit Risk Scoring Assessment',
         description: hasRisk
           ? `Risk score evaluated: ${data.riskAssessment.score}/100 (${data.riskAssessment.category || 'LOW'} Risk)`
-          : '4-Pillar Credit Risk Score has not been evaluated',
+          : '4-Pillar Credit Risk Score has not been evaluated — run evaluation first',
         category: 'RISK_SCORE',
         isDone: hasRisk,
       });
@@ -516,24 +555,34 @@ export default function ApplicationDetailPage() {
         title: 'Credit Analyst Recommendation Rationale',
         description: hasRecommendation
           ? `Recommendation recorded: ${recommendationRecord.recommendation}`
-          : 'Credit Analyst recommendation rationale not recorded',
+          : 'Credit Analyst recommendation rationale not yet recorded',
         category: 'RECOMMENDATION',
         isDone: hasRecommendation,
       });
     }
 
-    const hasPendingWork = items.some((i) => !i.isDone);
+    const hasAnyPending = items.some((i) => !i.isDone);
+    // Documents pending = hard block, no auto-resolve allowed
+    const hasDocsPending = unverifiedDocs.length > 0 || docs.length === 0;
 
-    if (hasPendingWork) {
+    if (hasAnyPending) {
       setPendingWorkList(items);
       setWarningSourceDept(sourceDept);
       setWarningTargetDept(targetDept);
-      setOnWarningConfirmAction(() => onAutoResolve);
+      // If documents are pending, the "complete and forward" button is disabled —
+      // user must manually go verify documents first (backend will also hard-block).
+      // If only non-doc items are pending, allow the auto-resolve path.
+      setOnWarningConfirmAction(
+        hasDocsPending
+          ? null  // disables the auto-forward button in modal
+          : () => onAutoResolve
+      );
       setWarningModalOpen(true);
     } else {
       onProceedDirectly();
     }
   };
+
 
   return (
     <div className="space-y-6">
@@ -2116,11 +2165,7 @@ export default function ApplicationDetailPage() {
         sourceDepartment={warningSourceDept}
         targetDepartment={warningTargetDept}
         pendingItems={pendingWorkList}
-        onCompleteAndForward={async () => {
-          if (onWarningConfirmAction) {
-            await onWarningConfirmAction();
-          }
-        }}
+        onCompleteAndForward={onWarningConfirmAction}
         onManualFix={() => {
           const custId = customer?.id || data?.customerId;
           if (custId) {

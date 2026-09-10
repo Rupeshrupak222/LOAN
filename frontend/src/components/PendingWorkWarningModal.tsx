@@ -36,7 +36,8 @@ interface PendingWorkWarningModalProps {
   sourceDepartment: string;
   targetDepartment: string;
   pendingItems: PendingWorkItem[];
-  onCompleteAndForward: () => Promise<void>;
+  /** null = hard-blocked by unverified documents; forward button disabled */
+  onCompleteAndForward: (() => Promise<void>) | null;
   onManualFix?: () => void;
 }
 
@@ -63,6 +64,7 @@ export function PendingWorkWarningModal({
   const totalCount = pendingItems.length;
 
   const handleAutoResolveAndForward = async () => {
+    if (!onCompleteAndForward) return;
     setIsResolving(true);
     try {
       await onCompleteAndForward();
@@ -213,22 +215,41 @@ export function PendingWorkWarningModal({
         {/* Action Buttons */}
         <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
           <Button variant="ghost" size="sm" onClick={onClose} className="w-full sm:w-auto text-xs text-slate-500">
-            Close Warning
+            Close
           </Button>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             {incompleteItems.length > 0 ? (
-              <Button
-                size="sm"
-                onClick={() => {
-                  onClose();
-                  if (onManualFix) onManualFix();
-                }}
-                className="w-full sm:w-auto gap-1.5 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm cursor-pointer"
-              >
-                <FileCheck className="w-4 h-4 text-white" /> Complete & Verify Documents in Workspace →
-              </Button>
+              onCompleteAndForward === null ? (
+                // Hard-blocked: documents are unverified — forward is disabled
+                <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto">
+                  <div className={cn(
+                    'text-[11px] font-semibold px-3 py-1.5 rounded-lg border flex items-center gap-1.5',
+                    'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400'
+                  )}>
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
+                    Forwarding is disabled until all documents are verified
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => { onClose(); if (onManualFix) onManualFix(); }}
+                    className="w-full sm:w-auto gap-1.5 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm cursor-pointer"
+                  >
+                    <FileCheck className="w-4 h-4 text-white" /> Go to Document Workspace to Verify →
+                  </Button>
+                </div>
+              ) : (
+                // Other pending items — allow manual fix
+                <Button
+                  size="sm"
+                  onClick={() => { onClose(); if (onManualFix) onManualFix(); }}
+                  className="w-full sm:w-auto gap-1.5 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm cursor-pointer"
+                >
+                  <FileCheck className="w-4 h-4 text-white" /> Complete Pending Items in Workspace →
+                </Button>
+              )
             ) : (
+              // All items done — show forward button
               <Button
                 size="sm"
                 onClick={handleAutoResolveAndForward}
@@ -236,13 +257,9 @@ export function PendingWorkWarningModal({
                 className="w-full sm:w-auto gap-1.5 font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm cursor-pointer"
               >
                 {isResolving ? (
-                  <>
-                    <Sparkles className="w-4 h-4 animate-spin text-white" /> Forwarding...
-                  </>
+                  <><Sparkles className="w-4 h-4 animate-spin text-white" /> Forwarding...</>
                 ) : (
-                  <>
-                    <Zap className="w-4 h-4 text-amber-300 fill-amber-300" /> Forward to {targetDepartment} →
-                  </>
+                  <><Zap className="w-4 h-4 text-amber-300 fill-amber-300" /> Forward to {targetDepartment} →</>
                 )}
               </Button>
             )}
