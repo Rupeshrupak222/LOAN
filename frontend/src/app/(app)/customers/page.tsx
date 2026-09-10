@@ -33,6 +33,7 @@ export default function CustomersPage() {
   const isLoanOfficer = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
 
   const { isDark } = useTheme();
+  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
   const toast = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
