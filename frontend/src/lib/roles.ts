@@ -179,6 +179,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'customers',
       'applications',
+      'loans',
       'loan-products',
       'communications',
       'emi-calculator',

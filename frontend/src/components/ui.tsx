@@ -1,6 +1,6 @@
 'use client';
 
-import { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, isValidElement } from 'react';
+import React, { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, isValidElement, forwardRef } from 'react';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -53,22 +53,26 @@ export function Button({
   );
 }
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  const { isDark } = useTheme();
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  ({ className, ...props }, ref) => {
+    const { isDark } = useTheme();
 
-  return (
-    <input
-      className={cn(
-        'h-9 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 disabled:cursor-not-allowed',
-        isDark
-          ? 'border-[#2B3566] bg-[#1E2445] text-slate-100 placeholder:text-slate-500 disabled:bg-[#16203D] disabled:text-slate-500'
-          : 'border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500',
-        className
-      )}
-      {...props}
-    />
-  );
-}
+    return (
+      <input
+        ref={ref}
+        className={cn(
+          'h-9 w-full rounded-xl border px-3 text-sm shadow-sm transition-colors focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 disabled:cursor-not-allowed',
+          isDark
+            ? 'border-[#2B3566] bg-[#1E2445] text-slate-100 placeholder:text-slate-500 disabled:bg-[#16203D] disabled:text-slate-500'
+            : 'border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500',
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+Input.displayName = 'Input';
 
 export function Card({
   className,

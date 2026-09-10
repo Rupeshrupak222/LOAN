@@ -3,8 +3,10 @@ import { z } from 'zod';
 export const registerDocumentSchema = z.object({
   customerId: z.string().uuid().optional(),
   applicationId: z.string().uuid().optional(),
-  category: z.enum(['IDENTITY', 'ADDRESS', 'INCOME', 'BANK_STATEMENT', 'BUSINESS', 'AGREEMENT', 'NOC']),
+  category: z.string().min(1, 'Document category is required'),
   documentType: z.string().min(1),
+  documentName: z.string().optional(),
+  description: z.string().optional(),
   fileName: z.string().min(1),
   storageKey: z.string().min(1),
   contentType: z.string().optional(),

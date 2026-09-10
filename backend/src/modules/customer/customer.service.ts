@@ -8,6 +8,12 @@ import { Money } from '../finance/money';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
+import {
+  validateCustomerDocumentFulfillment,
+  calculateApplicableDocuments,
+  normalizeEmploymentType,
+  normalizeProductType,
+} from '../documents/document-rules';
 import type {
   CreateCustomerInput,
   UpdateKycStatusInput,
@@ -258,16 +264,28 @@ export interface OriginationEligibilityResult {
     employmentComplete: boolean;
     bankComplete: boolean;
   };
+  documentDetails?: {
+    employmentType: string;
+    productType: string;
+    mandatoryCount: number;
+    uploadedCount: number;
+    missingCodes: string[];
+    missingNames: string[];
+  };
 }
 
-export function evaluateCustomerOnboardingStatus(customer: any): OriginationEligibilityResult {
+export function evaluateCustomerOnboardingStatus(
+  customer: any,
+  productContext?: { productType?: string; requestedAmount?: number; minAmount?: number }
+): OriginationEligibilityResult {
   const missing: string[] = [];
   const reasons: string[] = [];
 
   // Step 1: Profile Complete
   const hasFirstName = Boolean(customer.firstName && customer.firstName.trim().length > 0);
   const hasLastName = Boolean(customer.lastName && customer.lastName.trim().length > 0);
-  const hasMobile = Boolean(customer.mobile && customer.mobile.trim().length >= 10);
+  const cleanMobile = (customer.mobile || '').replace(/\D/g, '');
+  const hasMobile = Boolean(cleanMobile && cleanMobile.length === 10);
   const profileComplete = hasFirstName && hasLastName && hasMobile;
 
   if (!hasFirstName) {
@@ -280,32 +298,33 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
   }
   if (!hasMobile) {
     missing.push('MOBILE');
-    reasons.push('Valid 10-digit mobile number is required.');
+    reasons.push('Valid 10-digit numeric mobile number starting with 6-9 is required.');
   }
 
-  // Step 2: KYC & Photo Documents
+  // Step 2: Dynamic KYC & Mandatory Documents Validation
   const docs = Array.isArray(customer.documents) ? customer.documents : [];
-  const hasIdentityDoc = docs.some((d: any) =>
-    ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType)
-  );
-  const hasPhotoDoc = docs.some((d: any) =>
-    ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType)
-  );
-  const kycDocsComplete =
-    (hasIdentityDoc && (hasPhotoDoc || docs.length >= 2)) ||
-    docs.length >= 2 ||
-    (hasIdentityDoc && customer.kycStatus === 'VERIFIED') ||
-    customer.kycStatus === 'VERIFIED';
+  const empType = customer.employmentType || customer.employmentDetails?.[0]?.employmentType || 'SALARIED';
+  const prodType = productContext?.productType || 'PERSONAL';
 
-  if (!hasIdentityDoc && docs.length === 0 && customer.kycStatus !== 'VERIFIED') {
-    missing.push('IDENTITY_PROOF');
-    reasons.push('Primary identity proof (PAN Card / Aadhaar) is required.');
-  }
-  if (!hasPhotoDoc && docs.length < 2 && customer.kycStatus !== 'VERIFIED') {
-    missing.push('APPLICANT_PHOTO');
-    reasons.push('Applicant photograph / selfie document is required.');
+  const monthlyIncomeVal =
+    customer.monthlyIncome != null
+      ? Number(customer.monthlyIncome)
+      : customer.employmentDetails?.[0]?.monthlyIncome
+      ? Number(customer.employmentDetails[0].monthlyIncome)
+      : 0;
+
+  const docValidation = validateCustomerDocumentFulfillment(docs, empType, prodType, {
+    monthlyIncome: monthlyIncomeVal,
+    requestedAmount: productContext?.requestedAmount,
+  });
+
+  const kycDocsComplete = customer.kycStatus === 'VERIFIED' || docValidation.isComplete;
+
+  if (!kycDocsComplete) {
+    docValidation.missingCodes.forEach((code) => missing.push(code));
+    docValidation.missingNames.forEach((name) => {
+      reasons.push(`Required document missing for ${normalizeEmploymentType(empType)} applicant: ${name}`);
+    });
   }
 
   // Step 3: Employment & Income
@@ -316,15 +335,11 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
   const hasEmployer = Boolean(
     (customer.employerName && customer.employerName.trim().length > 0) ||
     (customer.employmentDetails &&
-      customer.employmentDetails.some((e: any) => e.employerName && e.employerName.trim().length > 0))
+      customer.employmentDetails.some((e: any) => e.employerName && e.employerName.trim().length > 0)) ||
+    ['HOMEMAKER', 'STUDENT', 'RETIRED'].includes(normalizeEmploymentType(empType))
   );
-  const monthlyIncomeVal =
-    customer.monthlyIncome != null
-      ? Number(customer.monthlyIncome)
-      : customer.employmentDetails?.[0]?.monthlyIncome
-      ? Number(customer.employmentDetails[0].monthlyIncome)
-      : 0;
-  const hasMonthlyIncome = monthlyIncomeVal > 0;
+  const hasMonthlyIncome =
+    monthlyIncomeVal > 0 || ['HOMEMAKER', 'STUDENT'].includes(normalizeEmploymentType(empType));
 
   const employmentComplete = hasEmploymentType && hasEmployer && hasMonthlyIncome;
 
@@ -334,11 +349,11 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
   }
   if (!hasEmployer) {
     missing.push('EMPLOYER_NAME');
-    reasons.push('Employer or business name is required.');
+    reasons.push('Employer or business organization name is required.');
   }
   if (!hasMonthlyIncome) {
     missing.push('MONTHLY_INCOME');
-    reasons.push('Valid monthly income is required.');
+    reasons.push('Valid positive monthly income is required.');
   }
 
   // Step 4: Bank Account Details
@@ -348,7 +363,7 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
       b.bankName &&
       b.bankName.trim().length > 0 &&
       b.accountNumber &&
-      b.accountNumber.trim().length >= 4 &&
+      b.accountNumber.trim().length >= 8 &&
       b.ifscCode &&
       b.ifscCode.trim().length >= 4
   );
@@ -356,7 +371,7 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
     customer.bankName &&
       customer.bankName.trim().length > 0 &&
       customer.bankAccountNo &&
-      customer.bankAccountNo.trim().length >= 4 &&
+      customer.bankAccountNo.trim().length >= 8 &&
       customer.bankIfsc &&
       customer.bankIfsc.trim().length >= 4
   );
@@ -364,7 +379,7 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
 
   if (!bankComplete) {
     missing.push('BANK_ACCOUNT');
-    reasons.push('At least one valid bank account (Bank Name, Account Number, IFSC) is required.');
+    reasons.push('At least one valid disbursement bank account (Bank Name, 8-20 digit Account Number, IFSC) is required.');
   }
 
   const eligible = profileComplete && kycDocsComplete && employmentComplete && bankComplete;
@@ -379,13 +394,22 @@ export function evaluateCustomerOnboardingStatus(customer: any): OriginationElig
       employmentComplete,
       bankComplete,
     },
+    documentDetails: {
+      employmentType: normalizeEmploymentType(empType),
+      productType: normalizeProductType(prodType),
+      mandatoryCount: docValidation.mandatoryCount,
+      uploadedCount: docValidation.uploadedCount,
+      missingCodes: docValidation.missingCodes,
+      missingNames: docValidation.missingNames,
+    },
   };
 }
 
 export async function validateLoanOfficerOriginationEligibility(
   customerId: string,
   tenantId?: string,
-  actor?: CustomerActorContext
+  actor?: CustomerActorContext,
+  productId?: string
 ): Promise<OriginationEligibilityResult> {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
@@ -415,7 +439,21 @@ export async function validateLoanOfficerOriginationEligibility(
     }
   }
 
-  return evaluateCustomerOnboardingStatus(customer);
+  let productContext: any = undefined;
+  if (productId) {
+    const prod = await prisma.loanProduct.findUnique({
+      where: { id: productId },
+      select: { productType: true, minAmount: true, maxAmount: true },
+    });
+    if (prod) {
+      productContext = {
+        productType: prod.productType,
+        minAmount: Number(prod.minAmount),
+      };
+    }
+  }
+
+  return evaluateCustomerOnboardingStatus(customer, productContext);
 }
 
 export async function createCustomer(

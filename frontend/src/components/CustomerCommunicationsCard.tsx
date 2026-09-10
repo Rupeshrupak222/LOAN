@@ -151,7 +151,15 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
     },
   });
 
-  const logs = logsData?.data || [];
+  const logs: any[] = Array.isArray(logsData?.data)
+    ? logsData.data
+    : Array.isArray(logsData?.data?.items)
+    ? logsData.data.items
+    : Array.isArray(logsData?.items)
+    ? logsData.items
+    : Array.isArray(logsData)
+    ? logsData
+    : [];
   const filteredTemplates = templates.filter((t: any) => {
     const matchCategory = !sendCategory || t.category === sendCategory;
     const matchChannel = !sendChannel || t.channel === sendChannel;
@@ -313,7 +321,7 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
           <div className="py-10 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
             <MessageSquare className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto" />
             <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-              No communication logs found for this customer.
+              No communication history available.
             </p>
             <p className="text-[11px] text-slate-400">
               Dispatches triggered by loan events, KYC changes, payment receipts, or manual notices will appear here.

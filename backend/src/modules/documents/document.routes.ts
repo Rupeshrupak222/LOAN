@@ -15,10 +15,33 @@ import {
   uploadAndRegisterDocument,
   deleteDocument,
 } from './document.service';
+import { calculateApplicableDocuments } from './document-rules';
 
 const router = Router();
 
 router.use(authenticate);
+
+/**
+ * Dynamic Document Checklist Engine
+ * Returns applicable mandatory, conditional, optional, and not-applicable documents
+ * for given employmentType & productType.
+ */
+router.get(
+  '/applicable-requirements',
+  asyncHandler(async (req, res) => {
+    const employmentType = req.query.employmentType ? String(req.query.employmentType) : undefined;
+    const productType = req.query.productType ? String(req.query.productType) : undefined;
+    const monthlyIncome = req.query.monthlyIncome ? Number(req.query.monthlyIncome) : undefined;
+    const requestedAmount = req.query.requestedAmount ? Number(req.query.requestedAmount) : undefined;
+
+    const checklist = calculateApplicableDocuments(employmentType, productType, {
+      monthlyIncome,
+      requestedAmount,
+    });
+
+    res.json(success(checklist));
+  })
+);
 
 router.get(
   '/',
@@ -94,7 +117,9 @@ router.post(
         customerId,
         applicationId: req.body.applicationId || undefined,
         category: req.body.category || 'IDENTITY_PROOF',
-        documentType: req.body.documentType || 'DOCUMENT',
+        documentType: req.body.documentType || req.body.documentName || 'DOCUMENT',
+        documentName: req.body.documentName || undefined,
+        description: req.body.description || undefined,
         expiryDate: req.body.expiryDate || undefined,
       },
       req.user?.id

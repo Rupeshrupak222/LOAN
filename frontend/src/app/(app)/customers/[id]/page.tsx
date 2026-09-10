@@ -51,6 +51,7 @@ import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelli
 import { CustomerCommunicationsCard } from '@/components/CustomerCommunicationsCard';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
+import { calculateApplicableDocuments, normalizeEmploymentType } from '@/lib/documentRules';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -573,15 +574,19 @@ export default function CustomerDetailPage() {
       {data && (() => {
         const hasProfile = Boolean(data.firstName && data.lastName && data.mobile);
         const docs = Array.isArray(data.documents) ? data.documents : [];
-        const hasIdentityDoc = docs.some((d: any) =>
-          ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-          ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType)
+        
+        const docRules = calculateApplicableDocuments(data.employmentType, undefined, {
+          monthlyIncome: Number(data.monthlyIncome) || undefined,
+        });
+        const mandatoryRules = docRules.mandatory;
+        const satisfiedMandatory = mandatoryRules.filter((r) =>
+          docs.some((d: any) => {
+            const docCat = (d.category || '').toUpperCase();
+            const docType = (d.documentType || '').toUpperCase();
+            return docCat === r.category.toUpperCase() || r.acceptedDocumentTypes.some((t) => docType.includes(t.toUpperCase()));
+          })
         );
-        const hasPhotoDoc = docs.some((d: any) =>
-          ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-          ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType)
-        );
-        const isKycDocsUploaded = (hasIdentityDoc && (hasPhotoDoc || docs.length >= 2)) || docs.length >= 2;
+        const isKycDocsUploaded = satisfiedMandatory.length >= mandatoryRules.length || docs.length >= mandatoryRules.length;
         const isKycVerified = data.kycStatus === 'VERIFIED' || docs.some((d: any) => d.status === 'VERIFIED' || d.verified);
 
         const hasEmployment = Boolean(
@@ -590,6 +595,7 @@ export default function CustomerDetailPage() {
         );
         const hasIncome = Boolean(
           data.monthlyIncome ||
+          ['HOMEMAKER', 'STUDENT'].includes(normalizeEmploymentType(data.employmentType)) ||
           (data.employmentDetails && data.employmentDetails.some((e: any) => e.monthlyIncome))
         );
         const hasBank = Boolean(

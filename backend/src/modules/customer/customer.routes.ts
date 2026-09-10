@@ -186,10 +186,12 @@ router.get(
 router.get(
   '/:id/origination-eligibility',
   asyncHandler(async (req, res) => {
+    const productId = req.query.productId ? String(req.query.productId) : undefined;
     const eligibility = await validateLoanOfficerOriginationEligibility(
       req.params.id,
       (req as any).tenantId || req.user?.tenantId,
-      req.user as any
+      req.user as any,
+      productId
     );
     res.json(success(eligibility));
   })
