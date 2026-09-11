@@ -67,7 +67,7 @@ import { cn, formatMoney, formatDate } from '@/lib/utils';
 import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
 import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
-import { BorrowerPortalShell } from '@/components/borrower/BorrowerPortalShell';
+import { BorrowerDashboardView } from '@/features/borrower';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -357,6 +357,10 @@ export default function DashboardPage() {
 
   if (authLoading) return <Spinner />;
   if (!user) return null;
+
+  if (primaryRole === 'CUSTOMER') {
+    return <BorrowerDashboardView />;
+  }
 
   const cardBgClass = isDark
     ? 'border-[#2B3566] bg-[#1E2445] text-white shadow-none'
@@ -826,27 +830,25 @@ export default function DashboardPage() {
           </button>
 
           {/* Export CSV Button (For staff) */}
-          {primaryRole !== 'CUSTOMER' && (
-            <button
-              type="button"
-              onClick={exportReport}
-              disabled={exporting}
-              className={cn(
-                'flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-2xs cursor-pointer select-none disabled:opacity-60',
-                isDark
-                  ? 'border-[#2B3566] bg-[#1E2445] text-[#60A5FA] hover:bg-[#2B3566]'
-                  : 'border-blue-200 bg-blue-50/70 text-[#2563EB] hover:bg-blue-100/80'
-              )}
-            >
-              <Download className={cn('h-3.5 w-3.5', exporting ? 'animate-bounce' : '')} />
-              <span>{exporting ? 'Exporting...' : 'Export Excel / CSV'}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={exportReport}
+            disabled={exporting}
+            className={cn(
+              'flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all shadow-2xs cursor-pointer select-none disabled:opacity-60',
+              isDark
+                ? 'border-[#2B3566] bg-[#1E2445] text-[#60A5FA] hover:bg-[#2B3566]'
+                : 'border-blue-200 bg-blue-50/70 text-[#2563EB] hover:bg-blue-100/80'
+            )}
+          >
+            <Download className={cn('h-3.5 w-3.5', exporting ? 'animate-bounce' : '')} />
+            <span>{exporting ? 'Exporting...' : 'Export Excel / CSV'}</span>
+          </button>
         </div>
       </div>
 
       {/* AI Executive Decision Intelligence Card (For Staff & Managers) */}
-      {primaryRole !== 'CUSTOMER' && <DecisionIntelligenceCard />}
+      <DecisionIntelligenceCard />
 
       {/* ========================================================================= */}
       {/* 2. ROLE-SPECIFIC DASHBOARD SECTIONS                                       */}

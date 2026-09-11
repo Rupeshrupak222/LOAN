@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const createApplicationSchema = z.object({
-  customerId: z.string().uuid('Invalid customer ID format'),
-  productId: z.union([z.string().uuid(), z.literal(''), z.null()]).optional().transform((v) => (v ? v : undefined)),
+  customerId: z.string().min(1, 'Customer ID is required'),
+  productId: z.union([z.string().min(1), z.literal(''), z.null()]).optional().transform((v) => (v ? v : undefined)),
   productName: z.string().optional(),
   requestedAmount: z.coerce.number().positive('Requested loan amount must be greater than 0'),
   interestRate: z.coerce.number().min(0.1).max(100).optional().nullable().transform((v) => (v != null ? Number(v) : undefined)),

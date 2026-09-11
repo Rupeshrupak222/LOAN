@@ -35,6 +35,7 @@ import {
   Activity,
   Workflow,
   Lock,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -51,6 +52,7 @@ const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
   customers: Users,
   applications: FileText,
+  'returned-applications': RotateCcw,
   products: Building2,
   'loan-products': Building2,
   'credit-assessment': Calculator,
@@ -60,6 +62,7 @@ const NAV_ICONS: Record<string, any> = {
   disbursements: Wallet,
   partners: Handshake,
   payments: Receipt,
+  'general-ledger': Scale,
   collections: AlertCircle,
   reconciliation: Scale,
   communications: Mail,
@@ -68,12 +71,14 @@ const NAV_ICONS: Record<string, any> = {
   compliance: ShieldCheck,
   privacy: ShieldCheck,
   reports: BarChart3,
+  'npa-monitoring': AlertTriangle,
   'fraud-intelligence': ShieldAlert,
   'early-warnings': AlertTriangle,
   'emi-calculator': Calculator,
   users: KeyRound,
   roles: KeyRound,
   workflows: Workflow,
+  'bre-studio': Sliders,
   settings: ShieldCheck,
   permissions: ShieldCheck,
   branches: Building2,
@@ -86,6 +91,8 @@ const NAV_ICONS: Record<string, any> = {
 
 const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS', 'ADMINISTRATION'] as const;
 
+import { useNavigation, canAccessRoute } from '@/lib/navigation';
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -96,6 +103,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [exceptionCenterOpen, setExceptionCenterOpen] = useState(false);
+
+  // Dynamic permission-driven navigation
+  const { authorizedItems: accessibleNav, groupedItems: groupedNav } = useNavigation();
 
   // Automatic redirect if unauthenticated without blank screen hang
   useEffect(() => {
@@ -131,32 +141,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;
   const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
-  const accessibleNav = roleCfg.nav
-    .map((k) => NAV_ITEMS[k])
-    .filter(Boolean) as NavItemConfig[];
-
-  const groupedNav: Record<string, NavItemConfig[]> = {
-    OVERVIEW: [],
-    CUSTOMERS: [],
-    LENDING: [],
-    SERVICING: [],
-    INSIGHTS: [],
-    ADMINISTRATION: [],
-  };
-
-  accessibleNav.forEach((item) => {
-    if (groupedNav[item.group]) {
-      groupedNav[item.group].push(item);
-    }
-  });
 
   const currentItem = accessibleNav.find(
     (item) => item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href))
   );
   const isDashboard = pathname === '/dashboard';
-  const isAccessibleRoute = isDashboard || accessibleNav.some(
-    (item) => item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-  );
+  const isAccessibleRoute = isDashboard || canAccessRoute(user, pathname);
   const currentLabel = currentItem?.label || 'Dashboard';
   const CurrentIcon = NAV_ICONS[currentItem?.key || 'dashboard'] || LayoutDashboard;
 

@@ -7,6 +7,7 @@ import { generatePaymentNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
+import { creditLimitsService } from '../credit-limits/credit-limits.service';
 import type { RecordPaymentInput } from './payment.schema';
 
 export interface PaymentActorContext {
@@ -439,6 +440,20 @@ export async function processPayment(
 
     return createdPayment;
   }, { maxWait: 10000, timeout: 30000 });
+
+  // Phase 5: Restore available credit limit if principal was repaid
+  if (bucketTotals.PRINCIPAL.greaterThan(0)) {
+    try {
+      creditLimitsService.applyRepaymentLimitRestoration(
+        loan.customerId,
+        bucketTotals.PRINCIPAL.toNumber(),
+        input.reference || paymentNo,
+        result.id
+      );
+    } catch (e) {
+      console.warn('Non-fatal error restoring credit limit:', e);
+    }
+  }
 
   await logAudit({
     userId: actorUserId,
