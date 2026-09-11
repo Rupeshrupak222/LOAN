@@ -17,6 +17,7 @@ export type NavKey =
   | 'dashboard'
   | 'customers'
   | 'applications'
+  | 'returned-applications'
   | 'loan-products'
   | 'credit-assessment'
   | 'branch-review'
@@ -25,7 +26,9 @@ export type NavKey =
   | 'disbursements'
   | 'payments'
   | 'collections'
+  | 'general-ledger'
   | 'reports'
+  | 'npa-monitoring'
   | 'emi-calculator'
   | 'branches'
   | 'users'
@@ -44,6 +47,7 @@ export type NavKey =
   | 'tenants'
   | 'roles'
   | 'workflows'
+  | 'bre-studio'
   | 'configuration'
   | 'branding';
 
@@ -66,6 +70,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   dashboard: { key: 'dashboard', href: '/dashboard', label: 'Dashboard', group: 'OVERVIEW' },
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
   applications: { key: 'applications', href: '/applications', label: 'Loan Applications', group: 'LENDING' },
+  'returned-applications': { key: 'returned-applications', href: '/returned-applications', label: 'Returned Applications', group: 'LENDING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
   'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
@@ -75,6 +80,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   partners: { key: 'partners', href: '/partners', label: 'Partners & DSAs', group: 'LENDING' },
   payments: { key: 'payments', href: '/payments', label: 'Payments Ledger', group: 'SERVICING' },
   collections: { key: 'collections', href: '/collections', label: 'Collections & Delinquency', group: 'SERVICING' },
+  'general-ledger': { key: 'general-ledger', href: '/general-ledger', label: 'General Ledger (GL)', group: 'SERVICING' },
   reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Accounting & Recon', group: 'SERVICING' },
   communications: { key: 'communications', href: '/communications', label: 'Omnichannel Hub', group: 'SERVICING' },
   'command-center': { key: 'command-center', href: '/command-center', label: 'AI Command Center', group: 'INSIGHTS' },
@@ -82,6 +88,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   compliance: { key: 'compliance', href: '/compliance', label: 'Regulatory & Compliance', group: 'INSIGHTS' },
   privacy: { key: 'privacy', href: '/privacy', label: 'Privacy & Consent', group: 'ADMINISTRATION' },
   reports: { key: 'reports', href: '/reports', label: 'Reports & Analytics', group: 'INSIGHTS' },
+  'npa-monitoring': { key: 'npa-monitoring', href: '/npa-monitoring', label: 'NPA & Asset Quality', group: 'INSIGHTS' },
   'fraud-intelligence': { key: 'fraud-intelligence', href: '/fraud-intelligence', label: 'Fraud & Anomaly Intelligence', group: 'INSIGHTS' },
   'early-warnings': { key: 'early-warnings', href: '/early-warnings', label: 'Early Warning Center', group: 'INSIGHTS' },
   'emi-calculator': { key: 'emi-calculator', href: '/emi-calculator', label: 'EMI Calculator', group: 'INSIGHTS' },
@@ -90,6 +97,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   tenants: { key: 'tenants', href: '/tenants', label: 'Lender Tenants', group: 'ADMINISTRATION' },
   roles: { key: 'roles', href: '/roles', label: 'Roles & Permissions', group: 'ADMINISTRATION' },
   workflows: { key: 'workflows', href: '/workflows', label: 'Workflow Studio', group: 'ADMINISTRATION' },
+  'bre-studio': { key: 'bre-studio', href: '/bre-studio', label: 'BRE & Policy Studio', group: 'ADMINISTRATION' },
   configuration: { key: 'configuration', href: '/configuration', label: 'Policy Configuration', group: 'ADMINISTRATION' },
   branding: { key: 'branding', href: '/branding', label: 'Branding & White-Label', group: 'ADMINISTRATION' },
   settings: { key: 'settings', href: '/settings', label: 'System Settings', group: 'ADMINISTRATION' },
@@ -113,6 +121,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'customers',
       'applications',
+      'returned-applications',
       'loan-products',
       'credit-assessment',
       'branch-review',
@@ -122,6 +131,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'partners',
       'payments',
       'collections',
+      'general-ledger',
       'reconciliation',
       'communications',
       'command-center',
@@ -129,6 +139,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'compliance',
       'privacy',
       'reports',
+      'npa-monitoring',
       'fraud-intelligence',
       'early-warnings',
       'emi-calculator',
@@ -137,6 +148,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'tenants',
       'roles',
       'workflows',
+      'bre-studio',
       'configuration',
       'branding',
       'settings',
@@ -154,9 +166,14 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'users',
       'branches',
       'roles',
+      'applications',
+      'returned-applications',
       'loan-products',
       'credit-assessment',
       'branch-review',
+      'general-ledger',
+      'npa-monitoring',
+      'bre-studio',
       'configuration',
       'workflows',
       'settings',
@@ -179,6 +196,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'customers',
       'applications',
+      'returned-applications',
       'loans',
       'loan-products',
       'communications',
@@ -195,6 +213,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'customers',
       'credit-assessment',
       'applications',
+      'returned-applications',
       'reports',
       'fraud-intelligence',
       'early-warnings',
@@ -210,7 +229,9 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'customers',
       'applications',
+      'returned-applications',
       'underwriting',
+      'bre-studio',
       'loans',
       'reports',
       'fraud-intelligence',
@@ -228,8 +249,10 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'customers',
       'disbursements',
       'payments',
-      'loans',
+      'general-ledger',
       'reconciliation',
+      'loans',
+      'npa-monitoring',
       'reports',
       'fraud-intelligence',
       'early-warnings',
@@ -261,11 +284,13 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'dashboard',
       'branch-review',
       'applications',
+      'returned-applications',
       'customers',
       'loans',
       'partners',
       'payments',
       'collections',
+      'npa-monitoring',
       'users',
       'reports',
       'early-warnings',
@@ -286,7 +311,9 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'applications',
       'loans',
       'payments',
+      'general-ledger',
       'reconciliation',
+      'npa-monitoring',
       'collections',
       'underwriting',
       'disbursements',
@@ -297,6 +324,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'privacy',
       'roles',
       'branches',
+      'bre-studio',
       'configuration',
       'workflows',
       'settings',

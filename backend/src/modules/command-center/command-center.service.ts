@@ -287,8 +287,8 @@ export class CommandCenterService {
         partnerName: p.name,
         partnerCode: p.code,
         partnerType: p.type,
-        commissionRate: `${p.commissionModel.ratePct}%`,
-        clawbackDays: p.commissionModel.clawbackPeriodDays,
+        commissionRate: `${p.commissionModel?.ratePct ?? 1.5}%`,
+        clawbackDays: p.commissionModel?.clawbackPeriodDays ?? 90,
         simulatedPar90Pct: p.code.includes('SOUTH') ? 14.2 : 2.5,
         status: p.status,
       }));

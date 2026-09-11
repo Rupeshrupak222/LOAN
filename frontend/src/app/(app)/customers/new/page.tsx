@@ -183,13 +183,19 @@ export default function NewCustomerPage() {
     user?.roles?.includes('COLLECTION_OFFICER') &&
     !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
 
+  const isUnderwriterOnly =
+    user?.roles?.includes('UNDERWRITER') &&
+    !user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
+
   useEffect(() => {
     if (isBranchManagerOnly) {
       router.replace('/branch-review');
     } else if (isFinanceOfficerOnly || isCollectionOfficerOnly) {
       router.replace('/dashboard');
+    } else if (isUnderwriterOnly) {
+      router.replace('/customers');
     }
-  }, [isBranchManagerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, router]);
+  }, [isBranchManagerOnly, isFinanceOfficerOnly, isCollectionOfficerOnly, isUnderwriterOnly, router]);
 
   const isLoanOfficer = Boolean(
     user?.roles?.some((r: string) => ['LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r))
