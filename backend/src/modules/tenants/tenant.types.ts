@@ -1,10 +1,13 @@
-// Step 33: Enterprise Admin & Multi-Tenant Types
+// Adyapan Lending OS — Phase 6: B2B Multi-Tenant Types & Contracts
 
 export type TenantStatus =
   | 'PROVISIONING'
+  | 'DRAFT'
+  | 'ONBOARDING'
   | 'ACTIVE'
   | 'SUSPENDED'
-  | 'DEACTIVATED';
+  | 'DEACTIVATED'
+  | 'TERMINATED';
 
 export type TenantTier = 'ENTERPRISE' | 'GROWTH' | 'STANDARD';
 
@@ -54,11 +57,127 @@ export interface CreateTenantDto {
   timezone?: string;
   settings?: Record<string, any>;
   metadata?: Record<string, any>;
+  seedDefaults?: boolean;
+}
+
+export interface UpdateTenantDto {
+  name?: string;
+  cinNumber?: string;
+  rbiRegistrationNo?: string;
+  domain?: string;
+  contactEmail?: string;
+  supportPhone?: string;
+  baseCurrency?: string;
+  country?: string;
+  timezone?: string;
+  tier?: TenantTier;
+  settings?: Record<string, any>;
 }
 
 export interface UpdateTenantStatusDto {
   status: TenantStatus;
   reason?: string;
+}
+
+export type TenantReadinessDomain =
+  | 'PRODUCTS'
+  | 'WORKFLOWS'
+  | 'DECISION_RULES'
+  | 'PRICING'
+  | 'APPROVAL_MATRIX'
+  | 'CREDIT_POLICIES'
+  | 'BRANCHES'
+  | 'STAFF_USERS';
+
+export interface ReadinessDomainCheck {
+  domain: TenantReadinessDomain;
+  title: string;
+  isReady: boolean;
+  itemCount: number;
+  details: string;
+  blockingReason?: string;
+}
+
+export interface TenantReadinessResult {
+  tenantId: string;
+  tenantCode: string;
+  tenantName: string;
+  isOverallReady: boolean;
+  readinessScorePct: number;
+  passedDomainsCount: number;
+  totalDomainsCount: number;
+  domains: ReadinessDomainCheck[];
+  evaluatedAt: string;
+}
+
+export interface TenantBrandingConfig {
+  institutionName: string;
+  tagline?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  primaryColor: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  surfaceColor?: string;
+  fontFamily?: string;
+  portalTitle?: string;
+  customDomain?: string;
+  emailSignature?: string;
+  supportEmail?: string;
+  supportPhone?: string;
+  contrastRatio?: number;
+  isContrastSafe?: boolean;
+}
+
+export interface TenantConfigurationBundle {
+  tenant: Tenant;
+  readiness: TenantReadinessResult;
+  branding: TenantBrandingConfig;
+  branchesCount: number;
+  branches: Array<{ id: string; code: string; name: string; city: string | null; state: string | null; isActive: boolean }>;
+  usersCount: number;
+  productsSummary: {
+    total: number;
+    active: number;
+    products: Array<{ id: string; code: string; name: string; productType: string; interestRate: number; isActive: boolean }>;
+  };
+  workflowsSummary: {
+    total: number;
+    active: number;
+    stagesCount: number;
+  };
+  decisionPoliciesSummary: {
+    totalRules: number;
+    activePolicies: number;
+  };
+  approvalMatrixSummary: {
+    levelsCount: number;
+    rolesConfigured: string[];
+    maxApprovalLimit: number;
+  };
+  creditLimitsSummary: {
+    facilityTypesConfigured: string[];
+    maxSystemExposure: number;
+  };
+  systemSettings: Record<string, any>;
+  generatedAt: string;
+}
+
+export interface CreateTenantBranchDto {
+  code: string;
+  name: string;
+  city?: string;
+  state?: string;
+  isActive?: boolean;
+}
+
+export interface CreateTenantUserDto {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  branchId?: string;
+  password?: string;
 }
 
 export interface TenantOnboardingWizardDto {
@@ -137,6 +256,7 @@ export interface TenantOperationsOverview {
     activeLoanAccounts: number;
     activeCustomersCount: number;
     integrationHealth: string;
+    readinessScorePct?: number;
     createdAt: string;
   }>;
   updatedAt: string;

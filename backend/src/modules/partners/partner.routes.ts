@@ -1,190 +1,451 @@
-import { Router } from 'express';
+/**
+ * Adyapan Lending OS — Phase 8: Partner, LSP & Embedded Lending REST API Routes
+ */
+
+import { Router, Request, Response } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
-import { success } from '../../common/response';
+import { ok, created, success } from '../../common/response';
 import { authenticate, authorize } from '../../middleware/auth';
+import { tenantContext } from '../../middleware/tenant-context';
+import {
+  authenticatePartnerApi,
+  requirePartnerScope,
+  partnerIdempotency,
+} from '../../middleware/partner-auth.middleware';
 import { partnerService } from './partner.service';
 
-const router = Router();
+// -----------------------------------------------------------------------------
+// 1. PARTNER ADMINISTRATION ROUTER (FOR LENDER ADMINS)
+// -----------------------------------------------------------------------------
+export const partnerRoutes = Router();
 
-router.use(authenticate);
-
-/**
- * POST /api/v1/partners
- * Registers a new DSA / LSP / Fintech partner entity.
- */
-router.post(
-  '/',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
-  asyncHandler(async (req, res) => {
-    const partner = await partnerService.registerPartner(req.body, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    res.json(success(partner));
-  })
-);
+partnerRoutes.use(authenticate);
+partnerRoutes.use(tenantContext);
 
 /**
  * GET /api/v1/partners
- * Lists all registered partner entities.
  */
-router.get(
+partnerRoutes.get(
   '/',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR', 'FINANCE_OFFICER'),
-  asyncHandler(async (req, res) => {
-    const partners = partnerService.listPartners({
-      id: req.user!.id,
-      roles: req.user!.roles,
-    });
-    res.json(success(partners));
+  asyncHandler(async (req: Request, res: Response) => {
+    const { search, status, type } = req.query;
+    const partners = partnerService.listPartners(
+      {
+        search: search as string,
+        status: status as string,
+        type: type as string,
+        tenantId: req.tenantId,
+      },
+      { id: req.user?.id, roles: req.user?.roles, tenantId: req.tenantId }
+    );
+    return ok(res, partners);
   })
 );
 
 /**
- * GET /api/v1/partners/:id
- * Retrieves a single partner profile.
+ * POST /api/v1/partners
  */
-router.get(
-  '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR', 'FINANCE_OFFICER'),
-  asyncHandler(async (req, res) => {
-    const partner = partnerService.getPartner(req.params.id, {
-      id: req.user!.id,
-      roles: req.user!.roles,
-    });
-    res.json(success(partner));
-  })
-);
-
-/**
- * PATCH /api/v1/partners/:id/status
- * Updates partner governance status (ACTIVE, SUSPENDED, TERMINATED).
- */
-router.patch(
-  '/:id/status',
+partnerRoutes.post(
+  '/',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
-  asyncHandler(async (req, res) => {
-    const { status } = req.body;
-    const partner = await partnerService.updatePartnerStatus(req.params.id, status, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
+  asyncHandler(async (req: Request, res: Response) => {
+    const partner = await partnerService.registerPartner(req.body, {
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
     });
-    res.json(success(partner));
-  })
-);
-
-/**
- * POST /api/v1/partners/leads
- * Submits a new sourced lead with verified borrower consent.
- */
-router.post(
-  '/leads',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
-  asyncHandler(async (req, res) => {
-    const lead = await partnerService.submitLead(req.body, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    res.json(success(lead));
-  })
-);
-
-/**
- * GET /api/v1/partners/leads
- * Lists sourced applications enforcing strict partner isolation.
- */
-router.get(
-  '/leads',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER', 'AUDITOR'),
-  asyncHandler(async (req, res) => {
-    const { partnerId } = req.query;
-    const leads = partnerService.listSourcedApplications(partnerId as string, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    res.json(success(leads));
-  })
-);
-
-/**
- * GET /api/v1/partners/leads/:id
- * Retrieves single sourced application with isolation check.
- */
-router.get(
-  '/leads/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER', 'AUDITOR'),
-  asyncHandler(async (req, res) => {
-    const lead = partnerService.getSourcedApplication(req.params.id, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
-    });
-    res.json(success(lead));
-  })
-);
-
-/**
- * POST /api/v1/partners/commissions/calculate-disbursement
- * Triggers commission calculation for a newly disbursed loan.
- */
-router.post(
-  '/commissions/calculate-disbursement',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
-  asyncHandler(async (req, res) => {
-    const records = partnerService.calculateCommissionOnDisbursement(req.body);
-    res.json(success(records));
+    return created(res, partner);
   })
 );
 
 /**
  * GET /api/v1/partners/commissions
- * Lists commission and clawback records.
  */
-router.get(
+partnerRoutes.get(
   '/commissions',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { partnerId } = req.query;
     const records = partnerService.listCommissions(partnerId as string);
-    res.json(success(records));
+    return ok(res, records);
+  })
+);
+
+/**
+ * POST /api/v1/partners/commissions/calculate-disbursement
+ */
+partnerRoutes.post(
+  '/commissions/calculate-disbursement',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const record = partnerService.calculateCommissionOnDisbursement(req.body);
+    return ok(res, record);
+  })
+);
+
+/**
+ * GET /api/v1/partners/:id
+ */
+partnerRoutes.get(
+  '/:id',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR', 'FINANCE_OFFICER'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const partner = partnerService.getPartner(req.params.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return ok(res, partner);
+  })
+);
+
+/**
+ * PUT /api/v1/partners/:id
+ */
+partnerRoutes.put(
+  '/:id',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const partner = await partnerService.updatePartner(req.params.id, req.body, {
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return ok(res, partner);
+  })
+);
+
+/**
+ * PATCH /api/v1/partners/:id/status
+ */
+partnerRoutes.patch(
+  '/:id/status',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { status } = req.body;
+    const partner = await partnerService.updatePartnerStatus(req.params.id, status, {
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return ok(res, partner);
+  })
+);
+
+/**
+ * POST /api/v1/partners/:id/credentials
+ */
+partnerRoutes.post(
+  '/:id/credentials',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const cred = partnerService.createApiCredential(req.params.id, req.body, {
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return created(res, cred);
+  })
+);
+
+/**
+ * GET /api/v1/partners/:id/credentials
+ */
+partnerRoutes.get(
+  '/:id/credentials',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'AUDITOR'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const creds = partnerService.listCredentials(req.params.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return ok(res, creds);
+  })
+);
+
+/**
+ * POST /api/v1/partners/:id/credentials/:credId/rotate
+ */
+partnerRoutes.post(
+  '/:id/credentials/:credId/rotate',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const cred = partnerService.rotateSecret(req.params.id, req.params.credId, {
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return ok(res, cred);
+  })
+);
+
+/**
+ * POST /api/v1/partners/:id/credentials/:credId/revoke
+ */
+partnerRoutes.post(
+  '/:id/credentials/:credId/revoke',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const cred = partnerService.revokeCredential(req.params.id, req.params.credId, {
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return ok(res, cred);
+  })
+);
+
+/**
+ * POST /api/v1/partners/:id/webhooks
+ */
+partnerRoutes.post(
+  '/:id/webhooks',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const sub = partnerService.registerWebhookSubscription(req.params.id, req.body, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    return created(res, sub);
+  })
+);
+
+/**
+ * GET /api/v1/partners/:id/webhooks
+ */
+partnerRoutes.get(
+  '/:id/webhooks',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'AUDITOR'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const subs = partnerService.listWebhookSubscriptions(req.params.id);
+    return ok(res, subs);
   })
 );
 
 /**
  * GET /api/v1/partners/:id/payout-summary
- * Fetches partner payout summary and net payable balances.
  */
-router.get(
+partnerRoutes.get(
   '/:id/payout-summary',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
-  asyncHandler(async (req, res) => {
-    const summary = partnerService.getPayoutSummary(req.params.id, {
-      id: req.user!.id,
-      roles: req.user!.roles,
-    });
-    res.json(success(summary));
+  asyncHandler(async (req: Request, res: Response) => {
+    const summary = partnerService.getPayoutSummary(req.params.id);
+    return ok(res, summary);
   })
 );
 
 /**
  * POST /api/v1/partners/:id/payouts/batch
- * Processes a commission payout batch.
  */
-router.post(
+partnerRoutes.post(
   '/:id/payouts/batch',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER'),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const result = await partnerService.processPayoutBatch(req.params.id, {
-      id: req.user!.id,
-      email: req.user!.email,
-      roles: req.user!.roles,
+      id: req.user?.id,
+      email: req.user?.email,
+      roles: req.user?.roles,
     });
-    res.json(success(result));
+    return ok(res, result);
   })
 );
 
-export const partnerRoutes = router;
+// -----------------------------------------------------------------------------
+// 2. PARTNER EMBEDDED API ROUTERS (MACHINE-TO-MACHINE & PARTNER PORTAL)
+// -----------------------------------------------------------------------------
+
+// --- /api/v1/partner-customers ---
+export const partnerCustomerRoutes = Router();
+partnerCustomerRoutes.use(authenticatePartnerApi);
+partnerCustomerRoutes.use(partnerIdempotency);
+
+partnerCustomerRoutes.post(
+  '/',
+  requirePartnerScope('partner.customer.create'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await partnerService.registerPartnerCustomer(req.body, req.partnerContext!);
+    return created(res, result);
+  })
+);
+
+// --- /api/v1/partner-applications ---
+export const partnerApplicationRoutes = Router();
+partnerApplicationRoutes.use(authenticatePartnerApi);
+partnerApplicationRoutes.use(partnerIdempotency);
+
+partnerApplicationRoutes.post(
+  '/',
+  requirePartnerScope('partner.application.create'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const mapping = await partnerService.createPartnerApplication(req.body, req.partnerContext!);
+    return created(res, mapping);
+  })
+);
+
+partnerApplicationRoutes.get(
+  '/',
+  requirePartnerScope('partner.application.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const list = partnerService.listPartnerApplications(req.partnerContext!);
+    return ok(res, list);
+  })
+);
+
+partnerApplicationRoutes.get(
+  '/:id',
+  requirePartnerScope('partner.application.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const mapping = partnerService.getPartnerApplicationMapping(req.params.id, req.partnerContext!);
+    return ok(res, mapping);
+  })
+);
+
+partnerApplicationRoutes.patch(
+  '/:id',
+  requirePartnerScope('partner.application.update'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const mapping = await partnerService.updatePartnerApplication(req.params.id, req.body, req.partnerContext!);
+    return ok(res, mapping);
+  })
+);
+
+partnerApplicationRoutes.post(
+  '/:id/submit',
+  requirePartnerScope('partner.application.submit'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await partnerService.submitPartnerApplication(req.params.id, req.partnerContext!);
+    return ok(res, result);
+  })
+);
+
+// --- /api/v1/partner-offers ---
+export const partnerOfferRoutes = Router();
+partnerOfferRoutes.use(authenticatePartnerApi);
+partnerOfferRoutes.use(partnerIdempotency);
+
+partnerOfferRoutes.get(
+  '/:partnerApplicationId',
+  requirePartnerScope('partner.offer.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const offer = await partnerService.getPartnerOffer(req.params.partnerApplicationId, req.partnerContext!);
+    return ok(res, offer);
+  })
+);
+
+partnerOfferRoutes.post(
+  '/:offerId/accept',
+  requirePartnerScope('partner.offer.accept'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { kfsAccepted, termsAccepted } = req.body;
+    const isAcknowledged = Boolean(kfsAccepted && termsAccepted);
+    const offer = await partnerService.acceptPartnerOffer(req.params.offerId, isAcknowledged, req.partnerContext!);
+    return ok(res, offer);
+  })
+);
+
+// --- /api/v1/partner-credit-lines ---
+export const partnerCreditLineRoutes = Router();
+partnerCreditLineRoutes.use(authenticatePartnerApi);
+partnerCreditLineRoutes.use(partnerIdempotency);
+
+partnerCreditLineRoutes.get(
+  '/customer/:customerId',
+  requirePartnerScope('partner.credit_limit.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const facility = partnerService.getPartnerCreditFacility(req.params.customerId, req.partnerContext!);
+    return ok(res, facility);
+  })
+);
+
+partnerCreditLineRoutes.post(
+  '/:facilityId/drawdowns',
+  requirePartnerScope('partner.drawdown.create'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const drawdown = await partnerService.requestPartnerDrawdown(req.params.facilityId, req.body, req.partnerContext!);
+    return created(res, drawdown);
+  })
+);
+
+// --- /api/v1/partner-webhooks ---
+export const partnerWebhookRoutes = Router();
+partnerWebhookRoutes.use(authenticatePartnerApi);
+
+partnerWebhookRoutes.get(
+  '/subscriptions',
+  requirePartnerScope('partner.webhook.manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const subs = partnerService.listWebhookSubscriptions(req.partnerContext!.partnerId);
+    return ok(res, subs);
+  })
+);
+
+partnerWebhookRoutes.post(
+  '/subscriptions',
+  requirePartnerScope('partner.webhook.manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const sub = partnerService.registerWebhookSubscription(req.partnerContext!.partnerId, req.body);
+    return created(res, sub);
+  })
+);
+
+partnerWebhookRoutes.get(
+  '/deliveries',
+  requirePartnerScope('partner.webhook.manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const deliveries = partnerService.listWebhookDeliveries(req.partnerContext!.partnerId);
+    return ok(res, deliveries);
+  })
+);
+
+partnerWebhookRoutes.post(
+  '/replay/:deliveryId',
+  requirePartnerScope('partner.webhook.manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const delivery = await partnerService.replayWebhookDelivery(req.params.deliveryId, req.partnerContext!);
+    return ok(res, delivery);
+  })
+);
+
+partnerWebhookRoutes.post(
+  '/test-ping',
+  requirePartnerScope('partner.webhook.manage'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const deliveries = await partnerService.dispatchWebhook(
+      req.partnerContext!.partnerId,
+      'test.ping',
+      { ping: true, message: 'Test webhook event from Adyapan Lending OS', timestamp: Date.now() },
+      req.partnerContext!.environment
+    );
+    return ok(res, { dispatchedCount: deliveries.length, deliveries });
+  })
+);
+
+// --- /api/v1/partner-reports ---
+export const partnerReportRoutes = Router();
+partnerReportRoutes.use(authenticatePartnerApi);
+
+partnerReportRoutes.get(
+  '/summary',
+  requirePartnerScope('partner.reporting.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const apps = partnerService.listPartnerApplications(req.partnerContext!);
+    const payout = partnerService.getPayoutSummary(req.partnerContext!.partnerId);
+    return ok(res, {
+      totalApplications: apps.length,
+      submittedCount: apps.filter((a) => a.status === 'SUBMITTED').length,
+      disbursedCount: apps.filter((a) => a.status === 'DISBURSED').length,
+      totalDisbursedVolume: payout.totalDisbursedVolume,
+      earnedCommissions: payout.totalEarnedCommission,
+      pendingPayouts: payout.pendingPayoutAmount,
+    });
+  })
+);

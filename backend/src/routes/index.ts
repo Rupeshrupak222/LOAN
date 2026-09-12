@@ -27,7 +27,15 @@ import { decisionIntelligenceRoutes } from '../modules/decision-intelligence/dec
 import { earlyWarningRoutes } from '../modules/early-warning/early-warning.routes';
 import { decisionSimulatorRoutes } from '../modules/decision-simulator/decision-simulator.routes';
 import { reconciliationRoutes } from '../modules/reconciliation/reconciliation.routes';
-import { partnerRoutes } from '../modules/partners/partner.routes';
+import {
+  partnerRoutes,
+  partnerCustomerRoutes,
+  partnerApplicationRoutes,
+  partnerOfferRoutes,
+  partnerCreditLineRoutes,
+  partnerWebhookRoutes,
+  partnerReportRoutes,
+} from '../modules/partners/partner.routes';
 import { communicationRoutes } from '../modules/communication/communication.routes';
 import { commandCenterRoutes } from '../modules/command-center/command-center.routes';
 import { tenantRoutes } from '../modules/tenants/tenant.routes';
@@ -46,6 +54,12 @@ import { clientOnboardingRoutes } from '../modules/onboarding/client-onboarding.
 import { slaSupportRoutes } from '../modules/support/sla-support.routes';
 import creditRoutes from '../modules/credit/credit.routes';
 import branchManagerRoutes from '../modules/branch-manager/branch-manager.routes';
+import breRoutes from '../modules/bre/bre.routes';
+import decisionEngineRoutes from '../modules/bre/decision-engine.routes';
+import approvalAuthorityRoutes from '../modules/approval-authority/approval-authority.routes';
+import { offerRoutes, pricingPolicyRoutes } from '../modules/offers/offers.routes';
+import { creditFacilityRoutes, creditPolicyRoutes, drawdownRoutes } from '../modules/credit-limits/credit-limits.routes';
+import contractsRoutes from '../modules/contracts/contracts.routes';
 
 const router = Router();
 
@@ -53,7 +67,21 @@ router.use('/auth', authRoutes);
 router.use('/customers', customerRoutes);
 router.use('/documents', documentRoutes);
 router.use('/loan-products', productRoutes);
+router.use('/products', productRoutes);
 router.use('/applications', applicationRoutes);
+router.use('/bre', breRoutes);
+router.use('/decision-engine', decisionEngineRoutes);
+router.use('/decision-policies', decisionEngineRoutes);
+router.use('/approval-authorities', approvalAuthorityRoutes);
+router.use('/approval-queue', approvalAuthorityRoutes);
+router.use('/approval-tasks', approvalAuthorityRoutes);
+router.use('/delegations', approvalAuthorityRoutes);
+router.use('/offers', offerRoutes);
+router.use('/pricing-policies', pricingPolicyRoutes);
+router.use('/credit-facilities', creditFacilityRoutes);
+router.use('/credit-policies', creditPolicyRoutes);
+router.use('/drawdowns', drawdownRoutes);
+router.use('/contracts', contractsRoutes);
 router.use('/credit', creditRoutes);
 router.use('/branch-manager', branchManagerRoutes);
 router.use('/eligibility', eligibilityRoutes);
@@ -80,6 +108,12 @@ router.use('/early-warnings', earlyWarningRoutes);
 router.use('/decision-simulator', decisionSimulatorRoutes);
 router.use('/reconciliation', reconciliationRoutes);
 router.use('/partners', partnerRoutes);
+router.use('/partner-customers', partnerCustomerRoutes);
+router.use('/partner-applications', partnerApplicationRoutes);
+router.use('/partner-offers', partnerOfferRoutes);
+router.use('/partner-credit-lines', partnerCreditLineRoutes);
+router.use('/partner-webhooks', partnerWebhookRoutes);
+router.use('/partner-reports', partnerReportRoutes);
 router.use('/communications', communicationRoutes);
 router.use('/command-center', commandCenterRoutes);
 router.use('/tenants', tenantRoutes);
