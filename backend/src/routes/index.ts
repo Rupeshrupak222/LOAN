@@ -53,6 +53,8 @@ import { workflowRoutes } from '../modules/workflows/workflow.routes';
 import { deploymentRoutes } from '../modules/deployment/deployment.routes';
 import { clientOnboardingRoutes } from '../modules/onboarding/client-onboarding.routes';
 import { slaSupportRoutes } from '../modules/support/sla-support.routes';
+import borrowerRoutes from '../modules/borrower/borrower.routes';
+import workspaceRoutes from '../modules/workspaces/workspace.routes';
 import creditRoutes from '../modules/credit/credit.routes';
 import branchManagerRoutes from '../modules/branch-manager/branch-manager.routes';
 import breRoutes from '../modules/bre/bre.routes';
@@ -62,6 +64,9 @@ import { offerRoutes, pricingPolicyRoutes } from '../modules/offers/offers.route
 import { creditFacilityRoutes, creditPolicyRoutes, drawdownRoutes } from '../modules/credit-limits/credit-limits.routes';
 import contractsRoutes from '../modules/contracts/contracts.routes';
 import accountingRoutes from '../modules/accounting/accounting.routes';
+import analyticsRoutes from '../modules/analytics/analytics.routes';
+import coreLendingRoutes from '../modules/core-lending/core-lending.routes';
+import operationsRoutes from '../modules/operations/operations.routes';
 
 const router = Router();
 
@@ -120,6 +125,11 @@ router.use('/partner-webhooks', partnerWebhookRoutes);
 router.use('/partner-reports', partnerReportRoutes);
 router.use('/communications', communicationRoutes);
 router.use('/command-center', commandCenterRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/borrower', borrowerRoutes);
+router.use('/workspaces', workspaceRoutes);
+router.use('/core-lending', coreLendingRoutes);
+router.use('/operations', operationsRoutes);
 router.use('/tenants', tenantRoutes);
 router.use('/configuration', configurationRoutes);
 router.use('/branding', brandingRoutes);

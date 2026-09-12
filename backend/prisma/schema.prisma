@@ -58,6 +58,10 @@ model Tenant {
   loans             Loan[]
   payments          Payment[]
   auditLogs         AuditLog[]
+  workQueues        WorkQueue[]
+  tasks             Task[]
+  activityLogs      ActivityLog[]
+  approvals         Approval[]
 
   @@index([code])
   @@index([status])
@@ -238,6 +242,7 @@ model Customer {
   status              CustomerStatus        @default(DRAFT)
 
   addresses           CustomerAddress[]
+  identifiers         CustomerIdentifier[]
   employmentDetails   CustomerEmployment[]
   bankAccounts        CustomerBankAccount[]
   applications        LoanApplication[]
@@ -303,6 +308,24 @@ model CustomerBankAccount {
   createdAt         DateTime @default(now())
 
   @@index([customerId])
+}
+
+model CustomerIdentifier {
+  id                 String    @id @default(uuid())
+  customerId         String
+  customer           Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  idType             String    // PAN, AADHAAR, PASSPORT, VOTER_ID, DRIVING_LICENSE, GSTIN
+  maskedValue        String
+  idHash             String?
+  encryptedValue     String?
+  verificationStatus String    @default("PENDING") // PENDING, VERIFIED, REJECTED, EXPIRED
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([idType])
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +402,12 @@ model LoanApplication {
   tenureMonths    Int
   purpose         String?
   status          ApplicationStatus          @default(DRAFT)
+  stage           String?                    @default("LEAD")
+  priority        String?                    @default("MEDIUM")
+  assignedToUserId String?
+  queueId         String?
+  submittedAt     DateTime?
+  closedAt        DateTime?
 
   statusHistory   ApplicationStatusHistory[]
   eligibility     EligibilityAssessment?
@@ -387,6 +416,10 @@ model LoanApplication {
   approvals       ApprovalRequest[]
   documents       Document[]
   loan            Loan?
+  assignments     ApplicationAssignment[]
+  tasks           Task[]
+  creditReviews   CreditReview[]
+  approvalRecords Approval[]
 
   createdAt       DateTime                   @default(now())
   updatedAt       DateTime                   @updatedAt
@@ -394,6 +427,10 @@ model LoanApplication {
   @@index([applicationNo])
   @@index([customerId])
   @@index([status])
+  @@index([stage])
+  @@index([assignedToUserId])
+  @@index([queueId])
+  @@index([priority])
   @@index([tenantId])
   @@index([branchId])
   @@index([tenantId, branchId])
@@ -403,10 +440,13 @@ model ApplicationStatusHistory {
   id            String             @id @default(uuid())
   applicationId String
   application   LoanApplication    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStage     String?
   fromStatus    ApplicationStatus?
+  toStage       String?
   toStatus      ApplicationStatus
   changedBy     String?
   reason        String?
+  metadata      Json?
   createdAt     DateTime           @default(now())
 
   @@index([applicationId])
@@ -454,6 +494,172 @@ model ApprovalRequest {
   createdAt      DateTime        @default(now())
 
   @@index([applicationId])
+}
+
+// ---------------------------------------------------------------------------
+// Operational Workflow: Queues, Assignments, Tasks, Notes, Reviews & Approvals
+// ---------------------------------------------------------------------------
+
+model WorkQueue {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  name        String
+  key         String   // OPERATIONS_QUEUE, CREDIT_REVIEW_QUEUE, RISK_QUEUE, APPROVAL_QUEUE, COLLECTIONS_QUEUE, FINANCE_QUEUE
+  department  String   // OPERATIONS, CREDIT, COLLECTIONS, FINANCE, MANAGEMENT, ADMIN
+  workspace   String   // WorkspaceKey
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments ApplicationAssignment[]
+  tasks       Task[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([department])
+}
+
+model ApplicationAssignment {
+  id               String          @id @default(uuid())
+  applicationId    String
+  application      LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  assignedToUserId String?
+  assignedByUserId String?
+  queueId          String?
+  queue            WorkQueue?      @relation(fields: [queueId], references: [id])
+  department       String          // OPERATIONS, CREDIT, COLLECTIONS, etc.
+  workspace        String?         // WorkspaceKey
+  assignmentType   String          @default("INDIVIDUAL") // INDIVIDUAL, QUEUE, TEAM
+  status           String          @default("ACTIVE") // ACTIVE, COMPLETED, REASSIGNED, RELEASED
+  assignedAt       DateTime        @default(now())
+  unassignedAt     DateTime?
+  notes            String?
+
+  @@index([applicationId])
+  @@index([assignedToUserId])
+  @@index([queueId])
+  @@index([status])
+}
+
+model Task {
+  id                String           @id @default(uuid())
+  tenantId          String?
+  tenant            Tenant?          @relation(fields: [tenantId], references: [id])
+  title             String
+  description       String?
+  taskType          String           // DOCUMENT_VERIFICATION, CREDIT_REVIEW, RISK_ASSESSMENT, UNDERWRITING_DECISION, SANCTION_APPROVAL, DISBURSEMENT_CHECK, COLLECTION_FOLLOWUP, CUSTOMER_KYC
+  entityType        String           // APPLICATION, CUSTOMER, LOAN, COLLECTION_CASE, DOCUMENT, APPROVAL
+  entityId          String
+  applicationId     String?
+  application       LoanApplication? @relation(fields: [applicationId], references: [id])
+  assignedToUserId  String?
+  assignedTeam      String?
+  queueId           String?
+  queue             WorkQueue?       @relation(fields: [queueId], references: [id])
+  priority          String           @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status            String           @default("OPEN") // OPEN, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED, OVERDUE
+  dueAt             DateTime?
+  completedAt       DateTime?
+  completedByUserId String?
+  createdByUserId   String?
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([applicationId])
+  @@index([assignedToUserId])
+  @@index([queueId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueAt])
+}
+
+model ActivityLog {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  entityType      String   // APPLICATION, CUSTOMER, LOAN, COLLECTION_CASE, DOCUMENT, APPROVAL, TASK
+  entityId        String
+  activityType    String   // NOTE, COMMENT, CALL, FOLLOWUP, STATUS_CHANGE, ASSIGNMENT, STAGE_TRANSITION, SYSTEM_EVENT
+  title           String?
+  message         String
+  metadata        Json?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([activityType])
+  @@index([createdAt])
+}
+
+model CreditReview {
+  id                String          @id @default(uuid())
+  applicationId     String
+  application       LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerId        String?
+  decision          String          @default("PENDING") // PENDING, APPROVE, APPROVE_WITH_CONDITIONS, REJECT, REFER
+  score             Int?
+  riskLevel         String?         @default("MEDIUM") // LOW, MEDIUM, HIGH, VERY_HIGH
+  maxSanctionAmount Decimal?        @db.Decimal(14, 2)
+  recommendedTenure Int?
+  recommendedRate   Decimal?        @db.Decimal(6, 3)
+  remarks           String?
+  conditions        Json?
+  factors           Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([applicationId])
+  @@index([reviewerId])
+  @@index([decision])
+}
+
+model Approval {
+  id                String            @id @default(uuid())
+  tenantId          String?
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id])
+  entityType        String            @default("APPLICATION") // APPLICATION, LOAN, DISBURSEMENT, RESTRUCTURE, SETTLEMENT, WAIVER
+  entityId          String
+  applicationId     String?
+  application       LoanApplication?  @relation(fields: [applicationId], references: [id])
+  approvalType      String            // SANCTION, DISBURSEMENT, RESTRUCTURE, SETTLEMENT, WAIVER, POLICY_OVERRIDE
+  level             Int               @default(1)
+  approverRole      String?           // UNDERWRITER, BRANCH_MANAGER, CREDIT_HEAD, CRO, CFO, COMMITTEE
+  requestedByUserId String?
+  assignedToUserId  String?
+  status            String            @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  decisionReason    String?
+  comments          String?
+  requestedAt       DateTime          @default(now())
+  decidedAt         DateTime?
+  history           ApprovalHistory[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([applicationId])
+  @@index([status])
+  @@index([assignedToUserId])
+}
+
+model ApprovalHistory {
+  id         String   @id @default(uuid())
+  approvalId String
+  approval   Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  actorId    String?
+  fromStatus String
+  toStatus   String
+  decision   String?
+  comments   String?
+  createdAt  DateTime @default(now())
+
+  @@index([approvalId])
 }
 
 // ---------------------------------------------------------------------------
