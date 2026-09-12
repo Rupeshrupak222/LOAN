@@ -135,12 +135,7 @@ export async function getPortfolioOverview(
     : {};
 
   const disbursementDateFilter = startDate && endDate
-    ? {
-        OR: [
-          { createdAt: { gte: startDate, lte: endDate } },
-          { disbursedAt: { gte: startDate, lte: endDate } },
-        ],
-      }
+    ? { createdAt: { gte: startDate, lte: endDate } }
     : {};
 
   const [loans, payments, disbursements, products, branches, collectionCases] = await Promise.all([
