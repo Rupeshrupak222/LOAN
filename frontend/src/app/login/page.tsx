@@ -23,7 +23,7 @@ import { Button, Input } from '@/components/ui';
 import { Logo, LogoMark } from '@/components/Logo';
 import { ROLE_CONFIG, RoleName } from '@/lib/roles';
 
-// Seeded operational staff & borrower demo accounts (10 roles)
+// Seeded operational staff & borrower demo accounts
 const DEMO_ACCOUNTS: { role: RoleName; email: string }[] = [
   { role: 'SUPER_ADMIN', email: 'superadmin@adyapan.dev' },
   { role: 'ADMIN', email: 'admin@adyapan.dev' },
@@ -31,6 +31,9 @@ const DEMO_ACCOUNTS: { role: RoleName; email: string }[] = [
   { role: 'LOAN_OFFICER', email: 'officer@adyapan.dev' },
   { role: 'CREDIT_ANALYST', email: 'analyst@adyapan.dev' },
   { role: 'UNDERWRITER', email: 'underwriter@adyapan.dev' },
+  { role: 'RISK_ANALYST', email: 'risk.analyst@adyapan.dev' },
+  { role: 'FRAUD_ANALYST', email: 'fraud.investigator@adyapan.dev' },
+  { role: 'RISK_MANAGER', email: 'risk.manager@adyapan.dev' },
   { role: 'FINANCE_OFFICER', email: 'finance@adyapan.dev' },
   { role: 'COLLECTION_OFFICER', email: 'collections@adyapan.dev' },
   { role: 'AUDITOR', email: 'auditor@adyapan.dev' },

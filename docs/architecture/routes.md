@@ -25,6 +25,16 @@
 | `/communications` | OPERATIONS | `platform` | Staff | `communications.view` |
 | `/reports` | OPERATIONS | `compliance` | Staff | `reports.view` |
 | `/npa-monitoring` | OPERATIONS | `finance` | Finance, BM, Auditor | `finance.npa.view` |
+| `/risk` | OPERATIONS | `risk` | Risk Analyst, Risk Manager, Admin | `risk.view` |
+| `/risk/queue` | OPERATIONS | `risk` | Risk Analyst, Credit Analyst, Underwriter | `risk.view_signals` |
+| `/risk/policies` | PLATFORM | `risk` | Risk Manager, Admin | `risk.manage_policies` |
+| `/risk/evaluations/[id]` | OPERATIONS | `risk` | Risk Analyst, Underwriter, Admin | `risk.view_signals` |
+| `/fraud` | OPERATIONS | `fraud` | Fraud Analyst, Risk Manager, Admin | `risk.fraud_intel` |
+| `/fraud/queue` | OPERATIONS | `fraud` | Fraud Analyst, Underwriter | `fraud.view_cases` |
+| `/fraud/cases` | OPERATIONS | `fraud` | Fraud Analyst, Risk Manager | `fraud.investigate` |
+| `/fraud/cases/[id]` | OPERATIONS | `fraud` | Fraud Analyst, Risk Manager | `fraud.investigate` |
+| `/fraud/rules` | PLATFORM | `fraud` | Risk Manager, Admin | `fraud.manage_rules` |
+| `/fraud/graph` | OPERATIONS | `fraud` | Fraud Analyst, Risk Manager | `fraud.view_cases` |
 | `/fraud-intelligence` | OPERATIONS | `credit` | Risk, Underwriter | `risk.fraud_intel` |
 | `/early-warnings` | OPERATIONS | `credit` | Staff | `risk.early_warnings` |
 | `/emi-calculator` | OPERATIONS | `finance` | Staff | None |

@@ -3,6 +3,7 @@ import { asyncHandler } from '../../common/asyncHandler';
 import { success } from '../../common/response';
 import { authenticate, authorize } from '../../middleware/auth';
 import { reconciliationService } from './reconciliation.service';
+import { settlementService } from './settlement.service';
 
 const router = Router();
 
@@ -176,5 +177,69 @@ router.get(
   })
 );
 
+/**
+ * Settlement Routes
+ */
+router.post(
+  '/settlements',
+  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
+  asyncHandler(async (req, res) => {
+    const batch = await settlementService.createSettlementBatch(req.body, {
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+    });
+    res.status(201).json(success(batch));
+  })
+);
+
+router.get(
+  '/settlements',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
+  asyncHandler(async (req, res) => {
+    const { providerCode, status } = req.query;
+    const batches = settlementService.listSettlementBatches({
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+      providerCode: providerCode as string,
+      status: status as string,
+    });
+    res.json(success(batches));
+  })
+);
+
+router.get(
+  '/settlements/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'),
+  asyncHandler(async (req, res) => {
+    const batch = settlementService.getSettlementBatch(req.params.id, {
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+      tenantId: (req as any).tenantId || req.user?.tenantId,
+    });
+    res.json(success(batch));
+  })
+);
+
+router.post(
+  '/settlements/:id/confirm',
+  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
+  asyncHandler(async (req, res) => {
+    const batch = await settlementService.confirmSettlement(
+      req.params.id,
+      req.body || {},
+      {
+        id: req.user!.id,
+        email: req.user!.email,
+        roles: req.user!.roles,
+        tenantId: (req as any).tenantId || req.user?.tenantId,
+      }
+    );
+    res.json(success(batch));
+  })
+);
+
 export const reconciliationRoutes = router;
+
 
