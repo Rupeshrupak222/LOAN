@@ -45,6 +45,7 @@ import {
   Scale,
   RotateCcw,
   FileUp,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   BarChart,
@@ -412,6 +413,21 @@ export default function DashboardPage() {
       title: 'Compliance & Audit Log Inspection Workspace',
       subtitle: 'Immutable inspection trail, financial transaction verifications, and before/after audit diffs.',
       icon: FileCheck,
+    },
+    RISK_ANALYST: {
+      title: 'Risk Modeling & Signal Intelligence Desk',
+      subtitle: 'Analyze 6-pillar risk vectors, calibrate scoring models, evaluate score bands, and review policy drafts.',
+      icon: Activity,
+    },
+    FRAUD_ANALYST: {
+      title: 'Fraud Detection & Identity Syndicate Desk',
+      subtitle: 'Investigate suspicious velocity, identity graphs, device/network fingerprint anomalies, and active cases.',
+      icon: ShieldAlert,
+    },
+    RISK_MANAGER: {
+      title: 'Enterprise Risk Governance & Override Matrix',
+      subtitle: 'Institutional risk policy publishing, fraud rules orchestration, 2D matrix controls, and audited overrides.',
+      icon: Sliders,
     },
     CUSTOMER: {
       title: 'Borrower Self-Service Portal',

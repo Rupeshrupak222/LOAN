@@ -1,466 +1,285 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  PhoneCall,
-  Calendar,
   AlertTriangle,
-  FileText,
+  Users,
+  PieChart,
+  Settings,
+  PlusCircle,
+  RefreshCw,
+  TrendingUp,
   Clock,
   CheckCircle2,
-  Users,
-  ShieldAlert,
-  Sparkles,
 } from 'lucide-react';
-import { api, apiErrorMessage } from '@/lib/api';
-import { useTheme } from '@/lib/theme';
-import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
-import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
-import { TableSkeleton } from '@/components/LoadingSkeletons';
-import { formatMoney, formatDate, cn } from '@/lib/utils';
-import { CollectionsIntelligenceModal } from '@/components/CollectionsIntelligenceModal';
-
-import { useAuth } from '@/lib/auth';
+import { Button, Card, KpiCard } from '@/components/ui';
+import { useToast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
+import { collectionsApi } from '@/features/collections/api';
+import { CollectionQueueTable } from '@/features/collections/CollectionQueueTable';
+import { CollectionAnalyticsView } from '@/features/collections/CollectionAnalyticsView';
+import { ContactActivityModal } from '@/features/collections/ContactActivityModal';
+import { PtpModal } from '@/features/collections/PtpModal';
+import { AssignmentModal } from '@/features/collections/AssignmentModal';
+import { EscalationModal } from '@/features/collections/EscalationModal';
+import { StrategyConfigModal } from '@/features/collections/StrategyConfigModal';
+import type { CollectionCaseSummary } from '@/features/collections/types';
 
 export default function CollectionsPage() {
-  const { isDark } = useTheme();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState<'QUEUE' | 'ANALYTICS' | 'STRATEGIES'>('QUEUE');
+  const [queueType, setQueueType] = useState<'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL'>('ALL');
   const [selectedBucket, setSelectedBucket] = useState('');
-  const [selectedCase, setSelectedCase] = useState<any | null>(null);
-  const [aiCaseSelected, setAiCaseSelected] = useState<any | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const canManageCollections = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r)
-  );
-
-  // Modals
+  // Selected case for action modals
+  const [selectedCase, setSelectedCase] = useState<CollectionCaseSummary | null>(null);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
-  const [activityType, setActivityType] = useState('CALL');
-  const [outcome, setOutcome] = useState('PROMISE_TO_PAY');
-  const [notes, setNotes] = useState('');
-  const [nextFollowUpDate, setNextFollowUpDate] = useState('');
-
   const [ptpModalOpen, setPtpModalOpen] = useState(false);
-  const [ptpAmount, setPtpAmount] = useState('');
-  const [ptpDate, setPtpDate] = useState('');
-  const [ptpMode, setPtpMode] = useState('UPI');
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
+  const [strategyModalOpen, setStrategyModalOpen] = useState(false);
 
-  // Dashboard KPIs & aging buckets
-  const { data: dashboardData } = useQuery({
+  // Dashboard Data
+  const { data: dashboard, isLoading: dashboardLoading } = useQuery({
     queryKey: ['collection-dashboard'],
-    queryFn: async () => (await api.get('/collections/dashboard')).data.data,
+    queryFn: () => collectionsApi.getDashboard(),
   });
 
-  // Cases list
-  const { data: casesData, isLoading } = useQuery({
-    queryKey: ['collection-cases', selectedBucket],
-    queryFn: async () => {
-      const res = await api.get('/collections/cases', {
-        params: { bucket: selectedBucket || undefined },
-      });
-      const rows = res.data?.data;
-      return (Array.isArray(rows) ? rows : []) as any[];
-    },
-  });
-
-  // Log Activity Mutation
-  const activityMutation = useMutation({
-    mutationFn: async () =>
-      api.post('/collections/activities', {
-        caseId: selectedCase.id,
-        activityType,
-        outcome,
-        notes,
-        nextFollowUpDate: nextFollowUpDate || undefined,
+  // Cases List
+  const { data: casesData, isLoading: casesLoading } = useQuery({
+    queryKey: ['collection-cases', selectedBucket, queueType, searchQuery],
+    queryFn: () =>
+      collectionsApi.listCases({
+        bucket: selectedBucket || undefined,
+        queueType: queueType === 'ALL' ? undefined : queueType,
+        search: searchQuery || undefined,
       }),
-    onSuccess: () => {
-      toast.success('Collection follow-up activity logged.');
+  });
+
+  // Strategies List
+  const { data: strategies, isLoading: strategiesLoading } = useQuery({
+    queryKey: ['collection-strategies'],
+    queryFn: () => collectionsApi.listStrategies(),
+    enabled: activeTab === 'STRATEGIES',
+  });
+
+  // Auto Assign Mutation
+  const autoAssignMutation = useMutation({
+    mutationFn: async () => collectionsApi.autoAssign(),
+    onSuccess: (res: any) => {
+      toast.success(`Auto-assigned ${res?.assignedCount || 0} delinquent cases across active officers.`);
       queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
       queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['loans'] });
-      queryClient.invalidateQueries({ queryKey: ['loan'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      setActivityModalOpen(false);
-      setNotes('');
-    },
-    onError: (err: any) => {
-      toast.error(apiErrorMessage(err), { title: 'Activity Logging Notice' });
     },
   });
-
-  // Record PTP Mutation
-  const ptpMutation = useMutation({
-    mutationFn: async () =>
-      api.post('/collections/ptp', {
-        caseId: selectedCase.id,
-        promisedAmount: Number(ptpAmount),
-        promisedDate: ptpDate,
-        paymentMode: ptpMode,
-      }),
-    onSuccess: () => {
-      toast.success('Promise-To-Pay (PTP) commitment recorded.');
-      queryClient.invalidateQueries({ queryKey: ['collection-cases'] });
-      queryClient.invalidateQueries({ queryKey: ['collection-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['loans'] });
-      queryClient.invalidateQueries({ queryKey: ['loan'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-collections-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reports'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      setPtpModalOpen(false);
-      setPtpAmount('');
-    },
-    onError: (err: any) => {
-      toast.error(apiErrorMessage(err), { title: 'PTP Commitment Notice' });
-    },
-  });
-
-  if (isLoading) return <TableSkeleton rows={6} cols={6} />;
-
-  const agingBuckets = Array.isArray(dashboardData?.agingBuckets) ? dashboardData.agingBuckets : [];
-  const cases = Array.isArray(casesData) ? casesData : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
+      {/* Header */}
       <PageHeader
-        breadcrumb="Servicing / Collections"
-        title="Collections & Delinquency Board"
-        subtitle="Manage overdue accounts, DPD aging buckets, follow-up calls, and Promise-To-Pay (PTP)"
+        title="Collections & Recovery Management Platform"
+        subtitle="End-to-end post-disbursement delinquency management, multi-factor priority scoring, PTP tracking, and automated recovery orchestration."
+        action={
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => autoAssignMutation.mutate()}
+              disabled={autoAssignMutation.isPending}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", autoAssignMutation.isPending && "animate-spin")} />
+              {autoAssignMutation.isPending ? 'Assigning...' : 'Auto-Assign Queue'}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => setStrategyModalOpen(true)}
+            >
+              <Settings className="h-3.5 w-3.5 mr-1.5" />
+              New Strategy Version
+            </Button>
+          </div>
+        }
       />
 
-      {/* Overview KPIs */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+      {/* KPI Cards Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Total Overdue Balance"
-          value={formatMoney(dashboardData?.summary?.totalOverdueAmount || 0)}
-          hint={`${dashboardData?.summary?.activeCases || 0} delinquent accounts`}
-          icon={<AlertTriangle className="h-4 w-4 text-rose-500" />}
+          title="Active Delinquent Accounts"
+          value={dashboardLoading ? '...' : (dashboard?.summary?.activeCases || 0).toString()}
+          subtext={`Total Overdue: ₹${(dashboard?.summary?.totalOverdueAmount || 0).toLocaleString()}`}
+          icon={<AlertTriangle className="h-5 w-5 text-rose-400" />}
+          variant="danger"
         />
         <KpiCard
-          label="Active PTP Commitments"
-          value={String(dashboardData?.summary?.pendingPtps || 0)}
-          hint="Scheduled borrower promises"
-          icon={<Clock className="h-4 w-4 text-[#2563EB] dark:text-[#60A5FA]" />}
+          title="Promises to Pay (PTP)"
+          value={dashboardLoading ? '...' : (dashboard?.summary?.pendingPtps || 0).toString()}
+          subtext={`Due Today: ${dashboard?.summary?.dueTodayPtps || 0} • Broken: ${dashboard?.summary?.brokenPtps || 0}`}
+          icon={<Clock className="h-5 w-5 text-amber-400" />}
+          variant="warning"
         />
         <KpiCard
-          label="Fair Recovery Practices"
-          value="100% Compliant"
-          hint="Audit trail enforced"
-          icon={<ShieldAlert className="h-4 w-4 text-emerald-600 dark:text-[#10B981]" />}
+          title="Collections Recovered"
+          value={dashboardLoading ? '...' : `₹${(dashboard?.summary?.collectionsRecovered || 0).toLocaleString()}`}
+          subtext={`Kept PTPs: ${dashboard?.summary?.keptPtps || 0}`}
+          icon={<TrendingUp className="h-5 w-5 text-emerald-400" />}
+          variant="success"
+        />
+        <KpiCard
+          title="Cured / Kept PTP Ratio"
+          value={dashboardLoading ? '...' : `${dashboard?.summary?.keptPtps ? Math.round((dashboard.summary.keptPtps / (dashboard.summary.keptPtps + (dashboard.summary.brokenPtps || 1))) * 100) : 100}%`}
+          subtext="Commitment fulfillment rate"
+          icon={<CheckCircle2 className="h-5 w-5 text-blue-400" />}
+          variant="default"
         />
       </div>
 
-      {/* Aging Buckets Filter Cards */}
-      {agingBuckets.length > 0 && (
-        <div>
-          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-2", isDark ? "text-white" : "text-slate-900")}>
-            DPD Aging Buckets
-          </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {agingBuckets.map((b: any) => {
-              const selected = selectedBucket === b.bucket;
-              return (
-                <div
-                  key={b.bucket}
-                  onClick={() => setSelectedBucket(selected ? '' : b.bucket)}
-                  className={cn(
-                    "cursor-pointer rounded-2xl border p-4 transition-all",
-                    selected
-                      ? (isDark ? "border-[#2563EB] bg-[#2563EB]/20 shadow ring-2 ring-[#2563EB]/30" : "border-[#2563EB] bg-blue-50 shadow ring-2 ring-[#2563EB]/30")
-                      : (isDark ? "border-[#2B3566] bg-[#1E2445] hover:border-slate-500" : "border-slate-200/80 bg-white hover:border-slate-300 shadow-2xs")
-                  )}
-                >
-                  <p className="text-[11px] font-bold text-slate-400 uppercase">{b.bucket} DPD</p>
-                  <p className={cn("text-lg font-bold mt-1", isDark ? "text-white" : "text-slate-900")}>{formatMoney(b.totalAmount || b.amount || 0)}</p>
-                  <p className={cn("text-xs font-semibold mt-0.5", isDark ? "text-[#60A5FA]" : "text-[#2563EB]")}>{b.count || 0} Accounts</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Main Navigation Tabs */}
+      <div className="flex border-b border-slate-800 space-x-4">
+        {[
+          { id: 'QUEUE', label: 'Operational Work Queue' },
+          { id: 'ANALYTICS', label: 'Delinquency & Migration Analytics' },
+          { id: 'STRATEGIES', label: 'Strategy Policies & Versioning' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={cn(
+              'py-2 px-1 border-b-2 text-xs font-semibold transition-all',
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-300'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Cases Table */}
-      <Card noPadding className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className={cn("text-xs font-bold uppercase tracking-wider", isDark ? "text-white" : "text-slate-900")}>
-              Delinquency Case Queue {selectedBucket && `— ${selectedBucket} DPD`}
-            </h3>
-            <p className="text-xs text-slate-400">Prioritized by days past due (DPD)</p>
-          </div>
-          {selectedBucket && (
-            <Button size="sm" variant="secondary" onClick={() => setSelectedBucket('')}>
-              Clear Filter
-            </Button>
-          )}
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className={cn(
-              "border-b text-[11px] font-bold uppercase",
-              isDark ? "border-[#2B3566] bg-[#16203D] text-slate-400" : "border-slate-200 bg-slate-50/80 text-slate-500"
-            )}>
-              <tr>
-                <th className="py-2.5 px-3">Case #</th>
-                <th className="py-2.5 px-3">Borrower</th>
-                <th className="py-2.5 px-3">Loan Account</th>
-                <th className="py-2.5 px-3">DPD</th>
-                <th className="py-2.5 px-3">Bucket</th>
-                <th className="py-2.5 px-3">Overdue Amount</th>
-                <th className="py-2.5 px-3">Logs / PTP</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className={cn(
-              "divide-y text-xs",
-              isDark ? "divide-[#2B3566] text-slate-200" : "divide-slate-100 text-slate-700"
-            )}>
-              {cases.length > 0 ? (
-                cases.map((c: any) => (
-                  <tr key={c.id} className={cn("transition-colors", isDark ? "hover:bg-[#16203D]/60" : "hover:bg-slate-50/70")}>
-                    <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">{c.caseNo || '-'}</td>
-                    <td className="py-3 px-3">
-                      <p className={cn("font-semibold leading-tight", isDark ? "text-white" : "text-slate-900")}>{c.customerName || 'Borrower'}</p>
-                      <p className="text-[11px] text-slate-400 font-mono">{c.mobile || ''} {c.city ? `· ${c.city}` : ''}</p>
-                    </td>
-                    <td className={cn("py-3 px-3 font-medium", isDark ? "text-slate-300" : "text-slate-700")}>{c.loanNo || '-'}</td>
-                    <td className="py-3 px-3">
-                      <span className={cn(
-                        "font-bold px-2 py-0.5 rounded text-[11px] border",
-                        isDark ? "bg-rose-950/40 text-rose-400 border-rose-800/40" : "bg-rose-50 text-rose-700 border-rose-200"
-                      )}>
-                        {c.dpd || 0} Days
-                      </span>
-                    </td>
-                    <td className={cn("py-3 px-3 font-semibold", isDark ? "text-slate-300" : "text-slate-700")}>{c.agingBucket || '-'}</td>
-                    <td className="py-3 px-3 font-bold text-rose-600 dark:text-rose-400 text-sm">{formatMoney(c.overdueAmount || 0)}</td>
-                    <td className={cn("py-3 px-3", isDark ? "text-slate-300" : "text-slate-600")}>
-                      <span className="font-medium">{c.activitiesCount || 0} Logs</span> ·{' '}
-                      <span className="font-bold text-[#2563EB] dark:text-[#60A5FA]">{c.promisesCount || 0} PTP</span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setAiCaseSelected(c)}
-                          className="text-xs py-1 gap-1 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/60 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                        >
-                          <Sparkles className="h-3 w-3 text-amber-500" /> AI Brief
-                        </Button>
-                        {canManageCollections && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setSelectedCase(c);
-                                setActivityModalOpen(true);
-                              }}
-                              className="text-xs py-1"
-                            >
-                              <PhoneCall className="h-3 w-3 mr-1" /> Log
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedCase(c);
-                                setPtpAmount(String(c.overdueAmount || ''));
-                                setPtpModalOpen(true);
-                              }}
-                              className="text-xs py-1 text-white bg-[#2563EB] hover:bg-blue-700 font-semibold"
-                            >
-                              <Clock className="h-3 w-3 mr-1" /> PTP
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="py-6 text-center text-xs text-slate-400">
-                    No delinquent accounts found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Log Activity Modal */}
-      {activityModalOpen && selectedCase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className={cn(
-            "w-full max-w-md rounded-2xl border p-6 shadow-2xl animate-fade-in space-y-4",
-            isDark ? "bg-[#1E2445] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
-          )}>
-            <div>
-              <h3 className={cn("text-base font-bold", isDark ? "text-white" : "text-slate-900")}>Log Follow-up Activity</h3>
-              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
-                Case: <strong>{selectedCase.caseNo}</strong> · Borrower: <strong>{selectedCase.customerName}</strong>
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Activity Channel</label>
-                <select
-                  value={activityType}
-                  onChange={(e) => setActivityType(e.target.value)}
-                  className={cn(
-                    "w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none",
-                    isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
-                  )}
-                >
-                  <option value="CALL">Telephonic Reminder Call</option>
-                  <option value="VISIT">Field Visit / In-Person</option>
-                  <option value="SMS">Official SMS Reminder</option>
-                  <option value="EMAIL">Email Follow-up</option>
-                  <option value="NOTICE">Formal Demand Notice</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Outcome</label>
-                <select
-                  value={outcome}
-                  onChange={(e) => setOutcome(e.target.value)}
-                  className={cn(
-                    "w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none",
-                    isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
-                  )}
-                >
-                  <option value="PROMISE_TO_PAY">PROMISE_TO_PAY (Committed Date)</option>
-                  <option value="CONTACTED">CONTACTED (Discussion in progress)</option>
-                  <option value="NO_ANSWER">NO_ANSWER (Call unanswered)</option>
-                  <option value="DISPUTE">DISPUTE (Borrower raised query)</option>
-                  <option value="SETTLEMENT_REQUESTED">SETTLEMENT_REQUESTED (Seeking OTS)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Follow-up Notes</label>
-                <textarea
-                  rows={3}
-                  placeholder="Record summary of conversation..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className={cn(
-                    "w-full rounded-xl border p-3 text-xs focus:border-[#2563EB] focus:outline-none",
-                    isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
-                  )}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Next Follow-up Date</label>
-                <Input
-                  type="date"
-                  value={nextFollowUpDate}
-                  onChange={(e) => setNextFollowUpDate(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <Button
-                  disabled={!notes.trim() || activityMutation.isPending}
-                  onClick={() => activityMutation.mutate()}
-                  className="flex-1 text-white"
-                >
-                  {activityMutation.isPending ? 'Logging...' : 'Save Activity Log'}
-                </Button>
-                <Button variant="secondary" onClick={() => setActivityModalOpen(false)}>Cancel</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Record PTP Modal */}
-      {ptpModalOpen && selectedCase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className={cn(
-            "w-full max-w-md rounded-2xl border p-6 shadow-2xl animate-fade-in space-y-4",
-            isDark ? "bg-[#1E2445] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
-          )}>
-            <div>
-              <h3 className={cn("text-base font-bold", isDark ? "text-white" : "text-slate-900")}>Record Promise-To-Pay (PTP)</h3>
-              <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>Capture verified commitment date and amount</p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Promised Amount (INR)</label>
-                <Input
-                  type="number"
-                  value={ptpAmount}
-                  onChange={(e) => setPtpAmount(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Promised Payment Date</label>
-                <Input
-                  type="date"
-                  value={ptpDate}
-                  onChange={(e) => setPtpDate(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>Expected Mode</label>
-                <select
-                  value={ptpMode}
-                  onChange={(e) => setPtpMode(e.target.value)}
-                  className={cn(
-                    "w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none",
-                    isDark ? "border-[#2B3566] bg-[#060F1B] text-slate-200" : "border-slate-300 bg-white text-slate-800"
-                  )}
-                >
-                  <option value="UPI">UPI Transfer</option>
-                  <option value="NET_BANKING">Net Banking / IMPS</option>
-                  <option value="CASH">Cash at Branch Desk</option>
-                  <option value="CHEQUE">Cheque Deposit</option>
-                </select>
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <Button
-                  disabled={!ptpAmount || !ptpDate || ptpMutation.isPending}
-                  onClick={() => ptpMutation.mutate()}
-                  className="flex-1 text-white"
-                >
-                  {ptpMutation.isPending ? 'Recording...' : 'Commit PTP Schedule'}
-                </Button>
-                <Button variant="secondary" onClick={() => setPtpModalOpen(false)}>Cancel</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Collections Intelligence Modal */}
-      {aiCaseSelected && (
-        <CollectionsIntelligenceModal
-          colCase={aiCaseSelected}
-          isOpen={!!aiCaseSelected}
-          onClose={() => setAiCaseSelected(null)}
+      {/* Tab 1: Queue Table */}
+      {activeTab === 'QUEUE' && (
+        <CollectionQueueTable
+          cases={casesData?.data || []}
+          isLoading={casesLoading}
+          selectedBucket={selectedBucket}
+          onSelectBucket={setSelectedBucket}
+          queueType={queueType}
+          onSelectQueueType={setQueueType}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onOpenActivity={(c) => {
+            setSelectedCase(c);
+            setActivityModalOpen(true);
+          }}
+          onOpenPtp={(c) => {
+            setSelectedCase(c);
+            setPtpModalOpen(true);
+          }}
+          onOpenAssign={(c) => {
+            setSelectedCase(c);
+            setAssignModalOpen(true);
+          }}
+          onOpenEscalate={(c) => {
+            setSelectedCase(c);
+            setEscalateModalOpen(true);
+          }}
         />
       )}
+
+      {/* Tab 2: Analytics & Migration */}
+      {activeTab === 'ANALYTICS' && (
+        <CollectionAnalyticsView />
+      )}
+
+      {/* Tab 3: Strategies */}
+      {activeTab === 'STRATEGIES' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-slate-100">Collection Strategies & Policy Versions</h3>
+            <Button size="sm" variant="primary" onClick={() => setStrategyModalOpen(true)}>
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Draft New Strategy
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {strategies?.map((strat) => (
+              <Card key={strat.id} className="border-slate-800 bg-slate-900 p-5 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-slate-100 text-sm">{strat.name}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{strat.description}</div>
+                  </div>
+                  <span className={cn(
+                    'px-2 py-0.5 rounded text-[10px] font-bold',
+                    strat.status === 'ACTIVE' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                    strat.status === 'DRAFT' ? 'bg-amber-950 text-amber-400 border border-amber-800' :
+                    'bg-slate-800 text-slate-400'
+                  )}>
+                    {strat.status} (v{strat.version})
+                  </span>
+                </div>
+
+                <div className="rounded border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300 space-y-1">
+                  <div className="font-semibold text-slate-200">Priority Factor Weights:</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                    <div>DPD Weight: <span className="text-slate-200">{strat.priorityWeights?.dpdWeight * 100}%</span></div>
+                    <div>Overdue Weight: <span className="text-slate-200">{strat.priorityWeights?.overdueAmountWeight * 100}%</span></div>
+                    <div>Risk Grade: <span className="text-slate-200">{strat.priorityWeights?.riskGradeWeight * 100}%</span></div>
+                    <div>Broken PTPs: <span className="text-slate-200">{strat.priorityWeights?.brokenPtpWeight * 100}%</span></div>
+                  </div>
+                </div>
+
+                <div className="text-slate-500 text-[11px] flex justify-between items-center pt-1">
+                  <span>Effective Date: {new Date(strat.effectiveDate).toLocaleDateString()}</span>
+                  {strat.status === 'DRAFT' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={async () => {
+                        await collectionsApi.activateStrategy(strat.id);
+                        toast.success('Strategy activated.');
+                        queryClient.invalidateQueries({ queryKey: ['collection-strategies'] });
+                      }}
+                    >
+                      Activate
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Global Modals */}
+      <ContactActivityModal
+        isOpen={activityModalOpen}
+        onClose={() => setActivityModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <PtpModal
+        isOpen={ptpModalOpen}
+        onClose={() => setPtpModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <AssignmentModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <EscalationModal
+        isOpen={escalateModalOpen}
+        onClose={() => setEscalateModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <StrategyConfigModal
+        isOpen={strategyModalOpen}
+        onClose={() => setStrategyModalOpen(false)}
+      />
     </div>
   );
 }

@@ -11,6 +11,9 @@ export type RoleName =
   | 'COLLECTION_OFFICER'
   | 'BRANCH_MANAGER'
   | 'AUDITOR'
+  | 'RISK_ANALYST'
+  | 'FRAUD_ANALYST'
+  | 'RISK_MANAGER'
   | 'CUSTOMER';
 
 export type NavKey =
@@ -27,6 +30,7 @@ export type NavKey =
   | 'payments'
   | 'collections'
   | 'general-ledger'
+  | 'accounting'
   | 'reports'
   | 'npa-monitoring'
   | 'emi-calculator'
@@ -35,6 +39,14 @@ export type NavKey =
   | 'settings'
   | 'audit-logs'
   | 'fraud-intelligence'
+  | 'risk'
+  | 'risk-queue'
+  | 'risk-policies'
+  | 'fraud'
+  | 'fraud-queue'
+  | 'fraud-cases'
+  | 'fraud-rules'
+  | 'fraud-graph'
   | 'integrations'
   | 'early-warnings'
   | 'reconciliation'
@@ -81,6 +93,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   payments: { key: 'payments', href: '/payments', label: 'Payments Ledger', group: 'SERVICING' },
   collections: { key: 'collections', href: '/collections', label: 'Collections & Delinquency', group: 'SERVICING' },
   'general-ledger': { key: 'general-ledger', href: '/general-ledger', label: 'General Ledger (GL)', group: 'SERVICING' },
+  accounting: { key: 'accounting', href: '/accounting', label: 'Accounting & Finance', group: 'SERVICING' },
   reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Accounting & Recon', group: 'SERVICING' },
   communications: { key: 'communications', href: '/communications', label: 'Omnichannel Hub', group: 'SERVICING' },
   'command-center': { key: 'command-center', href: '/command-center', label: 'AI Command Center', group: 'INSIGHTS' },
@@ -90,6 +103,14 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   reports: { key: 'reports', href: '/reports', label: 'Reports & Analytics', group: 'INSIGHTS' },
   'npa-monitoring': { key: 'npa-monitoring', href: '/npa-monitoring', label: 'NPA & Asset Quality', group: 'INSIGHTS' },
   'fraud-intelligence': { key: 'fraud-intelligence', href: '/fraud-intelligence', label: 'Fraud & Anomaly Intelligence', group: 'INSIGHTS' },
+  risk: { key: 'risk', href: '/risk', label: 'Risk Intelligence Hub', group: 'INSIGHTS' },
+  'risk-queue': { key: 'risk-queue', href: '/risk/queue', label: 'Risk Assessment Queue', group: 'LENDING' },
+  'risk-policies': { key: 'risk-policies', href: '/risk/policies', label: 'Risk Policy Studio', group: 'ADMINISTRATION' },
+  fraud: { key: 'fraud', href: '/fraud', label: 'Fraud Intelligence Hub', group: 'INSIGHTS' },
+  'fraud-queue': { key: 'fraud-queue', href: '/fraud/queue', label: 'Fraud Review Queue', group: 'LENDING' },
+  'fraud-cases': { key: 'fraud-cases', href: '/fraud/cases', label: 'Fraud Investigation Cases', group: 'INSIGHTS' },
+  'fraud-rules': { key: 'fraud-rules', href: '/fraud/rules', label: 'Fraud Rules Engine', group: 'ADMINISTRATION' },
+  'fraud-graph': { key: 'fraud-graph', href: '/fraud/graph', label: 'Identity Graph Visualizer', group: 'INSIGHTS' },
   'early-warnings': { key: 'early-warnings', href: '/early-warnings', label: 'Early Warning Center', group: 'INSIGHTS' },
   'emi-calculator': { key: 'emi-calculator', href: '/emi-calculator', label: 'EMI Calculator', group: 'INSIGHTS' },
   branches: { key: 'branches', href: '/branches', label: 'Branch Directory', group: 'ADMINISTRATION' },
@@ -132,6 +153,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'payments',
       'collections',
       'general-ledger',
+      'accounting',
       'reconciliation',
       'communications',
       'command-center',
@@ -141,6 +163,14 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'reports',
       'npa-monitoring',
       'fraud-intelligence',
+      'risk',
+      'risk-queue',
+      'risk-policies',
+      'fraud',
+      'fraud-queue',
+      'fraud-cases',
+      'fraud-rules',
+      'fraud-graph',
       'early-warnings',
       'emi-calculator',
       'branches',
@@ -171,7 +201,16 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'loan-products',
       'credit-assessment',
       'branch-review',
+      'risk',
+      'risk-queue',
+      'risk-policies',
+      'fraud',
+      'fraud-queue',
+      'fraud-cases',
+      'fraud-rules',
+      'fraud-graph',
       'general-ledger',
+      'accounting',
       'npa-monitoring',
       'bre-studio',
       'configuration',
@@ -214,6 +253,10 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'credit-assessment',
       'applications',
       'returned-applications',
+      'risk',
+      'risk-queue',
+      'fraud',
+      'fraud-queue',
       'reports',
       'fraud-intelligence',
       'early-warnings',
@@ -231,6 +274,13 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'applications',
       'returned-applications',
       'underwriting',
+      'risk',
+      'risk-queue',
+      'risk-policies',
+      'fraud',
+      'fraud-queue',
+      'fraud-cases',
+      'fraud-graph',
       'bre-studio',
       'loans',
       'reports',
@@ -241,6 +291,67 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     landing: '/dashboard',
     dashboard: 'UNDERWRITER',
   },
+  RISK_ANALYST: {
+    label: 'Risk Analyst',
+    description: 'Credit risk modeling, 6-pillar signal analysis, score calibration, and portfolio risk telemetry',
+    nav: [
+      'dashboard',
+      'risk',
+      'risk-queue',
+      'risk-policies',
+      'fraud-intelligence',
+      'early-warnings',
+      'applications',
+      'customers',
+      'reports',
+      'emi-calculator',
+    ],
+    landing: '/risk',
+    dashboard: 'RISK_ANALYST',
+  },
+  FRAUD_ANALYST: {
+    label: 'Fraud Investigator',
+    description: 'Fraud detection, identity syndicate graph analysis, suspicious case investigation, and rule governance',
+    nav: [
+      'dashboard',
+      'fraud',
+      'fraud-queue',
+      'fraud-cases',
+      'fraud-rules',
+      'fraud-graph',
+      'fraud-intelligence',
+      'early-warnings',
+      'applications',
+      'customers',
+      'reports',
+    ],
+    landing: '/fraud',
+    dashboard: 'FRAUD_ANALYST',
+  },
+  RISK_MANAGER: {
+    label: 'Risk & Fraud Manager',
+    description: 'Enterprise risk governance, 2D matrix controls, policy publishing, overrides, and escalation authority',
+    nav: [
+      'dashboard',
+      'risk',
+      'risk-queue',
+      'risk-policies',
+      'fraud',
+      'fraud-queue',
+      'fraud-cases',
+      'fraud-rules',
+      'fraud-graph',
+      'underwriting',
+      'applications',
+      'customers',
+      'bre-studio',
+      'reports',
+      'compliance',
+      'audit-logs',
+    ],
+    landing: '/risk',
+    dashboard: 'RISK_MANAGER',
+  },
   FINANCE_OFFICER: {
     label: 'Finance Officer',
     description: 'Pre-disbursement checks, electronic fund release, repayments, and NOC closure',
@@ -250,6 +361,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'disbursements',
       'payments',
       'general-ledger',
+      'accounting',
       'reconciliation',
       'loans',
       'npa-monitoring',
@@ -312,6 +424,7 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'loans',
       'payments',
       'general-ledger',
+      'accounting',
       'reconciliation',
       'npa-monitoring',
       'collections',
@@ -320,6 +433,11 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'compliance',
       'reports',
       'fraud-intelligence',
+      'risk',
+      'risk-policies',
+      'fraud',
+      'fraud-cases',
+      'fraud-rules',
       'early-warnings',
       'privacy',
       'roles',

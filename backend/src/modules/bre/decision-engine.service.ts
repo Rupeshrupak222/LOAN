@@ -20,6 +20,9 @@ import { logAudit } from '../audit/audit.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { productEngineService } from '../product/product-engine.service';
 import { workflowService } from '../workflows/workflow.service';
+import { riskEngineService } from '../risk/risk.service';
+import { fraudService } from '../fraud/fraud.service';
+import { riskFraudMatrixService } from '../risk/risk-fraud-matrix.service';
 
 export interface DecisionActorContext {
   id?: string;
@@ -573,6 +576,7 @@ export class DecisionEngineService {
             employmentDetails: true,
             documents: true,
             bankAccounts: true,
+            loans: true,
           },
         },
         product: true,
@@ -585,6 +589,29 @@ export class DecisionEngineService {
       // Resilient fallback context for demonstration or standalone evaluations
       const activeProducts = productEngineService.listProducts(tenantId, { status: 'ACTIVE' });
       const product = activeProducts[0] || productEngineService.listProducts(tenantId)[0];
+
+      let riskEval: any = null;
+      let fraudEval: any = null;
+      try {
+        riskEval = riskEngineService.getLatestEvaluation(tenantId, applicationId);
+      } catch {
+        // Safe fallback
+      }
+      try {
+        fraudEval = fraudService.getLatestEvaluation(tenantId, applicationId);
+      } catch {
+        // Safe fallback
+      }
+
+      const riskScore = riskEval?.riskScore ?? 25;
+      const riskBand = riskEval?.riskBand ?? 'LOW';
+      const riskGrade = riskEval?.riskGrade ?? 'A';
+      const fraudScore = fraudEval?.fraudScore ?? 15;
+      const fraudBand = fraudEval?.fraudBand ?? 'LOW';
+      const fraudOutcome = fraudEval?.outcome ?? 'CLEAR';
+
+      const matrixResult = riskFraudMatrixService.evaluateMatrix(riskScore, fraudScore);
+
       return {
         applicationId,
         applicationNo: `APP-DEMO-${applicationId.slice(-4).toUpperCase()}`,
@@ -625,10 +652,23 @@ export class DecisionEngineService {
         aadhaarVerified: true,
         allMandatoryDocsVerified: true,
         missingMandatoryDocs: [],
-        fraudRiskScore: 12,
+        fraudRiskScore: fraudScore,
+        fraudScore,
         deviceRiskDetected: false,
         identityMismatchDetected: false,
         duplicateApplicationDetected: false,
+        fraudOutcome,
+        fraudScoreBand: fraudBand,
+        fraudSignals: fraudEval?.signals || [],
+        identitySignals: fraudEval?.signals?.filter((s: any) => s.category === 'IDENTITY') || [],
+        velocitySignals: fraudEval?.signals?.filter((s: any) => s.category === 'APPLICATION_VELOCITY') || [],
+        riskScore,
+        riskBand,
+        riskGradeDerived: riskGrade,
+        riskSignals: riskEval?.signals || [],
+        bankingRiskSignals: riskEval?.signals?.filter((s: any) => s.category === 'BANKING') || [],
+        compositeMatrixAction: matrixResult.action,
+        matrixAction: matrixResult.action,
       };
     }
 
@@ -665,9 +705,27 @@ export class DecisionEngineService {
     if (!aadhaarVerified) missingMandatoryDocs.push('AADHAAR');
     if (!incomeVerified && monthlyIncome >= 50000) missingMandatoryDocs.push('INCOME_PROOF');
 
-    // Bureau score signals
-    const cibilScore = risk?.score || 740;
-    const fraudRiskScore = (risk?.factors as any)?.fraudScore || 15;
+    // Phase 9: Evaluate Risk & Fraud Intelligence Engines
+    let riskEval: any = null;
+    try {
+      riskEval = await riskEngineService.evaluateApplication(app.id, app.tenantId || tenantId);
+    } catch {
+      // Non-fatal fallback
+    }
+
+    let fraudEval: any = null;
+    try {
+      fraudEval = await fraudService.evaluateApplication(app.id, app.tenantId || tenantId);
+    } catch {
+      // Non-fatal fallback
+    }
+
+    const cibilScore = risk?.score || (riskEval ? Math.max(300, 850 - Math.round(riskEval.riskScore * 3.5)) : 740);
+    const fraudRiskScore = fraudEval ? fraudEval.fraudScore : (risk?.factors as any)?.fraudScore || 15;
+    const matrixResult = riskFraudMatrixService.evaluateMatrix(
+      riskEval?.riskScore ?? 25,
+      fraudEval?.fraudScore ?? 15
+    );
 
     // Load bound Product details from Product Engine
     const product = productEngineService.getProductById(tenantId, app.productId);
@@ -705,8 +763,8 @@ export class DecisionEngineService {
       maxTenureMonths: product.maxTenureMonths,
 
       cibilScore,
-      cibilOverdueAccounts: 0,
-      cibilDPD30Last12m: 0,
+      cibilOverdueAccounts: customer.loans.filter((l) => l.status === 'OVERDUE').length,
+      cibilDPD30Last12m: customer.loans.some((l) => l.status === 'OVERDUE') ? 45 : 0,
       recentEnquiries6m: 1,
       hasWriteOffs: false,
       hasSettlements: false,
@@ -722,10 +780,25 @@ export class DecisionEngineService {
       allMandatoryDocsVerified,
       missingMandatoryDocs,
 
+      // Phase 9 Fraud & Risk Signals
       fraudRiskScore,
-      deviceRiskDetected: false,
-      identityMismatchDetected: false,
-      duplicateApplicationDetected: false,
+      deviceRiskDetected: fraudEval ? fraudEval.signals.some((s: any) => s.category === 'DEVICE') : false,
+      identityMismatchDetected: fraudEval ? fraudEval.signals.some((s: any) => s.category === 'IDENTITY') : false,
+      duplicateApplicationDetected: fraudEval ? fraudEval.signals.some((s: any) => s.code.includes('DUPLICATE')) : false,
+      fraudOutcome: fraudEval?.outcome || 'CLEAR',
+      fraudScoreBand: fraudEval?.fraudBand || 'LOW',
+      fraudSignals: fraudEval?.signals || [],
+      identitySignals: fraudEval?.signals.filter((s: any) => s.category === 'IDENTITY') || [],
+      velocitySignals: fraudEval?.signals.filter((s: any) => s.category === 'APPLICATION_VELOCITY') || [],
+
+      riskScore: riskEval?.riskScore ?? 25,
+      riskBand: riskEval?.riskBand ?? 'LOW',
+      riskGradeDerived: riskEval?.riskGrade ?? 'A',
+      riskSignals: riskEval?.signals || [],
+      bankingRiskSignals: riskEval?.signals.filter((s: any) => s.category === 'BANKING') || [],
+      compositeMatrixAction: matrixResult.action,
+      matrixAction: matrixResult.action,
+      fraudScore: fraudRiskScore,
     };
 
     return context;
@@ -1286,3 +1359,12 @@ export class DecisionEngineService {
 }
 
 export const decisionEngineService = DecisionEngineService.getInstance();
+
+export async function buildDecisionContext(
+  applicationOrId: string | { id?: string; tenantId?: string; [key: string]: any },
+  tenantId: string = 'tenant-adyapan-default'
+): Promise<DecisionContext> {
+  const resolvedId = typeof applicationOrId === 'string' ? applicationOrId : applicationOrId?.id || 'demo-app-001';
+  const resolvedTenant = typeof applicationOrId === 'string' ? tenantId : applicationOrId?.tenantId || tenantId;
+  return decisionEngineService.buildDecisionContext(resolvedId, resolvedTenant);
+}

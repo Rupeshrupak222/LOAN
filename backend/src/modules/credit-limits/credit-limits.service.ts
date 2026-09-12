@@ -1215,6 +1215,12 @@ export class CreditLimitsService {
       .filter((a) => a.facilityId === facilityId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
+
+  public getFacilityByCustomerId(customerId: string): CreditFacility | undefined {
+    return Array.from(this.facilities.values()).find(
+      (f) => f.customerId === customerId && f.status === 'ACTIVE'
+    );
+  }
 }
 
 export const creditLimitsService = CreditLimitsService.getInstance();
