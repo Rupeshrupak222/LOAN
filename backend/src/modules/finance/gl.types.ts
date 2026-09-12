@@ -31,7 +31,17 @@ export type JournalReferenceType =
   | 'SETTLEMENT_WAIVER'
   | 'NPA_PROVISIONING'
   | 'WRITE_OFF'
-  | 'MANUAL_ADJUSTMENT';
+  | 'MANUAL_ADJUSTMENT'
+  | 'REFUND'
+  | 'REVERSAL'
+  | 'CHARGEBACK'
+  | 'SETTLEMENT'
+  | 'PARTNER_COMMISSION'
+  | 'MANUAL_JOURNAL'
+  | 'PAYOUT_TRANSFER'
+  | 'FEE_ACCRUAL'
+  | 'TAX_ENTRY'
+  | 'SUSPENSE_RESOLUTION';
 
 export interface JournalEntry {
   id: string;

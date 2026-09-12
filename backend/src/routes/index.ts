@@ -6,6 +6,7 @@ import productRoutes from '../modules/product/product.routes';
 import applicationRoutes from '../modules/application/application.routes';
 import eligibilityRoutes from '../modules/eligibility/eligibility.routes';
 import riskRoutes from '../modules/risk/risk.routes';
+import fraudRoutes from '../modules/fraud/fraud.routes';
 import underwritingRoutes from '../modules/underwriting/underwriting.routes';
 import creditAssessmentRoutes from '../modules/credit-assessment/credit-assessment.routes';
 import loanRoutes from '../modules/loans/loan.routes';
@@ -36,7 +37,7 @@ import {
   partnerWebhookRoutes,
   partnerReportRoutes,
 } from '../modules/partners/partner.routes';
-import { communicationRoutes } from '../modules/communication/communication.routes';
+import communicationRoutes from '../modules/communications/communication.routes';
 import { commandCenterRoutes } from '../modules/command-center/command-center.routes';
 import { tenantRoutes } from '../modules/tenants/tenant.routes';
 import { configurationRoutes } from '../modules/configuration/configuration.routes';
@@ -60,6 +61,7 @@ import approvalAuthorityRoutes from '../modules/approval-authority/approval-auth
 import { offerRoutes, pricingPolicyRoutes } from '../modules/offers/offers.routes';
 import { creditFacilityRoutes, creditPolicyRoutes, drawdownRoutes } from '../modules/credit-limits/credit-limits.routes';
 import contractsRoutes from '../modules/contracts/contracts.routes';
+import accountingRoutes from '../modules/accounting/accounting.routes';
 
 const router = Router();
 
@@ -86,6 +88,7 @@ router.use('/credit', creditRoutes);
 router.use('/branch-manager', branchManagerRoutes);
 router.use('/eligibility', eligibilityRoutes);
 router.use('/risk', riskRoutes);
+router.use('/fraud', fraudRoutes);
 router.use('/underwriting', underwritingRoutes);
 router.use('/credit-assessment', creditAssessmentRoutes);
 router.use('/loans', loanRoutes);
@@ -100,6 +103,7 @@ router.use('/settings', settingRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/audit', auditRoutes);
 router.use('/finance', financeRoutes);
+router.use('/accounting', accountingRoutes);
 router.use('/ai', aiRoutes);
 router.use('/integrations', integrationRoutes);
 router.use('/bank-intelligence', bankIntelligenceRoutes);

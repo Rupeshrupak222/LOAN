@@ -179,11 +179,26 @@ export interface DecisionContext {
   allMandatoryDocsVerified: boolean;
   missingMandatoryDocs: string[];
 
-  // Fraud & Anomaly Signals
+  // Fraud & Anomaly Signals (Phase 9)
   fraudRiskScore: number; // 0 (safe) - 100 (high risk)
+  fraudScore?: number;
   deviceRiskDetected: boolean;
   identityMismatchDetected: boolean;
   duplicateApplicationDetected: boolean;
+  fraudOutcome?: 'CLEAR' | 'LOW_RISK' | 'REVIEW' | 'HIGH_RISK' | 'BLOCK';
+  fraudScoreBand?: 'LOW' | 'MODERATE' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+  fraudSignals?: any[];
+  identitySignals?: any[];
+  velocitySignals?: any[];
+
+  // Risk Engine Signals (Phase 9)
+  riskScore?: number; // 0 (safe) - 100 (high risk)
+  riskBand?: 'LOW' | 'MODERATE' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+  riskGradeDerived?: RiskGrade;
+  riskSignals?: any[];
+  bankingRiskSignals?: any[];
+  compositeMatrixAction?: 'NORMAL' | 'REVIEW' | 'ADDITIONAL_REVIEW' | 'CREDIT_REVIEW' | 'FRAUD_REVIEW' | 'BLOCK';
+  matrixAction?: 'NORMAL' | 'REVIEW' | 'ADDITIONAL_REVIEW' | 'CREDIT_REVIEW' | 'FRAUD_REVIEW' | 'BLOCK';
 
   // Derived Financials (Filled by Financial Metrics Service)
   derived?: {

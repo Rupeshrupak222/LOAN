@@ -483,7 +483,7 @@ export class ReconciliationService {
 
     // Segregation of duties: Maker cannot approve their own adjustment (unless Super Admin in dev)
     if (adj.proposedBy === actor.email && !isSuperAdmin) {
-      throw new ForbiddenError('Maker-Checker Violation: You cannot approve an adjustment you proposed.');
+      throw new ForbiddenError('Maker-Checker Violation: You cannot approve your own proposed adjustment.');
     }
 
     adj.status = 'APPROVED';
