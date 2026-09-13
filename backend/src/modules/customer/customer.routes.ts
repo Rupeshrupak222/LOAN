@@ -27,6 +27,7 @@ import {
   deleteCustomer,
   validateLoanOfficerOriginationEligibility,
 } from './customer.service';
+import { borrowerJourneyService } from './borrower-journey.service';
 
 const router = Router();
 
@@ -256,12 +257,58 @@ router.delete(
   })
 );
 
-router.delete(
-  '/:id',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+router.get(
+  '/journey-overview',
   asyncHandler(async (req, res) => {
-    const result = await deleteCustomer(req.params.id, req.user?.id, req.user as any);
-    res.json(success(result));
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    const customer = await getCustomerByUserId(req.user.id, req.user as any);
+    const overview = await borrowerJourneyService.getBorrowerJourneyOverview(customer.id, req.user as any);
+    res.json(success(overview));
+  })
+);
+
+router.get(
+  '/notifications',
+  asyncHandler(async (req, res) => {
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    const customer = await getCustomerByUserId(req.user.id, req.user as any);
+    const notifs = borrowerJourneyService.getCustomerNotifications(customer.id, req.user as any);
+    res.json(success(notifs));
+  })
+);
+
+router.post(
+  '/tickets',
+  asyncHandler(async (req, res) => {
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    const customer = await getCustomerByUserId(req.user.id, req.user as any);
+    const { subject, category, message } = req.body;
+    const ticket = borrowerJourneyService.createCustomerTicket(
+      customer.id,
+      subject,
+      category || 'GENERAL_INQUIRY',
+      message,
+      req.user as any
+    );
+    res.status(201).json(success(ticket));
+  })
+);
+
+router.get(
+  '/tickets',
+  asyncHandler(async (req, res) => {
+    if (!req.user?.id) {
+      throw new ForbiddenError('Not authenticated');
+    }
+    const customer = await getCustomerByUserId(req.user.id, req.user as any);
+    const tickets = borrowerJourneyService.getCustomerTickets(customer.id, req.user as any);
+    res.json(success(tickets));
   })
 );
 

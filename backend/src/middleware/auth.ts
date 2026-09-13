@@ -9,6 +9,8 @@ export interface AuthUser {
   roles: string[];
   tenantId?: string;
   branchId?: string;
+  customerId?: string;
+  partnerId?: string;
 }
 
 declare global {

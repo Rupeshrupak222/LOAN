@@ -434,6 +434,31 @@ export default function DashboardPage() {
       subtitle: 'View your active loan accounts, upcoming EMI repayments, digital receipts, and loan NOC.',
       icon: CreditCard,
     },
+    PARTNER_ADMIN: {
+      title: 'Partner Enterprise Administration & API Gateway',
+      subtitle: 'Manage partner organization settings, API credentials, webhooks, and sourcing channels.',
+      icon: Building,
+    },
+    PARTNER_OPERATIONS: {
+      title: 'Partner Sourcing & Embedded Lending Operations',
+      subtitle: 'Originate partner loan applications, monitor stage transitions, and track borrower status.',
+      icon: Users,
+    },
+    PARTNER_AGENT: {
+      title: 'Partner Field Sourcing & Customer Intake',
+      subtitle: 'Submit borrower applications, upload documents, and assist with offer acceptance.',
+      icon: Users,
+    },
+    PARTNER_FINANCE: {
+      title: 'Partner Commercials, Commissions & Settlements',
+      subtitle: 'Monitor earned sourcing fees, disbursement commissions, clawback schedules, and payout batches.',
+      icon: Wallet,
+    },
+    PARTNER_SUPPORT: {
+      title: 'Partner Customer Support & Application Status Desk',
+      subtitle: 'Inquire application status, document readiness, and customer-safe servicing details.',
+      icon: HelpCircle,
+    },
   };
 
   const header = ROLE_CONFIGS[primaryRole] || ROLE_CONFIGS.SUPER_ADMIN;

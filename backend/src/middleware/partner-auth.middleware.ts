@@ -4,7 +4,13 @@
 
 import { NextFunction, Request, Response } from 'express';
 import crypto from 'crypto';
-import { UnauthorizedError, ForbiddenError, TooManyRequestsError, ConflictError } from '../common/errors';
+import {
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+  ConflictError,
+} from '../common/errors';
 import { PartnerContext, PartnerScope } from '../modules/partners/partner.types';
 import { partnerService } from '../modules/partners/partner.service';
 
@@ -21,11 +27,15 @@ declare global {
 // In-memory rate limiting tracker: key -> { count: number, resetAt: number }
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-// In-memory idempotency cache: key -> { status: 'PROCESSING' | 'COMPLETED', statusCode: number, body: any, timestamp: number }
-const idempotencyStore = new Map<string, { status: 'PROCESSING' | 'COMPLETED'; statusCode: number; body: any; timestamp: number }>();
+// In-memory idempotency cache: key -> { status: 'PROCESSING' | 'COMPLETED', statusCode: number, body: any, payloadHash: string, timestamp: number }
+const idempotencyStore = new Map<
+  string,
+  { status: 'PROCESSING' | 'COMPLETED'; statusCode: number; body: any; payloadHash: string; timestamp: number }
+>();
 
 /**
- * Authenticates Partner API requests via x-api-key & x-api-secret, Bearer API key, or JWT fallback.
+ * Authenticates Partner API requests via x-api-key & x-api-secret, Bearer API key, or verified JWT session.
+ * Never trusts unauthenticated partnerId or tenantId from request parameters.
  */
 export function authenticatePartnerApi(req: Request, res: Response, next: NextFunction): void {
   // 1. Check API Key headers
@@ -52,6 +62,14 @@ export function authenticatePartnerApi(req: Request, res: Response, next: NextFu
     const cred = partnerService.validateApiCredential(keyToValidate, secretToValidate);
     if (!cred) {
       throw new UnauthorizedError('Invalid, expired, or revoked Partner API credentials');
+    }
+
+    if (cred.status === 'REVOKED') {
+      throw new ForbiddenError('Partner API credential has been REVOKED. Access permanently disabled.');
+    }
+
+    if (cred.status === 'EXPIRED') {
+      throw new UnauthorizedError('Partner API credential has EXPIRED. Please rotate or generate new credentials.');
     }
 
     const partner = partnerService.getPartner(cred.partnerId);
@@ -101,25 +119,57 @@ export function authenticatePartnerApi(req: Request, res: Response, next: NextFu
     return next();
   }
 
-  // 3. Fallback: If standard JWT user is already attached (e.g. from internal staff or partner user session)
+  // 3. Fallback: Authenticated session via JWT (req.user)
   if (req.user) {
-    // If user has partner roles or admin roles
-    const tenantId = req.tenantId || req.user.tenantId || 'tenant-adyapan-default';
-    const partnerId = (req.query.partnerId as string) || (req.headers['x-partner-id'] as string) || 'part-demo-001';
-    
-    req.partnerContext = {
-      partnerId,
-      partnerCode: 'PART-AUTH-USER',
-      partnerName: 'Partner Authenticated User',
-      tenantId,
-      environment: 'PRODUCTION',
-      scopes: [
+    const userRoles = (req.user.roles || []).map((r) => r.toUpperCase());
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isAdmin = userRoles.includes('ADMIN') || userRoles.includes('COMPANY_ADMIN');
+    const isPartnerRole = userRoles.some((r) =>
+      ['PARTNER_ADMIN', 'PARTNER_OPERATIONS', 'PARTNER_AGENT', 'PARTNER_FINANCE', 'PARTNER_SUPPORT', 'PARTNER_API_CLIENT'].includes(r)
+    );
+
+    const tenantId = req.user.tenantId || req.tenantId || 'tenant-adyapan-default';
+
+    // Partner users MUST use their bound partnerId. Never trust query or body override.
+    let partnerId = req.user.partnerId;
+
+    if (!partnerId) {
+      if (isSuperAdmin || isAdmin) {
+        // Internal staff acting on partner workspace
+        partnerId = (req.query.partnerId as string) || (req.headers['x-partner-id'] as string) || 'part-demo-001';
+      } else {
+        throw new ForbiddenError('Authenticated user is not associated with a partner organization.');
+      }
+    } else if (req.query.partnerId && req.query.partnerId !== partnerId) {
+      // Prevent cross-partner IDOR
+      throw new ForbiddenError(`[IDOR_BLOCKED] Partner user cannot access partner '${req.query.partnerId}'.`);
+    }
+
+    const partner = partnerService.getPartner(partnerId);
+    if (!partner) {
+      throw new NotFoundError(`Partner organization '${partnerId}' not found.`);
+    }
+
+    if (partner.tenantId !== tenantId && !isSuperAdmin) {
+      throw new ForbiddenError(`[IDOR_BLOCKED] Cross-tenant partner access denied.`);
+    }
+
+    if (partner.status === 'SUSPENDED') {
+      throw new ForbiddenError('Partner account is currently SUSPENDED.');
+    }
+
+    // Derive permitted scopes based on partner user role
+    const scopes: PartnerScope[] = [];
+    if (isSuperAdmin || isAdmin || userRoles.includes('PARTNER_ADMIN')) {
+      scopes.push(
         'partner.customer.read',
         'partner.customer.create',
         'partner.application.create',
         'partner.application.read',
         'partner.application.update',
         'partner.application.submit',
+        'partner.document.read',
+        'partner.document.upload',
         'partner.offer.read',
         'partner.offer.accept',
         'partner.loan.read',
@@ -127,28 +177,67 @@ export function authenticatePartnerApi(req: Request, res: Response, next: NextFu
         'partner.credit_limit.read',
         'partner.drawdown.create',
         'partner.webhook.manage',
-        'partner.reporting.read',
-      ],
+        'partner.reporting.read'
+      );
+    } else if (userRoles.includes('PARTNER_OPERATIONS') || userRoles.includes('PARTNER_AGENT')) {
+      scopes.push(
+        'partner.customer.read',
+        'partner.customer.create',
+        'partner.application.create',
+        'partner.application.read',
+        'partner.application.update',
+        'partner.application.submit',
+        'partner.document.read',
+        'partner.document.upload',
+        'partner.offer.read',
+        'partner.offer.accept',
+        'partner.loan.read'
+      );
+    } else if (userRoles.includes('PARTNER_FINANCE')) {
+      scopes.push(
+        'partner.loan.read',
+        'partner.repayment.read',
+        'partner.reporting.read'
+      );
+    } else if (userRoles.includes('PARTNER_SUPPORT')) {
+      scopes.push(
+        'partner.customer.read',
+        'partner.application.read',
+        'partner.loan.read'
+      );
+    } else {
+      // Default minimal read
+      scopes.push('partner.application.read');
+    }
+
+    req.partnerContext = {
+      partnerId: partner.id,
+      partnerCode: partner.code,
+      partnerName: partner.name,
+      tenantId: partner.tenantId,
+      environment: partner.environment,
+      scopes,
+      allowedProducts: partner.allowedProducts.filter((p) => p.isActive).map((p) => p.productId),
     };
-    req.partnerId = partnerId;
-    req.tenantId = tenantId;
+    req.partnerId = partner.id;
+    req.tenantId = partner.tenantId;
     return next();
   }
 
-  throw new UnauthorizedError('Partner authentication required. Provide x-api-key or Bearer token.');
+  throw new UnauthorizedError('Partner authentication required. Provide valid x-api-key credentials or partner session.');
 }
 
 /**
- * Enforces granular partner API scopes.
+ * Enforces granular partner API scopes. Hard authorization failure if scope missing.
  */
 export function requirePartnerScope(scope: PartnerScope) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.partnerContext) {
-      throw new UnauthorizedError('Partner context missing');
+      throw new UnauthorizedError('Partner context missing.');
     }
 
-    if (!req.partnerContext.scopes.includes(scope)) {
-      throw new ForbiddenError(`Insufficient permissions: Partner API credential lacks '${scope}' scope`);
+    if (!req.partnerContext.scopes || !req.partnerContext.scopes.includes(scope)) {
+      throw new ForbiddenError(`Insufficient permissions: Partner credential lacks required '${scope}' scope.`);
     }
 
     next();
@@ -157,6 +246,8 @@ export function requirePartnerScope(scope: PartnerScope) {
 
 /**
  * Enforces idempotency on state-changing API endpoints via x-idempotency-key header.
+ * Key is strictly scoped to tenant + partner + operation + idempotencyKey.
+ * Reusing a key with a materially different payload triggers a ConflictError.
  */
 export function partnerIdempotency(req: Request, res: Response, next: NextFunction): void {
   const idempotencyKey = (req.headers['x-idempotency-key'] || req.headers['idempotency-key']) as string | undefined;
@@ -166,13 +257,18 @@ export function partnerIdempotency(req: Request, res: Response, next: NextFuncti
   }
 
   const partnerId = req.partnerContext?.partnerId || 'anonymous';
-  const scopedKey = `${partnerId}:${req.method}:${req.path}:${idempotencyKey}`;
+  const tenantId = req.partnerContext?.tenantId || req.tenantId || 'global';
+  const scopedKey = `${tenantId}:${partnerId}:${req.method}:${req.path}:${idempotencyKey}`;
+  const currentPayloadHash = crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex');
   const now = Date.now();
 
   const cached = idempotencyStore.get(scopedKey);
   if (cached) {
     if (cached.status === 'PROCESSING') {
       throw new ConflictError('Concurrent request with identical idempotency key is currently processing');
+    }
+    if (cached.payloadHash && cached.payloadHash !== currentPayloadHash) {
+      throw new ConflictError('Idempotency key reused with materially different request payload parameters.');
     }
     // Return cached response
     res.setHeader('X-Idempotent-Replay', 'true');
@@ -184,6 +280,7 @@ export function partnerIdempotency(req: Request, res: Response, next: NextFuncti
     status: 'PROCESSING',
     statusCode: 200,
     body: null,
+    payloadHash: currentPayloadHash,
     timestamp: now,
   });
 
@@ -194,6 +291,7 @@ export function partnerIdempotency(req: Request, res: Response, next: NextFuncti
       status: 'COMPLETED',
       statusCode: res.statusCode || 200,
       body,
+      payloadHash: currentPayloadHash,
       timestamp: Date.now(),
     });
     return originalJson(body);

@@ -14,7 +14,12 @@ export type RoleName =
   | 'RISK_ANALYST'
   | 'FRAUD_ANALYST'
   | 'RISK_MANAGER'
-  | 'CUSTOMER';
+  | 'CUSTOMER'
+  | 'PARTNER_ADMIN'
+  | 'PARTNER_OPERATIONS'
+  | 'PARTNER_AGENT'
+  | 'PARTNER_FINANCE'
+  | 'PARTNER_SUPPORT';
 
 export type NavKey =
   | 'dashboard'
@@ -32,6 +37,7 @@ export type NavKey =
   | 'general-ledger'
   | 'accounting'
   | 'reports'
+  | 'analytics'
   | 'npa-monitoring'
   | 'emi-calculator'
   | 'branches'
@@ -61,7 +67,13 @@ export type NavKey =
   | 'workflows'
   | 'bre-studio'
   | 'configuration'
-  | 'branding';
+  | 'branding'
+  | 'partner-workspace'
+  | 'partner-applications'
+  | 'partner-credentials'
+  | 'partner-webhooks'
+  | 'partner-commissions'
+  | 'partner-settings';
 
 export type NavGroupKey =
   | 'OVERVIEW'
@@ -101,6 +113,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   compliance: { key: 'compliance', href: '/compliance', label: 'Regulatory & Compliance', group: 'INSIGHTS' },
   privacy: { key: 'privacy', href: '/privacy', label: 'Privacy & Consent', group: 'ADMINISTRATION' },
   reports: { key: 'reports', href: '/reports', label: 'Reports & Analytics', group: 'INSIGHTS' },
+  analytics: { key: 'analytics', href: '/analytics', label: 'Analytics & Intelligence Hub', group: 'INSIGHTS' },
   'npa-monitoring': { key: 'npa-monitoring', href: '/npa-monitoring', label: 'NPA & Asset Quality', group: 'INSIGHTS' },
   'fraud-intelligence': { key: 'fraud-intelligence', href: '/fraud-intelligence', label: 'Fraud & Anomaly Intelligence', group: 'INSIGHTS' },
   risk: { key: 'risk', href: '/risk', label: 'Risk Intelligence Hub', group: 'INSIGHTS' },
@@ -124,6 +137,12 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   settings: { key: 'settings', href: '/settings', label: 'System Settings', group: 'ADMINISTRATION' },
   'audit-logs': { key: 'audit-logs', href: '/audit-logs', label: 'Audit Logs', group: 'ADMINISTRATION' },
   integrations: { key: 'integrations', href: '/integrations', label: 'Integration Hub', group: 'ADMINISTRATION' },
+  'partner-workspace': { key: 'partner-workspace', href: '/partner', label: 'Partner Overview', group: 'OVERVIEW' },
+  'partner-applications': { key: 'partner-applications', href: '/partner/applications', label: 'Applications Pipeline', group: 'LENDING' },
+  'partner-credentials': { key: 'partner-credentials', href: '/partner/api-credentials', label: 'API Credentials', group: 'ADMINISTRATION' },
+  'partner-webhooks': { key: 'partner-webhooks', href: '/partner/webhooks', label: 'Webhooks', group: 'ADMINISTRATION' },
+  'partner-commissions': { key: 'partner-commissions', href: '/partner/reports', label: 'Commissions & Reports', group: 'INSIGHTS' },
+  'partner-settings': { key: 'partner-settings', href: '/partner/settings', label: 'Partner Settings', group: 'ADMINISTRATION' },
 };
 
 export interface RoleConfig {
@@ -463,8 +482,62 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
       'emi-calculator',
       'privacy',
     ],
-    landing: '/dashboard',
+    landing: '/customer/dashboard',
     dashboard: 'CUSTOMER',
+  },
+  PARTNER_ADMIN: {
+    label: 'Partner Administrator',
+    description: 'Manage partner organization users, credentials, webhooks, and view pipeline overview',
+    nav: [
+      'partner-workspace',
+      'partner-applications',
+      'partner-credentials',
+      'partner-webhooks',
+      'partner-commissions',
+      'partner-settings',
+    ],
+    landing: '/partner',
+    dashboard: 'PARTNER_ADMIN',
+  },
+  PARTNER_OPERATIONS: {
+    label: 'Partner Operations',
+    description: 'Originate and track partner applications and submit applicant documents',
+    nav: [
+      'partner-workspace',
+      'partner-applications',
+    ],
+    landing: '/partner',
+    dashboard: 'PARTNER_OPERATIONS',
+  },
+  PARTNER_AGENT: {
+    label: 'Partner Sourcing Agent',
+    description: 'Originate, submit, and track applications in the field or embedded channel',
+    nav: [
+      'partner-workspace',
+      'partner-applications',
+    ],
+    landing: '/partner',
+    dashboard: 'PARTNER_AGENT',
+  },
+  PARTNER_FINANCE: {
+    label: 'Partner Finance',
+    description: 'Access partner commission statements, payout summaries, and settlement reconciliation',
+    nav: [
+      'partner-workspace',
+      'partner-commissions',
+    ],
+    landing: '/partner',
+    dashboard: 'PARTNER_FINANCE',
+  },
+  PARTNER_SUPPORT: {
+    label: 'Partner Support',
+    description: 'View applicant pipeline status and raise partner support cases',
+    nav: [
+      'partner-workspace',
+      'partner-applications',
+    ],
+    landing: '/partner',
+    dashboard: 'PARTNER_SUPPORT',
   },
 };
 

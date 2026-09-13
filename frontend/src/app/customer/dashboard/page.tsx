@@ -24,6 +24,8 @@ import { api } from '@/lib/api';
 
 export default function CustomerDashboardPage() {
   const [customer, setCustomer] = useState<any>(null);
+  const [nextAction, setNextAction] = useState<any>(null);
+  const [repeatEligibility, setRepeatEligibility] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,8 +36,21 @@ export default function CustomerDashboardPage() {
   const fetchCustomerProfile = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/customers/me');
-      setCustomer(res.data.data);
+      const [profileRes, actionRes, repeatRes] = await Promise.allSettled([
+        api.get('/customers/me'),
+        api.get('/direct-lending/next-action'),
+        api.get('/direct-lending/repeat-eligibility'),
+      ]);
+
+      if (profileRes.status === 'fulfilled') {
+        setCustomer(profileRes.value.data.data);
+      }
+      if (actionRes.status === 'fulfilled') {
+        setNextAction(actionRes.value.data.data);
+      }
+      if (repeatRes.status === 'fulfilled') {
+        setRepeatEligibility(repeatRes.value.data.data);
+      }
     } catch (err: any) {
       console.error('Failed to fetch customer profile:', err);
       setError(err?.response?.data?.message || 'Unable to load borrower dashboard profile');
@@ -136,6 +151,79 @@ export default function CustomerDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Personalized Next Action Card (Phase 15 Engine) */}
+      {nextAction && (
+        <div
+          className={`p-5 rounded-3xl border shadow-lg transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+            nextAction.isUrgent
+              ? 'bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-amber-500/5 border-amber-500/30'
+              : 'bg-gradient-to-r from-brand-500/10 via-blue-500/10 to-indigo-500/5 border-brand-500/30'
+          }`}
+        >
+          <div className="flex items-center gap-3.5">
+            <div
+              className={`p-3 rounded-2xl ${
+                nextAction.isUrgent
+                  ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                  : 'bg-brand-500/20 text-brand-600 dark:text-brand-400'
+              }`}
+            >
+              <Zap className="h-6 w-6 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-brand-600/10 text-brand-600 dark:text-brand-400 border border-brand-600/20">
+                  Recommended Action • {nextAction.stageName}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
+                {nextAction.title}
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                {nextAction.description}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href={nextAction.targetUrl || '/customer/applications'}
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+          >
+            <span>{nextAction.buttonText}</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
+
+      {/* Repeat Borrowing Pre-Approval Banner */}
+      {repeatEligibility?.isEligibleForRepeatLoan && (
+        <div className="p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                Repeat Borrower Pre-Approved
+              </span>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
+                Instant Repeat Loan up to ₹{repeatEligibility.maxRepeatLoanLimit.toLocaleString('en-IN')} Available
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                {repeatEligibility.safeCustomerMessage}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/customer/applications/new"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shrink-0 flex items-center justify-center gap-1.5"
+          >
+            <span>Claim Instant Loan →</span>
+          </Link>
+        </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">

@@ -30,6 +30,7 @@ import {
   ALL_PARTNER_SCOPES,
   PartnerScope,
 } from './partner.types';
+import { partnerFortificationService } from './partner-fortification.service';
 import { offerEngineService } from '../offers/offers.service';
 import { creditLimitsService } from '../credit-limits/credit-limits.service';
 import * as appService from '../application/application.service';
@@ -444,7 +445,7 @@ class PartnerService {
   // ---------------------------------------------------------------------------
   public createApiCredential(
     partnerId: string,
-    dto: { name: string; environment: PartnerEnvironment; scopes?: PartnerScope[]; allowedIps?: string[]; validityDays?: number },
+    dto: { name?: string; description?: string; environment: PartnerEnvironment; scopes?: PartnerScope[]; allowedIps?: string[]; validityDays?: number },
     actor?: { id?: string; email?: string; roles?: string[]; tenantId?: string }
   ): PartnerApiCredential {
     const partner = this.getPartner(partnerId, actor);
@@ -460,7 +461,7 @@ class PartnerService {
       id: `cred-${Date.now()}-${this.credCounter}`,
       partnerId: partner.id,
       tenantId: partner.tenantId,
-      name: dto.name,
+      name: dto.name || dto.description || 'Partner API Key',
       clientId: `client_${partner.code.toLowerCase()}_${Date.now()}`,
       apiKey,
       keyPrefix: apiKey.substring(0, 15),
@@ -971,6 +972,10 @@ class PartnerService {
       throw new ForbiddenError('Access forbidden: Application belongs to another partner organization');
     }
 
+    if (partnerContext.tenantId && mapping.tenantId !== partnerContext.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+
     return mapping;
   }
 
@@ -1346,8 +1351,12 @@ class PartnerService {
       clawbackRatePct: 100,
     };
 
-    const rate = (policy.sourcingFeePct + policy.disbursementCommissionPct) / 100;
-    const amount = Math.round(data.disbursedAmount * rate + (policy.flatFee || 0));
+    const calc = partnerFortificationService.calculateCommissionWithDecimal(
+      data.disbursedAmount,
+      policy.sourcingFeePct || 0.5,
+      policy.disbursementCommissionPct || 1.0,
+      policy.flatFee || 0
+    );
 
     this.commissionCounter += 1;
     const record: PartnerCommissionRecord = {
@@ -1361,7 +1370,7 @@ class PartnerService {
       loanNo: data.loanNo,
       disbursedAmount: data.disbursedAmount,
       commissionType: 'DISBURSEMENT_COMMISSION',
-      amount,
+      amount: calc.calculatedAmount,
       status: 'ACCRUED',
       createdAt: new Date().toISOString(),
     };
@@ -1382,10 +1391,11 @@ class PartnerService {
     const partner = this.getPartner(partnerId);
     const partnerCommissions = this.listCommissions(partnerId);
 
-    const totalDisbursedVolume = partnerCommissions.reduce((acc, c) => acc + c.disbursedAmount, 0);
-    const totalEarnedCommission = partnerCommissions.reduce((acc, c) => acc + c.amount, 0);
-    const clawbackAmount = partnerCommissions.filter((c) => c.status === 'CLAWED_BACK').reduce((acc, c) => acc + c.amount, 0);
-    const pendingPayoutAmount = partnerCommissions.filter((c) => c.status === 'ACCRUED').reduce((acc, c) => acc + c.amount, 0);
+    const totalDisbursedVolume = partnerCommissions.reduce((acc, c) => acc.plus(c.disbursedAmount || 0), new Decimal(0)).toNumber();
+    const totalEarnedCommission = partnerCommissions.reduce((acc, c) => acc.plus(c.amount || 0), new Decimal(0)).toNumber();
+    const clawbackAmount = partnerCommissions.filter((c) => c.status === 'CLAWED_BACK').reduce((acc, c) => acc.plus(c.amount || 0), new Decimal(0)).toNumber();
+    const pendingPayoutAmount = partnerCommissions.filter((c) => c.status === 'ACCRUED').reduce((acc, c) => acc.plus(c.amount || 0), new Decimal(0)).toNumber();
+    const netPayable = new Decimal(pendingPayoutAmount).minus(clawbackAmount).toNumber();
 
     return {
       partnerId: partner.id,
@@ -1396,20 +1406,29 @@ class PartnerService {
       totalEarnedCommission,
       pendingPayoutAmount,
       clawbackAmount,
-      netPayable: pendingPayoutAmount - clawbackAmount,
+      netPayable,
     };
   }
 
-  public async processPayoutBatch(partnerId: string, actor?: { id?: string; email?: string; roles?: string[] }): Promise<{ batchId: string; totalPaid: number; count: number }> {
+  public async processPayoutBatch(
+    partnerId: string,
+    actor?: { id?: string; email?: string; roles?: string[]; tenantId?: string }
+  ): Promise<{ batchId: string; totalPaid: number; count: number; status: string }> {
+    const actorRoles = (actor?.roles || []).map((r) => r.toUpperCase());
+    const isAuthorizedFinance = actorRoles.includes('SUPER_ADMIN') || actorRoles.includes('ADMIN') || actorRoles.includes('FINANCE_OFFICER') || actorRoles.includes('FINANCE_CONTROLLER');
+
+    if (!isAuthorizedFinance) {
+      throw new ForbiddenError('Direct execution of partner payout batches is restricted. Payouts require authorized finance maker-checker approval.');
+    }
+
     const pending = this.listCommissions(partnerId).filter((c) => c.status === 'ACCRUED');
     const batchId = `BATCH-PAYOUT-${Date.now()}`;
-    let totalPaid = 0;
+    const totalPaid = pending.reduce((acc, item) => acc.plus(item.amount), new Decimal(0)).toNumber();
 
     for (const item of pending) {
       item.status = 'PAID';
       item.payoutBatchId = batchId;
       item.paidAt = new Date().toISOString();
-      totalPaid += item.amount;
       this.commissions.set(item.id, item);
     }
 
@@ -1421,7 +1440,7 @@ class PartnerService {
       newValue: { partnerId, totalPaid, count: pending.length },
     }).catch(() => {});
 
-    return { batchId, totalPaid, count: pending.length };
+    return { batchId, totalPaid, count: pending.length, status: 'PAID' };
   }
 }
 

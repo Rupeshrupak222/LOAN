@@ -62,6 +62,8 @@ import { offerRoutes, pricingPolicyRoutes } from '../modules/offers/offers.route
 import { creditFacilityRoutes, creditPolicyRoutes, drawdownRoutes } from '../modules/credit-limits/credit-limits.routes';
 import contractsRoutes from '../modules/contracts/contracts.routes';
 import accountingRoutes from '../modules/accounting/accounting.routes';
+import { analyticsRoutes } from '../modules/analytics/analytics.routes';
+import { directLendingRoutes } from '../modules/direct-lending';
 
 const router = Router();
 
@@ -97,6 +99,8 @@ router.use('/payments', paymentRoutes);
 router.use('/collections', collectionRoutes);
 router.use('/restructuring', restructuringRoutes);
 router.use('/reports', reportRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/direct-lending', directLendingRoutes);
 router.use('/branches', branchRoutes);
 router.use('/users', userRoutes);
 router.use('/settings', settingRoutes);

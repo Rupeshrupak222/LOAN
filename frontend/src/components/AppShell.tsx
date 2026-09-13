@@ -37,43 +37,60 @@ import {
   Lock,
   RotateCcw,
   GitBranch,
+  ChevronDown,
+  Headphones,
+  LifeBuoy,
+  FileSpreadsheet,
+  Coins,
+  CheckCircle2,
+  Sparkles,
+  CreditCard,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { useBranding } from '@/lib/branding';
 import { cn } from '@/lib/utils';
-import { ROLE_CONFIG, NAV_ITEMS, RoleName, NavItemConfig } from '@/lib/roles';
+import { ROLE_CONFIG, RoleName } from '@/lib/roles';
 import { Spinner } from './ui';
 import { NotificationBell } from './NotificationBell';
 import { CopilotDrawer } from './CopilotDrawer';
 import { WorkflowExceptionCenterModal } from './WorkflowExceptionCenterModal';
 import { NavigationProgressBar } from './NavigationProgressBar';
+import { useNavigation, canAccessRoute, WorkspaceId, WORKSPACES } from '@/lib/navigation';
 
 const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
   customers: Users,
   applications: FileText,
   'returned-applications': RotateCcw,
+  documents: FileCheck,
   products: Building2,
   'loan-products': Building2,
   'credit-assessment': Calculator,
   'branch-review': FileCheck,
   underwriting: FileCheck,
   'approval-queue': FileCheck,
+  'approval-tasks': FileCheck,
   loans: DollarSign,
   disbursements: Wallet,
   partners: Handshake,
+  'partner-portal': Handshake,
   payments: Receipt,
+  payouts: Send,
   'general-ledger': Scale,
   accounting: Scale,
+  settlements: Coins,
   collections: AlertCircle,
-  reconciliation: Scale,
+  reconciliation: CheckCircle2,
   communications: Mail,
+  'support-sla': LifeBuoy,
   'command-center': Cpu,
   operations: Activity,
   compliance: ShieldCheck,
   privacy: ShieldCheck,
-  reports: BarChart3,
+  reports: FileSpreadsheet,
+  analytics: BarChart3,
   'npa-monitoring': AlertTriangle,
   'fraud-intelligence': ShieldAlert,
   risk: Activity,
@@ -84,9 +101,10 @@ const NAV_ICONS: Record<string, any> = {
   'fraud-cases': Search,
   'fraud-rules': Workflow,
   'fraud-graph': GitBranch,
-  'credit-facilities': Layers,
+  'credit-facilities': CreditCard,
   'credit-policies': Sliders,
   'pricing-policies': Sliders,
+  offers: Sparkles,
   'authority-matrix': ShieldCheck,
   'tenant-settings': Sliders,
   'early-warnings': AlertTriangle,
@@ -95,19 +113,47 @@ const NAV_ICONS: Record<string, any> = {
   roles: KeyRound,
   workflows: Workflow,
   'bre-studio': Sliders,
-  settings: ShieldCheck,
-  permissions: ShieldCheck,
+  settings: Sliders,
+  permissions: KeyRound,
   branches: Building2,
-  tenants: Layers,
+  tenants: Building2,
   configuration: Sliders,
   branding: Palette,
   'audit-logs': ScrollText,
   integrations: Cpu,
+  'customer-dashboard': LayoutDashboard,
+  'customer-apply': FileText,
+  'customer-credit': CreditCard,
+  'customer-documents': FileCheck,
+  'customer-loans': DollarSign,
+  'customer-payments': Receipt,
+  'customer-support': Headphones,
 };
 
-const GROUP_ORDER = ['OVERVIEW', 'CUSTOMERS', 'LENDING', 'SERVICING', 'INSIGHTS', 'ADMINISTRATION'] as const;
+const WORKSPACE_ICONS: Record<WorkspaceId, any> = {
+  ORIGINATION: FileText,
+  CREDIT: ShieldCheck,
+  FINANCE: DollarSign,
+  COLLECTIONS: AlertTriangle,
+  PARTNER: Handshake,
+  SUPPORT: Headphones,
+  PLATFORM: Layers,
+  BORROWER: Users,
+};
 
-import { useNavigation, canAccessRoute } from '@/lib/navigation';
+const GROUP_ORDER = [
+  'OVERVIEW',
+  'ORIGINATION',
+  'CREDIT_ASSESSMENT',
+  'RISK_FRAUD',
+  'FINANCIAL_OPS',
+  'SERVICING',
+  'COLLECTIONS',
+  'PARTNERSHIP',
+  'SUPPORT',
+  'GOVERNANCE',
+  'ADMINISTRATION',
+] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -119,9 +165,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [exceptionCenterOpen, setExceptionCenterOpen] = useState(false);
+  const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false);
 
-  // Dynamic permission-driven navigation
-  const { authorizedItems: accessibleNav, groupedItems: groupedNav } = useNavigation();
+  // Dynamic permission-driven navigation and active workspace state
+  const {
+    activeWorkspace,
+    setActiveWorkspace,
+    authorizedWorkspaces,
+    authorizedItems: accessibleNav,
+    groupedItems: groupedNav,
+  } = useNavigation();
 
   // Automatic redirect if unauthenticated without blank screen hang
   useEffect(() => {
@@ -166,6 +219,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const currentLabel = currentItem?.label || 'Dashboard';
   const CurrentIcon = NAV_ICONS[currentItem?.key || 'dashboard'] || LayoutDashboard;
 
+  const currentWorkspaceConfig = WORKSPACES[activeWorkspace] || WORKSPACES.ORIGINATION;
+  const WorkspaceIcon = WORKSPACE_ICONS[activeWorkspace] || Layers;
+
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
     const q = globalSearch.trim();
@@ -186,7 +242,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Instant Navigation Route Progress Bar */}
       <NavigationProgressBar />
 
-      {/* Sidebar - Always Sleek Dark Navy */}
+      {/* Sidebar - Sleek Enterprise Navy */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-30 flex h-full w-64 flex-col flex-none border-r border-[#1E2445]/80 bg-[#060F1B] transition-transform lg:static lg:translate-x-0',
@@ -195,7 +251,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {/* Brand Header */}
         <div className="flex h-16 flex-none items-center justify-between px-5 border-b border-[#1E2445]/80">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Link href={currentWorkspaceConfig.defaultRoute || '/dashboard'} className="flex items-center gap-2.5">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-bold shadow-sm"
               style={{ backgroundColor: branding?.primaryColor || '#2563EB' }}
@@ -221,16 +277,86 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
+        {/* Workspace Switcher Pill (if user has access to multiple workspaces) */}
+        {authorizedWorkspaces.length > 1 && primaryRole !== 'CUSTOMER' && (
+          <div className="relative px-3 pt-3 flex-none">
+            <button
+              type="button"
+              onClick={() => setWorkspaceDropdownOpen(!workspaceDropdownOpen)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#1E2445] bg-[#1E2445]/70 px-3 py-2 text-left text-xs transition-all hover:border-blue-500/50 hover:bg-[#1E2445]"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex h-6 w-6 flex-none items-center justify-center rounded-lg bg-blue-600/20 text-blue-400">
+                  <WorkspaceIcon className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-white leading-tight">
+                    {currentWorkspaceConfig.shortLabel}
+                  </p>
+                  <p className="truncate text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
+                    Workspace Hub
+                  </p>
+                </div>
+              </div>
+              <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", workspaceDropdownOpen ? "rotate-180" : "")} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {workspaceDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setWorkspaceDropdownOpen(false)}
+                />
+                <div className="absolute left-3 right-3 top-14 z-40 max-h-72 overflow-y-auto rounded-xl border border-[#1E2445] bg-[#0C152B] p-1.5 shadow-2xl space-y-1">
+                  <p className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Switch Business Hub
+                  </p>
+                  {authorizedWorkspaces.map((ws) => {
+                    const WIcon = WORKSPACE_ICONS[ws.id] || Layers;
+                    const isSelected = ws.id === activeWorkspace;
+                    return (
+                      <button
+                        key={ws.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveWorkspace(ws.id);
+                          setWorkspaceDropdownOpen(false);
+                          router.push(ws.defaultRoute);
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-all text-left',
+                          isSelected
+                            ? 'bg-blue-600 text-white font-bold'
+                            : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                        )}
+                      >
+                        <WIcon className="h-3.5 w-3.5 flex-none" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate leading-tight">{ws.shortLabel}</p>
+                          <p className={cn("text-[9px] truncate", isSelected ? "text-blue-100" : "text-slate-400")}>
+                            {ws.name}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Grouped Nav List */}
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-[#1E2445]">
           {GROUP_ORDER.map((group) => {
             const items = groupedNav[group];
-            if (!items.length) return null;
+            if (!items || !items.length) return null;
 
             return (
               <div key={group} className="space-y-1">
                 <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {group}
+                  {group.replace('_', ' ')}
                 </p>
                 <div className="space-y-0.5 pt-1">
                   {items.map((item) => {
@@ -298,7 +424,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Top Header */}
         <header className={cn(
           "sticky top-0 z-30 flex h-16 flex-none items-center justify-between border-b px-4 sm:px-6 backdrop-blur transition-colors",
-          isDark ? "border-[#1E2445] bg-[#060F1B]" : "border-slate-200/80 bg-white"
+          isDark ? "border-[#1E2445] bg-[#060F1B]/90" : "border-slate-200/80 bg-white/90"
         )}>
           {/* Left: Mobile Menu + Breadcrumbs */}
           <div className="flex items-center gap-3">

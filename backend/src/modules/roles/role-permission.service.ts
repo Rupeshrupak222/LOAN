@@ -15,6 +15,189 @@ import { evidenceAuditService } from '../audit/evidence.service';
 import { logAudit } from '../audit/audit.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 
+export const PERMISSION_ALIAS_MAP: Record<string, string[]> = {
+  // Customer
+  'customer.view': ['customer.view', 'VIEW_CUSTOMER_DETAILS', 'CUSTOMERS_VIEW', 'CUST_VIEW', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+  'customer.create': ['customer.create', 'CUSTOMERS_CREATE'],
+  'customer.edit': ['customer.edit', 'CUSTOMERS_EDIT'],
+  'customer.kyc': ['customer.kyc', 'PRIVACY_VIEW_CONSENT_REGISTRY', 'KYC_INITIATE'],
+  'KYC_INITIATE': ['KYC_INITIATE', 'customer.kyc', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+
+  // Applications
+  'application.view': ['application.view', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS'],
+  'application.create': ['application.create', 'APPLICATIONS_CREATE'],
+  'application.edit': ['application.edit', 'APPLICATIONS_EDIT'],
+  'application.submit': ['application.submit', 'APPLICATIONS_SUBMIT', 'APPLICATIONS_CREATE'],
+  'application.review': ['application.review', 'APPLICATIONS_REVIEW', 'REVIEW_APPLICATION'],
+  'application.return': ['application.return', 'SEND_BACK_FOR_CORRECTION'],
+  'application.resubmit': ['application.resubmit', 'APPLICATIONS_RESUBMIT'],
+  'application.approve': ['application.approve', 'APPLICATIONS_APPROVE', 'APPROVE_WITHIN_DELEGATED_LIMIT'],
+  'application.reject': ['application.reject', 'APPLICATIONS_REJECT'],
+
+  // Loans & Servicing
+  'loan.view': ['loan.view', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS', 'PAYMENTS_VIEW'],
+  'loan.manage': ['loan.manage', 'APPLICATIONS_APPROVE', 'COLLECTIONS_ASSIGN'],
+
+  // Credit
+  'credit.view': ['credit.view', 'CREDIT_ASSESSMENT_VIEW', 'VIEW_CREDIT_ANALYST_REPORT'],
+  'credit.assess': ['credit.assess', 'CREDIT_ASSESSMENT_EVALUATE', 'VIEW_REPAYMENT_ASSESSMENT'],
+  'credit.recommend': ['credit.recommend', 'CREDIT_ASSESSMENT_SUBMIT'],
+  'credit.bank_intelligence': ['credit.bank_intelligence', 'CREDIT_ASSESSMENT_EVALUATE'],
+  'credit.fraud_score': ['credit.fraud_score', 'VIEW_RISK_ASSESSMENT'],
+
+  // Underwriting & Approvals
+  'underwriting.view': ['underwriting.view', 'UNDERWRITING_VIEW_BUREAU'],
+  'underwriting.decide': ['underwriting.decide', 'APPLICATIONS_APPROVE', 'APPROVE_WITHIN_DELEGATED_LIMIT'],
+  'underwriting.condition': ['underwriting.condition', 'ADD_MANAGER_REMARKS'],
+  'underwriting.override': ['underwriting.override', 'UNDERWRITING_APPROVE_EXCEPTION'],
+  'approval.view': ['approval.view', 'APPLICATIONS_VIEW'],
+  'approval.approve': ['approval.approve', 'APPLICATIONS_APPROVE', 'APPROVE_WITHIN_DELEGATED_LIMIT'],
+  'approval.reject': ['approval.reject', 'APPLICATIONS_REJECT'],
+  'approval.send_back': ['approval.send_back', 'SEND_BACK_FOR_CORRECTION'],
+  'approval.escalate': ['approval.escalate', 'ESCALATE_TO_UNDERWRITER'],
+  'offer.view': ['offer.view', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS'],
+  'offer.generate': ['offer.generate', 'APPLICATIONS_APPROVE', 'APPLICATIONS_REVIEW', 'APPROVE_WITHIN_DELEGATED_LIMIT'],
+  'offer.accept': ['offer.accept', 'APPLICATIONS_CREATE', 'APPLICATIONS_VIEW'],
+
+  // Disbursements & Payouts
+  'disbursement.view': ['disbursement.view', 'PAYOUTS_VIEW'],
+  'disbursement.execute': ['disbursement.execute', 'DISBURSEMENTS_EXECUTE_TRANSFER', 'PAYOUTS_INITIATE', 'DISBURSEMENTS_INITIATE_PAYOUT'],
+  'disbursement.verify': ['disbursement.verify', 'DISBURSEMENTS_APPROVE_MAKER_CHECKER'],
+  'payout.view': ['payout.view', 'PAYOUTS_VIEW'],
+  'payout.create': ['payout.create', 'PAYOUTS_INITIATE', 'DISBURSEMENTS_INITIATE_PAYOUT'],
+  'payout.initiate': ['payout.initiate', 'PAYOUTS_INITIATE', 'DISBURSEMENTS_INITIATE_PAYOUT'],
+  'payout.approve': ['payout.approve', 'PAYOUTS_APPROVE', 'DISBURSEMENTS_APPROVE_MAKER_CHECKER'],
+  'payout.cancel': ['payout.cancel', 'PAYOUTS_VIEW'],
+
+  // Payments & Reconciliation
+  'payment.view': ['payment.view', 'PAYMENTS_VIEW'],
+  'payment.create': ['payment.create', 'PAYMENTS_CREATE'],
+  'payment.record': ['payment.record', 'PAYMENTS_CREATE'],
+  'payment.confirm': ['payment.confirm', 'PAYMENTS_CONFIRM'],
+  'payment.refund': ['payment.refund', 'PAYMENTS_REFUND'],
+  'payment.reverse': ['payment.reverse', 'PAYMENTS_REVERSE'],
+  'settlement.view': ['settlement.view', 'SETTLEMENTS_VIEW'],
+  'settlement.reconcile': ['settlement.reconcile', 'SETTLEMENTS_RECONCILE'],
+  'recon.view': ['recon.view', 'RECONCILIATION_VIEW'],
+  'recon.execute': ['recon.execute', 'RECONCILIATION_EXECUTE'],
+  'recon.resolve': ['recon.resolve', 'RECONCILIATION_RESOLVE'],
+
+  // Collections
+  'collection.view': ['collection.view', 'COLLECTIONS_VIEW_DPD'],
+  'collection.assign': ['collection.assign', 'COLLECTIONS_ASSIGN'],
+  'collection.contact': ['collection.contact', 'COLLECTIONS_CONTACT'],
+  'collection.activity': ['collection.activity', 'COLLECTIONS_CONTACT'],
+  'collection.ptp': ['collection.ptp', 'COLLECTIONS_RECORD_PTP'],
+  'collection.create_ptp': ['collection.create_ptp', 'COLLECTIONS_RECORD_PTP'],
+  'collection.update_ptp': ['collection.update_ptp', 'COLLECTIONS_UPDATE_PTP'],
+  'collection.escalate': ['collection.escalate', 'COLLECTIONS_ESCALATE'],
+  'collection.settle': ['collection.settle', 'COLLECTIONS_SETTLE_LOAN', 'COLLECTIONS_SETTLEMENT_REQUEST'],
+  'collection.settlement.request': ['collection.settlement.request', 'COLLECTIONS_SETTLEMENT_REQUEST'],
+  'collection.settlement.approve': ['collection.settlement.approve', 'COLLECTIONS_SETTLEMENT_APPROVE'],
+  'collection.writeoff': ['collection.writeoff', 'COLLECTIONS_WRITEOFF_REQUEST'],
+  'collection.writeoff.request': ['collection.writeoff.request', 'COLLECTIONS_WRITEOFF_REQUEST'],
+  'collection.writeoff.approve': ['collection.writeoff.approve', 'COLLECTIONS_WRITEOFF_APPROVE'],
+
+  // Accounting & GL
+  'finance.gl.view': ['finance.gl.view', 'ACCOUNTING_VIEW'],
+  'finance.gl.post': ['finance.gl.post', 'JOURNAL_POST'],
+  'accounting.view': ['accounting.view', 'ACCOUNTING_VIEW'],
+  'accounting.dashboard.view': ['accounting.dashboard.view', 'ACCOUNTING_DASHBOARD_VIEW'],
+  'accounting.coa.view': ['accounting.coa.view', 'COA_VIEW'],
+  'accounting.coa.manage': ['accounting.coa.manage', 'COA_CREATE', 'COA_EDIT'],
+  'accounting.period.view': ['accounting.period.view', 'PERIOD_VIEW'],
+  'accounting.period.manage': ['accounting.period.manage', 'PERIOD_OPEN', 'PERIOD_CLOSE', 'PERIOD_SOFT_CLOSE'],
+  'accounting.journal.view': ['accounting.journal.view', 'JOURNAL_VIEW'],
+  'accounting.journal.create': ['accounting.journal.create', 'JOURNAL_CREATE'],
+  'accounting.journal.approve': ['accounting.journal.approve', 'JOURNAL_APPROVE'],
+  'accounting.journal.post': ['accounting.journal.post', 'JOURNAL_POST'],
+  'accounting.journal.reverse': ['accounting.journal.reverse', 'JOURNAL_REVERSE'],
+  'accounting.trial_balance.view': ['accounting.trial_balance.view', 'TRIAL_BALANCE_VIEW'],
+  'accounting.financial_statements.view': ['accounting.financial_statements.view', 'FINANCIAL_STATEMENTS_VIEW'],
+  'accounting.receivables.view': ['accounting.receivables.view', 'RECEIVABLES_VIEW'],
+  'accounting.payables.view': ['accounting.payables.view', 'PAYABLES_VIEW'],
+  'accounting.payables.manage': ['accounting.payables.manage', 'PAYABLES_CREATE', 'PAYABLES_APPROVE'],
+  'accounting.payables.approve': ['accounting.payables.approve', 'PAYABLES_APPROVE'],
+  'accounting.accruals.view': ['accounting.accruals.view', 'ACCRUAL_VIEW'],
+  'accounting.accruals.run': ['accounting.accruals.run', 'ACCRUAL_POST'],
+  'accounting.tax.view': ['accounting.tax.view', 'TAX_VIEW'],
+  'accounting.tax.manage': ['accounting.tax.manage', 'TAX_MANAGE'],
+  'accounting.suspense.view': ['accounting.suspense.view', 'SUSPENSE_MANAGE'],
+  'accounting.suspense.clear': ['accounting.suspense.clear', 'SUSPENSE_MANAGE'],
+
+  // Risk & Fraud
+  'risk.view': ['risk.view', 'RISK_VIEW_SIGNALS', 'VIEW_RISK_ASSESSMENT'],
+  'risk.evaluate': ['risk.evaluate', 'RISK_EVALUATE'],
+  'risk.manage_policies': ['risk.manage_policies', 'RISK_MANAGE_POLICIES'],
+  'risk.override': ['risk.override', 'RISK_OVERRIDE'],
+  'fraud.view_cases': ['fraud.view_cases', 'FRAUD_VIEW_CASES'],
+  'fraud.investigate': ['fraud.investigate', 'FRAUD_INVESTIGATE'],
+  'fraud.manage_rules': ['fraud.manage_rules', 'FRAUD_MANAGE_RULES'],
+  'fraud.override': ['fraud.override', 'FRAUD_OVERRIDE'],
+
+  // Communications & Support
+  'communications.view': ['communications.view', 'COMMUNICATIONS_VIEW'],
+  'communications.send': ['communications.send', 'COMMUNICATIONS_SEND'],
+  'support.ticket.view': ['support.ticket.view', 'SUPPORT_VIEW'],
+  'support.ticket.create': ['support.ticket.create', 'SUPPORT_TICKET_CREATE'],
+  'support.ticket.assign': ['support.ticket.assign', 'SUPPORT_TICKET_ASSIGN'],
+  'support.ticket.reply': ['support.ticket.reply', 'SUPPORT_TICKET_REPLY'],
+  'support.ticket.resolve': ['support.ticket.resolve', 'SUPPORT_TICKET_RESOLVE'],
+  'support.complaint.view': ['support.complaint.view', 'SUPPORT_COMPLAINT_VIEW'],
+  'support.complaint.manage': ['support.complaint.manage', 'SUPPORT_COMPLAINT_MANAGE'],
+
+  // Administration & Governance
+  'audit.view': ['audit.view', 'AUDIT_EXPORT_EVIDENCE_PACKAGE', 'AUDIT_VERIFY_CHAIN'],
+  'audit.export': ['audit.export', 'AUDIT_EXPORT_EVIDENCE_PACKAGE'],
+  'compliance.view': ['compliance.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'privacy.manage': ['privacy.manage', 'PRIVACY_PURGE_PII'],
+  'tenant.view': ['tenant.view', 'TENANT_VIEW_OPERATIONS_CENTER'],
+  'tenant.manage': ['tenant.manage', 'TENANT_MANAGE_USERS', 'TENANT_ASSIGN_ROLES'],
+  'branch.view': ['branch.view', 'VIEW_BRANCH_APPLICATIONS'],
+  'user.view': ['user.view', 'TENANT_MANAGE_USERS'],
+  'user.manage': ['user.manage', 'TENANT_MANAGE_USERS'],
+  'role.view': ['role.view', 'TENANT_ASSIGN_ROLES'],
+  'role.manage': ['role.manage', 'TENANT_ASSIGN_ROLES'],
+  'config.view': ['config.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'config.manage': ['config.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'integration.view': ['integration.view', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'integration.manage': ['integration.manage', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'analytics.view': ['analytics.view', 'ANALYTICS_VIEW'],
+  'analytics.command_center': ['analytics.command_center', 'ANALYTICS_COMMAND_CENTER'],
+  'reports.view': ['reports.view', 'REPORT_VIEW'],
+  'reports.export': ['reports.export', 'REPORT_EXPORT'],
+
+  // Partner & Ecosystem Domain (P7 Normalized)
+  'partner.dashboard.view': ['partner.dashboard.view', 'partner.view'],
+  'partner.users.view': ['partner.users.view', 'partner.view'],
+  'partner.users.manage': ['partner.users.manage', 'partner.manage'],
+  'partner.applications.create': ['partner.applications.create', 'partner.application.create', 'APPLICATIONS_CREATE'],
+  'partner.applications.view': ['partner.applications.view', 'partner.application.read', 'partner.view'],
+  'partner.applications.update': ['partner.applications.update', 'partner.application.update'],
+  'partner.applications.submit': ['partner.applications.submit', 'partner.application.submit'],
+  'partner.applications.documents.view': ['partner.applications.documents.view', 'partner.applications.view'],
+  'partner.applications.documents.upload': ['partner.applications.documents.upload', 'partner.applications.update'],
+  'partner.application.status.view': ['partner.application.status.view', 'partner.applications.view'],
+  'partner.offers.view': ['partner.offers.view', 'partner.offer.read', 'offer.view'],
+  'partner.offers.accept': ['partner.offers.accept', 'partner.offer.accept', 'offer.accept'],
+  'partner.customers.view': ['partner.customers.view', 'partner.customer.read'],
+  'partner.webhooks.view': ['partner.webhooks.view', 'partner.webhooks.manage', 'partner.webhook.manage'],
+  'partner.webhooks.replay': ['partner.webhooks.replay', 'partner.webhooks.manage', 'partner.webhook.manage'],
+  'partner.api_credentials.view': ['partner.api_credentials.view', 'partner.credentials.manage'],
+  'partner.api_credentials.create': ['partner.api_credentials.create', 'partner.credentials.manage'],
+  'partner.api_credentials.rotate': ['partner.api_credentials.rotate', 'partner.credentials.manage'],
+  'partner.api_credentials.revoke': ['partner.api_credentials.revoke', 'partner.credentials.manage'],
+  'partner.commissions.view': ['partner.commissions.view', 'partner.reports.view'],
+  'partner.settlements.view': ['partner.settlements.view', 'partner.reports.view'],
+  'partner.support.create': ['partner.support.create'],
+  'partner.support.view': ['partner.support.view'],
+  'partner.view': ['partner.view', 'partner.dashboard.view'],
+  'partner.manage': ['partner.manage', 'partner.users.manage'],
+  'partner.credentials.manage': ['partner.credentials.manage', 'partner.api_credentials.create'],
+  'partner.webhooks.manage': ['partner.webhooks.manage', 'partner.webhooks.view'],
+  'partner.reports.view': ['partner.reports.view', 'partner.commissions.view'],
+};
+
 export class RolePermissionService {
   private static instance: RolePermissionService;
 
@@ -184,6 +367,54 @@ export class RolePermissionService {
     { code: 'SUPPORT_COMPLAINT_VIEW', category: 'COMMUNICATIONS_SUPPORT', name: 'View Grievance Complaints', description: 'Inspect RBI regulatory complaints register and details', riskLevel: 'LOW' },
     { code: 'SUPPORT_COMPLAINT_MANAGE', category: 'COMMUNICATIONS_SUPPORT', name: 'Manage Grievance Complaints', description: 'Investigate, resolve, or award concessions on grievance cases', riskLevel: 'HIGH' },
     { code: 'SUPPORT_REPORTS_VIEW', category: 'COMMUNICATIONS_SUPPORT', name: 'View Support Analytics', description: 'Access SLA compliance, response times, and CSAT metrics', riskLevel: 'LOW' },
+
+    // Analytics, MIS & Enterprise Command Center (Phase 14)
+    { code: 'ANALYTICS_VIEW', category: 'ANALYTICS_MIS', name: 'View Analytics Hub', description: 'Access centralized analytics dashboards and high-level KPI trends', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_PORTFOLIO', category: 'ANALYTICS_MIS', name: 'View Portfolio Analytics', description: 'Inspect active portfolio, exposure, vintage, and aging metrics', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_CREDIT', category: 'ANALYTICS_MIS', name: 'View Credit & BRE Analytics', description: 'Inspect decision engine rule execution, rejection reasons, and approval rates', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_RISK', category: 'ANALYTICS_MIS', name: 'View Risk Analytics', description: 'Inspect portfolio risk grade distribution and risk vs delinquency correlation', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_FRAUD', category: 'ANALYTICS_MIS', name: 'View Fraud Analytics', description: 'Inspect fraud signal volume, syndicate clustering, and case resolution rates', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_COLLECTIONS', category: 'ANALYTICS_MIS', name: 'View Collections & Recovery Analytics', description: 'Inspect DPD migration, roll rates, collector scorecards, and recovery metrics', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_FINANCE', category: 'ANALYTICS_MIS', name: 'View Financial & Accounting Analytics', description: 'Inspect management-level cash flow, fee income, P&L, and GL ledger telemetry', riskLevel: 'MEDIUM' },
+    { code: 'ANALYTICS_PARTNERS', category: 'ANALYTICS_MIS', name: 'View Partner Performance Analytics', description: 'Inspect partner sourcing, approval rates, and commission payouts', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_BRANCHES', category: 'ANALYTICS_MIS', name: 'View Branch Performance Analytics', description: 'Inspect branch turnaround times, disbursements, and staff productivity', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_PRODUCTS', category: 'ANALYTICS_MIS', name: 'View Product Analytics', description: 'Inspect loan product performance, conversion rates, and portfolio profitability', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_OPERATIONS', category: 'ANALYTICS_MIS', name: 'View Operational SLA Analytics', description: 'Inspect bottleneck stages, SLA breaches, and workflow cycle times', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_SUPPORT', category: 'ANALYTICS_MIS', name: 'View Customer Support Analytics', description: 'Inspect ticket categories, resolution times, and customer grievances', riskLevel: 'LOW' },
+    { code: 'ANALYTICS_COMMAND_CENTER', category: 'ANALYTICS_MIS', name: 'View Executive Command Center', description: 'Access real-time executive command cockpit and natural language query processor', riskLevel: 'HIGH' },
+    { code: 'REPORT_VIEW', category: 'ANALYTICS_MIS', name: 'View Reports & MIS', description: 'Access saved reports, MIS report catalog, and standard queries', riskLevel: 'LOW' },
+    { code: 'REPORT_CREATE', category: 'ANALYTICS_MIS', name: 'Create Custom Reports', description: 'Build and save custom report queries using approved dimensions and metrics', riskLevel: 'MEDIUM' },
+    { code: 'REPORT_EDIT', category: 'ANALYTICS_MIS', name: 'Edit Saved Reports', description: 'Modify report filters, metric selections, and visual layout configuration', riskLevel: 'MEDIUM' },
+    { code: 'REPORT_EXECUTE', category: 'ANALYTICS_MIS', name: 'Execute On-Demand Reports', description: 'Run on-demand parameterized queries against reporting layer', riskLevel: 'LOW' },
+    { code: 'REPORT_EXPORT', category: 'ANALYTICS_MIS', name: 'Export Reporting Data', description: 'Download CSV and Excel-compatible report outputs with PII masking', riskLevel: 'HIGH' },
+    { code: 'REPORT_SHARE', category: 'ANALYTICS_MIS', name: 'Share Reports', description: 'Publish and share custom report configurations with team or tenant', riskLevel: 'MEDIUM' },
+    { code: 'DASHBOARD_VIEW', category: 'ANALYTICS_MIS', name: 'View Configured Dashboards', description: 'Access user-customized analytics widgets and dashboard views', riskLevel: 'LOW' },
+    { code: 'DASHBOARD_CONFIGURE', category: 'ANALYTICS_MIS', name: 'Configure Dashboard Widgets', description: 'Add, remove, reorder, and customize analytics dashboard widgets', riskLevel: 'MEDIUM' },
+
+    // Partner & Ecosystem (Phase P7 Normalized)
+    { code: 'partner.dashboard.view', category: 'PARTNER_ECOSYSTEM', name: 'View Partner Dashboard', description: 'Access partner workspace overview, pipelines, and summary telemetry', riskLevel: 'LOW' },
+    { code: 'partner.users.view', category: 'PARTNER_ECOSYSTEM', name: 'View Partner Users', description: 'List partner organization internal team members', riskLevel: 'LOW' },
+    { code: 'partner.users.manage', category: 'PARTNER_ECOSYSTEM', name: 'Manage Partner Users', description: 'Create and assign roles to partner team members', riskLevel: 'MEDIUM' },
+    { code: 'partner.applications.create', category: 'PARTNER_ECOSYSTEM', name: 'Originate Partner Application', description: 'Create new partner-sourced loan application', riskLevel: 'LOW' },
+    { code: 'partner.applications.view', category: 'PARTNER_ECOSYSTEM', name: 'View Partner Applications', description: 'Access partner-assigned loan application pipeline', riskLevel: 'LOW' },
+    { code: 'partner.applications.update', category: 'PARTNER_ECOSYSTEM', name: 'Update Draft Application', description: 'Modify draft loan terms and applicant parameters', riskLevel: 'LOW' },
+    { code: 'partner.applications.submit', category: 'PARTNER_ECOSYSTEM', name: 'Submit Partner Application', description: 'Formally submit completed partner application to decision engine', riskLevel: 'MEDIUM' },
+    { code: 'partner.applications.documents.view', category: 'PARTNER_ECOSYSTEM', name: 'View Required Documents', description: 'Inspect required checklist and document status', riskLevel: 'LOW' },
+    { code: 'partner.applications.documents.upload', category: 'PARTNER_ECOSYSTEM', name: 'Upload Partner Document', description: 'Upload KYC or income document for applicant', riskLevel: 'LOW' },
+    { code: 'partner.application.status.view', category: 'PARTNER_ECOSYSTEM', name: 'View Application Status', description: 'Inspect sanitized partner-safe status timeline', riskLevel: 'LOW' },
+    { code: 'partner.offers.view', category: 'PARTNER_ECOSYSTEM', name: 'View Loan Offer & KFS', description: 'Inspect approved offer terms and statutory Key Fact Statement', riskLevel: 'LOW' },
+    { code: 'partner.offers.accept', category: 'PARTNER_ECOSYSTEM', name: 'Accept Loan Offer', description: 'Record partner-assisted borrower offer acceptance with KFS acknowledgment', riskLevel: 'MEDIUM' },
+    { code: 'partner.customers.view', category: 'PARTNER_ECOSYSTEM', name: 'View Partner Customers', description: 'Inspect masked applicant identity and contact data', riskLevel: 'LOW' },
+    { code: 'partner.webhooks.view', category: 'PARTNER_ECOSYSTEM', name: 'View Webhook Deliveries', description: 'Inspect webhook subscriptions and delivery attempt logs', riskLevel: 'LOW' },
+    { code: 'partner.webhooks.replay', category: 'PARTNER_ECOSYSTEM', name: 'Replay Webhook Event', description: 'Trigger replay of authorized webhook delivery', riskLevel: 'MEDIUM' },
+    { code: 'partner.api_credentials.view', category: 'PARTNER_ECOSYSTEM', name: 'View API Credentials', description: 'Inspect API client IDs, key prefixes, and scopes', riskLevel: 'LOW' },
+    { code: 'partner.api_credentials.create', category: 'PARTNER_ECOSYSTEM', name: 'Generate API Credential', description: 'Issue new scoped partner API keys and secrets', riskLevel: 'HIGH' },
+    { code: 'partner.api_credentials.rotate', category: 'PARTNER_ECOSYSTEM', name: 'Rotate API Secret', description: 'Rotate HMAC client secret for partner API credential', riskLevel: 'HIGH' },
+    { code: 'partner.api_credentials.revoke', category: 'PARTNER_ECOSYSTEM', name: 'Revoke API Credential', description: 'Deactivate and revoke active partner API credential', riskLevel: 'HIGH' },
+    { code: 'partner.commissions.view', category: 'PARTNER_ECOSYSTEM', name: 'View Commission Statements', description: 'Inspect partner sourcing fees, disbursement commissions, and ledger balances', riskLevel: 'LOW' },
+    { code: 'partner.settlements.view', category: 'PARTNER_ECOSYSTEM', name: 'View Settlements', description: 'Inspect partner settlement summaries and payout batch references', riskLevel: 'LOW' },
+    { code: 'partner.support.create', category: 'PARTNER_ECOSYSTEM', name: 'Create Partner Support Ticket', description: 'Open support case for partner operational or technical inquiries', riskLevel: 'LOW' },
+    { code: 'partner.support.view', category: 'PARTNER_ECOSYSTEM', name: 'View Partner Support Tickets', description: 'Track status and replies on partner support tickets', riskLevel: 'LOW' },
   ];
 
   // Banking Segregation of Duties (SoD) Rules
@@ -314,6 +545,30 @@ export class RolePermissionService {
       name: 'Accounts Payable Creator vs Approver Separation',
       description: 'A user drafting a partner or vendor payable cannot authorize that payable payout.',
       conflictingPermissions: ['PAYABLES_CREATE', 'PAYABLES_APPROVE'],
+      severity: 'CRITICAL_BLOCK',
+    },
+    {
+      id: 'sod-17',
+      code: 'SOD_PARTNER_CREDIT_UNDERWRITING',
+      name: 'Partner vs Internal Credit Sanction Separation',
+      description: 'Partner users originating applications cannot possess credit underwriting or sanctioning authority.',
+      conflictingPermissions: ['partner.applications.create', 'APPLICATIONS_APPROVE'],
+      severity: 'CRITICAL_BLOCK',
+    },
+    {
+      id: 'sod-18',
+      code: 'SOD_PARTNER_FINANCE_DISBURSER',
+      name: 'Partner vs Fund Disbursement Execution Separation',
+      description: 'Partner users cannot execute bank fund transfers or authorize disbursement batches.',
+      conflictingPermissions: ['partner.dashboard.view', 'DISBURSEMENTS_EXECUTE_TRANSFER'],
+      severity: 'CRITICAL_BLOCK',
+    },
+    {
+      id: 'sod-19',
+      code: 'SOD_PARTNER_GENERAL_LEDGER',
+      name: 'Partner vs General Ledger Posting Separation',
+      description: 'Partner users cannot post manual or automated accounting journals to the General Ledger.',
+      conflictingPermissions: ['partner.commissions.view', 'JOURNAL_POST'],
       severity: 'CRITICAL_BLOCK',
     },
   ];
@@ -717,6 +972,123 @@ export class RolePermissionService {
           ],
           scope: 'GLOBAL',
         },
+        {
+          code: 'PARTNER_ADMIN',
+          name: 'Partner / LSP Administrator',
+          description: 'Manage partner users, API credentials, webhook endpoints, and view partner dashboard',
+          permissions: [
+            'partner.dashboard.view',
+            'partner.users.view',
+            'partner.users.manage',
+            'partner.applications.create',
+            'partner.applications.view',
+            'partner.applications.update',
+            'partner.applications.submit',
+            'partner.applications.documents.view',
+            'partner.applications.documents.upload',
+            'partner.application.status.view',
+            'partner.offers.view',
+            'partner.offers.accept',
+            'partner.customers.view',
+            'partner.webhooks.view',
+            'partner.webhooks.replay',
+            'partner.api_credentials.view',
+            'partner.api_credentials.create',
+            'partner.api_credentials.rotate',
+            'partner.api_credentials.revoke',
+            'partner.commissions.view',
+            'partner.settlements.view',
+            'partner.support.create',
+            'partner.support.view',
+          ],
+          scope: 'PARTNER',
+        },
+        {
+          code: 'PARTNER_OPERATIONS',
+          name: 'Partner Operations / Lead Desk',
+          description: 'Originate, submit, and track partner-sourced applications and upload documents',
+          permissions: [
+            'partner.dashboard.view',
+            'partner.applications.create',
+            'partner.applications.view',
+            'partner.applications.update',
+            'partner.applications.submit',
+            'partner.applications.documents.view',
+            'partner.applications.documents.upload',
+            'partner.application.status.view',
+            'partner.offers.view',
+            'partner.offers.accept',
+            'partner.customers.view',
+            'partner.support.create',
+            'partner.support.view',
+          ],
+          scope: 'PARTNER',
+        },
+        {
+          code: 'PARTNER_AGENT',
+          name: 'Partner Sourcing Agent / DSA',
+          description: 'Field sourcing agent originating and submitting loan applications on partner channels',
+          permissions: [
+            'partner.dashboard.view',
+            'partner.applications.create',
+            'partner.applications.view',
+            'partner.applications.update',
+            'partner.applications.submit',
+            'partner.applications.documents.view',
+            'partner.applications.documents.upload',
+            'partner.application.status.view',
+            'partner.offers.view',
+            'partner.offers.accept',
+            'partner.customers.view',
+            'partner.support.create',
+            'partner.support.view',
+          ],
+          scope: 'PARTNER',
+        },
+        {
+          code: 'PARTNER_FINANCE',
+          name: 'Partner Finance Officer',
+          description: 'View partner commission statements, payout summaries, and settlement reconciliation',
+          permissions: [
+            'partner.dashboard.view',
+            'partner.commissions.view',
+            'partner.settlements.view',
+            'partner.support.create',
+            'partner.support.view',
+          ],
+          scope: 'PARTNER',
+        },
+        {
+          code: 'PARTNER_SUPPORT',
+          name: 'Partner Support Specialist',
+          description: 'Track application and customer servicing status and raise partner support inquiries',
+          permissions: [
+            'partner.dashboard.view',
+            'partner.applications.view',
+            'partner.application.status.view',
+            'partner.customers.view',
+            'partner.support.create',
+            'partner.support.view',
+          ],
+          scope: 'PARTNER',
+        },
+        {
+          code: 'PARTNER_API_CLIENT',
+          name: 'Partner Machine-to-Machine API Client',
+          description: 'Machine-to-machine integration client governed strictly by assigned API scopes',
+          permissions: [
+            'partner.applications.create',
+            'partner.applications.view',
+            'partner.applications.update',
+            'partner.applications.submit',
+            'partner.offers.view',
+            'partner.offers.accept',
+            'partner.customers.view',
+            'partner.webhooks.view',
+            'partner.webhooks.replay',
+          ],
+          scope: 'PARTNER',
+        },
       ];
 
     for (const tpl of systemRoleTemplates) {
@@ -967,6 +1339,21 @@ export class RolePermissionService {
     return Array.from(effectiveSet);
   }
 
+  private checkFinancialLimits(roles: string[], tenantId: string, requiredSanctionAmount?: number): boolean {
+    if (requiredSanctionAmount === undefined) {
+      return true;
+    }
+    let maxSanctionLimit = 0;
+    for (const roleCode of roles) {
+      const key = `${tenantId}:${roleCode.toUpperCase()}`;
+      const role = this.roles.get(key) || this.roles.get(`tenant-adyapan-default:${roleCode.toUpperCase()}`);
+      if (role?.sanctionLimitAmount && role.sanctionLimitAmount > maxSanctionLimit) {
+        maxSanctionLimit = role.sanctionLimitAmount;
+      }
+    }
+    return maxSanctionLimit >= requiredSanctionAmount;
+  }
+
   public hasPermission(
     userOrRoles: AuthUser | string[],
     requiredPermission: PermissionCode,
@@ -981,27 +1368,26 @@ export class RolePermissionService {
 
     const effectivePermissions = this.getEffectivePermissions(roles, tenantId);
 
-    if (!effectivePermissions.includes(requiredPermission)) {
-      return false;
+    // 1. Direct match
+    if (effectivePermissions.includes(requiredPermission)) {
+      return this.checkFinancialLimits(roles, tenantId, options?.requiredSanctionAmount);
     }
 
-    // Check financial sanction limit if required
-    if (options?.requiredSanctionAmount !== undefined) {
-      let maxSanctionLimit = 0;
-      for (const roleCode of roles) {
-        const key = `${tenantId}:${roleCode.toUpperCase()}`;
-        const role = this.roles.get(key) || this.roles.get(`tenant-adyapan-default:${roleCode.toUpperCase()}`);
-        if (role?.sanctionLimitAmount && role.sanctionLimitAmount > maxSanctionLimit) {
-          maxSanctionLimit = role.sanctionLimitAmount;
-        }
-      }
+    // 2. Forward alias match (requiredPermission -> aliases)
+    const aliases = PERMISSION_ALIAS_MAP[requiredPermission] || [];
+    if (aliases.some((a) => effectivePermissions.includes(a))) {
+      return this.checkFinancialLimits(roles, tenantId, options?.requiredSanctionAmount);
+    }
 
-      if (maxSanctionLimit < options.requiredSanctionAmount) {
-        return false;
+    // 3. Reverse alias match (effectivePermissions -> aliases containing requiredPermission)
+    for (const p of effectivePermissions) {
+      const pAliases = PERMISSION_ALIAS_MAP[p] || [];
+      if (pAliases.includes(requiredPermission)) {
+        return this.checkFinancialLimits(roles, tenantId, options?.requiredSanctionAmount);
       }
     }
 
-    return true;
+    return false;
   }
 
   public validateRoleAssignment(
