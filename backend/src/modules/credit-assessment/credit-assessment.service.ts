@@ -8,6 +8,7 @@ import { calculateEmi } from '../finance/emi';
 import { configurationService } from '../configuration/configuration.service';
 import { evaluateApplicationEligibility } from '../eligibility/eligibility.service';
 import { evaluateApplicationRisk } from '../risk/risk.service';
+import { validateCustomerDocumentFulfillment } from '../documents/document-rules';
 import type {
   CreditAssessmentDashboardMetrics,
   CreditAssessmentQueueItem,
@@ -753,6 +754,7 @@ export async function forwardToUnderwriting(
     where: { id: applicationId },
     include: {
       customer: { include: { documents: true } },
+      product: true,
       eligibility: true,
       riskAssessment: true,
     },
@@ -779,50 +781,24 @@ export async function forwardToUnderwriting(
 
   // Gate 1: KYC Verification Gate
   const docs = app.customer.documents || [];
-  const verifiedDocs = docs.filter((d) => d.verified || d.status === 'VERIFIED');
   if (app.customer.kycStatus !== 'VERIFIED') {
     blockers.push('Borrower identity verification (KYC) must be VERIFIED');
   }
 
-  // Gate 2: All 5 Mandatory Documents Gate
-  const missingCategories: string[] = [];
-  const hasIdentityDoc = docs.some((d) =>
-    (['IDENTITY_PROOF', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'Aadhar_CARD'].includes(d.documentType || '')) &&
-    (d.status === 'VERIFIED' || d.verified)
+  // Gate 2: Dynamic Document Fulfillment Check
+  const verifiedDocs = docs.filter((d) => d.verified || d.status === 'VERIFIED');
+  const docFulfillment = validateCustomerDocumentFulfillment(
+    verifiedDocs,
+    app.customer.employmentType || 'SALARIED',
+    app.product?.productType || 'PERSONAL',
+    {
+      monthlyIncome: Number(app.customer.monthlyIncome || 0),
+      requestedAmount: Number(app.requestedAmount || 0),
+    }
   );
-  if (!hasIdentityDoc) missingCategories.push('Identity Proof (PAN/Aadhaar)');
 
-  const hasPhotoDoc = docs.some((d) =>
-    (['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO'].includes(d.documentType || '')) &&
-    (d.status === 'VERIFIED' || d.verified)
-  );
-  if (!hasPhotoDoc) missingCategories.push('Applicant Photo / Selfie');
-
-  const hasAddressDoc = docs.some((d) =>
-    (['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
-    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')) &&
-    (d.status === 'VERIFIED' || d.verified)
-  );
-  if (!hasAddressDoc) missingCategories.push('Address Proof');
-
-  const hasIncomeDoc = docs.some((d) =>
-    (['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
-    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')) &&
-    (d.status === 'VERIFIED' || d.verified)
-  );
-  if (!hasIncomeDoc) missingCategories.push('Income Proof (Salary Slip / ITR)');
-
-  const hasBankDoc = docs.some((d) =>
-    (['BANK_STATEMENT'].includes(d.category) ||
-    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')) &&
-    (d.status === 'VERIFIED' || d.verified)
-  );
-  if (!hasBankDoc) missingCategories.push('Bank Statement (Latest 6 Months)');
-
-  if (missingCategories.length > 0) {
-    blockers.push(`Mandatory intake documents missing or unverified: ${missingCategories.join(', ')}`);
+  if (!docFulfillment.isComplete) {
+    blockers.push(`Mandatory intake documents missing or unverified: ${docFulfillment.missingNames.join(', ')}`);
   }
 
   const unverifiedUploads = docs.filter((d) => !d.verified && d.status !== 'VERIFIED');

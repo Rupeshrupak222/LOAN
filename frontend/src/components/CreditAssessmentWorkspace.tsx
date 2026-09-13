@@ -740,12 +740,12 @@ export function CreditAssessmentWorkspace({
       <div className="bg-white dark:bg-[#1E2445] p-3 rounded-2xl border border-slate-200 dark:border-[#2B3566] shadow-xs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {[
-            { step: 1, label: 'Application', isComplete: isStep1Complete },
-            { step: 2, label: 'KYC & Documents', isComplete: isStep2Complete },
-            { step: 3, label: 'Financial Eligibility', isComplete: isStep3Complete },
-            { step: 4, label: 'Credit Risk', isComplete: isStep4Complete },
-            { step: 5, label: 'Analyst Decision', isComplete: isStep5Complete },
-            { step: 6, label: 'Underwriter Handover', isComplete: isStep6Complete },
+            { step: 1, label: '1. Application & Eligibility', isComplete: isStep1Complete },
+            { step: 2, label: '2. KYC / Identity & Docs', isComplete: isStep2Complete },
+            { step: 3, label: '3. Financial Assessment', isComplete: isStep3Complete },
+            { step: 4, label: '4. Credit / Risk', isComplete: isStep4Complete },
+            { step: 5, label: '5. Recommendation', isComplete: isStep5Complete },
+            { step: 6, label: '6. Underwriter Handoff', isComplete: isStep6Complete },
           ].map((item) => {
             const stepNum = item.step as StepNumber;
             const unlocked = isStepUnlocked(stepNum);

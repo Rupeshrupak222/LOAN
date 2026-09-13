@@ -9,6 +9,7 @@ import { evaluateApplicationEligibility } from '../eligibility/eligibility.servi
 import { evaluateApplicationRisk } from '../risk/risk.service';
 import { updateKycStatus } from '../customer/customer.service';
 import { configurationService } from '../configuration/configuration.service';
+import { validateCustomerDocumentFulfillment } from '../documents/document-rules';
 import type {
   SubmitCreditDecisionInput,
   VerifyFinancialsInput,
@@ -826,24 +827,25 @@ export async function submitCreditDecision(
     );
   }
 
-  // Prerequisite 2: Step 3 Document Verification Checklist
+  // Prerequisite 2: Step 3 Dynamic Document Verification Checklist
   const allDocs = [...(app.customer.documents || []), ...(app.documents || [])];
   const uniqueDocs = Array.from(new Map(allDocs.map((d) => [d.id, d])).values());
 
-  const mandatoryCategories = ['IDENTITY', 'ADDRESS', 'INCOME', 'BANK_STATEMENT', 'EMPLOYMENT_BUSINESS'];
-  for (const cat of mandatoryCategories) {
-    const matchingDocs = uniqueDocs.filter((d) => mapDocumentCategory(d) === cat);
-    if (matchingDocs.length === 0) {
-      throw new BadRequestError(
-        `Cannot submit credit decision: Mandatory document category '${cat}' is missing. Please verify all mandatory documents in Step 3.`
-      );
+  const docFulfillment = validateCustomerDocumentFulfillment(
+    uniqueDocs,
+    app.customer.employmentType || 'SALARIED',
+    app.product.productType || 'PERSONAL',
+    {
+      monthlyIncome: Number(app.customer.monthlyIncome || 0),
+      requestedAmount: Number(app.requestedAmount || 0),
     }
-    const hasVerified = matchingDocs.some((d) => d.status === 'VERIFIED' || d.verified);
-    if (!hasVerified) {
-      throw new BadRequestError(
-        `Cannot submit credit decision: Mandatory document category '${cat}' is not VERIFIED. Please complete Step 3 document verification.`
-      );
-    }
+  );
+
+  if (!docFulfillment.isComplete) {
+    const missingNames = docFulfillment.missingNames.join(', ');
+    throw new BadRequestError(
+      `Cannot submit credit decision: Missing mandatory document(s) for ${app.customer.employmentType || 'borrower'}: ${missingNames}. Please verify all mandatory documents in Step 3.`
+    );
   }
 
   // Prerequisite 3: Step 4 Financial Eligibility Check

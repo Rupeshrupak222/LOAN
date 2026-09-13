@@ -46,12 +46,15 @@ import {
   Sparkles,
   CreditCard,
   Send,
+  Inbox,
+  Clock,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { useBranding } from '@/lib/branding';
 import { cn } from '@/lib/utils';
-import { ROLE_CONFIG, RoleName } from '@/lib/roles';
+import { ROLE_CONFIG, NAV_ITEMS, RoleName } from '@/lib/roles';
 import { Spinner } from './ui';
 import { NotificationBell } from './NotificationBell';
 import { CopilotDrawer } from './CopilotDrawer';
@@ -61,13 +64,17 @@ import { useNavigation, canAccessRoute, WorkspaceId, WORKSPACES } from '@/lib/na
 
 const NAV_ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
-  customers: Users,
+  'credit-queue': Inbox,
   applications: FileText,
-  'returned-applications': RotateCcw,
+  'credit-assessment': Calculator,
   documents: FileCheck,
+  verifications: UserCheck,
+  tasks: Clock,
+  support: Headphones,
+  customers: Users,
+  'returned-applications': RotateCcw,
   products: Building2,
   'loan-products': Building2,
-  'credit-assessment': Calculator,
   'branch-review': FileCheck,
   underwriting: FileCheck,
   'approval-queue': FileCheck,
@@ -287,7 +294,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Workspace Switcher Pill (if user has access to multiple workspaces) */}
-        {authorizedWorkspaces.length > 1 && primaryRole !== 'CUSTOMER' && (
+        {authorizedWorkspaces.length > 1 && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && (
           <div className="relative px-3 pt-3 flex-none">
             <button
               type="button"
@@ -356,50 +363,87 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        {/* Grouped Nav List */}
+        {/* Nav List */}
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-[#1E2445]">
-          {GROUP_ORDER.map((group) => {
-            const items = groupedNav[group];
-            if (!items || !items.length) return null;
+          {primaryRole === 'CREDIT_ANALYST' ? (
+            <div className="space-y-1">
+              <div className="space-y-0.5 pt-1">
+                {roleCfg.nav.map((navKey) => {
+                  const navItem = NAV_ITEMS[navKey];
+                  if (!navItem) return null;
+                  const active =
+                    pathname === navItem.href ||
+                    (navItem.href !== '/dashboard' && pathname.startsWith(navItem.href));
+                  const Icon = NAV_ICONS[navKey] || LayoutDashboard;
 
-            return (
-              <div key={group} className="space-y-1">
-                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {group.replace('_', ' ')}
-                </p>
-                <div className="space-y-0.5 pt-1">
-                  {items.map((item) => {
-                    const active =
-                      pathname === item.href ||
-                      (item.href !== '/dashboard' && pathname.startsWith(item.href));
-                    const Icon = NAV_ICONS[item.key] || LayoutDashboard;
-
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setOpen(false)}
+                  return (
+                    <Link
+                      key={navItem.href}
+                      href={navItem.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors',
+                        active
+                          ? 'bg-[#2563EB] text-white font-bold shadow-sm shadow-[#2563EB]/30'
+                          : 'text-slate-300 font-medium hover:bg-white/6 hover:text-white'
+                      )}
+                    >
+                      <Icon
                         className={cn(
-                          'group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors',
-                          active
-                            ? 'bg-[#2563EB] text-white font-bold shadow-sm shadow-[#2563EB]/30'
-                            : 'text-slate-300 font-medium hover:bg-white/6 hover:text-white'
+                          'h-4 w-4 flex-none transition-colors stroke-[2]',
+                          active ? 'text-white' : 'text-slate-400 group-hover:text-white'
                         )}
-                      >
-                        <Icon
-                          className={cn(
-                            'h-4 w-4 flex-none transition-colors stroke-[2]',
-                            active ? 'text-white' : 'text-slate-400 group-hover:text-white'
-                          )}
-                        />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                      />
+                      <span className="truncate">{navItem.label}</span>
+                    </Link>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ) : (
+            GROUP_ORDER.map((group) => {
+              const items = groupedNav[group];
+              if (!items || !items.length) return null;
+
+              return (
+                <div key={group} className="space-y-1">
+                  <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {group.replace('_', ' ')}
+                  </p>
+                  <div className="space-y-0.5 pt-1">
+                    {items.map((item) => {
+                      const active =
+                        pathname === item.href ||
+                        (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                      const Icon = NAV_ICONS[item.key] || LayoutDashboard;
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setOpen(false)}
+                          className={cn(
+                            'group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors',
+                            active
+                              ? 'bg-[#2563EB] text-white font-bold shadow-sm shadow-[#2563EB]/30'
+                              : 'text-slate-300 font-medium hover:bg-white/6 hover:text-white'
+                          )}
+                        >
+                          <Icon
+                            className={cn(
+                              'h-4 w-4 flex-none transition-colors stroke-[2]',
+                              active ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                            )}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </nav>
 
         {/* User Card at bottom of sidebar */}

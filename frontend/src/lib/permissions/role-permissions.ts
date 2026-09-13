@@ -116,17 +116,12 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
   ],
 
   CREDIT_ANALYST: [
-    // Credit Assessment & Underwriting Recommendation
+    // Credit Assessment & Verification Owner
     'customer.view', 'customer.kyc',
     'application.view', 'application.review', 'application.return',
     'credit.view', 'credit.assess', 'credit.recommend', 'credit.bank_intelligence', 'credit.fraud_score',
-    'approval.view', 'approval.review', 'approval.queue.view', 'approval.send_back',
-    'authority.view',
-    'offer.view', 'offer.simulate', 'offer.pricing.view',
-    'credit_limit.view', 'credit_limit.evaluate', 'credit_facility.view', 'credit_limit.policy.view',
-    'risk.view', 'risk.view_signals', 'risk.evaluate', 'risk.fraud_intel', 'risk.early_warnings',
-    'fraud.view_cases',
-    'product.view', 'product.simulate', 'workflow.view',
+    'credit_limit.view', 'credit_limit.evaluate', 'credit_limit.policy.view',
+    'product.view', 'workflow.view',
     'decision.view', 'decision.evaluate', 'decision.simulate', 'decision.policy.view', 'decision.rules.view',
     'reports.view',
   ],
