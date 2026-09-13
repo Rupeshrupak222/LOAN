@@ -38,6 +38,7 @@ import {
   RotateCcw,
   GitBranch,
   ChevronDown,
+  ClipboardCheck,
   Headphones,
   LifeBuoy,
   FileSpreadsheet,
@@ -76,11 +77,13 @@ const NAV_ICONS: Record<string, any> = {
   products: Building2,
   'loan-products': Building2,
   'branch-review': FileCheck,
+  'underwriting-queue': ClipboardCheck,
   underwriting: FileCheck,
   'approval-queue': FileCheck,
   'approval-tasks': FileCheck,
   loans: DollarSign,
   disbursements: Wallet,
+  'finance-queue': Coins,
   partners: Handshake,
   'partner-portal': Handshake,
   payments: Receipt,
@@ -294,7 +297,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Workspace Switcher Pill (if user has access to multiple workspaces) */}
-        {authorizedWorkspaces.length > 1 && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && (
+        {authorizedWorkspaces.length > 1 && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && (
           <div className="relative px-3 pt-3 flex-none">
             <button
               type="button"
@@ -365,7 +368,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Nav List */}
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-[#1E2445]">
-          {primaryRole === 'CREDIT_ANALYST' ? (
+          {primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' ? (
             <div className="space-y-1">
               <div className="space-y-0.5 pt-1">
                 {roleCfg.nav.map((navKey) => {

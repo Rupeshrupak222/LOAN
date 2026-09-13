@@ -75,10 +75,12 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 Input.displayName = 'Input';
 
 export function Card({
+  id,
   className,
   children,
   noPadding = false,
 }: {
+  id?: string;
   className?: string;
   children: ReactNode;
   noPadding?: boolean;
@@ -87,6 +89,7 @@ export function Card({
 
   return (
     <div
+      id={id}
       className={cn(
         'rounded-2xl border transition-shadow',
         isDark

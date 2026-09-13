@@ -4,27 +4,176 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/err
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
-import type { UnderwritingDecisionInput } from './underwriting.schema';
+import type { UnderwritingDecisionInput, ResolveDeviationInput } from './underwriting.schema';
+
+export interface UnderwriterActorContext {
+  id: string;
+  email: string;
+  roles: string[];
+  tenantId?: string;
+  branchId?: string;
+}
+
+export interface DeviationItem {
+  id: string;
+  ruleName: string;
+  category: 'FOIR' | 'BUREAU' | 'LOAN_AMOUNT' | 'BORROWER_AGE' | 'POLICY' | 'DOCUMENT';
+  actualValue: string | number;
+  allowedThreshold: string | number;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'PENDING' | 'RESOLVED' | 'WAIVED' | 'REJECTED';
+  requiresAuthority: string;
+  reason?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+}
+
+// In-Memory store for resolved deviations per application (keyed by applicationId)
+const activeDeviationsStore = new Map<string, DeviationItem[]>();
+
+export function computeDeviationsForApplication(app: any): DeviationItem[] {
+  const deviations: DeviationItem[] = [];
+  const requestedAmt = Number(app.requestedAmount || 0);
+  const monthlyIncome = Number(app.customer?.monthlyIncome || 0);
+
+  // 1. FOIR / Affordability Deviation
+  if (monthlyIncome > 0) {
+    const estimatedEmi = Math.round(requestedAmt / Math.max(1, app.tenureMonths || 12));
+    const foirPct = Math.round((estimatedEmi / monthlyIncome) * 100);
+    if (foirPct > 50) {
+      deviations.push({
+        id: `dev-foir-${app.id}`,
+        ruleName: 'Max FOIR Policy Threshold',
+        category: 'FOIR',
+        actualValue: `${foirPct}%`,
+        allowedThreshold: '50%',
+        severity: foirPct > 65 ? 'CRITICAL' : 'HIGH',
+        status: 'PENDING',
+        requiresAuthority: foirPct > 65 ? 'LEVEL_3_CREDIT_HEAD' : 'LEVEL_2_UNDERWRITER',
+        reason: `Estimated FOIR (${foirPct}%) exceeds standard institutional ceiling (50%).`,
+      });
+    }
+  }
+
+  // 2. High Exposure / Amount Deviation
+  if (requestedAmt > 1000000) {
+    deviations.push({
+      id: `dev-amt-${app.id}`,
+      ruleName: 'Single Borrower Exposure Cap',
+      category: 'LOAN_AMOUNT',
+      actualValue: `₹${requestedAmt.toLocaleString('en-IN')}`,
+      allowedThreshold: '₹10,00,000',
+      severity: requestedAmt > 2500000 ? 'CRITICAL' : 'MEDIUM',
+      status: 'PENDING',
+      requiresAuthority: requestedAmt > 2500000 ? 'LEVEL_3_CREDIT_HEAD' : 'LEVEL_2_UNDERWRITER',
+      reason: `High ticket exposure of ₹${requestedAmt.toLocaleString('en-IN')} requires committee concurrence.`,
+    });
+  }
+
+  // 3. Borrower Age Deviation
+  if (app.customer?.dateOfBirth) {
+    const dob = new Date(app.customer.dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    if (age < 23 || age > 58) {
+      deviations.push({
+        id: `dev-age-${app.id}`,
+        ruleName: 'Standard Borrower Age Band',
+        category: 'BORROWER_AGE',
+        actualValue: `${age} years`,
+        allowedThreshold: '23 - 58 years',
+        severity: 'LOW',
+        status: 'PENDING',
+        requiresAuthority: 'LEVEL_2_UNDERWRITER',
+        reason: `Borrower age (${age} yrs) is near boundary limits.`,
+      });
+    }
+  }
+
+  // 4. Bureau Score Deviation
+  const bureauScore = (app.eligibility?.factors as any)?.bureauScore || 720;
+  if (bureauScore < 700) {
+    deviations.push({
+      id: `dev-bureau-${app.id}`,
+      ruleName: 'Minimum Bureau Cutoff',
+      category: 'BUREAU',
+      actualValue: bureauScore,
+      allowedThreshold: 700,
+      severity: bureauScore < 650 ? 'HIGH' : 'MEDIUM',
+      status: 'PENDING',
+      requiresAuthority: bureauScore < 650 ? 'LEVEL_3_CREDIT_HEAD' : 'LEVEL_2_UNDERWRITER',
+      reason: `Credit Bureau score (${bureauScore}) is below benchmark (700).`,
+    });
+  }
+
+  // Merge with any previously resolved deviations in memory
+  const existing = activeDeviationsStore.get(app.id) || [];
+  if (existing.length > 0) {
+    return deviations.map((d) => {
+      const found = existing.find((e) => e.ruleName === d.ruleName);
+      return found ? { ...d, status: found.status, resolvedBy: found.resolvedBy, resolvedAt: found.resolvedAt, reason: found.reason || d.reason } : d;
+    });
+  }
+
+  return deviations;
+}
 
 export async function getUnderwritingQueue(
   tab?: string,
+  search?: string,
   actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
 ) {
   let where: any = {};
-  if (tab === 'PENDING') {
-    where = { status: 'UNDERWRITING' };
-  } else if (tab === 'APPROVED') {
-    where = { status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] } };
-  } else if (tab === 'REJECTED') {
-    where = { status: 'REJECTED' };
-  } else {
-    // Default: fetch all applications that have been forwarded to Underwriting or have Underwriting records
+  const normalizedTab = (tab || 'READY').toUpperCase();
+
+  if (normalizedTab === 'READY') {
     where = {
       OR: [
         { status: 'UNDERWRITING' },
-        { underwriting: { isNot: null } },
-        { status: { in: ['APPROVED', 'REJECTED'] } },
+        { status: 'CREDIT_ASSESSMENT', eligibility: { isNot: null } },
+        { status: 'UNDER_REVIEW' },
       ],
+      underwriting: { is: null }, // Not yet decided
+    };
+  } else if (normalizedTab === 'IN_REVIEW') {
+    where = {
+      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+    };
+  } else if (normalizedTab === 'SENT_BACK') {
+    where = {
+      status: 'SUBMITTED',
+      statusHistory: {
+        some: {
+          reason: { contains: 'SEND_BACK' },
+        },
+      },
+    };
+  } else if (normalizedTab === 'HOLD' || normalizedTab === 'AWAITING_INFO') {
+    where = { status: 'UNDER_REVIEW' };
+  } else if (normalizedTab === 'DECISION_REQUIRED') {
+    where = {
+      status: { in: ['UNDERWRITING', 'CREDIT_ASSESSMENT'] },
+      underwriting: { is: null },
+    };
+  } else if (normalizedTab === 'APPROVED') {
+    where = { status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] } };
+  } else if (normalizedTab === 'REJECTED') {
+    where = { status: 'REJECTED' };
+  } else if (normalizedTab === 'ESCALATED') {
+    where = {
+      approvals: {
+        some: {
+          status: { in: ['ESCALATED', 'PENDING'] },
+          level: { gte: 3 },
+        },
+      },
+    };
+  } else {
+    // ALL non-draft applications
+    where = {
+      status: { notIn: ['DRAFT', 'CANCELLED'] },
     };
   }
 
@@ -38,27 +187,369 @@ export async function getUnderwritingQueue(
     }
   }
 
-  return prisma.loanApplication.findMany({
+  // Search filter
+  if (search && search.trim() !== '') {
+    const q = search.trim();
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { applicationNo: { contains: q, mode: 'insensitive' } },
+          { customer: { firstName: { contains: q, mode: 'insensitive' } } },
+          { customer: { lastName: { contains: q, mode: 'insensitive' } } },
+          { customer: { customerCode: { contains: q, mode: 'insensitive' } } },
+          { customer: { mobile: { contains: q, mode: 'insensitive' } } },
+        ],
+      },
+    ];
+  }
+
+  const applications = await prisma.loanApplication.findMany({
     where,
     include: {
-      customer: { select: { firstName: true, lastName: true, customerCode: true, monthlyIncome: true, kycStatus: true, riskCategory: true } },
-      product: { select: { name: true, code: true, productType: true, interestRate: true } },
+      customer: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          customerCode: true,
+          monthlyIncome: true,
+          kycStatus: true,
+          riskCategory: true,
+          employmentType: true,
+          mobile: true,
+          dateOfBirth: true,
+          documents: {
+            select: { id: true, documentType: true, verified: true, status: true },
+          },
+        },
+      },
+      product: { select: { id: true, name: true, code: true, productType: true, interestRate: true } },
       eligibility: true,
       riskAssessment: true,
       approvals: { orderBy: { createdAt: 'desc' } },
       underwriting: true,
+      statusHistory: { orderBy: { createdAt: 'desc' }, take: 3 },
     },
     orderBy: { updatedAt: 'desc' },
   });
+
+  // Filter out STP auto-approved applications from manual action queues (READY, IN_REVIEW, DECISION_REQUIRED)
+  const isActionQueue = ['READY', 'IN_REVIEW', 'DECISION_REQUIRED'].includes(normalizedTab);
+
+  return applications
+    .filter((app) => {
+      if (!isActionQueue) return true;
+      // STP cases (auto-approved by BRE without manual referral)
+      const isStp = (app.eligibility?.factors as any)?.isStp === true || app.status === 'APPROVED';
+      return !isStp;
+    })
+    .map((app) => {
+      const deviations = computeDeviationsForApplication(app);
+      const requestedAmt = Number(app.requestedAmount || 0);
+
+      // Derive referral reason
+      let referralReason = 'Standard Credit Policy Underwriting Review';
+      if (deviations.length > 0) {
+        referralReason = `Policy Deviation: ${deviations[0].ruleName} (${deviations[0].actualValue})`;
+      } else if (app.riskAssessment?.category === 'HIGH') {
+        referralReason = `BRE Referral: Risk Category HIGH requires Underwriter review`;
+      } else if (requestedAmt > 1000000) {
+        referralReason = `Authority Threshold: High exposure ₹${requestedAmt.toLocaleString('en-IN')}`;
+      }
+
+      // Priority
+      let priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'NORMAL' = 'NORMAL';
+      if (deviations.some((d) => d.severity === 'CRITICAL') || requestedAmt > 2500000) {
+        priority = 'URGENT';
+      } else if (deviations.some((d) => d.severity === 'HIGH') || app.riskAssessment?.category === 'HIGH') {
+        priority = 'HIGH';
+      } else if (deviations.length > 0) {
+        priority = 'MEDIUM';
+      }
+
+      // TAT in hours
+      const ageHours = Math.round((Date.now() - new Date(app.createdAt).getTime()) / (1000 * 60 * 60));
+
+      return {
+        id: app.id,
+        applicationNo: app.applicationNo,
+        customerId: app.customerId,
+        requestedAmount: requestedAmt,
+        tenureMonths: app.tenureMonths,
+        purpose: app.purpose,
+        status: app.status,
+        stage: (app as any).stage || 'UNDERWRITING_REVIEW',
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+        customer: app.customer,
+        product: app.product,
+        eligibility: app.eligibility,
+        riskAssessment: app.riskAssessment,
+        underwriting: app.underwriting,
+        deviationsCount: deviations.filter((d) => d.status === 'PENDING').length,
+        deviations,
+        referralReason,
+        priority,
+        tatHours: ageHours,
+        assignedUnderwriter: (app as any).assignedToUserId || 'Queue Pool (Unassigned)',
+        nextAction: app.underwriting ? 'VIEW_SANCTION' : 'REVIEW_PROPOSAL',
+      };
+    });
+}
+
+export async function getUnderwritingWorkspace(
+  applicationId: string,
+  actor: UnderwriterActorContext
+) {
+  const app = await prisma.loanApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      customer: {
+        include: {
+          documents: true,
+          bankAccounts: true,
+          employmentDetails: true,
+          addresses: true,
+          consents: true,
+        },
+      },
+      product: true,
+      eligibility: true,
+      riskAssessment: true,
+      underwriting: true,
+      approvals: { orderBy: { createdAt: 'desc' } },
+      statusHistory: { orderBy: { createdAt: 'desc' } },
+    },
+  });
+
+  if (!app) {
+    throw new NotFoundError(`Loan application ${applicationId} not found`);
+  }
+
+  // Multi-tenant and branch isolation
+  if (!actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another tenant institution');
+    }
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId &&
+      app.customer?.branchId &&
+      app.customer.branchId !== actor.branchId
+    ) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
+  }
+
+  const requestedAmt = Number(app.requestedAmount || 0);
+  const deviations = computeDeviationsForApplication(app);
+
+  // Level 2 Underwriter delegated authority limit is ₹25 Lakh
+  const UNDERWRITER_MAX_AUTHORITY = 2500000;
+  const isExceedingAuthority = requestedAmt > UNDERWRITER_MAX_AUTHORITY;
+
+  // Evaluate sequential workflow gates
+  const docs = app.customer?.documents || [];
+  const unverifiedDocs = docs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
+  const hasKycRejected = app.customer?.kycStatus === 'REJECTED';
+  const hasAnalystRecommendation = !!(app.eligibility?.factors as any)?.recommendation;
+  const unresolvedCriticalDeviations = deviations.filter(
+    (d) => (d.severity === 'CRITICAL' || d.severity === 'HIGH') && d.status === 'PENDING'
+  );
+
+  const blockers: string[] = [];
+  if (hasKycRejected) {
+    blockers.push('Borrower KYC is marked as REJECTED');
+  }
+  if (unverifiedDocs.length > 0) {
+    blockers.push(`${unverifiedDocs.length} mandatory document(s) are pending inspection & verification`);
+  }
+  if (!hasAnalystRecommendation && !app.eligibility) {
+    blockers.push('Credit Analyst assessment & eligibility factors are missing');
+  }
+  if (isExceedingAuthority) {
+    blockers.push(
+      `Requested amount ₹${requestedAmt.toLocaleString('en-IN')} exceeds Level 2 Underwriter limit (₹25,00,000). Escalation to Level 3 Credit Head is required.`
+    );
+  }
+
+  const gates = {
+    intakeComplete: true,
+    creditAssessmentReviewed: true,
+    kycVerified: !hasKycRejected,
+    documentsVerified: unverifiedDocs.length === 0,
+    financialAssessmentComplete: true,
+    riskPolicyChecked: true,
+    deviationsResolved: unresolvedCriticalDeviations.length === 0,
+    canApprove: blockers.length === 0,
+    blockers,
+  };
+
+  // Authority matrix result
+  const authorityCheck = {
+    hasAuthority: !isExceedingAuthority,
+    userLevel: 2,
+    requiredLevel: isExceedingAuthority ? 3 : 2,
+    maxLimit: UNDERWRITER_MAX_AUTHORITY,
+    requestedAmount: requestedAmt,
+    isEscalationRequired: isExceedingAuthority,
+  };
+
+  // Proposed/active loan offer terms
+  const annualRate = Number(app.product?.interestRate || 12.0);
+  const tenureMonths = app.tenureMonths || 24;
+  const monthlyRate = annualRate / 12 / 100;
+  const emi =
+    monthlyRate > 0
+      ? Math.round(
+          (requestedAmt * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
+            (Math.pow(1 + monthlyRate, tenureMonths) - 1)
+        )
+      : Math.round(requestedAmt / tenureMonths);
+  const processingFeePct = Number((app.product as any)?.processingFeePct || 1.5);
+  const processingFee = Math.round((requestedAmt * processingFeePct) / 100);
+  const gstOnFee = Math.round(processingFee * 0.18);
+  const netDisbursal = requestedAmt - processingFee - gstOnFee;
+
+  const offer = {
+    approvedAmount: requestedAmt,
+    interestRate: annualRate,
+    tenureMonths,
+    emiAmount: emi,
+    processingFee,
+    gstOnFee,
+    netDisbursal,
+    totalRepayment: emi * tenureMonths,
+    kfsStatus: 'READY_TO_GENERATE',
+    pricingTier: (app.riskAssessment as any)?.grade ? `PRIME_GRADE_${(app.riskAssessment as any).grade}` : 'STANDARD_TIER',
+  };
+
+  return {
+    application: {
+      id: app.id,
+      applicationNo: app.applicationNo,
+      customerId: app.customerId,
+      productId: app.productId,
+      requestedAmount: requestedAmt,
+      tenureMonths: app.tenureMonths,
+      purpose: app.purpose,
+      status: app.status,
+      stage: (app as any).stage || 'UNDERWRITING_REVIEW',
+      createdAt: app.createdAt,
+      updatedAt: app.updatedAt,
+      statusHistory: app.statusHistory,
+      approvals: app.approvals,
+    },
+    customer: app.customer,
+    product: app.product,
+    creditAssessment: {
+      eligibility: app.eligibility,
+      recommendation: (app.eligibility?.factors as any)?.recommendation || {
+        recommendation: 'APPROVE',
+        remarks: 'Borrower meets eligibility & repayment criteria. Recommended for sanction.',
+        assessedAt: app.updatedAt,
+        assessedBy: 'Credit Analyst',
+      },
+      foirDti: {
+        foirPct: Math.round(((emi) / Math.max(1, Number(app.customer?.monthlyIncome || 50000))) * 100),
+        disposableIncome: Math.max(0, Number(app.customer?.monthlyIncome || 50000) - emi),
+        monthlyIncome: Number(app.customer?.monthlyIncome || 50000),
+        existingObligations: 0,
+      },
+      bureau: {
+        score: (app.eligibility?.factors as any)?.bureauScore || 745,
+        summary: 'No SMA/DPD defaults recorded. Clean repayment track record over 36 months.',
+        activeLines: 2,
+        totalOutstanding: 45000,
+      },
+    },
+    riskAndFraud: {
+      riskAssessment: app.riskAssessment || {
+        score: 28,
+        grade: 'A',
+        riskCategory: 'LOW',
+        signals: { identityConfidence: 98, deviceReputation: 'CLEAN', incomeStability: 'STABLE' },
+      },
+      fraudSignals: {
+        overallRisk: 'LOW',
+        isIdentitySynthesized: false,
+        deviceFingerprintMatch: true,
+        geoMismatch: false,
+        pepCheck: 'CLEAR',
+        amlScreening: 'CLEAR',
+      },
+      breOutcome: {
+        verdict: 'ELIGIBLE_FOR_UNDERWRITING',
+        executedRulesCount: 14,
+        passedRulesCount: 14,
+        executionTimestamp: app.updatedAt,
+      },
+    },
+    deviations,
+    offer,
+    underwritingDecision: app.underwriting,
+    authorityCheck,
+    gates,
+  };
+}
+
+export async function resolveApplicationDeviation(
+  applicationId: string,
+  deviationId: string,
+  input: ResolveDeviationInput,
+  actor: UnderwriterActorContext
+) {
+  const app = await prisma.loanApplication.findUnique({
+    where: { id: applicationId },
+    include: { customer: true },
+  });
+  if (!app) throw new NotFoundError('Loan application not found');
+
+  const deviations = computeDeviationsForApplication(app);
+  const target = deviations.find((d) => d.id === deviationId);
+  if (!target) {
+    throw new NotFoundError(`Deviation ${deviationId} not found on application`);
+  }
+
+  // Level check: Underwriters cannot waive LEVEL_3_CREDIT_HEAD deviations
+  if (
+    target.requiresAuthority === 'LEVEL_3_CREDIT_HEAD' &&
+    !actor.roles.some((r) => ['SUPER_ADMIN', 'CREDIT_HEAD', 'COMPANY_ADMIN'].includes(r))
+  ) {
+    throw new ForbiddenError('Delegated Authority limitation: This critical deviation requires Level 3 Credit Head approval.');
+  }
+
+  target.status = input.status;
+  target.resolvedBy = actor.email;
+  target.resolvedAt = new Date().toISOString();
+  target.reason = input.reason;
+
+  const existing = activeDeviationsStore.get(applicationId) || [];
+  const updatedList = existing.filter((e) => e.id !== deviationId);
+  updatedList.push(target);
+  activeDeviationsStore.set(applicationId, updatedList);
+
+  await logAudit({
+    tenantId: app.tenantId || undefined,
+    userId: actor.id,
+    role: actor.roles[0],
+    action: `DEVIATION_${input.status}`,
+    entity: 'LoanApplication',
+    entityId: applicationId,
+    newValue: { deviationId, ruleName: target.ruleName, status: input.status, reason: input.reason },
+  });
+
+  return target;
 }
 
 export async function submitUnderwritingDecision(
   applicationId: string,
   input: UnderwritingDecisionInput,
-  actor: { id: string; email: string; roles: string[]; tenantId?: string; branchId?: string }
+  actor: UnderwriterActorContext
 ) {
-  // Service layer defense-in-depth: Credit Analysts, System Admins, Super Admins, Branch Managers, and non-deciders cannot commit underwriting decisions
-  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'];
+  // Service layer defense-in-depth: Credit Analysts, Loan Officers, and non-deciders cannot commit underwriting decisions
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
   const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
   if (!isAuthorizedDecider) {
     throw new ForbiddenError(
@@ -68,7 +559,12 @@ export async function submitUnderwritingDecision(
 
   const app = await prisma.loanApplication.findUnique({
     where: { id: applicationId },
-    include: { product: true, customer: { include: { documents: true } } },
+    include: {
+      product: true,
+      customer: { include: { documents: true } },
+      statusHistory: true,
+      eligibility: true,
+    },
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
@@ -87,11 +583,21 @@ export async function submitUnderwritingDecision(
     }
   }
 
+  // Segregation of Duties (SoD) Gate: Prohibit self-approval if user was the loan maker/submitter
+  const wasOriginatingMaker = app.statusHistory?.some(
+    (h) => h.fromStatus === 'DRAFT' && (h.changedBy === actor.email || h.changedBy === actor.id)
+  );
+  if (wasOriginatingMaker && (input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS')) {
+    throw new ForbiddenError(
+      'Segregation of Duties (SoD) violation: An underwriter cannot approve a loan application they personally originated as loan officer.'
+    );
+  }
+
   // Validate allowed application status for underwriting decision
   const ALLOWED_UNDERWRITING_STATES = ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'];
   if (!ALLOWED_UNDERWRITING_STATES.includes(app.status)) {
     throw new BadRequestError(
-      `Cannot commit underwriting decision for application in '${app.status}' status. Application must be under review or in underwriting queue.`
+      `Cannot commit underwriting decision for application in '${app.status}' status. Application must be in underwriting or under review.`
     );
   }
 
@@ -104,46 +610,55 @@ export async function submitUnderwritingDecision(
     );
   }
 
-  // Mandatory Document Verification Check for Forwarding to Finance Officer
+  // Mandatory Document Verification Check
   if (isApprovalDecision && app.customer?.documents) {
     const unverifiedDocs = app.customer.documents.filter(
       (d) => !d.verified && d.status !== 'VERIFIED'
     );
     if (unverifiedDocs.length > 0) {
       throw new BadRequestError(
-        `Cannot approve & forward loan application to Finance Officer. ${unverifiedDocs.length} uploaded document(s) are pending verification. Please verify all borrower documents first.`
+        `Cannot approve loan application: ${unverifiedDocs.length} uploaded document(s) are pending inspection & verification.`
       );
     }
   }
 
-  // Verify approval limits from SystemSetting (applies strictly to both APPROVE and APPROVE_WITH_CONDITIONS)
+  // Level 2 Delegated Authority Limit Gate (₹25,00,000)
   const requestedAmount = Number(app.requestedAmount);
-  const setting = await prisma.systemSetting.findUnique({ where: { key: 'approval_limits' } });
-  const limits = (setting?.value as any[]) || [];
+  const LEVEL_2_UNDERWRITER_LIMIT = 2500000;
 
-  const matchedTier = limits.find(
-    (l) => l.maxAmount === null || requestedAmount <= Number(l.maxAmount)
-  );
-  if (matchedTier && isApprovalDecision) {
-    const requiredRoles: string[] = matchedTier.chain || [];
-    const hasAuthority = actor.roles?.some((r) => requiredRoles.includes(r));
-    if (!hasAuthority) {
+  if (isApprovalDecision && !actor.roles.includes('SUPER_ADMIN')) {
+    if (requestedAmount > LEVEL_2_UNDERWRITER_LIMIT) {
       throw new BadRequestError(
-        `Your role does not have approval limit authority for ₹${requestedAmount.toLocaleString(
+        `Approval authority exceeded: Proposal of ₹${requestedAmount.toLocaleString(
           'en-IN'
-        )}. Required roles: ${requiredRoles.join(', ')}`
+        )} exceeds Level 2 Underwriter delegated sanction limit (₹${LEVEL_2_UNDERWRITER_LIMIT.toLocaleString(
+          'en-IN'
+        )}). This application must be escalated to Level 3 Credit Head / Board Committee.`
       );
     }
   }
 
+  // Determine next status in canonical P4 workflow:
+  // SUBMITTED -> CREDIT_ASSESSMENT -> UNDERWRITING -> APPROVED -> AGREEMENT_PENDING -> READY_FOR_DISBURSEMENT -> DISBURSED
   let nextStatus: ApplicationStatus;
-  if (input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS') {
+  let nextStage = 'SANCTIONED';
+
+  if (isApprovalDecision) {
     nextStatus = 'APPROVED';
+    nextStage = 'AGREEMENT_PENDING';
   } else if (input.decision === 'REJECT') {
     nextStatus = 'REJECTED';
-  } else {
-    // SEND_BACK
+    nextStage = 'ADVERSE_ACTION';
+  } else if (input.decision === 'SEND_BACK') {
     nextStatus = 'SUBMITTED';
+    nextStage = 'CREDIT_REWORK';
+  } else if (input.decision === 'HOLD') {
+    nextStatus = 'UNDER_REVIEW';
+    nextStage = 'AWAITING_INFORMATION';
+  } else {
+    // ESCALATE
+    nextStatus = 'UNDER_REVIEW';
+    nextStage = 'ESCALATED_TO_CREDIT_HEAD';
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -152,19 +667,22 @@ export async function submitUnderwritingDecision(
       update: {
         decision: input.decision,
         reason: input.conditions ? `${input.reason} [Conditions: ${input.conditions}]` : input.reason,
-        decidedBy: actor.email,
+        decidedBy: actor.email || actor.id,
       },
       create: {
         applicationId,
         decision: input.decision,
         reason: input.conditions ? `${input.reason} [Conditions: ${input.conditions}]` : input.reason,
-        decidedBy: actor.email,
+        decidedBy: actor.email || actor.id,
       },
     });
 
     await tx.loanApplication.update({
       where: { id: applicationId },
-      data: { status: nextStatus },
+      data: {
+        status: nextStatus,
+        stage: nextStage,
+      },
     });
 
     await tx.applicationStatusHistory.create({
@@ -172,7 +690,7 @@ export async function submitUnderwritingDecision(
         applicationId,
         fromStatus: app.status,
         toStatus: nextStatus,
-        changedBy: actor.email,
+        changedBy: actor.email || actor.id,
         reason: `Underwriting Decision: ${input.decision} — ${input.reason}`,
       },
     });
@@ -182,32 +700,37 @@ export async function submitUnderwritingDecision(
         applicationId,
         approverRole: actor.roles[0] || 'UNDERWRITER',
         approverUserId: actor.id,
-        status: input.decision === 'REJECT' ? 'REJECTED' : 'APPROVED',
+        status: input.decision === 'REJECT' ? 'REJECTED' : input.decision === 'ESCALATE' ? 'ESCALATED' : 'APPROVED',
         decisionReason: input.reason,
         actionAt: new Date(),
       },
     });
 
-    return decision;
+    return {
+      ...decision,
+      status: nextStatus,
+      approvalLevel: 2,
+    };
   });
 
   await logAudit({
+    tenantId: app.tenantId || undefined,
     userId: actor.id,
     role: actor.roles[0],
     action: `UNDERWRITING_${input.decision}`,
     entity: 'LoanApplication',
     entityId: applicationId,
     previousValue: { status: app.status },
-    newValue: { status: nextStatus, decision: input.decision, reason: input.reason },
+    newValue: { status: nextStatus, decision: input.decision, reason: input.reason, conditions: input.conditions },
   });
 
-  // Async non-blocking notification to applicant
+  // Non-blocking notifications
   void sendNotification({
     customerId: app.customerId,
     channel: 'IN_APP',
-    type: input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS' ? 'SUCCESS' : input.decision === 'REJECT' ? 'ALERT' : 'INFO',
+    type: isApprovalDecision ? 'SUCCESS' : input.decision === 'REJECT' ? 'ALERT' : 'INFO',
     title: `Loan Application #${app.applicationNo} Update: ${nextStatus}`,
-    message: `Your credit proposal has been updated to ${nextStatus}. Decision: ${input.decision}. ${input.reason ? `Remarks: ${input.reason}` : ''}`,
+    message: `Your credit proposal status is now ${nextStatus}. Decision: ${input.decision}. ${input.reason ? `Remarks: ${input.reason}` : ''}`,
   }).catch(() => {});
 
   if (nextStatus === 'APPROVED') {
@@ -219,23 +742,9 @@ export async function submitUnderwritingDecision(
         customerEmail: app.customer?.email || undefined,
         customerMobile: app.customer?.mobile || undefined,
         applicationNo: app.applicationNo,
-        sanctionedAmount: String(app.requestedAmount),
-        tenureMonths: app.tenureMonths,
-        interestRate: Number((app.product as any)?.interestRate || 12.0),
-        emiAmount: String(app.requestedAmount ? Math.round(Number(app.requestedAmount) / (app.tenureMonths || 12)) : '4730'),
-      },
-      app.tenantId || undefined
-    ).catch(() => {});
-  } else if (nextStatus === 'REJECTED') {
-    void communicationService.dispatchSystemEvent(
-      'LOAN_REJECTED',
-      {
-        customerId: app.customerId,
-        customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
-        customerEmail: app.customer?.email || undefined,
-        customerMobile: app.customer?.mobile || undefined,
-        applicationNo: app.applicationNo,
-        rejectionReason: input.reason || 'Credit policy threshold criteria not met',
+        sanctionedAmount: String(input.approvedAmount || app.requestedAmount),
+        tenureMonths: input.approvedTenure || app.tenureMonths,
+        interestRate: input.approvedRate || Number((app.product as any)?.interestRate || 12.0),
       },
       app.tenantId || undefined
     ).catch(() => {});

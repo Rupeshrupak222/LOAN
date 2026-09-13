@@ -35,8 +35,11 @@ export type NavKey =
   | 'verifications'
   | 'documents'
   | 'branch-review'
+  | 'underwriting-queue'
   | 'underwriting'
+  | 'offers'
   | 'loans'
+  | 'finance-queue'
   | 'disbursements'
   | 'payments'
   | 'collections'
@@ -110,15 +113,18 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   'returned-applications': { key: 'returned-applications', href: '/returned-applications', label: 'Returned Applications', group: 'LENDING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
-  underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting Queue', group: 'LENDING' },
+  'underwriting-queue': { key: 'underwriting-queue', href: '/underwriting-queue', label: 'Underwriting Queue', group: 'OVERVIEW' },
+  underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting', group: 'OVERVIEW' },
+  offers: { key: 'offers', href: '/offers', label: 'Offers & Decisions', group: 'OVERVIEW' },
   loans: { key: 'loans', href: '/loans', label: 'Loan Accounts', group: 'LENDING' },
   disbursements: { key: 'disbursements', href: '/disbursements', label: 'Disbursements', group: 'LENDING' },
+  'finance-queue': { key: 'finance-queue', href: '/finance-queue', label: 'Finance Queue', group: 'OVERVIEW' },
   partners: { key: 'partners', href: '/partners', label: 'Partners & DSAs', group: 'LENDING' },
-  payments: { key: 'payments', href: '/payments', label: 'Payments Ledger', group: 'SERVICING' },
+  payments: { key: 'payments', href: '/payments', label: 'Repayments & Payments', group: 'SERVICING' },
   collections: { key: 'collections', href: '/collections', label: 'Collections & Delinquency', group: 'SERVICING' },
   'general-ledger': { key: 'general-ledger', href: '/general-ledger', label: 'General Ledger (GL)', group: 'SERVICING' },
   accounting: { key: 'accounting', href: '/accounting', label: 'Accounting & Finance', group: 'SERVICING' },
-  reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Accounting & Recon', group: 'SERVICING' },
+  reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Reconciliation', group: 'SERVICING' },
   communications: { key: 'communications', href: '/communications', label: 'Omnichannel Hub', group: 'SERVICING' },
   'command-center': { key: 'command-center', href: '/command-center', label: 'AI Command Center', group: 'INSIGHTS' },
   analytics: { key: 'analytics', href: '/analytics', label: 'Analytics Hub', group: 'INSIGHTS' },
@@ -294,25 +300,14 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Credit committee decision queue, conditional sanction, and approval limits',
     nav: [
       'dashboard',
-      'customers',
+      'underwriting-queue',
       'applications',
-      'returned-applications',
       'underwriting',
-      'risk',
-      'risk-queue',
-      'risk-policies',
-      'fraud',
-      'fraud-queue',
-      'fraud-cases',
-      'fraud-graph',
-      'bre-studio',
-      'loans',
-      'reports',
-      'fraud-intelligence',
-      'early-warnings',
-      'emi-calculator',
+      'offers',
+      'tasks',
+      'support',
     ],
-    landing: '/dashboard',
+    landing: '/underwriting-queue',
     dashboard: 'UNDERWRITER',
   },
   RISK_ANALYST: {
@@ -378,23 +373,18 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   FINANCE_OFFICER: {
     label: 'Finance Officer',
-    description: 'Pre-disbursement checks, electronic fund release, repayments, and NOC closure',
+    description: 'Financial controls, pre-disbursement verification, electronic fund release, repayments, and reconciliation',
     nav: [
       'dashboard',
-      'customers',
+      'finance-queue',
+      'applications',
       'disbursements',
       'payments',
-      'general-ledger',
-      'accounting',
       'reconciliation',
-      'loans',
-      'npa-monitoring',
-      'reports',
-      'fraud-intelligence',
-      'early-warnings',
-      'emi-calculator',
+      'tasks',
+      'support',
     ],
-    landing: '/dashboard',
+    landing: '/finance-queue',
     dashboard: 'FINANCE_OFFICER',
   },
   COLLECTION_OFFICER: {
