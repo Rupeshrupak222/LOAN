@@ -120,7 +120,6 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   compliance: { key: 'compliance', href: '/compliance', label: 'Regulatory & Compliance', group: 'INSIGHTS' },
   privacy: { key: 'privacy', href: '/privacy', label: 'Privacy & Consent', group: 'ADMINISTRATION' },
   reports: { key: 'reports', href: '/reports', label: 'Reports & Analytics', group: 'INSIGHTS' },
-  analytics: { key: 'analytics', href: '/analytics', label: 'Analytics & Intelligence Hub', group: 'INSIGHTS' },
   'npa-monitoring': { key: 'npa-monitoring', href: '/npa-monitoring', label: 'NPA & Asset Quality', group: 'INSIGHTS' },
   'fraud-intelligence': { key: 'fraud-intelligence', href: '/fraud-intelligence', label: 'Fraud & Anomaly Intelligence', group: 'INSIGHTS' },
   risk: { key: 'risk', href: '/risk', label: 'Risk Intelligence Hub', group: 'INSIGHTS' },
