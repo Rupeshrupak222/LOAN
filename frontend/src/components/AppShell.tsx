@@ -72,6 +72,8 @@ const NAV_ICONS: Record<string, any> = {
   tasks: Clock,
   support: Headphones,
   customers: Users,
+  'review-complete': CheckCircle2,
+  'submit-to-credit': Send,
   'returned-applications': RotateCcw,
   products: Building2,
   'loan-products': Building2,
