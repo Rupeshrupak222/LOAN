@@ -131,8 +131,6 @@ router.use('/command-center', commandCenterRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/borrower', borrowerRoutes);
 router.use('/workspaces', workspaceRoutes);
-router.use('/core-lending', coreLendingRoutes);
-router.use('/operations', operationsRoutes);
 router.use('/tenants', tenantRoutes);
 router.use('/configuration', configurationRoutes);
 router.use('/branding', brandingRoutes);

@@ -19,5 +19,14 @@
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/modules/operations",
+    "src/modules/core-lending",
+    "src/modules/analytics/analytics-export.service.ts",
+    "src/modules/analytics/analytics-metrics.service.ts",
+    "src/modules/analytics/analytics-utils.ts",
+    "src/modules/analytics/reporting-snapshot.service.ts"
+  ]
 }

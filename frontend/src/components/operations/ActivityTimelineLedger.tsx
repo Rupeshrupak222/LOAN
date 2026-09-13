@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { MessageSquare, Send, Clock, User, ShieldCheck } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/utils';
 
 interface Props {
   activityLogs: any[];
@@ -91,7 +91,7 @@ export function ActivityTimelineLedger({ activityLogs, onAddNote, submitting }: 
                   </span>
                   <span className="text-[10px] text-slate-400 flex items-center gap-1">
                     <Clock className="h-2.5 w-2.5" />
-                    {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                    {formatDate(log.createdAt)}
                   </span>
                 </div>
                 <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{log.message}</p>

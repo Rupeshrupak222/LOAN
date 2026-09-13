@@ -1,6 +1,7 @@
 'use client';
 
 import React, { ReactNode, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -155,7 +156,7 @@ const GROUP_ORDER = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, loading, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { branding } = useBranding();
   const isDark = theme === 'dark';
@@ -182,7 +183,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [authLoading, user, pathname, router]);
 
-  if (authLoading || wsLoading) {
+  if (authLoading) {
     return (
       <div
         className={cn(
@@ -219,6 +220,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;
   const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
+  const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
 
   const currentItem = accessibleNav.find(
     (item) => item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href))
@@ -425,9 +427,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setOpen(false)}
         />
       )}
-    >
-      {/* Route Transition Progress Bar */}
-      <NavigationProgressBar />
 
       {/* Main Content Area with independent scroll */}
       <div className={cn("flex flex-1 flex-col h-full min-w-0 overflow-y-auto overscroll-contain transition-colors", isDark ? "bg-[#060F1B]" : "bg-[#f8fafc]")}>
@@ -564,16 +563,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
           </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          {children}
         </main>
       </div>
     </div>
-  );
-}
-
-export function AppShell({ children }: { children: ReactNode }) {
-  return (
-    <WorkspaceProvider>
-      <InnerAppShell>{children}</InnerAppShell>
-    </WorkspaceProvider>
   );
 }
