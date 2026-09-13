@@ -115,6 +115,7 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Accounting & Recon', group: 'SERVICING' },
   communications: { key: 'communications', href: '/communications', label: 'Omnichannel Hub', group: 'SERVICING' },
   'command-center': { key: 'command-center', href: '/command-center', label: 'AI Command Center', group: 'INSIGHTS' },
+  analytics: { key: 'analytics', href: '/analytics', label: 'Analytics Hub', group: 'INSIGHTS' },
   operations: { key: 'operations', href: '/operations', label: 'Operations & Observability', group: 'INSIGHTS' },
   compliance: { key: 'compliance', href: '/compliance', label: 'Regulatory & Compliance', group: 'INSIGHTS' },
   privacy: { key: 'privacy', href: '/privacy', label: 'Privacy & Consent', group: 'ADMINISTRATION' },

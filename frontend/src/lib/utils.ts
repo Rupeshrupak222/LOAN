@@ -44,3 +44,20 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   return `${dateStr} · ${timeStr}`;
 }
 
+export function formatRelativeTime(value: string | Date | null | undefined): string {
+  if (!value) return '-';
+  const d = new Date(value);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSec < 60) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return formatDate(value);
+}
+

@@ -163,10 +163,10 @@ export default function ReportsPage() {
     } finally {
       setExporting(false);
     }
-  }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       <PageHeader
         breadcrumb="Insights / Reports"
         title="MIS Report Builder & Query Center"
