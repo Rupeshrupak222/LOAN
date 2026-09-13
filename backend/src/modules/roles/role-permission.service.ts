@@ -18,21 +18,44 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/err
 export const PERMISSION_ALIAS_MAP: Record<string, string[]> = {
   // Customer
   'customer.view': ['customer.view', 'VIEW_CUSTOMER_DETAILS', 'CUSTOMERS_VIEW', 'CUST_VIEW', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
-  'customer.create': ['customer.create', 'CUSTOMERS_CREATE'],
-  'customer.edit': ['customer.edit', 'CUSTOMERS_EDIT'],
+  'customer.create': ['customer.create', 'CUSTOMERS_CREATE', 'APPLICATIONS_CREATE'],
+  'customer.update': ['customer.update', 'customer.edit', 'CUSTOMERS_EDIT', 'APPLICATIONS_CREATE'],
+  'customer.edit': ['customer.edit', 'customer.update', 'CUSTOMERS_EDIT', 'APPLICATIONS_CREATE'],
   'customer.kyc': ['customer.kyc', 'PRIVACY_VIEW_CONSENT_REGISTRY', 'KYC_INITIATE'],
-  'KYC_INITIATE': ['KYC_INITIATE', 'customer.kyc', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+  'customer.kyc.initiate': ['customer.kyc.initiate', 'KYC_INITIATE', 'customer.kyc', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+  'customer.kyc.view': ['customer.kyc.view', 'customer.kyc', 'VIEW_CUSTOMER_DETAILS', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+  'KYC_INITIATE': ['KYC_INITIATE', 'customer.kyc.initiate', 'customer.kyc', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+
+  // Leads
+  'lead.view': ['lead.view', 'APPLICATIONS_VIEW', 'CUSTOMERS_VIEW', 'VIEW_BRANCH_APPLICATIONS'],
+  'lead.create': ['lead.create', 'APPLICATIONS_CREATE', 'CUSTOMERS_CREATE'],
+  'lead.update': ['lead.update', 'APPLICATIONS_EDIT', 'CUSTOMERS_EDIT', 'APPLICATIONS_CREATE'],
 
   // Applications
   'application.view': ['application.view', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS'],
   'application.create': ['application.create', 'APPLICATIONS_CREATE'],
-  'application.edit': ['application.edit', 'APPLICATIONS_EDIT'],
+  'application.update': ['application.update', 'application.edit', 'APPLICATIONS_EDIT', 'APPLICATIONS_CREATE'],
+  'application.edit': ['application.edit', 'application.update', 'APPLICATIONS_EDIT'],
   'application.submit': ['application.submit', 'APPLICATIONS_SUBMIT', 'APPLICATIONS_CREATE'],
   'application.review': ['application.review', 'APPLICATIONS_REVIEW', 'REVIEW_APPLICATION'],
   'application.return': ['application.return', 'SEND_BACK_FOR_CORRECTION'],
   'application.resubmit': ['application.resubmit', 'APPLICATIONS_RESUBMIT'],
   'application.approve': ['application.approve', 'APPLICATIONS_APPROVE', 'APPROVE_WITHIN_DELEGATED_LIMIT'],
   'application.reject': ['application.reject', 'APPLICATIONS_REJECT'],
+
+  // Dynamic Documents
+  'application.documents.view': ['application.documents.view', 'VIEW_DOCUMENTS', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS'],
+  'application.documents.upload': ['application.documents.upload', 'VIEW_DOCUMENTS', 'APPLICATIONS_CREATE', 'APPLICATIONS_VIEW'],
+  'application.documents.request': ['application.documents.request', 'VIEW_DOCUMENTS', 'APPLICATIONS_CREATE', 'APPLICATIONS_VIEW'],
+
+  // Bank Verification
+  'bank-verification.initiate': ['bank-verification.initiate', 'APPLICATIONS_CREATE', 'CUSTOMERS_CREATE', 'VIEW_DOCUMENTS'],
+  'bank-verification.view': ['bank-verification.view', 'VIEW_CUSTOMER_DETAILS', 'CUSTOMERS_VIEW', 'APPLICATIONS_VIEW'],
+
+  // Tasks & Support
+  'task.view': ['task.view', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS'],
+  'support.create': ['support.create', 'SUPPORT_TICKET_CREATE'],
+  'support.view': ['support.view', 'SUPPORT_VIEW'],
 
   // Loans & Servicing
   'loan.view': ['loan.view', 'APPLICATIONS_VIEW', 'VIEW_BRANCH_APPLICATIONS', 'PAYMENTS_VIEW'],
@@ -954,13 +977,23 @@ export class RolePermissionService {
         {
           code: 'LOAN_OFFICER',
           name: 'Field Loan Sourcing Officer',
-          description: 'Sources applications, submits borrower KYC documents, and tracks status',
+          description: 'Sources applications, collects customer profile and dynamic KYC documents, and submits to Credit Analyst',
           permissions: [
             'APPLICATIONS_CREATE',
             'APPLICATIONS_VIEW',
+            'VIEW_BRANCH_APPLICATIONS',
+            'VIEW_CUSTOMER_DETAILS',
+            'VIEW_DOCUMENTS',
+            'KYC_INITIATE',
+            'COMMUNICATIONS_VIEW',
+            'COMMUNICATIONS_SEND',
+            'SUPPORT_VIEW',
+            'SUPPORT_TICKET_CREATE',
             'PRIVACY_VIEW_CONSENT_REGISTRY',
           ],
           scope: 'BRANCH',
+          sanctionLimit: 0,
+          payoutLimit: 0,
         },
         {
           code: 'CUSTOMER',

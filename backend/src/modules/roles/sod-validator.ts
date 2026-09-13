@@ -120,6 +120,23 @@ export class SodValidator {
       }
     }
   }
+
+  /**
+   * Enforces that the loan officer who sourced/originated the application
+   * cannot act as the credit analyst, underwriter, or disbursement officer on that proposal.
+   */
+  public static assertLoanOfficerSeparation(
+    originatorUserId: string | undefined | null,
+    approverUserId: string | undefined | null,
+    actionName: string
+  ): void {
+    if (!originatorUserId || !approverUserId) return;
+    if (originatorUserId.trim().toLowerCase() === approverUserId.trim().toLowerCase()) {
+      throw new ForbiddenError(
+        `[SOD_VIOLATION] Sourcing vs Approval conflict: Loan Officer '${approverUserId}' who originated or submitted the application cannot approve, sanction, or disburse it for '${actionName}'.`
+      );
+    }
+  }
 }
 
 export const assertMakerCheckerSeparation = SodValidator.assertMakerCheckerSeparation;
@@ -127,3 +144,4 @@ export const assertDualControlPayout = SodValidator.assertDualControlPayout;
 export const assertAuditorReadOnly = SodValidator.assertAuditorReadOnly;
 export const assertBorrowerInternalRestriction = SodValidator.assertBorrowerInternalRestriction;
 export const assertOperationalSeparation = SodValidator.assertOperationalSeparation;
+export const assertLoanOfficerSeparation = SodValidator.assertLoanOfficerSeparation;

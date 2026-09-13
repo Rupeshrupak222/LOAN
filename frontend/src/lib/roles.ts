@@ -23,9 +23,12 @@ export type RoleName =
 
 export type NavKey =
   | 'dashboard'
+  | 'leads'
   | 'customers'
   | 'applications'
   | 'returned-applications'
+  | 'tasks'
+  | 'support'
   | 'loan-products'
   | 'credit-assessment'
   | 'branch-review'
@@ -92,9 +95,12 @@ export interface NavItemConfig {
 
 export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   dashboard: { key: 'dashboard', href: '/dashboard', label: 'Dashboard', group: 'OVERVIEW' },
+  leads: { key: 'leads', href: '/leads', label: 'Leads & Sourcing', group: 'CUSTOMERS' },
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
   applications: { key: 'applications', href: '/applications', label: 'Loan Applications', group: 'LENDING' },
   'returned-applications': { key: 'returned-applications', href: '/returned-applications', label: 'Returned Applications', group: 'LENDING' },
+  tasks: { key: 'tasks', href: '/tasks', label: 'Tasks Desk', group: 'OVERVIEW' },
+  support: { key: 'support', href: '/support', label: 'Support & Inquiries', group: 'SERVICING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
   'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
@@ -249,16 +255,14 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   LOAN_OFFICER: {
     label: 'Loan Officer',
-    description: 'Customer onboarding, KYC document collection, and loan intake',
+    description: 'Lead sourcing, customer onboarding, dynamic document collection, and loan origination desk',
     nav: [
       'dashboard',
-      'customers',
+      'leads',
       'applications',
-      'returned-applications',
-      'loans',
-      'loan-products',
-      'communications',
-      'emi-calculator',
+      'customers',
+      'tasks',
+      'support',
     ],
     landing: '/dashboard',
     dashboard: 'LOAN_OFFICER',

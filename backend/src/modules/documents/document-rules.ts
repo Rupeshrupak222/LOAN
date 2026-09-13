@@ -543,6 +543,19 @@ export function calculateApplicableDocuments(
 
     case 'HOMEMAKER':
     case 'STUDENT': {
+      if (empType === 'STUDENT') {
+        mandatory.push({
+          code: 'STUDENT_ID_PROOF',
+          category: 'EMPLOYMENT_PROOF',
+          defaultDocumentType: 'STUDENT_ID',
+          acceptedDocumentTypes: ['STUDENT_ID', 'COLLEGE_ID', 'ADMISSION_LETTER', 'ENROLLMENT_CERTIFICATE'],
+          name: 'Student ID / University Admission Letter',
+          description: 'Valid college/institution identification card, enrollment proof, or admission letter',
+          status: 'MANDATORY',
+          allowMultiple: false,
+        });
+      }
+
       conditional.push({
         code: 'CO_APPLICANT_KYC',
         category: 'CO_APPLICANT',
@@ -551,7 +564,7 @@ export function calculateApplicableDocuments(
         name: 'Co-Applicant / Guarantor KYC Proof',
         description: 'Primary identity and address proof of earning spouse, parent, or sponsor',
         status: 'CONDITIONAL',
-        conditionReason: 'Required: Earning co-applicant or guarantor required to sponsor the credit facility',
+        conditionReason: 'Required: Earning co-applicant or parent/sponsor required for student/homemaker facility',
         allowMultiple: true,
       });
 
@@ -566,19 +579,6 @@ export function calculateApplicableDocuments(
         conditionReason: 'Required: Income proof of the sponsoring family member',
         allowMultiple: true,
       });
-
-      if (empType === 'STUDENT') {
-        optional.push({
-          code: 'STUDENT_ID_PROOF',
-          category: 'EMPLOYMENT_PROOF',
-          defaultDocumentType: 'STUDENT_ID',
-          acceptedDocumentTypes: ['STUDENT_ID', 'COLLEGE_ID', 'ADMISSION_LETTER'],
-          name: 'Student ID / University Admission Letter',
-          description: 'Valid college identification card or course admission letter',
-          status: 'OPTIONAL',
-          allowMultiple: false,
-        });
-      }
 
       notApplicable.push(
         {

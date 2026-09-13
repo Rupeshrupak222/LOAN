@@ -64,6 +64,7 @@ import contractsRoutes from '../modules/contracts/contracts.routes';
 import accountingRoutes from '../modules/accounting/accounting.routes';
 import { analyticsRoutes } from '../modules/analytics/analytics.routes';
 import { directLendingRoutes } from '../modules/direct-lending';
+import leadRoutes from '../modules/origination/lead.routes';
 
 const router = Router();
 
@@ -73,6 +74,7 @@ router.use('/documents', documentRoutes);
 router.use('/loan-products', productRoutes);
 router.use('/products', productRoutes);
 router.use('/applications', applicationRoutes);
+router.use('/leads', leadRoutes);
 router.use('/bre', breRoutes);
 router.use('/decision-engine', decisionEngineRoutes);
 router.use('/decision-policies', decisionEngineRoutes);
