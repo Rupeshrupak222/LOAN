@@ -69,6 +69,7 @@ import { Spinner, Input, Button, Badge } from '@/components/ui';
 import { RoleName } from '@/lib/roles';
 import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
 import { BorrowerDashboardView } from '@/features/borrower';
+import { LoanOfficerDashboardView } from '@/features/origination';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -361,6 +362,10 @@ export default function DashboardPage() {
 
   if (primaryRole === 'CUSTOMER') {
     return <BorrowerDashboardView />;
+  }
+
+  if (primaryRole === 'LOAN_OFFICER') {
+    return <LoanOfficerDashboardView />;
   }
 
   const cardBgClass = isDark
@@ -895,138 +900,7 @@ export default function DashboardPage() {
       {/* 2. ROLE-SPECIFIC DASHBOARD SECTIONS                                       */}
       {/* ========================================================================= */}
 
-      {/* A. LOAN OFFICER WORKSPACE */}
-      {primaryRole === 'LOAN_OFFICER' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
-            <KpiItem label="MY ONBOARDED BORROWERS" value={String(totalCustomersCount)} hint="Registered borrowers" icon={<Users className="h-4 w-4" />} iconColor="purple" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="APPLICATIONS INTAKE" value={String(totalAppsCount)} hint="Total origination pool" icon={<FileText className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="RETURNED FOR CORRECTIONS" value={String(sentBackCount)} hint="Action required" icon={<RotateCcw className="h-4 w-4" />} iconColor="amber" cardBgClass={cardBgClass} isDark={isDark} highlightText={sentBackCount > 0 ? `${sentBackCount} returned` : undefined} />
-            <KpiItem label="KYC PENDING" value={String(pendingKycCount)} hint="Action required" icon={<AlertCircle className="h-4 w-4" />} iconColor="amber" cardBgClass={cardBgClass} isDark={isDark} highlightText={pendingKycCount > 0 ? `${pendingKycCount} need docs` : undefined} />
-            <KpiItem label="DRAFT PROPOSALS" value={String(draftAppsCount)} hint="Ready to submit" icon={<Clock className="h-4 w-4" />} iconColor="blue" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="FORWARDED TO CREDIT" value={String(submittedAppsCount)} hint="In credit appraisal queue" icon={<Send className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
-            <KpiItem label="PROPOSALS SANCTIONED" value={String(approvedAppsCount)} hint="Approved by underwriter" icon={<CheckCircle2 className="h-4 w-4" />} iconColor="emerald" cardBgClass={cardBgClass} isDark={isDark} />
-          </div>
 
-          {/* Prominent Notification & Action Queue for Returned Applications */}
-          {returnedApps.length > 0 && (
-            <div className="p-5 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50/95 via-amber-50/75 to-orange-50/60 dark:from-amber-950/40 dark:via-amber-950/25 dark:to-orange-950/20 dark:border-amber-800/60 shadow-sm space-y-4 animate-in fade-in">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 border-amber-200 dark:border-amber-800/50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300 shrink-0">
-                    <RotateCcw className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">
-                        Action Required: Returned Applications ({returnedApps.length})
-                      </h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 dark:bg-amber-900/80 dark:text-amber-200">
-                        Returned by Credit Analyst
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                      The following application(s) were returned for missing mandatory documents or corrections. Upload the required documents and resubmit.
-                    </p>
-                  </div>
-                </div>
-                <Link href="/applications" className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline shrink-0">
-                  View All in Queue →
-                </Link>
-              </div>
-
-              {/* Grid of Returned Applications */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {returnedApps.slice(0, 6).map((app: any) => (
-                  <div
-                    key={app.id}
-                    className="p-4 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-white/95 dark:bg-slate-900/90 space-y-3 shadow-2xs hover:shadow-xs transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                            #{app.applicationNo}
-                          </span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-                            Returned
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 mt-1">
-                          {app.customerName || `${app.customer?.firstName || ''} ${app.customer?.lastName || ''}`.trim() || 'Borrower'}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {app.product || app.productDetail?.name || 'Loan'} · {formatMoney(app.requestedAmount || 0)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {app.createdAt ? formatDate(app.createdAt) : ''}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Return note snippet */}
-                    <div className="p-2.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 line-clamp-2">
-                      <span className="font-semibold">Reason:</span> {app.underwriting?.reason || 'Missing mandatory documents or corrections required'}
-                    </div>
-
-                    {/* Action Button */}
-                    <Link href={`/applications/${app.id}`} className="block">
-                      <Button
-                        size="sm"
-                        className="w-full gap-1.5 text-xs font-semibold bg-[#2563EB] hover:bg-blue-700 text-white shadow-2xs cursor-pointer"
-                      >
-                        <FileUp className="w-3.5 h-3.5" /> Upload Missing Docs & Resubmit →
-                      </Button>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className={cn('lg:col-span-2 rounded-2xl border p-5 space-y-4', cardBgClass)}>
-              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                <h3 className="text-sm font-bold tracking-tight">Recent Loan Applications Queue</h3>
-                <Link href="/applications" className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline">View All →</Link>
-              </div>
-              <ApplicationsTable items={appsList} isDark={isDark} />
-            </div>
-
-            <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-              <div>
-                <h3 className="text-sm font-bold tracking-tight">Quick Intake Actions</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Start borrower origination or upload KYC</p>
-                <div className="space-y-3 pt-4">
-                  {!isUnderwriter && (
-                    <Link href="/customers/new" className="block">
-                      <Button size="sm" className="w-full flex items-center justify-center gap-2 text-xs text-white">
-                        <Plus className="h-3.5 w-3.5" /> Onboard New Customer
-                      </Button>
-                    </Link>
-                  )}
-                  <Link href="/applications" className="block">
-                    <Button size="sm" variant="secondary" className="w-full flex items-center justify-center gap-2 text-xs">
-                      <FileText className="h-3.5 w-3.5" /> Create Loan Application
-                    </Button>
-                  </Link>
-                  <Link href="/loan-products" className="block">
-                    <Button size="sm" variant="secondary" className="w-full flex items-center justify-center gap-2 text-xs">
-                      <Coins className="h-3.5 w-3.5" /> Browse Product Catalog
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-[#060F1B]/60 border border-blue-100 dark:border-[#2B3566] text-xs">
-                <p className="font-bold text-brand-700 dark:text-blue-400">KYC Policy Notice</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Ensure Aadhaar & PAN documents are uploaded directly to Cloudinary Vault.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* C. CREDIT ANALYST WORKSPACE */}
       {primaryRole === 'CREDIT_ANALYST' && (() => {
