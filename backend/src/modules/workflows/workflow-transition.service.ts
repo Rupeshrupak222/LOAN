@@ -12,6 +12,7 @@ import { SodValidator } from '../roles/sod-validator';
 import { rolePermissionService } from '../roles/role-permission.service';
 import { logAudit } from '../audit/audit.service';
 import { PayoutGatekeeperService } from '../disbursements/payout-gatekeeper.service';
+import { validateCustomerDocumentFulfillment } from '../documents/document-rules';
 
 export interface WorkflowActorContext {
   id?: string;
@@ -119,7 +120,6 @@ export class WorkflowTransitionService {
             bankAccounts: true,
             employmentDetails: true,
             addresses: true,
-            consents: true,
           },
         },
         product: true,
@@ -200,7 +200,7 @@ export class WorkflowTransitionService {
 
         // Maker-Checker on Approval
         if (targetStatus === 'APPROVED') {
-          const creationHistory = app.statusHistory.find((h) => h.toStatus === 'DRAFT' || h.toStatus === 'SUBMITTED');
+          const creationHistory = (app as any).statusHistory?.find((h: any) => h.toStatus === 'DRAFT' || h.toStatus === 'SUBMITTED');
           const makerId = creationHistory?.changedBy || (app as any).createdBy;
           if (makerId && actor.id) {
             SodValidator.assertMakerCheckerSeparation(makerId, actor.id, 'LOAN_SANCTION_APPROVAL');
@@ -348,7 +348,7 @@ export class WorkflowTransitionService {
     if (isKycVerified) completed.push(kycPrereq);
     else {
       pending.push(kycPrereq);
-      if (['CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(targetStatus)) {
+      if (['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(targetStatus)) {
         blockers.push('Dynamic KYC verification must be completed first.');
       }
     }
@@ -371,8 +371,32 @@ export class WorkflowTransitionService {
     if (isFinancialDataComplete) completed.push(finPrereq);
     else {
       pending.push(finPrereq);
-      if (['UNDERWRITING', 'APPROVED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(targetStatus)) {
+      if (['SUBMITTED', 'UNDERWRITING', 'APPROVED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(targetStatus)) {
         blockers.push('Financial data and bank statements must be parsed and verified.');
+      }
+    }
+
+    // ─── Prerequisite 2.5: Mandatory Profile-Specific Documents ───
+    const employmentType = customer.employmentDetails?.[0]?.employmentType || 'SALARIED';
+    const productType = app.product?.type || 'PERSONAL';
+    const docFulfillment = validateCustomerDocumentFulfillment(docs, employmentType, productType, {
+      monthlyIncome: customer.employmentDetails?.[0]?.monthlyIncome,
+      requestedAmount: app.requestedAmount,
+    });
+    
+    const docPrereq: PrerequisiteCheckResult = {
+      key: 'MANDATORY_DOCUMENTS',
+      label: 'Profile-Specific Mandatory Documents',
+      passed: docFulfillment.isComplete,
+      requiredCondition: 'All mandatory documents per customer profile and product type must be uploaded.',
+      reason: docFulfillment.isComplete ? undefined : `Missing required documents: ${docFulfillment.missingNames.join(', ')}`,
+    };
+
+    if (docFulfillment.isComplete) completed.push(docPrereq);
+    else {
+      pending.push(docPrereq);
+      if (['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(targetStatus)) {
+        blockers.push(`Missing mandatory profile-specific documents: ${docFulfillment.missingNames.join(', ')}`);
       }
     }
 
