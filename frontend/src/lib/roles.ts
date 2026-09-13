@@ -27,6 +27,8 @@ export type NavKey =
   | 'customers'
   | 'applications'
   | 'returned-applications'
+  | 'review-complete'
+  | 'submit-to-credit'
   | 'tasks'
   | 'support'
   | 'loan-products'
@@ -108,6 +110,8 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   leads: { key: 'leads', href: '/leads', label: 'Leads & Sourcing', group: 'CUSTOMERS' },
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
   'returned-applications': { key: 'returned-applications', href: '/returned-applications', label: 'Returned Applications', group: 'LENDING' },
+  'review-complete': { key: 'review-complete', href: '/review-complete', label: 'Review & Complete', group: 'OVERVIEW' },
+  'submit-to-credit': { key: 'submit-to-credit', href: '/submit-to-credit', label: 'Submit to Credit', group: 'OVERVIEW' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
   underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting Queue', group: 'LENDING' },
@@ -264,11 +268,12 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Lead sourcing, customer onboarding, dynamic document collection, and loan origination desk',
     nav: [
       'dashboard',
-      'leads',
-      'applications',
       'customers',
-      'tasks',
-      'support',
+      'applications',
+      'documents',
+      'review-complete',
+      'submit-to-credit',
+      'returned-applications',
     ],
     landing: '/dashboard',
     dashboard: 'LOAN_OFFICER',
