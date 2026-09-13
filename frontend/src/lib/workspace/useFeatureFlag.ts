@@ -5,10 +5,9 @@
 import { useWorkspace } from './useWorkspace';
 
 export function useFeatureFlag(flagKey: string): boolean {
-  try {
-    const { isFeatureEnabled } = useWorkspace();
-    return isFeatureEnabled(flagKey);
-  } catch {
-    return true; // Default fallback to enabled
+  const workspace = useWorkspace();
+  if (!workspace || !workspace.isFeatureEnabled) {
+    return true;
   }
+  return workspace.isFeatureEnabled(flagKey);
 }

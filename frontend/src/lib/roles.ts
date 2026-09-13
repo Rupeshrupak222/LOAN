@@ -31,6 +31,9 @@ export type NavKey =
   | 'support'
   | 'loan-products'
   | 'credit-assessment'
+  | 'credit-queue'
+  | 'verifications'
+  | 'documents'
   | 'branch-review'
   | 'underwriting'
   | 'loans'
@@ -95,14 +98,17 @@ export interface NavItemConfig {
 
 export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   dashboard: { key: 'dashboard', href: '/dashboard', label: 'Dashboard', group: 'OVERVIEW' },
+  'credit-queue': { key: 'credit-queue', href: '/credit-queue', label: 'Credit Queue', group: 'OVERVIEW' },
+  applications: { key: 'applications', href: '/applications', label: 'Applications', group: 'OVERVIEW' },
+  'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment', group: 'OVERVIEW' },
+  documents: { key: 'documents', href: '/documents', label: 'Documents', group: 'OVERVIEW' },
+  verifications: { key: 'verifications', href: '/verifications', label: 'Verifications', group: 'OVERVIEW' },
+  tasks: { key: 'tasks', href: '/tasks', label: 'Tasks', group: 'OVERVIEW' },
+  support: { key: 'support', href: '/support', label: 'Support', group: 'OVERVIEW' },
   leads: { key: 'leads', href: '/leads', label: 'Leads & Sourcing', group: 'CUSTOMERS' },
   customers: { key: 'customers', href: '/customers', label: 'Customers', group: 'CUSTOMERS' },
-  applications: { key: 'applications', href: '/applications', label: 'Loan Applications', group: 'LENDING' },
   'returned-applications': { key: 'returned-applications', href: '/returned-applications', label: 'Returned Applications', group: 'LENDING' },
-  tasks: { key: 'tasks', href: '/tasks', label: 'Tasks Desk', group: 'OVERVIEW' },
-  support: { key: 'support', href: '/support', label: 'Support & Inquiries', group: 'SERVICING' },
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
-  'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
   underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting Queue', group: 'LENDING' },
   loans: { key: 'loans', href: '/loans', label: 'Loan Accounts', group: 'LENDING' },
@@ -272,20 +278,15 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Credit assessment, policy eligibility scoring, and repayment capacity evaluation',
     nav: [
       'dashboard',
-      'customers',
-      'credit-assessment',
+      'credit-queue',
       'applications',
-      'returned-applications',
-      'risk',
-      'risk-queue',
-      'fraud',
-      'fraud-queue',
-      'reports',
-      'fraud-intelligence',
-      'early-warnings',
-      'emi-calculator',
+      'credit-assessment',
+      'documents',
+      'verifications',
+      'tasks',
+      'support',
     ],
-    landing: '/dashboard',
+    landing: '/credit-assessment',
     dashboard: 'CREDIT_ANALYST',
   },
   UNDERWRITER: {

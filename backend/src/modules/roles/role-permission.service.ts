@@ -70,6 +70,7 @@ export const PERMISSION_ALIAS_MAP: Record<string, string[]> = {
 
   // Underwriting & Approvals
   'underwriting.view': ['underwriting.view', 'UNDERWRITING_VIEW_BUREAU'],
+  'underwriting.bureau_view': ['underwriting.bureau_view', 'UNDERWRITING_VIEW_BUREAU'],
   'underwriting.decide': ['underwriting.decide', 'APPLICATIONS_APPROVE', 'APPROVE_WITHIN_DELEGATED_LIMIT'],
   'underwriting.condition': ['underwriting.condition', 'ADD_MANAGER_REMARKS'],
   'underwriting.override': ['underwriting.override', 'UNDERWRITING_APPROVE_EXCEPTION'],
