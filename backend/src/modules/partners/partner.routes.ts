@@ -7,12 +7,15 @@ import { asyncHandler } from '../../common/asyncHandler';
 import { ok, created, success } from '../../common/response';
 import { authenticate, authorize } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenant-context';
+import { prisma } from '../../config/prisma';
+import { NotFoundError, ForbiddenError } from '../../common/errors';
 import {
   authenticatePartnerApi,
   requirePartnerScope,
   partnerIdempotency,
 } from '../../middleware/partner-auth.middleware';
 import { partnerService } from './partner.service';
+import { partnerFortificationService } from './partner-fortification.service';
 
 // -----------------------------------------------------------------------------
 // 1. PARTNER ADMINISTRATION ROUTER (FOR LENDER ADMINS)
@@ -244,6 +247,27 @@ partnerRoutes.get(
 );
 
 /**
+ * GET /api/v1/partners/:id/co-lending
+ */
+partnerRoutes.get(
+  '/:id/co-lending',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'AUDITOR'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const partner = partnerService.getPartner(req.params.id, {
+      id: req.user?.id,
+      roles: req.user?.roles,
+      tenantId: req.tenantId,
+    });
+    const { loanAmount, nbfcSharePercentage } = req.query;
+    const allocation = partnerFortificationService.calculateCoLendingAllocation(
+      Number(loanAmount) || 1000000,
+      Number(nbfcSharePercentage) || 80
+    );
+    return ok(res, { partnerId: partner.id, partnerName: partner.name, ...allocation });
+  })
+);
+
+/**
  * POST /api/v1/partners/:id/payouts/batch
  */
 partnerRoutes.post(
@@ -273,7 +297,26 @@ partnerCustomerRoutes.post(
   requirePartnerScope('partner.customer.create'),
   asyncHandler(async (req: Request, res: Response) => {
     const result = await partnerService.registerPartnerCustomer(req.body, req.partnerContext!);
-    return created(res, result);
+    const sanitized = partnerFortificationService.sanitizeCustomerForPartner(result, req.partnerContext!);
+    return created(res, sanitized);
+  })
+);
+
+partnerCustomerRoutes.get(
+  '/:id',
+  requirePartnerScope('partner.customer.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const customer = await prisma.customer.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!customer) {
+      throw new NotFoundError(`Customer with ID ${req.params.id} not found`);
+    }
+    if (customer.tenantId !== req.partnerContext!.tenantId) {
+      throw new ForbiddenError('Access denied to cross-tenant customer record');
+    }
+    const sanitized = partnerFortificationService.sanitizeCustomerForPartner(customer, req.partnerContext!);
+    return ok(res, sanitized);
   })
 );
 
@@ -287,7 +330,8 @@ partnerApplicationRoutes.post(
   requirePartnerScope('partner.application.create'),
   asyncHandler(async (req: Request, res: Response) => {
     const mapping = await partnerService.createPartnerApplication(req.body, req.partnerContext!);
-    return created(res, mapping);
+    const sanitized = partnerFortificationService.sanitizeApplicationForPartner(mapping, req.partnerContext!);
+    return created(res, sanitized);
   })
 );
 
@@ -296,7 +340,8 @@ partnerApplicationRoutes.get(
   requirePartnerScope('partner.application.read'),
   asyncHandler(async (req: Request, res: Response) => {
     const list = partnerService.listPartnerApplications(req.partnerContext!);
-    return ok(res, list);
+    const sanitized = list.map((item) => partnerFortificationService.sanitizeApplicationForPartner(item, req.partnerContext!));
+    return ok(res, sanitized);
   })
 );
 
@@ -305,7 +350,8 @@ partnerApplicationRoutes.get(
   requirePartnerScope('partner.application.read'),
   asyncHandler(async (req: Request, res: Response) => {
     const mapping = partnerService.getPartnerApplicationMapping(req.params.id, req.partnerContext!);
-    return ok(res, mapping);
+    const sanitized = partnerFortificationService.sanitizeApplicationForPartner(mapping, req.partnerContext!);
+    return ok(res, sanitized);
   })
 );
 
@@ -314,7 +360,8 @@ partnerApplicationRoutes.patch(
   requirePartnerScope('partner.application.update'),
   asyncHandler(async (req: Request, res: Response) => {
     const mapping = await partnerService.updatePartnerApplication(req.params.id, req.body, req.partnerContext!);
-    return ok(res, mapping);
+    const sanitized = partnerFortificationService.sanitizeApplicationForPartner(mapping, req.partnerContext!);
+    return ok(res, sanitized);
   })
 );
 
@@ -322,8 +369,62 @@ partnerApplicationRoutes.post(
   '/:id/submit',
   requirePartnerScope('partner.application.submit'),
   asyncHandler(async (req: Request, res: Response) => {
+    const mapping = partnerService.getPartnerApplicationMapping(req.params.id, req.partnerContext!);
+    partnerFortificationService.validatePartnerAllowedStageTransition(mapping.currentStage || 'DRAFT', 'SUBMIT_APPLICATION');
     const result = await partnerService.submitPartnerApplication(req.params.id, req.partnerContext!);
-    return ok(res, result);
+    const sanitized = partnerFortificationService.sanitizeApplicationForPartner(result, req.partnerContext!);
+    return ok(res, sanitized);
+  })
+);
+
+partnerApplicationRoutes.get(
+  '/:id/documents',
+  requirePartnerScope('partner.document.read'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const mapping = partnerService.getPartnerApplicationMapping(req.params.id, req.partnerContext!);
+    const docs = await prisma.document.findMany({
+      where: {
+        applicationId: mapping.adyapanApplicationId,
+      },
+      select: {
+        id: true,
+        category: true,
+        documentType: true,
+        status: true,
+        fileName: true,
+        createdAt: true,
+      },
+    });
+    return ok(res, docs);
+  })
+);
+
+partnerApplicationRoutes.post(
+  '/:id/documents',
+  requirePartnerScope('partner.document.upload'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const mapping = partnerService.getPartnerApplicationMapping(req.params.id, req.partnerContext!);
+    partnerFortificationService.validatePartnerAllowedStageTransition(mapping.currentStage || 'DRAFT', 'UPLOAD_DOCUMENT');
+    const { type, fileName, fileUrl } = req.body;
+    const doc = await prisma.document.create({
+      data: {
+        category: type || 'PARTNER_ATTACHMENT',
+        documentType: type || 'PARTNER_DOCUMENT',
+        fileName: fileName || 'document.pdf',
+        storageKey: fileUrl || 'https://storage.adyapan.internal/partner-docs/temp',
+        status: 'PENDING',
+        applicationId: mapping.adyapanApplicationId,
+      },
+      select: {
+        id: true,
+        category: true,
+        documentType: true,
+        status: true,
+        fileName: true,
+        createdAt: true,
+      },
+    });
+    return created(res, doc);
   })
 );
 
@@ -337,7 +438,8 @@ partnerOfferRoutes.get(
   requirePartnerScope('partner.offer.read'),
   asyncHandler(async (req: Request, res: Response) => {
     const offer = await partnerService.getPartnerOffer(req.params.partnerApplicationId, req.partnerContext!);
-    return ok(res, offer);
+    const sanitized = partnerFortificationService.sanitizeOfferForPartner(offer, req.params.partnerApplicationId);
+    return ok(res, sanitized);
   })
 );
 
@@ -348,7 +450,8 @@ partnerOfferRoutes.post(
     const { kfsAccepted, termsAccepted } = req.body;
     const isAcknowledged = Boolean(kfsAccepted && termsAccepted);
     const offer = await partnerService.acceptPartnerOffer(req.params.offerId, isAcknowledged, req.partnerContext!);
-    return ok(res, offer);
+    const sanitized = partnerFortificationService.sanitizeOfferForPartner(offer, offer.partnerApplicationId || req.params.offerId);
+    return ok(res, sanitized);
   })
 );
 

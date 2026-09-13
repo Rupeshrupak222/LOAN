@@ -1,495 +1,414 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+// Phase 14: Analytics, MIS & Enterprise Command Center API Routes
+
+import { Router } from 'express';
+import { asyncHandler } from '../../common/asyncHandler';
+import { success } from '../../common/response';
+import { BadRequestError } from '../../common/errors';
 import { authenticate } from '../../middleware/auth';
-import { requirePermission } from '../../middleware/rbac-permission';
-import { analyticsMetricsService } from './analytics-metrics.service';
+import { analyticsService } from './analytics.service';
+import { snapshotService } from './snapshot.service';
 import { reportBuilderService } from './report-builder.service';
-import { reportingSnapshotService } from './reporting-snapshot.service';
-import { analyticsExportService } from './analytics-export.service';
-import { validate } from '../../middleware/validate';
+import { exportService } from './export.service';
+import { dashboardService } from './dashboard.service';
+import { AnalyticsFilterOptions, TimeRangePreset } from './analytics.types';
 
 const router = Router();
 
-// Zod query schema for analytics filters
-const analyticsFilterSchema = z.object({
-  query: z.object({
-    preset: z.enum([
-      'TODAY',
-      'YESTERDAY',
-      'LAST_7_DAYS',
-      'LAST_30_DAYS',
-      'THIS_MONTH',
-      'LAST_MONTH',
-      'THIS_QUARTER',
-      'LAST_QUARTER',
-      'THIS_FINANCIAL_YEAR',
-      'CUSTOM',
-    ]).optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    tenantId: z.string().optional(),
-    branchId: z.string().optional(),
-    productId: z.string().optional(),
-    partnerId: z.string().optional(),
-    channel: z.string().optional(),
-    riskGrade: z.string().optional(),
-    fraudTier: z.string().optional(),
-    dpdBucket: z.string().optional(),
-  }).optional(),
-});
+router.use(authenticate);
 
-// Zod schema for dynamic report builder queries
-const reportBuilderSchema = z.object({
-  body: z.object({
-    title: z.string().optional(),
-    dimensions: z.array(z.string()).min(1, 'At least one dimension is required'),
-    metrics: z.array(z.string()).min(1, 'At least one metric is required'),
-    filters: z.object({
-      preset: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-      tenantId: z.string().optional(),
-      branchId: z.string().optional(),
-      productId: z.string().optional(),
-      partnerId: z.string().optional(),
-      channel: z.string().optional(),
-    }).optional(),
-    sortBy: z.string().optional(),
-    sortOrder: z.enum(['asc', 'desc']).optional(),
-    page: z.number().int().positive().optional(),
-    limit: z.number().int().positive().max(1000).optional(),
-  }),
-});
-
-// Zod schema for creating a saved report
-const createSavedReportSchema = z.object({
-  body: z.object({
-    name: z.string().min(1, 'Report name is required').max(150),
-    description: z.string().max(500).optional(),
-    visibility: z.enum(['PRIVATE', 'TEAM', 'TENANT']).optional(),
-    queryConfig: z.object({
-      title: z.string().optional(),
-      dimensions: z.array(z.string()).min(1),
-      metrics: z.array(z.string()).min(1),
-      filters: z.any().optional(),
-    }),
-  }),
-});
-
-// Helper to extract actor from authenticated request
-function getActor(req: Request) {
-  const user = req.user!;
+function extractActor(req: any) {
   return {
-    id: user.id,
-    userId: user.id,
-    roles: user.roles || [],
-    tenantId: user.tenantId,
-    branchId: user.branchId,
-    partnerId: (user as any).partnerId,
-    email: user.email,
-    name: (user as any).name || user.email,
+    id: req.user?.id,
+    email: req.user?.email,
+    roles: req.user?.roles || [],
+    tenantId: req.user?.tenantId,
+    branchId: req.user?.branchId,
+    partnerId: req.user?.partnerId,
   };
 }
 
-// -----------------------------------------------------------------------------
-// 1. OVERVIEW & COMMAND CENTER
-// -----------------------------------------------------------------------------
+function extractFilters(req: any): AnalyticsFilterOptions {
+  return {
+    timeRange: (req.query.timeRange as TimeRangePreset) || 'all_time',
+    startDate: req.query.startDate as string,
+    endDate: req.query.endDate as string,
+    tenantId: req.query.tenantId as string,
+    branchId: req.query.branchId as string,
+    productId: req.query.productId as string,
+    channel: req.query.channel as string,
+    partnerId: req.query.partnerId as string,
+    riskGrade: req.query.riskGrade as string,
+    dpdBucket: req.query.dpdBucket as string,
+    loanStatus: req.query.loanStatus as string,
+    limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+    offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
+  };
+}
+
+/**
+ * GET /api/v1/analytics/overview
+ */
 router.get(
-  '/command-center',
-  authenticate,
-  requirePermission('ANALYTICS_COMMAND_CENTER'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getCommandCenterOverview(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  '/overview',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getOverview(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 2. ORIGINATION & FUNNEL
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/funnel
+ */
 router.get(
   '/funnel',
-  authenticate,
-  requirePermission('ANALYTICS_VIEW'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getOriginationFunnel(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getFunnel(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 3. CREDIT & BRE
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/credit
+ */
 router.get(
   '/credit',
-  authenticate,
-  requirePermission('ANALYTICS_CREDIT'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getCreditBREAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getCreditBre(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 4. RISK & FRAUD
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/risk-fraud
+ */
 router.get(
   '/risk-fraud',
-  authenticate,
-  requirePermission('ANALYTICS_RISK'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getRiskFraudAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getRiskFraud(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 5. DISBURSEMENTS
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/disbursements
+ */
 router.get(
   '/disbursements',
-  authenticate,
-  requirePermission('ANALYTICS_VIEW'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getDisbursementAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getDisbursements(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 6. PORTFOLIO
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/portfolio
+ */
 router.get(
   '/portfolio',
-  authenticate,
-  requirePermission('ANALYTICS_PORTFOLIO'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getPortfolioAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getPortfolio(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 7. DELINQUENCY & DPD
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/delinquency
+ */
 router.get(
   '/delinquency',
-  authenticate,
-  requirePermission('ANALYTICS_COLLECTIONS'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getDelinquencyAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getDelinquency(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 8. COLLECTIONS & RECOVERY
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/collections
+ */
 router.get(
   '/collections',
-  authenticate,
-  requirePermission('ANALYTICS_COLLECTIONS'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getCollectionAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getCollections(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 9. FINANCIAL & ACCOUNTING
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/finance
+ */
 router.get(
   '/finance',
-  authenticate,
-  requirePermission('ANALYTICS_FINANCE'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getFinancialAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getFinance(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 10. PARTNERS & LSP
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/partners
+ */
 router.get(
   '/partners',
-  authenticate,
-  requirePermission('ANALYTICS_PARTNERS'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getPartnerAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getPartners(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 11. PRODUCTS
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/products
+ */
 router.get(
   '/products',
-  authenticate,
-  requirePermission('ANALYTICS_PRODUCTS'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getProductAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getProducts(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 12. BRANCHES
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/branches
+ */
 router.get(
   '/branches',
-  authenticate,
-  requirePermission('ANALYTICS_BRANCHES'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getBranchAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getBranches(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 13. OPERATIONAL SLA
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/operations
+ */
 router.get(
-  '/operations-sla',
-  authenticate,
-  requirePermission('ANALYTICS_OPERATIONS'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getOperationalSlaAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  '/operations',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getOperationsSla(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 14. CUSTOMER SUPPORT & GRIEVANCES
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/support
+ */
 router.get(
   '/support',
-  authenticate,
-  requirePermission('ANALYTICS_SUPPORT'),
-  validate(analyticsFilterSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await analyticsMetricsService.getCustomerSupportAnalytics(getActor(req), req.query as any);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getSupport(actor, filters);
+    res.json(success(data));
+  })
 );
 
-// -----------------------------------------------------------------------------
-// 15. DYNAMIC REPORT BUILDER & SAVED REPORTS
-// -----------------------------------------------------------------------------
-router.post(
-  '/reports/query',
-  authenticate,
-  requirePermission('REPORT_EXECUTE'),
-  validate(reportBuilderSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await reportBuilderService.executeReportQuery(getActor(req), req.body);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
+/**
+ * GET /api/v1/analytics/command-center
+ */
 router.get(
-  '/reports/saved',
-  authenticate,
-  requirePermission('REPORT_VIEW'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = reportBuilderService.listSavedReports(getActor(req));
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  '/command-center',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const filters = extractFilters(req);
+    const data = await analyticsService.getCommandCenterTelemetry(actor, filters);
+    res.json(success(data));
+  })
 );
 
-router.get(
-  '/reports/saved/:id',
-  authenticate,
-  requirePermission('REPORT_VIEW'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = reportBuilderService.getSavedReportById(getActor(req), req.params.id);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
+/**
+ * POST /api/v1/analytics/drilldown
+ */
 router.post(
-  '/reports/saved',
-  authenticate,
-  requirePermission('REPORT_CREATE'),
-  validate(createSavedReportSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await reportBuilderService.createSavedReport(getActor(req), req.body);
-      res.status(201).json({ success: true, data });
-    } catch (err) {
-      next(err);
+  '/drilldown',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const { dimension, filters, page, pageSize } = req.body;
+    if (!dimension) {
+      throw new BadRequestError('Dimension is required for drilldown queries.');
     }
-  }
+    const data = await analyticsService.getDrilldown(actor, {
+      dimension,
+      filters: filters || {},
+      page,
+      pageSize,
+    });
+    res.json(success(data));
+  })
 );
 
-router.delete(
-  '/reports/saved/:id',
-  authenticate,
-  requirePermission('REPORT_EDIT'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await reportBuilderService.deleteSavedReport(getActor(req), req.params.id);
-      res.json({ success: true, message: `Saved report '${req.params.id}' deleted successfully.` });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-router.post(
-  '/reports/export',
-  authenticate,
-  requirePermission('REPORT_EXPORT'),
-  validate(reportBuilderSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const unmaskPii = req.query.unmask === 'true';
-      const exportResult = await analyticsExportService.exportReportToCsv(
-        getActor(req),
-        req.body,
-        { unmaskPii }
-      );
-
-      res.setHeader('Content-Type', exportResult.contentType);
-      res.setHeader('Content-Disposition', `attachment; filename="${exportResult.filename}"`);
-      res.send(exportResult.csvContent);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// -----------------------------------------------------------------------------
-// 16. REPORTING SNAPSHOTS
-// -----------------------------------------------------------------------------
+/**
+ * GET /api/v1/analytics/snapshots
+ */
 router.get(
   '/snapshots',
-  authenticate,
-  requirePermission('REPORT_VIEW'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const tenantId = req.query.tenantId as string;
-      const data = reportingSnapshotService.listSnapshots(getActor(req), tenantId);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 30;
+    const data = await snapshotService.listSnapshots(actor, limit);
+    res.json(success(data));
+  })
 );
 
-router.get(
-  '/snapshots/:id',
-  authenticate,
-  requirePermission('REPORT_VIEW'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = reportingSnapshotService.getSnapshotById(getActor(req), req.params.id);
-      res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
+/**
+ * POST /api/v1/analytics/snapshots/generate
+ */
 router.post(
   '/snapshots/generate',
-  authenticate,
-  requirePermission('REPORT_CREATE'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { snapshotDate, snapshotType, tenantId } = req.body;
-      const data = await reportingSnapshotService.generateSnapshot(getActor(req), {
-        snapshotDate: snapshotDate || new Date().toISOString().slice(0, 10),
-        snapshotType: snapshotType || 'DAILY',
-        tenantId,
-      });
-      res.status(201).json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const snapshot = await snapshotService.generateDailySnapshot(req.body.tenantId, actor);
+    res.json(success(snapshot));
+  })
 );
 
+/**
+ * GET /api/v1/analytics/saved-reports
+ */
+router.get(
+  '/saved-reports',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const reports = await reportBuilderService.listSavedReports(actor);
+    res.json(success(reports));
+  })
+);
+
+/**
+ * POST /api/v1/analytics/saved-reports
+ */
+router.post(
+  '/saved-reports',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const report = await reportBuilderService.createSavedReport(actor, req.body);
+    res.json(success(report));
+  })
+);
+
+/**
+ * GET /api/v1/analytics/saved-reports/:id
+ */
+router.get(
+  '/saved-reports/:id',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const report = await reportBuilderService.getSavedReportById(req.params.id, actor);
+    res.json(success(report));
+  })
+);
+
+/**
+ * PUT /api/v1/analytics/saved-reports/:id
+ */
+router.put(
+  '/saved-reports/:id',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const updated = await reportBuilderService.updateSavedReport(req.params.id, actor, req.body);
+    res.json(success(updated));
+  })
+);
+
+/**
+ * DELETE /api/v1/analytics/saved-reports/:id
+ */
+router.delete(
+  '/saved-reports/:id',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const result = await reportBuilderService.deleteSavedReport(req.params.id, actor);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/analytics/saved-reports/:id/run
+ */
+router.post(
+  '/saved-reports/:id/run',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const result = await reportBuilderService.runSavedReport(req.params.id, actor, req.body.runtimeFilters);
+    res.json(success(result));
+  })
+);
+
+/**
+ * POST /api/v1/analytics/export
+ */
+router.post(
+  '/export',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const { reportType, format, filters, selectedColumns, maskPii } = req.body;
+
+    if (!reportType) {
+      throw new BadRequestError('reportType is required for export.');
+    }
+
+    const { csv, filename } = await exportService.exportToCsv(actor, {
+      reportType,
+      format: format || 'CSV',
+      filters: filters || {},
+      selectedColumns,
+      maskPii,
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(csv);
+  })
+);
+
+/**
+ * GET /api/v1/analytics/dashboard-layout
+ */
+router.get(
+  '/dashboard-layout',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const layout = await dashboardService.getDashboardLayout(actor);
+    res.json(success(layout));
+  })
+);
+
+/**
+ * POST /api/v1/analytics/dashboard-layout
+ */
+router.post(
+  '/dashboard-layout',
+  asyncHandler(async (req, res) => {
+    const actor = extractActor(req);
+    const { layoutConfig, layoutName } = req.body;
+    const result = await dashboardService.saveDashboardLayout(actor, layoutConfig, layoutName);
+    res.json(success(result));
+  })
+);
+
+export const analyticsRoutes = router;
 export default router;

@@ -1,33 +1,17 @@
-# Interactive Drill-Down Pathways
+# Phase 14: Generic Parameterized Drill-Down Engine
 
-## 1. Drill-Down Mappings
+## 1. Overview
+The Drill-Down Engine (`POST /api/v1/analytics/drilldown`) enables bidirectional navigation from aggregated high-level KPIs down to specific transactional records.
 
-### A. Portfolio Exposure
-```
-Total Outstanding Portfolio AUM
-  ↳ Breakdown by Product (e.g., Personal Loan Express)
-      ↳ Breakdown by Branch (e.g., Mumbai Central Flagship)
-          ↳ Individual Active Loan Account (/loans/:id)
-              ↳ Repayment Ledger & Amortization Schedule
-```
+## 2. Supported Drill-Down Dimensions
+1. **`APPLICATIONS`**: Sourced loan applications filtered by stage, risk grade, branch, or product.
+2. **`LOANS`**: Active loans filtered by DPD bucket, status, or branch.
+3. **`DISBURSEMENTS`**: Individual payout orders filtered by date range and status.
+4. **`PAYMENTS`**: Repayment records filtered by status and date range.
+5. **`COLLECTIONS`**: Delinquent cases filtered by assigned collector and aging bucket.
 
-### B. Credit Conversion Funnel
-```
-Origination Pipeline (e.g., 78.4% Approval Rate)
-  ↳ Decision Breakdown (Approve, Conditions, Refer, Reject)
-      ↳ Top Policy Rejection Reasons (e.g., FOIR ceiling exceeded)
-          ↳ Underlying Loan Application (/applications/:id)
-```
-
-### C. Delinquency & DPD Migration
-```
-Gross NPA & PAR 30 Ratio
-  ↳ DPD Aging Bucket (e.g., 31-60 DPD / SMA-1)
-      ↳ Collection Case Dossier (/collections)
-          ↳ Promise-to-Pay (PTP) Commitment & Field Recovery Logs
-```
-
----
-
-## 2. Filter & Scope Preservation
-All drill-down interactions preserve the active date range (`TODAY`, `LAST_30_DAYS`, `THIS_FINANCIAL_YEAR`), product scope, and branch role boundaries.
+## 3. Context & Security Preservation
+Drill-down queries automatically carry:
+- Time-range bounds.
+- Tenant and branch security boundaries.
+- Paginated table views with search and export options.

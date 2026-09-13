@@ -17,7 +17,7 @@ export class SandboxPayoutProvider implements PayoutProvider {
     const providerPayoutId = `pout_sbx_${timestamp}_${Math.random().toString(36).slice(2, 6)}`;
 
     // Failure simulation
-    if (params.payoutNo.includes('FAIL') || params.beneficiaryAccountNo.endsWith('99999')) {
+    if (params.payoutNo?.includes('FAIL') || params.beneficiaryAccountNo?.endsWith('99999')) {
       return {
         providerPayoutId,
         status: 'FAILED',

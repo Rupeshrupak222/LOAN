@@ -1,16 +1,38 @@
-# Authoritative Metric Definitions & Sources of Truth
+# Phase 14: Analytics Metric Definitions & Formulas
 
-| Metric Domain | Metric Name | Mathematical Formula / Definition | Authoritative Source of Truth |
-|---|---|---|---|
-| **Originations** | Approval Rate (%) | `(Approved + Sanctioned + Disbursed Apps) / Total Sourced Apps * 100` | `LoanApplication` (Status) |
-| **Originations** | Turnaround Time (TAT) | `Application Submission Timestamp → Final Sanction Decision Timestamp` | `ApplicationStatusHistory` |
-| **Portfolio** | Total AUM | `Sum(Loan.outstandingPrincipal)` for all active / disbursed loans | `Loan.outstandingPrincipal` |
-| **Delinquency** | PAR 30 Ratio (%) | `Sum(Loan.outstandingPrincipal where DPD >= 30) / Total Active Principal * 100` | Phase 11 `CollectionCase.dpd` |
-| **Delinquency** | Gross NPA Ratio (%) | `Sum(Loan.outstandingPrincipal where DPD >= 90) / Total Active Principal * 100` | Phase 11 `CollectionCase.dpd` |
-| **Collections** | Collection Efficiency (%) | `Collected Amount / (Collected Amount + Overdue Demand) * 100` | Phase 10 `Payment` & Phase 11 `CollectionCase` |
-| **Collections** | PTP Fulfillment Rate (%) | `Kept Promises to Pay / Total Promises to Pay * 100` | `PromiseToPay.status` |
-| **Financials** | Gross Operating Revenue | `Interest Income + Processing Fees + Penalty Charges + Documentation Fees` | Phase 12 `financialStatementsService` |
-| **Financials** | Net Operating Income | `Gross Operating Revenue - Partner Commissions - Operating Expenses` | Phase 12 `ProfitAndLossReport` |
-| **Risk / Fraud** | High-Risk Portfolio Share (%) | `Sum(Exposure on Grade D & E Loans) / Total Portfolio * 100` | Phase 9 `RiskAssessment` & `Loan` |
-| **Operational SLA** | Stage SLA Breach Rate (%) | `Breached Stage Tasks / Total Processed Stage Tasks * 100` | Workflow Execution Timers |
-| **Support** | Grievance Resolution TAT | `Grievance Registration Date → Formal Concession / Resolution Date` | Phase 13 `SupportComplaint` |
+This document establishes the authoritative definitions for all business and financial KPIs across the Adyapan Lending OS platform.
+
+## 1. Origination & Funnel Metrics
+- **Total Applications**: Total loan applications received within the reporting interval.
+- **Approval Rate (%)**: `(Approved Applications + Disbursed Applications) / Total Evaluated Applications × 100`
+- **Rejection Rate (%)**: `Rejected Applications / Total Evaluated Applications × 100`
+- **Referral Rate (%)**: `(Under Review + Submitted) / Total Evaluated Applications × 100`
+- **Conversion Rate (%)**: `Stage Count / Total Applications Sourced × 100`
+- **Drop-off Rate (%)**: `(Stage Count (N-1) - Stage Count (N)) / Stage Count (N-1) × 100`
+
+## 2. Portfolio & Exposure Metrics
+- **AUM / Portfolio Outstanding**: Sum of active loan principal balances (`outstandingPrincipal`).
+- **Total Exposure**: `Outstanding Principal + Outstanding Interest + Outstanding Fees & Penalties`.
+- **Average Ticket Size**: `Total Disbursed Principal / Completed Disbursement Count`.
+
+## 3. Delinquency & DPD Asset Quality Metrics (Authoritative Phase 11 DPD)
+- **PAR 30 (Portfolio at Risk 30+)**: `Principal on Loans with DPD ≥ 30 / Total Active Principal × 100`
+- **PAR 60 (Portfolio at Risk 60+)**: `Principal on Loans with DPD ≥ 60 / Total Active Principal × 100`
+- **PAR 90 (NPA / Non-Performing Asset)**: `Principal on Loans with DPD ≥ 90 / Total Active Principal × 100`
+- **Cure Rate (%)**: `Loans migrating from 30+ DPD back to Current / Total Delinquent Loans × 100`
+- **SMA Classification**:
+  - **SMA-0**: 1 – 30 DPD
+  - **SMA-1**: 31 – 60 DPD
+  - **SMA-2**: 61 – 90 DPD
+  - **NPA**: 90+ DPD
+
+## 4. Collections & Recovery Metrics
+- **Collection Efficiency (%)**: `Realized Collections / Expected Scheduled Receivables for Period × 100`
+- **PTP Fulfillment Rate (%)**: `Kept PTPs / Total Created Promise-to-Pays × 100`
+- **Recovery Rate (%)**: `Recovered Amounts on Overdue / Total Gross Overdue × 100`
+
+## 5. Financial & General Ledger Metrics (Authoritative Phase 10/12 GL)
+- **Net Cash Flow**: `Gross Customer Repayments - Gross Loan Disbursement Outflows`
+- **Interest Income**: General Ledger Code `4010` credit balance.
+- **Fee Revenue**: General Ledger Code `4020` processing and penal fee credit balance.
+- **Partner Commission Expense**: General Ledger Code `5010` debit balance.

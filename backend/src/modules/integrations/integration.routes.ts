@@ -28,6 +28,25 @@ router.get(
 );
 
 /**
+ * 1b. Get Integration System Health for all 12 domains
+ * Restricted to staff roles; Borrowers (CUSTOMER) strictly rejected.
+ */
+router.get(
+  '/health',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const isBorrower = req.user?.roles.includes('CUSTOMER');
+    if (isBorrower) {
+      throw new ForbiddenError('Access forbidden: Borrowers cannot view Integration Hub health.');
+    }
+
+    const { providerRegistry } = await import('./provider-registry.service');
+    const health = await providerRegistry.getHealthSummary();
+    res.json(success(health));
+  })
+);
+
+/**
  * 2. Get single provider details
  */
 router.get(

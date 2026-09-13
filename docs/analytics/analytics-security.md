@@ -1,21 +1,29 @@
-# Analytics Security & Data Governance
+# Phase 14: Analytics Security & Multi-Tenant Access Control
 
-## 1. Multi-Tenant & Branch Scoping
-Every analytical request is intercepted by `buildScopedPrismaFilter`:
-- **Super Administrators (`SUPER_ADMIN`)**: May view cross-tenant analytics or specify `tenantId`.
-- **Institution Admins (`COMPANY_ADMIN`)**: Scoped strictly to their own institution's `tenantId`. Attempting to access another tenant's metrics triggers a `403 ForbiddenError`.
-- **Branch Managers & Officers**: Locked to their assigned `branchId`.
-- **Lending Service Providers (`PARTNER`)**: Locked to their own `partnerId`. They can never access another partner's performance, commission, or borrower records.
-- **Borrowers (`CUSTOMER`)**: Strictly forbidden from accessing internal analytics, collection scorecards, or command center dashboards.
+## 1. Security Architecture
+Every analytical request undergoes a 5-step authorization verification:
+```
+Incoming HTTP Request
+       ↓
+JWT Authentication Verification
+       ↓
+Role Permission Check (e.g., ANALYTICS_VIEW, REPORT_EXPORT)
+       ↓
+Tenant & Branch Context Extraction
+       ↓
+buildSecurityScope() Hard-Filter Injection
+       ↓
+Database-Side Filtered Aggregation
+```
 
----
+## 2. Segregation by Role
+- **SUPER_ADMIN / COMPANY_ADMIN**: Unrestricted access across all branches, products, and partners within the tenant.
+- **BRANCH_MANAGER**: Strictly bounded to loans, applications, and collections belonging to their assigned `branchId`.
+- **CREDIT_ANALYST / UNDERWRITER**: Permitted to view credit decisioning, BRE outcomes, risk bands, and application queue aging.
+- **COLLECTION_OFFICER / MANAGER**: Restricted to collection cases, DPD delinquency buckets, and collector scorecards.
+- **FINANCE_OFFICER**: Permitted to view disbursement outflows, repayment inflows, fee revenue, and general ledger balances.
+- **PARTNER / LSP**: Strictly restricted to their own partner-sourced loan pipeline and commission records.
+- **CUSTOMER / BORROWER**: Completely blocked from accessing institutional analytics endpoints.
 
-## 2. PII Masking
-When exporting reporting datasets, PII fields are masked by default:
-- **Phone Numbers**: `+91 98****3210`
-- **Email Addresses**: `r***a@example.com`
-- **PAN Numbers**: `ABCDE****F`
-- **Aadhaar Numbers**: `********9012`
-- **Bank Account Numbers**: `*******61928`
-
-Only compliance auditors and super administrators with explicit audit permissions can trigger unmasked evidence exports.
+## 3. IDOR and Filter Manipulation Defense
+The backend overrides any user-supplied `tenantId`, `branchId`, or `partnerId` in query parameters with the authenticated token's verified identity, preventing parameter tampering.

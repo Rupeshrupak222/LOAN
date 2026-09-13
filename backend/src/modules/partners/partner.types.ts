@@ -33,6 +33,8 @@ export type PartnerScope =
   | 'partner.application.read'
   | 'partner.application.update'
   | 'partner.application.submit'
+  | 'partner.document.read'
+  | 'partner.document.upload'
   | 'partner.offer.read'
   | 'partner.offer.accept'
   | 'partner.loan.read'
@@ -49,6 +51,8 @@ export const ALL_PARTNER_SCOPES: PartnerScope[] = [
   'partner.application.read',
   'partner.application.update',
   'partner.application.submit',
+  'partner.document.read',
+  'partner.document.upload',
   'partner.offer.read',
   'partner.offer.accept',
   'partner.loan.read',

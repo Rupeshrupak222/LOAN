@@ -29,39 +29,40 @@ enum TenantTier {
 }
 
 model Tenant {
-  id                String            @id @default(uuid())
-  code              String            @unique
+  id                String       @id @default(uuid())
+  code              String       @unique
   name              String
-  status            TenantStatus      @default(ACTIVE)
-  tier              TenantTier        @default(STANDARD)
+  status            TenantStatus @default(ACTIVE)
+  tier              TenantTier   @default(STANDARD)
   cinNumber         String?
   rbiRegistrationNo String?
   domain            String?
   contactEmail      String
   supportPhone      String?
-  baseCurrency      String            @default("INR")
-  country           String            @default("IN")
-  timezone          String            @default("Asia/Kolkata")
+  baseCurrency      String       @default("INR")
+  country           String       @default("IN")
+  timezone          String       @default("Asia/Kolkata")
   settings          Json?
   metadata          Json?
   createdBy         String?
   suspendedAt       DateTime?
-  activatedAt       DateTime?         @default(now())
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  activatedAt       DateTime?    @default(now())
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  branches          Branch[]
-  users             User[]
-  customers         Customer[]
-  loanProducts      LoanProduct[]
-  applications      LoanApplication[]
-  loans             Loan[]
-  payments          Payment[]
-  auditLogs         AuditLog[]
-  workQueues        WorkQueue[]
-  tasks             Task[]
-  activityLogs      ActivityLog[]
-  approvals         Approval[]
+  branches                 Branch[]
+  users                    User[]
+  customers                Customer[]
+  loanProducts             LoanProduct[]
+  applications             LoanApplication[]
+  loans                    Loan[]
+  payments                 Payment[]
+  auditLogs                AuditLog[]
+  AnalyticsSnapshot        AnalyticsSnapshot[]
+  SavedReport              SavedReport[]
+  AnalyticsDashboardLayout AnalyticsDashboardLayout[]
+  CustomerConsent          CustomerConsent[]
+  CreditReassessment       CreditReassessment[]
 
   @@index([code])
   @@index([status])
@@ -78,31 +79,31 @@ enum UserStatus {
 }
 
 model User {
-  id                  String         @id @default(uuid())
-  email               String         @unique
-  employeeId          String?        @unique
-  passwordHash        String
-  firstName           String
-  lastName            String
-  status              UserStatus     @default(ACTIVE)
-  tenantId            String?
-  tenant              Tenant?        @relation(fields: [tenantId], references: [id])
-  branchId            String?
-  branch              Branch?        @relation(fields: [branchId], references: [id])
+  id           String     @id @default(uuid())
+  email        String     @unique
+  employeeId   String?    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  status       UserStatus @default(ACTIVE)
+  tenantId     String?
+  tenant       Tenant?    @relation(fields: [tenantId], references: [id])
+  branchId     String?
+  branch       Branch?    @relation(fields: [branchId], references: [id])
 
   // login security
-  failedLoginAttempts Int            @default(0)
+  failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
-  mfaEnabled          Boolean        @default(false)
+  mfaEnabled          Boolean   @default(false)
 
-  roles               UserRole[]
-  refreshTokens       RefreshToken[]
-  auditLogs           AuditLog[]
-  customer            Customer?
+  roles         UserRole[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  customer      Customer?
 
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([tenantId])
@@ -129,8 +130,8 @@ model Permission {
 model UserRole {
   userId String
   roleId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
 }
@@ -161,19 +162,20 @@ model RefreshToken {
 // ---------------------------------------------------------------------------
 
 model Branch {
-  id           String            @id @default(uuid())
-  code         String
-  name         String
-  city         String?
-  state        String?
-  isActive     Boolean           @default(true)
-  tenantId     String?
-  tenant       Tenant?           @relation(fields: [tenantId], references: [id])
-  users        User[]
-  customers    Customer[]
-  applications LoanApplication[]
-  loans        Loan[]
-  createdAt    DateTime          @default(now())
+  id                String              @id @default(uuid())
+  code              String
+  name              String
+  city              String?
+  state             String?
+  isActive          Boolean             @default(true)
+  tenantId          String?
+  tenant            Tenant?             @relation(fields: [tenantId], references: [id])
+  users             User[]
+  customers         Customer[]
+  applications      LoanApplication[]
+  loans             Loan[]
+  createdAt         DateTime            @default(now())
+  AnalyticsSnapshot AnalyticsSnapshot[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -208,53 +210,55 @@ enum RiskCategory {
 }
 
 model Customer {
-  id                  String                @id @default(uuid())
-  customerCode        String                @unique
-  userId              String?               @unique
-  user                User?                 @relation(fields: [userId], references: [id])
-  tenantId            String?
-  tenant              Tenant?               @relation(fields: [tenantId], references: [id])
-  branchId            String?
-  branch              Branch?               @relation(fields: [branchId], references: [id])
+  id           String  @id @default(uuid())
+  customerCode String  @unique
+  userId       String? @unique
+  user         User?   @relation(fields: [userId], references: [id])
+  tenantId     String?
+  tenant       Tenant? @relation(fields: [tenantId], references: [id])
+  branchId     String?
+  branch       Branch? @relation(fields: [branchId], references: [id])
 
-  firstName           String
-  lastName            String
-  dateOfBirth         DateTime?
-  gender              String?
-  mobile              String
-  email               String?
-  addressLine         String?
-  city                String?
-  state               String?
-  pincode             String?
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime?
+  gender      String?
+  mobile      String
+  email       String?
+  addressLine String?
+  city        String?
+  state       String?
+  pincode     String?
 
   employmentType      String?
   employerName        String?
-  monthlyIncome       Decimal?              @db.Decimal(14, 2)
-  existingObligations Decimal?              @db.Decimal(14, 2)
+  monthlyIncome       Decimal? @db.Decimal(14, 2)
+  existingObligations Decimal? @db.Decimal(14, 2)
 
-  bankName            String?
-  bankAccountNo       String?
-  bankIfsc            String?
+  bankName      String?
+  bankAccountNo String?
+  bankIfsc      String?
 
-  kycStatus           KycStatus             @default(NOT_STARTED)
-  riskCategory        RiskCategory?
-  status              CustomerStatus        @default(DRAFT)
+  kycStatus    KycStatus      @default(NOT_STARTED)
+  riskCategory RiskCategory?
+  status       CustomerStatus @default(DRAFT)
 
-  addresses           CustomerAddress[]
-  identifiers         CustomerIdentifier[]
-  employmentDetails   CustomerEmployment[]
-  bankAccounts        CustomerBankAccount[]
-  applications        LoanApplication[]
-  loans               Loan[]
-  documents           Document[]
-  payments            Payment[]
-  paymentSubmissions  PaymentSubmission[]
-  collectionCases     CollectionCase[]
-  notifications       Notification[]
+  addresses          CustomerAddress[]
+  employmentDetails  CustomerEmployment[]
+  bankAccounts       CustomerBankAccount[]
+  applications       LoanApplication[]
+  loans              Loan[]
+  documents          Document[]
+  payments           Payment[]
+  paymentSubmissions PaymentSubmission[]
+  collectionCases    CollectionCase[]
+  notifications      Notification[]
+  consents           CustomerConsent[]
+  lifecycleHistory   CustomerLifecycleHistory[]
+  reassessments      CreditReassessment[]
 
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([mobile])
   @@index([email])
@@ -338,29 +342,30 @@ enum InterestMethod {
 }
 
 model LoanProduct {
-  id               String            @id @default(uuid())
+  id               String         @id @default(uuid())
   code             String
   name             String
   productType      String
   tenantId         String?
-  tenant           Tenant?           @relation(fields: [tenantId], references: [id])
-  minAmount        Decimal           @db.Decimal(14, 2)
-  maxAmount        Decimal           @db.Decimal(14, 2)
+  tenant           Tenant?        @relation(fields: [tenantId], references: [id])
+  minAmount        Decimal        @db.Decimal(14, 2)
+  maxAmount        Decimal        @db.Decimal(14, 2)
   minTenureMonths  Int
   maxTenureMonths  Int
-  interestRate     Decimal           @db.Decimal(6, 3) // annual %
-  interestMethod   InterestMethod    @default(REDUCING)
-  processingFeePct Decimal           @db.Decimal(6, 3) @default(0)
-  lateFeePct       Decimal           @db.Decimal(6, 3) @default(0)
-  gracePeriodDays  Int               @default(0)
+  interestRate     Decimal        @db.Decimal(6, 3) // annual %
+  interestMethod   InterestMethod @default(REDUCING)
+  processingFeePct Decimal        @default(0) @db.Decimal(6, 3)
+  lateFeePct       Decimal        @default(0) @db.Decimal(6, 3)
+  gracePeriodDays  Int            @default(0)
   eligibilityRules Json?
-  isActive         Boolean           @default(true)
+  isActive         Boolean        @default(true)
 
-  applications     LoanApplication[]
-  loans            Loan[]
+  applications LoanApplication[]
+  loans        Loan[]
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  AnalyticsSnapshot AnalyticsSnapshot[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -387,42 +392,34 @@ enum ApplicationStatus {
 }
 
 model LoanApplication {
-  id              String                     @id @default(uuid())
-  applicationNo   String                     @unique
-  customerId      String
-  customer        Customer                   @relation(fields: [customerId], references: [id])
-  productId       String
-  product         LoanProduct                @relation(fields: [productId], references: [id])
-  tenantId        String?
-  tenant          Tenant?                    @relation(fields: [tenantId], references: [id])
-  branchId        String?
-  branch          Branch?                    @relation(fields: [branchId], references: [id])
+  id            String      @id @default(uuid())
+  applicationNo String      @unique
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  productId     String
+  product       LoanProduct @relation(fields: [productId], references: [id])
+  tenantId      String?
+  tenant        Tenant?     @relation(fields: [tenantId], references: [id])
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
 
-  requestedAmount Decimal                    @db.Decimal(14, 2)
+  requestedAmount Decimal           @db.Decimal(14, 2)
   tenureMonths    Int
   purpose         String?
-  status          ApplicationStatus          @default(DRAFT)
-  stage           String?                    @default("LEAD")
-  priority        String?                    @default("MEDIUM")
-  assignedToUserId String?
-  queueId         String?
-  submittedAt     DateTime?
-  closedAt        DateTime?
+  status          ApplicationStatus @default(DRAFT)
+  stage           String?
+  priority        String?
 
-  statusHistory   ApplicationStatusHistory[]
-  eligibility     EligibilityAssessment?
-  riskAssessment  RiskAssessment?
-  underwriting    UnderwritingDecision?
-  approvals       ApprovalRequest[]
-  documents       Document[]
-  loan            Loan?
-  assignments     ApplicationAssignment[]
-  tasks           Task[]
-  creditReviews   CreditReview[]
-  approvalRecords Approval[]
+  statusHistory  ApplicationStatusHistory[]
+  eligibility    EligibilityAssessment?
+  riskAssessment RiskAssessment?
+  underwriting   UnderwritingDecision?
+  approvals      ApprovalRequest[]
+  documents      Document[]
+  loan           Loan?
 
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([applicationNo])
   @@index([customerId])
@@ -456,7 +453,7 @@ model EligibilityAssessment {
   id            String          @id @default(uuid())
   applicationId String          @unique
   application   LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  result        String          // ELIGIBLE, CONDITIONALLY_ELIGIBLE, NOT_ELIGIBLE
+  result        String // ELIGIBLE, CONDITIONALLY_ELIGIBLE, NOT_ELIGIBLE
   factors       Json
   createdAt     DateTime        @default(now())
 }
@@ -475,7 +472,7 @@ model UnderwritingDecision {
   id            String          @id @default(uuid())
   applicationId String          @unique
   application   LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  decision      String          // APPROVE, APPROVE_WITH_CONDITIONS, SEND_BACK, REJECT
+  decision      String // APPROVE, APPROVE_WITH_CONDITIONS, SEND_BACK, REJECT
   reason        String?
   decidedBy     String
   createdAt     DateTime        @default(now())
@@ -676,47 +673,47 @@ enum LoanStatus {
 }
 
 model Loan {
-  id                   String                  @id @default(uuid())
-  loanNo               String                  @unique
-  applicationId        String?                 @unique
-  application          LoanApplication?        @relation(fields: [applicationId], references: [id])
-  customerId           String
-  customer             Customer                @relation(fields: [customerId], references: [id])
-  productId            String
-  product              LoanProduct             @relation(fields: [productId], references: [id])
-  tenantId             String?
-  tenant               Tenant?                 @relation(fields: [tenantId], references: [id])
-  branchId             String?
-  branch               Branch?                 @relation(fields: [branchId], references: [id])
+  id            String           @id @default(uuid())
+  loanNo        String           @unique
+  applicationId String?          @unique
+  application   LoanApplication? @relation(fields: [applicationId], references: [id])
+  customerId    String
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  productId     String
+  product       LoanProduct      @relation(fields: [productId], references: [id])
+  tenantId      String?
+  tenant        Tenant?          @relation(fields: [tenantId], references: [id])
+  branchId      String?
+  branch        Branch?          @relation(fields: [branchId], references: [id])
 
-  principal            Decimal                 @db.Decimal(14, 2)
-  interestRate         Decimal                 @db.Decimal(6, 3)
-  tenureMonths         Int
-  emiAmount            Decimal                 @db.Decimal(14, 2)
+  principal    Decimal @db.Decimal(14, 2)
+  interestRate Decimal @db.Decimal(6, 3)
+  tenureMonths Int
+  emiAmount    Decimal @db.Decimal(14, 2)
 
-  disbursementDate     DateTime?
-  maturityDate         DateTime?
-  closedAt             DateTime?
+  disbursementDate DateTime?
+  maturityDate     DateTime?
+  closedAt         DateTime?
 
-  outstandingPrincipal Decimal                 @db.Decimal(14, 2)
-  outstandingInterest  Decimal                 @db.Decimal(14, 2) @default(0)
-  outstandingFees      Decimal                 @db.Decimal(14, 2) @default(0)
+  outstandingPrincipal Decimal   @db.Decimal(14, 2)
+  outstandingInterest  Decimal   @default(0) @db.Decimal(14, 2)
+  outstandingFees      Decimal   @default(0) @db.Decimal(14, 2)
   nextDueDate          DateTime?
 
-  status               LoanStatus              @default(ACTIVE)
+  status LoanStatus @default(ACTIVE)
 
-  schedule             RepaymentScheduleItem[]
-  disbursements        Disbursement[]
-  payments             Payment[]
-  paymentSubmissions   PaymentSubmission[]
-  transactions         Transaction[]
-  collectionCases      CollectionCase[]
-  restructures         LoanRestructure[]
-  settlements          Settlement[]
-  closure              LoanClosure?
+  schedule           RepaymentScheduleItem[]
+  disbursements      Disbursement[]
+  payments           Payment[]
+  paymentSubmissions PaymentSubmission[]
+  transactions       Transaction[]
+  collectionCases    CollectionCase[]
+  restructures       LoanRestructure[]
+  settlements        Settlement[]
+  closure            LoanClosure?
 
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([loanNo])
   @@index([customerId])
@@ -744,12 +741,12 @@ model RepaymentScheduleItem {
   dueDate       DateTime
   principal     Decimal           @db.Decimal(14, 2)
   interest      Decimal           @db.Decimal(14, 2)
-  fees          Decimal           @db.Decimal(14, 2) @default(0)
+  fees          Decimal           @default(0) @db.Decimal(14, 2)
   totalDue      Decimal           @db.Decimal(14, 2)
-  paidAmount    Decimal           @db.Decimal(14, 2) @default(0)
+  paidAmount    Decimal           @default(0) @db.Decimal(14, 2)
   outstanding   Decimal           @db.Decimal(14, 2)
-  penaltyAmount Decimal           @db.Decimal(14, 2) @default(0)
-  waivedAmount  Decimal           @db.Decimal(14, 2) @default(0)
+  penaltyAmount Decimal           @default(0) @db.Decimal(14, 2)
+  waivedAmount  Decimal           @default(0) @db.Decimal(14, 2)
   paidDate      DateTime?
   status        InstallmentStatus @default(UPCOMING)
 
@@ -791,23 +788,23 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id             String              @id @default(uuid())
-  paymentNo      String              @unique
+  id             String        @id @default(uuid())
+  paymentNo      String        @unique
   loanId         String
-  loan           Loan                @relation(fields: [loanId], references: [id])
+  loan           Loan          @relation(fields: [loanId], references: [id])
   customerId     String
-  customer       Customer            @relation(fields: [customerId], references: [id])
+  customer       Customer      @relation(fields: [customerId], references: [id])
   tenantId       String?
-  tenant         Tenant?             @relation(fields: [tenantId], references: [id])
-  amount         Decimal             @db.Decimal(14, 2)
-  method         String              // BANK_TRANSFER, UPI, CASH, CHEQUE, GATEWAY
+  tenant         Tenant?       @relation(fields: [tenantId], references: [id])
+  amount         Decimal       @db.Decimal(14, 2)
+  method         String // BANK_TRANSFER, UPI, CASH, CHEQUE, GATEWAY
   reference      String?
-  idempotencyKey String?             @unique
-  status         PaymentStatus       @default(PENDING)
-  paidAt         DateTime            @default(now())
+  idempotencyKey String?       @unique
+  status         PaymentStatus @default(PENDING)
+  paidAt         DateTime      @default(now())
 
-  allocations    PaymentAllocation[]
-  createdAt      DateTime            @default(now())
+  allocations PaymentAllocation[]
+  createdAt   DateTime            @default(now())
 
   @@index([loanId])
   @@index([customerId])
@@ -819,7 +816,7 @@ model PaymentAllocation {
   id        String   @id @default(uuid())
   paymentId String
   payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  bucket    String   // FEES, PENALTY, INTEREST, PRINCIPAL
+  bucket    String // FEES, PENALTY, INTEREST, PRINCIPAL
   amount    Decimal  @db.Decimal(14, 2)
   createdAt DateTime @default(now())
 
@@ -840,8 +837,8 @@ model PaymentSubmission {
   customerId       String
   customer         Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
   amount           Decimal          @db.Decimal(14, 2)
-  method           String           // UPI, NEFT, IMPS, NET_BANKING, CASH, CHEQUE
-  reference        String           // UTR / Transaction reference
+  method           String // UPI, NEFT, IMPS, NET_BANKING, CASH, CHEQUE
+  reference        String // UTR / Transaction reference
   payerMobile      String?
   paidAt           DateTime         @default(now())
   notes            String?
@@ -851,8 +848,8 @@ model PaymentSubmission {
   rejectionReason  String?
   paymentId        String?
 
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([loanId])
   @@index([customerId])
@@ -864,8 +861,8 @@ model Transaction {
   id          String   @id @default(uuid())
   loanId      String?
   loan        Loan?    @relation(fields: [loanId], references: [id])
-  type        String   // DISBURSEMENT, PAYMENT, FEE, PENALTY, ADJUSTMENT, SETTLEMENT
-  direction   String   // DEBIT, CREDIT
+  type        String // DISBURSEMENT, PAYMENT, FEE, PENALTY, ADJUSTMENT, SETTLEMENT
+  direction   String // DEBIT, CREDIT
   amount      Decimal  @db.Decimal(14, 2)
   reference   String?
   description String?
@@ -880,23 +877,23 @@ model Transaction {
 // ---------------------------------------------------------------------------
 
 model CollectionCase {
-  id                String               @id @default(uuid())
-  caseNo            String               @unique
+  id                String   @id @default(uuid())
+  caseNo            String   @unique
   loanId            String
-  loan              Loan                 @relation(fields: [loanId], references: [id])
+  loan              Loan     @relation(fields: [loanId], references: [id])
   customerId        String
-  customer          Customer             @relation(fields: [customerId], references: [id])
+  customer          Customer @relation(fields: [customerId], references: [id])
   assignedOfficerId String?
-  dpd               Int                  @default(0) // Days Past Due
-  agingBucket       String               @default("0-30") // 0-30, 31-60, 61-90, 91-180, 180+
-  overdueAmount     Decimal              @db.Decimal(14, 2) @default(0)
-  status            String               @default("OPEN") // OPEN, IN_PROGRESS, PROMISED, ESCALATED, RESOLVED, CLOSED
-  priority          String               @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  dpd               Int      @default(0) // Days Past Due
+  agingBucket       String   @default("0-30") // 0-30, 31-60, 61-90, 91-180, 180+
+  overdueAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  status            String   @default("OPEN") // OPEN, IN_PROGRESS, PROMISED, ESCALATED, RESOLVED, CLOSED
+  priority          String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
 
-  activities        CollectionActivity[]
-  promises          PromiseToPay[]
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  activities CollectionActivity[]
+  promises   PromiseToPay[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
 
   @@index([loanId])
   @@index([customerId])
@@ -908,8 +905,8 @@ model CollectionActivity {
   id               String         @id @default(uuid())
   caseId           String
   collectionCase   CollectionCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  activityType     String         // CALL, VISIT, SMS, EMAIL, NOTICE, LEGAL
-  outcome          String         // CONTACTED, NO_ANSWER, WRONG_NUMBER, PROMISE_TO_PAY, DISPUTE, REFUSED
+  activityType     String // CALL, VISIT, SMS, EMAIL, NOTICE, LEGAL
+  outcome          String // CONTACTED, NO_ANSWER, WRONG_NUMBER, PROMISE_TO_PAY, DISPUTE, REFUSED
   notes            String
   nextFollowUpDate DateTime?
   performedBy      String
@@ -955,17 +952,17 @@ model LoanRestructure {
 }
 
 model Settlement {
-  id                String    @id @default(uuid())
-  loanId            String
-  loan              Loan      @relation(fields: [loanId], references: [id])
-  totalOutstanding  Decimal   @db.Decimal(14, 2)
-  settlementAmount  Decimal   @db.Decimal(14, 2)
-  waivedAmount      Decimal   @db.Decimal(14, 2)
-  reason            String
-  status            String    @default("PENDING") // PENDING, APPROVED, COMPLETED, CANCELLED
-  approvedBy        String?
-  paidDate          DateTime?
-  createdAt         DateTime  @default(now())
+  id               String    @id @default(uuid())
+  loanId           String
+  loan             Loan      @relation(fields: [loanId], references: [id])
+  totalOutstanding Decimal   @db.Decimal(14, 2)
+  settlementAmount Decimal   @db.Decimal(14, 2)
+  waivedAmount     Decimal   @db.Decimal(14, 2)
+  reason           String
+  status           String    @default("PENDING") // PENDING, APPROVED, COMPLETED, CANCELLED
+  approvedBy       String?
+  paidDate         DateTime?
+  createdAt        DateTime  @default(now())
 
   @@index([loanId])
 }
@@ -975,7 +972,7 @@ model LoanClosure {
   loanId        String   @unique
   loan          Loan     @relation(fields: [loanId], references: [id])
   nocNumber     String   @unique
-  closureType   String   // NORMAL_MATURITY, EARLY_PREPAYMENT, SETTLEMENT, WRITE_OFF
+  closureType   String // NORMAL_MATURITY, EARLY_PREPAYMENT, SETTLEMENT, WRITE_OFF
   principalPaid Decimal  @db.Decimal(14, 2)
   interestPaid  Decimal  @db.Decimal(14, 2)
   feesPaid      Decimal  @db.Decimal(14, 2)
@@ -994,10 +991,10 @@ model Document {
   customer        Customer?        @relation(fields: [customerId], references: [id])
   applicationId   String?
   application     LoanApplication? @relation(fields: [applicationId], references: [id])
-  category        String           // IDENTITY, ADDRESS, INCOME, BANK_STATEMENT, BUSINESS, AGREEMENT, NOC
+  category        String // IDENTITY, ADDRESS, INCOME, BANK_STATEMENT, BUSINESS, AGREEMENT, NOC
   documentType    String?
   fileName        String
-  storageKey      String           // object storage key / signed URL identifier
+  storageKey      String // object storage key / signed URL identifier
   contentType     String?
   sizeBytes       Int?
   status          String           @default("PENDING") // PENDING, UNDER_REVIEW, VERIFIED, REJECTED
@@ -1039,7 +1036,7 @@ model NotificationTemplate {
   event         String
   titleTemplate String
   bodyTemplate  String
-  channels      Json     // array of channel names
+  channels      Json // array of channel names
   isActive      Boolean  @default(true)
   updatedAt     DateTime @updatedAt
 }
@@ -1076,4 +1073,134 @@ model SystemSetting {
   value     Json
   category  String?
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Phase 14: Analytics, MIS & Enterprise Command Center
+// ---------------------------------------------------------------------------
+
+model AnalyticsSnapshot {
+  id           String       @id @default(uuid())
+  snapshotDate DateTime     @default(now())
+  snapshotType String       @default("DAILY_PORTFOLIO") // DAILY_PORTFOLIO, ORIGINATIONS, COLLECTIONS, FINANCIAL, RISK, BRANCH_PERFORMANCE
+  tenantId     String?
+  tenant       Tenant?      @relation(fields: [tenantId], references: [id])
+  branchId     String?
+  branch       Branch?      @relation(fields: [branchId], references: [id])
+  productId    String?
+  product      LoanProduct? @relation(fields: [productId], references: [id])
+  channel      String?
+  metrics      Json
+  dimensions   Json?
+  createdAt    DateTime     @default(now())
+
+  @@index([snapshotDate])
+  @@index([tenantId])
+  @@index([branchId])
+  @@index([productId])
+  @@index([snapshotType])
+}
+
+model SavedReport {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  reportType  String // PORTFOLIO, ORIGINATIONS, CREDIT_BRE, RISK_FRAUD, DISBURSEMENTS, COLLECTIONS, FINANCIAL, PARTNERS, PRODUCTS, BRANCHES, OPERATIONS_SLA, SUPPORT, CUSTOM
+  metricKeys  Json // array of string metric keys
+  dimensions  Json? // array of dimension keys
+  filters     Json? // object containing applied filters
+  chartType   String?   @default("BAR") // KPI, LINE, BAR, STACKED_BAR, DONUT, FUNNEL, TABLE
+  visibility  String    @default("PRIVATE") // PRIVATE, TEAM, TENANT
+  ownerId     String
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([tenantId])
+  @@index([reportType])
+}
+
+model AnalyticsDashboardLayout {
+  id           String   @id @default(uuid())
+  userId       String?
+  role         String?
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  name         String   @default("Default Layout")
+  layoutConfig Json // widget grid layout and configurations
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([role])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15: Direct Lending & mPokket-Grade Product Enhancement
+// ---------------------------------------------------------------------------
+
+model CustomerConsent {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  consentType String   // AADHAAR_KYC, CREDIT_BUREAU, LOAN_AGREEMENT, ENACH_MANDATE, DATA_PRIVACY, MARKETING_COMMUNICATION
+  version     String   @default("v1.0")
+  purpose     String
+  granted     Boolean  @default(true)
+  ipAddress   String?
+  userAgent   String?
+  channel     String   @default("DIRECT_WEB") // DIRECT_WEB, MOBILE_APP, BRANCH_PORTAL
+  grantedAt   DateTime @default(now())
+  revokedAt   DateTime?
+
+  @@index([customerId])
+  @@index([tenantId])
+  @@index([consentType])
+}
+
+model CustomerLifecycleHistory {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  fromState  String?
+  toState    String   // NEW, PROFILE_INCOMPLETE, KYC_PENDING, KYC_VERIFIED, ELIGIBILITY_PENDING, ELIGIBLE, ACTIVE_BORROWER, REPEAT_BORROWER, CREDIT_LINE_CUSTOMER, SUSPENDED
+  reason     String?
+  metadata   Json?
+  actorId    String?
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@index([toState])
+  @@index([createdAt])
+}
+
+model CreditReassessment {
+  id               String    @id @default(uuid())
+  customerId       String
+  customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenantId         String?
+  tenant           Tenant?   @relation(fields: [tenantId], references: [id])
+  currentLimit     Decimal   @db.Decimal(14, 2)
+  proposedLimit    Decimal   @db.Decimal(14, 2)
+  approvedLimit    Decimal?  @db.Decimal(14, 2)
+  reassessmentType String    @default("PERIODIC_PERFORMANCE") // PERIODIC_PERFORMANCE, ON_TIME_REPAYMENT, INCOME_UPDATE, MANUAL_REQUEST
+  evaluationScore  Int?
+  status           String    @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, REJECTED, EXPIRED
+  rejectionReason  String?
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  appliedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([tenantId])
+  @@index([status])
 }

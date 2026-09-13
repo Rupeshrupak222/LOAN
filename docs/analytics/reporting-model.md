@@ -1,39 +1,31 @@
-# Reporting Model & Dimensional Aggregation
+# Phase 14: Reporting Data Model & Snapshots
 
-## 1. Supported Dimensions
-The reporting engine supports multi-dimensional aggregation across 8 primary business dimensions:
+## 1. Schema Extensions
+The Phase 14 database schema introduces three reporting models:
 
-1. **TENANT**: Multi-tenant institutional separation.
-2. **BRANCH**: Physical and virtual lending branches.
-3. **PRODUCT**: Loan products and pricing variants.
-4. **CHANNEL**: Origination channels (`DIRECT_DIGITAL`, `PARTNER_LSP`, `BRANCH_ASSISTED`, `EMBEDDED`).
-5. **PARTNER**: Third-party Lending Service Providers (LSPs) and DSAs.
-6. **RISK_GRADE**: 5-tier borrower risk grading (`Grade A` to `Grade E`).
-7. **LOAN_STATUS**: Operational loan states (`DRAFT`, `UNDER_REVIEW`, `APPROVED`, `ACTIVE`, `DELINQUENT`, `CLOSED`).
-8. **DPD_BUCKET**: Standard regulatory delinquency aging buckets (`CURRENT`, `1-30`, `31-60`, `61-90`, `91-180`, `180+`).
+### `AnalyticsSnapshot`
+Stores periodic immutable reporting snapshots for portfolio, vintage, and cohort trend analysis.
+- `id`: Unique UUID.
+- `snapshotDate`: Timestamp of snapshot capture.
+- `snapshotType`: Categorization (`DAILY_PORTFOLIO`, `ORIGINATIONS`, `COLLECTIONS`, `FINANCIAL`, `RISK`, `BRANCH_PERFORMANCE`).
+- `tenantId` & `branchId` & `productId`: Multi-tenant and branch attribution.
+- `metrics`: JSON object holding detailed aggregates.
+- `dimensions`: JSON object holding high-level indexable dimensions.
 
----
+### `SavedReport`
+Persists parameterized query configurations created in the Report Builder.
+- `id`: Unique UUID.
+- `name` & `description`: User-defined labels.
+- `reportType`: Whitelisted server-side domain (`PORTFOLIO`, `ORIGINATIONS`, `CREDIT_BRE`, `RISK_FRAUD`, `DISBURSEMENTS`, `COLLECTIONS`, `FINANCIAL`, `PARTNERS`, `PRODUCTS`, `BRANCHES`, `OPERATIONS_SLA`, `SUPPORT`, `CUSTOM`).
+- `metricKeys` & `dimensions`: Selected fields.
+- `filters`: JSON object holding applied criteria.
+- `chartType`: Visualization choice (`KPI`, `LINE`, `BAR`, `STACKED_BAR`, `DONUT`, `FUNNEL`, `TABLE`).
+- `visibility`: Access scope (`PRIVATE`, `TEAM`, `TENANT`).
+- `ownerId`: User ID of report creator.
+- `lastRunAt`: Timestamp of last execution.
 
-## 2. Snapshot Schema & Immutability
-Periodic snapshots are stored as immutable point-in-time state objects:
-
-```typescript
-interface ReportingSnapshotRecord {
-  id: string;
-  snapshotDate: string; // YYYY-MM-DD
-  snapshotType: 'DAILY' | 'MONTHLY' | 'QUARTERLY';
-  tenantId: string;
-  totalAum: number;
-  activeLoansCount: number;
-  totalDisbursedMonth: number;
-  totalCollectedMonth: number;
-  totalOverdue: number;
-  par30Amount: number;
-  par90Amount: number;
-  totalRevenueMonth: number;
-  isImmutable: boolean;
-  generatedAt: string;
-  metadata?: Record<string, any>;
-}
-```
-Historical reporting snapshots cannot be overwritten or mutated when product policies or pricing models are altered in future periods.
+### `AnalyticsDashboardLayout`
+Stores customized dashboard widget configurations for users or institutional roles.
+- `userId` & `role`: Layout owner attribution.
+- `layoutConfig`: JSON array of widget coordinates, chart types, and metric domains.
+- `isDefault`: Whether this layout serves as the default preset.
