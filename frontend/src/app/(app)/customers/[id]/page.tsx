@@ -506,7 +506,7 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
@@ -873,7 +873,7 @@ export default function CustomerDetailPage() {
                   + Upload Document
                 </Button>
               )}
-              {(isUnderwriter || isAdmin) && (
+              {isAdmin && (
                 <Button size="sm" onClick={() => setKycModalOpen(true)}>
                   Update KYC Status
                 </Button>
@@ -964,7 +964,7 @@ export default function CustomerDetailPage() {
                           >
                             <Sparkles className="h-3 w-3 text-amber-500" /> AI Check
                           </Button>
-                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)) && !isBranchManager && (
+                          {user?.roles?.some((r: string) => ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST'].includes(r)) && !isBranchManager && (
                             <Button
                               size="sm"
                               variant="secondary"

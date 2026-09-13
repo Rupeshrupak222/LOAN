@@ -1,7 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from 'react';
-import Link from 'next/link';
+import React, { ReactNode, useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -178,14 +177,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Automatic redirect if unauthenticated without blank screen hang
   useEffect(() => {
-    if (!loading && !user && pathname && !pathname.startsWith('/login')) {
+    if (!authLoading && !user && pathname && !pathname.startsWith('/login')) {
       router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [loading, user, pathname, router]);
+  }, [authLoading, user, pathname, router]);
 
-  if (loading) {
+  if (authLoading || wsLoading) {
     return (
-      <div className={cn("flex h-screen w-full items-center justify-center transition-colors", isDark ? "bg-[#060F1B] text-slate-100" : "bg-[#f8fafc] text-slate-900")}>
+      <div
+        className={cn(
+          'flex h-screen w-full items-center justify-center transition-colors',
+          isDark ? 'bg-[#060F1B] text-slate-100' : 'bg-[#f8fafc] text-slate-900'
+        )}
+      >
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Loading Workspace...</p>
@@ -196,7 +200,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!user) {
     return (
-      <div className={cn("flex h-screen w-full items-center justify-center transition-colors", isDark ? "bg-[#060F1B] text-slate-100" : "bg-[#f8fafc] text-slate-900")}>
+      <div
+        className={cn(
+          'flex h-screen w-full items-center justify-center transition-colors',
+          isDark ? 'bg-[#060F1B] text-slate-100' : 'bg-[#f8fafc] text-slate-900'
+        )}
+      >
         <div className="flex flex-col items-center gap-3 text-center px-4">
           <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
             <Lock className="h-5 w-5" />
@@ -234,8 +243,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       router.push(`/customers?search=${encodeURIComponent(q)}`);
     }
   }
-
-  const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() || 'AD';
 
   return (
     <div className={cn("flex h-screen w-full overflow-hidden transition-colors duration-200", isDark ? "dark bg-[#060F1B] text-slate-100" : "bg-[#f8fafc] text-slate-900")}>
@@ -418,6 +425,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setOpen(false)}
         />
       )}
+    >
+      {/* Route Transition Progress Bar */}
+      <NavigationProgressBar />
 
       {/* Main Content Area with independent scroll */}
       <div className={cn("flex flex-1 flex-col h-full min-w-0 overflow-y-auto overscroll-contain transition-colors", isDark ? "bg-[#060F1B]" : "bg-[#f8fafc]")}>
@@ -554,42 +564,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
           </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto animate-fade-in">
-          {!isAccessibleRoute ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 mb-4 border border-rose-500/20">
-                <AlertCircle className="h-8 w-8" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                403 — Workspace Access Restricted
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
-                Your current role <span className="font-semibold text-slate-700 dark:text-slate-200">({roleCfg.label})</span> does not have authorized permission to view or operate in the <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-xs font-mono text-rose-500">{pathname}</code> module.
-              </p>
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] text-white text-xs font-bold shadow-md shadow-[#2563EB]/25 hover:bg-[#1D4ED8] transition-colors"
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                Return to My Dashboard
-              </Link>
-            </div>
-          ) : (
-            children
-          )}
         </main>
       </div>
-
-      {/* AI Workflow & Exception Center Modal */}
-      {exceptionCenterOpen && (
-        <WorkflowExceptionCenterModal
-          isOpen={exceptionCenterOpen}
-          onClose={() => setExceptionCenterOpen(false)}
-        />
-      )}
     </div>
+  );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <WorkspaceProvider>
+      <InnerAppShell>{children}</InnerAppShell>
+    </WorkspaceProvider>
   );
 }

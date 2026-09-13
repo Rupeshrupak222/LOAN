@@ -855,11 +855,28 @@ export async function forwardToUnderwriting(
     blockers.push('Credit Analyst recommendation must be recorded before Underwriter handoff');
   }
 
+  // Gate 3: All Uploaded Documents Must Be Verified
+  const allDocs = app.customer?.documents || [];
+  if (allDocs.length > 0) {
+    const unverifiedDocs = allDocs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
+    if (unverifiedDocs.length > 0) {
+      const docNames = unverifiedDocs
+        .map((d: any) => d.documentType || d.fileName || 'Document')
+        .join(', ');
+      blockers.push(
+        `${unverifiedDocs.length} document(s) are pending verification (${docNames}). All uploaded borrower documents must be verified before Underwriter handoff`
+      );
+    }
+  } else if (allDocs.length === 0) {
+    blockers.push('No borrower documents found. At least one verified document is required before Underwriter handoff');
+  }
+
   if (blockers.length > 0) {
     throw new BadRequestError(
       `Cannot forward application to Underwriting. Mandatory assessment gates incomplete: ${blockers.join('; ')}.`
     );
   }
+
 
   const targetStatus: ApplicationStatus = 'UNDERWRITING';
 
