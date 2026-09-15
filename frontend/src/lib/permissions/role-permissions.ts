@@ -4,45 +4,32 @@ import { PermissionKey } from './permissions.types';
 // Canonical Role-to-Permissions Mapping for Adyapan Lending OS
 export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
   SUPER_ADMIN: [
-    // SuperAdmin possesses universal permissions across all workspaces
-    'customer.view', 'customer.create', 'customer.edit', 'customer.delete', 'customer.kyc',
-    'application.view', 'application.create', 'application.edit', 'application.submit', 'application.review', 'application.return', 'application.resubmit',
-    'credit.view', 'credit.assess', 'credit.recommend', 'credit.bank_intelligence', 'credit.fraud_score',
-    'underwriting.view', 'underwriting.decide', 'underwriting.condition', 'underwriting.override', 'underwriting.kfs_generate',
-    'approval.view', 'approval.review', 'approval.approve', 'approval.reject', 'approval.send_back', 'approval.escalate', 'approval.delegate', 'approval.queue.view',
-    'authority.view', 'authority.create', 'authority.edit', 'authority.activate', 'authority.archive',
-    'delegation.view', 'delegation.create', 'delegation.edit', 'delegation.revoke',
-    'offer.view', 'offer.generate', 'offer.edit', 'offer.regenerate', 'offer.accept', 'offer.decline', 'offer.cancel', 'offer.simulate', 'offer.pricing.view', 'offer.pricing.configure', 'offer.policy.view', 'offer.policy.create', 'offer.policy.edit', 'offer.policy.activate', 'offer.policy.archive',
-    'credit_limit.view', 'credit_limit.create', 'credit_limit.evaluate', 'credit_limit.approve', 'credit_limit.increase', 'credit_limit.decrease', 'credit_limit.suspend', 'credit_limit.freeze', 'credit_limit.resume', 'credit_limit.close',
-    'credit_facility.view', 'credit_facility.create', 'credit_facility.edit',
-    'drawdown.view', 'drawdown.request', 'drawdown.approve', 'drawdown.cancel',
-    'credit_limit.policy.view', 'credit_limit.policy.create', 'credit_limit.policy.edit', 'credit_limit.policy.activate', 'credit_limit.policy.archive',
-    'disbursement.view', 'disbursement.verify', 'disbursement.execute', 'disbursement.penny_drop',
-    'payout.view', 'payout.initiate', 'payout.retry',
-    'loan.view', 'loan.manage', 'loan.restructure', 'loan.settle', 'loan.close', 'loan.noc_issue',
-    'payment.view', 'payment.record', 'payment.verify', 'payment.initiate', 'payment.confirm', 'payment.refund', 'payment.reverse',
-    'settlement.view', 'settlement.confirm', 'dispute.view', 'dispute.manage', 'recon.view', 'recon.execute', 'recon.adjust',
-    'collection.view', 'collection.manage', 'collection.activity', 'collection.ptp',
-    'finance.gl.view', 'finance.gl.post', 'finance.trial_balance', 'finance.accrual.run', 'finance.npa.view', 'finance.recon.view', 'finance.recon.execute',
-    'accounting.dashboard.view', 'accounting.coa.view', 'accounting.coa.manage', 'accounting.period.view', 'accounting.period.manage', 'accounting.journal.create', 'accounting.journal.approve', 'accounting.journal.post', 'accounting.journal.reverse', 'accounting.trial_balance.view', 'accounting.financial_statements.view', 'accounting.receivables.view', 'accounting.payables.view', 'accounting.payables.manage', 'accounting.payables.approve', 'accounting.accruals.view', 'accounting.accruals.run', 'accounting.accruals.reverse', 'accounting.tax.view', 'accounting.tax.manage', 'accounting.suspense.view', 'accounting.suspense.clear',
-    'bre.view', 'bre.edit', 'bre.simulate',
-    'decision.view', 'decision.evaluate', 'decision.simulate', 'decision.override',
-    'decision.policy.view', 'decision.policy.create', 'decision.policy.edit', 'decision.policy.activate', 'decision.policy.archive',
-    'decision.rules.view', 'decision.rules.create', 'decision.rules.edit', 'decision.rules.activate', 'decision.rules.archive',
-    'risk.view', 'risk.view_signals', 'risk.evaluate', 'risk.manage_policies', 'risk.override', 'risk.fraud_intel', 'risk.early_warnings',
-    'fraud.view_cases', 'fraud.investigate', 'fraud.manage_rules', 'fraud.override',
-    'audit.view', 'compliance.view', 'privacy.manage', 'reports.view', 'reports.export',
-    'partner.view', 'partner.manage', 'communications.view', 'communications.send',
-    'communications.templates.view', 'communications.templates.manage',
-    'communications.policies.view', 'communications.policies.manage',
-    'communications.preferences.view', 'communications.preferences.manage',
-    'support.tickets.view', 'support.tickets.manage', 'support.tickets.escalate',
-    'support.complaints.view', 'support.complaints.manage', 'support.reports.view',
-    'product.view', 'product.create', 'product.edit', 'product.activate', 'product.deactivate', 'product.archive', 'product.configure', 'product.simulate',
-    'workflow.view', 'workflow.create', 'workflow.edit', 'workflow.activate', 'workflow.archive', 'workflow.manage',
+    // SuperAdmin is strictly the PLATFORM CONTROL-PLANE role (no operational execution/mutation)
+    // 1. Platform & Tenant Governance
     'tenant.view', 'tenant.manage', 'branch.view', 'branch.manage', 'user.view', 'user.manage', 'role.view', 'role.manage',
-    'config.view', 'config.manage', 'branding.view', 'branding.manage', 'integration.view', 'integration.manage',
+    // 2. Product, BRE & Policy Configuration
+    'product.view', 'product.create', 'product.edit', 'product.activate', 'product.deactivate', 'product.archive', 'product.configure', 'product.simulate',
+    'offer.policy.view', 'offer.policy.create', 'offer.policy.edit', 'offer.policy.activate', 'offer.policy.archive', 'offer.pricing.view', 'offer.pricing.configure',
+    'credit_limit.policy.view', 'credit_limit.policy.create', 'credit_limit.policy.edit', 'credit_limit.policy.activate', 'credit_limit.policy.archive',
+    'bre.view', 'bre.edit', 'bre.simulate',
+    'decision.view', 'decision.policy.view', 'decision.policy.create', 'decision.policy.edit', 'decision.policy.activate', 'decision.policy.archive',
+    'decision.rules.view', 'decision.rules.create', 'decision.rules.edit', 'decision.rules.activate', 'decision.rules.archive',
+    // 3. Workflow & Approval Matrix Configuration (No individual loan bypasses)
+    'workflow.view', 'workflow.create', 'workflow.edit', 'workflow.activate', 'workflow.archive', 'workflow.manage',
+    'authority.view', 'authority.create', 'authority.edit', 'authority.activate', 'authority.archive',
+    'delegation.view',
+    // 4. Integrations & Platform Operations
+    'integration.view', 'integration.manage',
+    'config.view', 'config.manage', 'branding.view', 'branding.manage',
     'settings.manage', 'system.observability', 'support.sla', 'analytics.command_center',
+    // 5. Governance, Audit & Compliance Oversight
+    'audit.view', 'compliance.view', 'privacy.manage', 'reports.view', 'reports.export',
+    // 6. High-Level Read-Only Business Visibility (Oversight Only - No Operational Mutation)
+    'customer.view', 'application.view', 'credit.view', 'underwriting.view', 'approval.view', 'approval.queue.view',
+    'offer.view', 'credit_limit.view', 'credit_facility.view', 'drawdown.view',
+    'disbursement.view', 'payout.view', 'loan.view', 'payment.view', 'settlement.view', 'dispute.view', 'recon.view',
+    'collection.view', 'finance.gl.view', 'finance.npa.view', 'finance.recon.view', 'accounting.dashboard.view',
+    'risk.view', 'fraud.view_cases', 'partner.view', 'communications.view', 'support.tickets.view', 'support.complaints.view',
   ],
 
   ADMIN: [

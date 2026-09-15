@@ -100,7 +100,7 @@ router.get(
 // 4. Contact Activity
 router.post(
   '/activities',
-  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   validate(logActivitySchema),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
@@ -112,7 +112,7 @@ router.post(
 // 5. PTP Recording
 router.post(
   '/ptp',
-  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   validate(recordPtpSchema),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
@@ -154,7 +154,7 @@ router.post(
 // 8. Follow-Ups
 router.post(
   '/follow-ups',
-  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const followUp = await collectionEscalationService.createFollowUp(req.body, actor);
@@ -164,7 +164,7 @@ router.post(
 
 router.post(
   '/follow-ups/:id/complete',
-  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const completed = collectionEscalationService.completeFollowUp(
@@ -179,7 +179,7 @@ router.post(
 // 9. Case Escalations
 router.post(
   '/cases/:id/escalate',
-  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const escalation = await collectionEscalationService.escalateCase(
@@ -199,7 +199,7 @@ router.post(
 // 10. Settlements
 router.post(
   '/settlements',
-  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const settlement = await collectionSettlementService.proposeSettlement(req.body, actor as any);
@@ -209,7 +209,7 @@ router.post(
 
 router.post(
   '/settlements/:id/authorize',
-  authorize('BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_CONTROLLER'),
+  authorize('BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_CONTROLLER'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const result = await collectionSettlementService.authorizeSettlement(
@@ -225,7 +225,7 @@ router.post(
 // 11. Write-offs
 router.post(
   '/write-offs',
-  authorize('COLLECTION_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COLLECTION_OFFICER', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const writeOff = await collectionWriteOffService.proposeWriteOff(req.body, actor as any);
@@ -235,7 +235,7 @@ router.post(
 
 router.post(
   '/write-offs/:id/authorize',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const actor = await getActor(req);
     const result = await collectionWriteOffService.authorizeWriteOff(

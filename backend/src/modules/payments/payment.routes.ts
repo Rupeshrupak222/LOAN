@@ -98,7 +98,7 @@ router.post(
  */
 router.post(
   '/:id/confirm',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER'),
+  authorize('COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER'),
   asyncHandler(async (req, res) => {
     const result = await confirmPayment(req.params.id, req.body || {}, {
       id: req.user!.id,
@@ -117,7 +117,7 @@ router.post(
  */
 router.post(
   '/:id/refund',
-  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
+  authorize('FINANCE_OFFICER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const refund = await processRefund(req.params.id, req.body || {}, {
       id: req.user!.id,
@@ -136,7 +136,7 @@ router.post(
  */
 router.post(
   '/:id/reverse',
-  authorize('SUPER_ADMIN', 'FINANCE_OFFICER'),
+  authorize('FINANCE_OFFICER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const reversal = await reversePayment(req.params.id, req.body || {}, {
       id: req.user!.id,
@@ -185,7 +185,7 @@ router.get(
  */
 router.post(
   '/payouts/initiate',
-  authorize('SUPER_ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'ADMIN'),
+  authorize('FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const payout = await initiatePayout(req.body || {}, {
       id: req.user!.id,
@@ -301,7 +301,7 @@ router.post(
  */
 router.post(
   '/collect',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'COLLECTION_OFFICER'),
+  authorize('COMPANY_ADMIN', 'ADMIN', 'COLLECTION_OFFICER'),
   asyncHandler(async (req, res) => {
     if (
       req.user?.roles?.includes('FINANCE_OFFICER') &&
@@ -408,7 +408,7 @@ router.get(
 
 router.post(
   '/submissions/:id/verify',
-  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('FINANCE_OFFICER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     if (
       req.user?.roles?.includes('COLLECTION_OFFICER') &&
@@ -431,7 +431,7 @@ router.post(
 
 router.post(
   '/submissions/:id/reject',
-  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('FINANCE_OFFICER', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     if (
       req.user?.roles?.includes('COLLECTION_OFFICER') &&
@@ -495,7 +495,7 @@ router.get(
 
 router.post(
   '/',
-  authorize('FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CUSTOMER'),
+  authorize('FINANCE_OFFICER', 'COMPANY_ADMIN', 'ADMIN', 'CUSTOMER'),
   validate(recordPaymentSchema),
   asyncHandler(async (req, res) => {
     if (

@@ -137,6 +137,38 @@ export class SodValidator {
       );
     }
   }
+  /**
+   * Enforces that Super Admin cannot perform operational lending transactions.
+   * Super Admin is strictly a platform control-plane role.
+   *
+   * @throws ForbiddenError if user only has SUPER_ADMIN or attempts an operational lending transaction under platform authority
+   */
+  public static assertSuperAdminOperationalSeparation(userOrRoles: string[] | { roles?: string[] }, actionName: string): void {
+    const rawRoles = Array.isArray(userOrRoles) ? userOrRoles : userOrRoles?.roles || [];
+    const normalizedRoles = rawRoles.map((r) => r.toUpperCase());
+    const isSuperAdmin = normalizedRoles.includes('SUPER_ADMIN');
+
+    // Operational roles that would be needed to execute operational transactions
+    const operationalLendingRoles = [
+      'UNDERWRITER',
+      'CREDIT_HEAD',
+      'CREDIT_ANALYST',
+      'LOAN_OFFICER',
+      'DISBURSEMENT_OFFICER',
+      'FINANCE_OFFICER',
+      'COLLECTION_OFFICER',
+      'COLLECTION_AGENT',
+      'BRANCH_MANAGER',
+    ];
+
+    const hasOperationalRole = normalizedRoles.some((r) => operationalLendingRoles.includes(r));
+
+    if (isSuperAdmin && !hasOperationalRole) {
+      throw new ForbiddenError(
+        `[SOD_VIOLATION] Platform Admin vs Lending Operative conflict: SUPER_ADMIN is a platform control-plane role and cannot perform operational lending action '${actionName}'. Operational lending actions require an authorized business or credit role.`
+      );
+    }
+  }
 }
 
 export const assertMakerCheckerSeparation = SodValidator.assertMakerCheckerSeparation;
@@ -145,3 +177,4 @@ export const assertAuditorReadOnly = SodValidator.assertAuditorReadOnly;
 export const assertBorrowerInternalRestriction = SodValidator.assertBorrowerInternalRestriction;
 export const assertOperationalSeparation = SodValidator.assertOperationalSeparation;
 export const assertLoanOfficerSeparation = SodValidator.assertLoanOfficerSeparation;
+export const assertSuperAdminOperationalSeparation = SodValidator.assertSuperAdminOperationalSeparation;

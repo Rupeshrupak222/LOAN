@@ -71,6 +71,7 @@ import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard'
 import { BorrowerDashboardView } from '@/features/borrower';
 import { LoanOfficerDashboardView } from '@/features/origination';
 import { CreditAnalystDashboardView } from '@/components/CreditAnalystDashboardView';
+import { SuperAdminDashboardView } from '@/components/SuperAdminDashboardView';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -217,42 +218,42 @@ export default function DashboardPage() {
   const { data: underwritingData } = useQuery({
     queryKey: ['dashboard-underwriting-queue'],
     queryFn: async () => (await api.get('/underwriting/queue')).data.data,
-    enabled: !!user && ['UNDERWRITER', 'CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['UNDERWRITER', 'CREDIT_ANALYST', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
     refetchInterval: 5000,
   });
 
   const { data: disbursementsData } = useQuery({
     queryKey: ['dashboard-disbursements-queue'],
     queryFn: async () => (await api.get('/disbursements/queue')).data.data,
-    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
+    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
     refetchInterval: 5000,
   });
 
   const { data: collectionsData } = useQuery({
     queryKey: ['dashboard-collections'],
     queryFn: async () => (await api.get('/collections/dashboard')).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['COLLECTION_OFFICER', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
     refetchInterval: 5000,
   });
 
   const { data: casesData } = useQuery({
     queryKey: ['dashboard-collection-cases'],
     queryFn: async () => (await api.get('/collections/cases', { params: { pageSize: 10 } })).data.data,
-    enabled: !!user && ['COLLECTION_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['COLLECTION_OFFICER', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
     refetchInterval: 5000,
   });
 
   const { data: submissionsData } = useQuery({
     queryKey: ['dashboard-payment-submissions'],
     queryFn: async () => (await api.get('/payments/submissions', { params: { pageSize: 15 } })).data.data,
-    enabled: !!user && (isFinanceOfficer || ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
+    enabled: !!user && (isFinanceOfficer || ['COLLECTION_OFFICER', 'FINANCE_OFFICER', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
     refetchInterval: 5000,
   });
 
   const { data: paymentsData } = useQuery({
     queryKey: ['dashboard-payments-transactions'],
     queryFn: async () => (await api.get('/payments/transactions', { params: { pageSize: 20 } })).data.data,
-    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
+    enabled: !!user && (isFinanceOfficer || ['FINANCE_OFFICER', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole) || user?.roles?.includes('FINANCE_OFFICER')),
     refetchInterval: 5000,
   });
 
@@ -266,14 +267,14 @@ export default function DashboardPage() {
   const { data: creditQueueData } = useQuery({
     queryKey: ['dashboard-credit-queue'],
     queryFn: async () => (await api.get('/credit/queue', { params: { tab: 'ALL' } })).data?.data,
-    enabled: !!user && ['CREDIT_ANALYST', 'SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
+    enabled: !!user && ['CREDIT_ANALYST', 'ADMIN', 'BRANCH_MANAGER'].includes(primaryRole),
     refetchInterval: 5000,
   });
 
   const { data: branchQueueData } = useQuery({
     queryKey: ['dashboard-branch-queue'],
     queryFn: async () => (await api.get('/branch-manager/queue', { params: { tab: 'ALL' } })).data?.data,
-    enabled: !!user && ['BRANCH_MANAGER', 'SUPER_ADMIN', 'ADMIN'].includes(primaryRole),
+    enabled: !!user && ['BRANCH_MANAGER', 'ADMIN'].includes(primaryRole),
     refetchInterval: 5000,
   });
 
@@ -360,6 +361,10 @@ export default function DashboardPage() {
 
   if (authLoading) return <Spinner />;
   if (!user) return null;
+
+  if (primaryRole === 'SUPER_ADMIN') {
+    return <SuperAdminDashboardView />;
+  }
 
   if (primaryRole === 'CUSTOMER') {
     return <BorrowerDashboardView />;

@@ -186,13 +186,13 @@ export const PolicyManagement: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header / Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <FileCode2 className="w-5 h-5 text-indigo-400" />
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <FileCode2 className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
             Decision Policy Management
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Configure versioned, deterministic underwriting policy rulebooks linked to Loan Products
           </p>
         </div>
@@ -200,7 +200,7 @@ export const PolicyManagement: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => refetch()}
-            className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700/80 border border-slate-700 transition-colors"
+            className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-colors"
             title="Refresh policies"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -251,7 +251,7 @@ export const PolicyManagement: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Policy Selector & Filter (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/90 rounded-2xl p-4 shadow-sm dark:shadow-xl space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -259,7 +259,7 @@ export const PolicyManagement: React.FC = () => {
                 placeholder="Search policies or products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
@@ -270,8 +270,8 @@ export const PolicyManagement: React.FC = () => {
                   onClick={() => setStatusFilter(st)}
                   className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
                     statusFilter === st
-                      ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                      : 'text-slate-400 hover:bg-slate-800'
+                      ? 'bg-indigo-50 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/40'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   {st}
@@ -282,7 +282,7 @@ export const PolicyManagement: React.FC = () => {
             {/* List of Policies */}
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
               {filteredPolicies.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-500">
+                <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500">
                   No matching decision policies found.
                 </div>
               ) : (
@@ -299,35 +299,35 @@ export const PolicyManagement: React.FC = () => {
                       onClick={() => setSelectedPolicyId(pol.id)}
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-950/40 border-indigo-500/60 shadow-lg shadow-indigo-950/50'
-                          : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                          ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-500/60 shadow-sm dark:shadow-indigo-950/50'
+                          : 'bg-slate-50/60 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-900/60'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="font-bold text-xs text-white truncate">{pol.name}</span>
+                        <span className="font-bold text-xs text-slate-900 dark:text-white truncate">{pol.name}</span>
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
                             pol.status === 'ACTIVE'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              ? 'bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30'
                               : pol.status === 'DRAFT'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              : 'bg-slate-800 text-slate-400'
+                              ? 'bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30'
+                              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                           }`}
                         >
                           {pol.status} v{pol.version}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span className="font-mono text-indigo-300/80">{pol.code}</span>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="font-mono text-indigo-600 dark:text-indigo-300/80">{pol.code}</span>
                         <span>{totalRules} Rules in {pol.ruleGroups?.length || 0} Groups</span>
                       </div>
 
                       {pol.productCode && (
-                        <div className="mt-2 text-[10px] text-slate-400 flex items-center gap-1">
-                          <Tag className="w-3 h-3 text-slate-500" />
+                        <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                           <span>Product:</span>
-                          <span className="font-semibold text-slate-300">{pol.productCode}</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{pol.productCode}</span>
                         </div>
                       )}
                     </div>
@@ -343,18 +343,18 @@ export const PolicyManagement: React.FC = () => {
           {activePolicy ? (
             <div className="space-y-4">
               {/* Policy Header Card */}
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+              <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
                   <div>
                     <div className="flex items-center gap-2.5">
-                      <h2 className="text-lg font-bold text-white tracking-tight">
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                         {activePolicy.name}
                       </h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                         Version {activePolicy.version}.0
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">{activePolicy.description}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{activePolicy.description}</p>
                   </div>
 
                   {/* Version Actions */}
@@ -371,7 +371,7 @@ export const PolicyManagement: React.FC = () => {
 
                     <button
                       onClick={() => handleCreateNewVersion(activePolicy.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all active:scale-95"
                       title="Clone as new incremental version"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -381,7 +381,7 @@ export const PolicyManagement: React.FC = () => {
                     {activePolicy.status !== 'ARCHIVED' && (
                       <button
                         onClick={() => handleArchive(activePolicy.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-xl hover:bg-slate-800 border border-slate-800 transition-colors"
+                        className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-colors"
                         title="Archive version"
                       >
                         <Archive className="w-4 h-4" />
@@ -392,26 +392,26 @@ export const PolicyManagement: React.FC = () => {
 
                 {/* Policy Metadata & Scoring Weights strip */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 text-xs">
-                  <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Policy Code</span>
-                    <span className="font-mono text-indigo-300 font-semibold">{activePolicy.code}</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block mb-0.5">Policy Code</span>
+                    <span className="font-mono text-indigo-600 dark:text-indigo-300 font-semibold">{activePolicy.code}</span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Target Product</span>
-                    <span className="font-semibold text-slate-200">{activePolicy.productCode || 'ALL_PRODUCTS'}</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block mb-0.5">Target Product</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{activePolicy.productCode || 'ALL_PRODUCTS'}</span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Effective Date</span>
-                    <span className="text-slate-300">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block mb-0.5">Effective Date</span>
+                    <span className="text-slate-700 dark:text-slate-300">
                       {new Date(activePolicy.effectiveFrom || activePolicy.createdAt).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-950/50 rounded-xl border border-slate-800/80">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Total Rule Count</span>
-                    <span className="font-bold text-white">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block mb-0.5">Total Rule Count</span>
+                    <span className="font-bold text-slate-900 dark:text-white">
                       {(activePolicy.ruleGroups || []).reduce((sum, g) => sum + (g.rules?.length || 0), 0)} Rules
                     </span>
                   </div>
@@ -421,8 +421,8 @@ export const PolicyManagement: React.FC = () => {
               {/* Rule Groups Container */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                     Policy Rule Groups ({activePolicy.ruleGroups?.length || 0})
                   </h3>
                 </div>
@@ -434,12 +434,12 @@ export const PolicyManagement: React.FC = () => {
                   return (
                     <div
                       key={group.id}
-                      className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-lg"
+                      className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-lg"
                     >
                       {/* Group Header Bar */}
                       <div
                         onClick={() => toggleGroup(group.category)}
-                        className="flex items-center justify-between p-4 bg-slate-950/40 hover:bg-slate-800/40 cursor-pointer transition-colors border-b border-slate-800/60"
+                        className="flex items-center justify-between p-4 bg-slate-50/80 dark:bg-slate-950/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-800/60"
                       >
                         <div className="flex items-center gap-3">
                           {isExpanded ? (
@@ -449,23 +449,23 @@ export const PolicyManagement: React.FC = () => {
                           )}
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-white">{group.name}</span>
-                              <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-indigo-950 text-indigo-300 border border-indigo-800">
+                              <span className="font-bold text-sm text-slate-900 dark:text-white">{group.name}</span>
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                                 {group.logicalOperator}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-0.5">{group.description}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{group.description}</p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-xs text-slate-400 font-medium">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                             {enabledCount}/{group.rules?.length || 0} active
                           </span>
 
                           <button
                             onClick={() => handleOpenAddRule(group.id, group.category)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 transition-all active:scale-95"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 transition-all active:scale-95"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             Add Rule
@@ -477,7 +477,7 @@ export const PolicyManagement: React.FC = () => {
                       {isExpanded && (
                         <div className="p-4 space-y-3">
                           {(!group.rules || group.rules.length === 0) ? (
-                            <div className="text-center py-6 border border-dashed border-slate-800 rounded-xl text-xs text-slate-500">
+                            <div className="text-center py-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-400 dark:text-slate-500">
                               No rules defined in this group. Click &quot;Add Rule&quot; to configure criteria.
                             </div>
                           ) : (
@@ -487,37 +487,37 @@ export const PolicyManagement: React.FC = () => {
                                   key={rule.id}
                                   className={`p-3.5 rounded-xl border transition-all ${
                                     rule.enabled
-                                      ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                                      : 'bg-slate-950/20 border-slate-900 opacity-60'
+                                      ? 'bg-slate-50/50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                                      : 'bg-slate-100/50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-900 opacity-60'
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-3">
                                     {/* Left: Code, Name & Condition */}
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-2">
-                                        <span className="font-mono text-xs font-bold text-indigo-300">
+                                        <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-300">
                                           {rule.code}
                                         </span>
-                                        <span className="text-xs font-semibold text-slate-200">
+                                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                                           {rule.name}
                                         </span>
                                         <span
                                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                                             rule.severity === 'HARD_STOP'
-                                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                              ? 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30'
                                               : rule.severity === 'HIGH'
-                                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                              : 'bg-slate-800 text-slate-400'
+                                              ? 'bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30'
+                                              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                                           }`}
                                         >
                                           {rule.severity}
                                         </span>
                                       </div>
 
-                                      <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                                        <span className="text-indigo-400">{rule.field}</span>
-                                        <span className="text-amber-400">{rule.operator}</span>
-                                        <span className="text-emerald-300">
+                                      <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400">
+                                        <span className="text-indigo-600 dark:text-indigo-400">{rule.field}</span>
+                                        <span className="text-amber-600 dark:text-amber-400">{rule.operator}</span>
+                                        <span className="text-emerald-600 dark:text-emerald-300">
                                           {Array.isArray(rule.expectedValue)
                                             ? `[${rule.expectedValue.join(', ')}]`
                                             : String(rule.expectedValue)}
@@ -537,8 +537,8 @@ export const PolicyManagement: React.FC = () => {
                                         onClick={() => handleToggleRule(group.id, rule.id)}
                                         className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors ${
                                           rule.enabled
-                                            ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
-                                            : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
+                                            ? 'bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 dark:hover:bg-emerald-500/30'
+                                            : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-700'
                                         }`}
                                       >
                                         {rule.enabled ? 'Enabled' : 'Disabled'}
@@ -546,7 +546,7 @@ export const PolicyManagement: React.FC = () => {
 
                                       <button
                                         onClick={() => handleOpenEditRule(group.id, rule)}
-                                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                                        className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                                         title="Edit rule"
                                       >
                                         <Edit2 className="w-3.5 h-3.5" />
@@ -554,7 +554,7 @@ export const PolicyManagement: React.FC = () => {
 
                                       <button
                                         onClick={() => handleDeleteRule(group.id, rule.id)}
-                                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800"
+                                        className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                                         title="Delete rule"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -573,7 +573,7 @@ export const PolicyManagement: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="p-12 text-center bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400">
+            <div className="p-12 text-center bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 shadow-sm">
               Select or create a Decision Policy to configure rules.
             </div>
           )}

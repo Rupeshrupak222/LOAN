@@ -10,7 +10,6 @@ export function hasPermission(
   permission: PermissionKey
 ): boolean {
   if (!user || !user.roles || user.roles.length === 0) return false;
-  if (user.roles.includes('SUPER_ADMIN')) return true;
 
   const userPerms = getEffectivePermissions(user.roles);
   return userPerms.includes(permission);
@@ -24,7 +23,6 @@ export function hasAnyPermission(
   permissions: PermissionKey[]
 ): boolean {
   if (!user || !user.roles || user.roles.length === 0) return false;
-  if (user.roles.includes('SUPER_ADMIN')) return true;
 
   const userPerms = getEffectivePermissions(user.roles);
   return permissions.some((p) => userPerms.includes(p));
@@ -38,7 +36,6 @@ export function hasAllPermissions(
   permissions: PermissionKey[]
 ): boolean {
   if (!user || !user.roles || user.roles.length === 0) return false;
-  if (user.roles.includes('SUPER_ADMIN')) return true;
 
   const userPerms = getEffectivePermissions(user.roles);
   return permissions.every((p) => userPerms.includes(p));

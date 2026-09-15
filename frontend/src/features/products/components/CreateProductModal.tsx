@@ -97,29 +97,29 @@ export function CreateProductModal({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
               <Package className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Create New Lending Product Draft</h2>
-              <p className="text-xs text-slate-400">Step {currentStep} of 5: {steps[currentStep - 1].title}</p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Create New Lending Product Draft</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Step {currentStep} of 5: {steps[currentStep - 1].title}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Stepper Header */}
-        <div className="px-6 py-3 border-b border-slate-800/80 bg-slate-950/30 flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/30 flex items-center justify-between gap-2 overflow-x-auto">
           {steps.map((s) => (
             <div key={s.number} className="flex items-center gap-2">
               <div
@@ -129,7 +129,7 @@ export function CreateProductModal({ onClose }: Props) {
                     ? 'bg-blue-600 text-white ring-2 ring-blue-500/30'
                     : currentStep > s.number
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-800 text-slate-500'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                 )}
               >
                 {currentStep > s.number ? <Check className="w-3.5 h-3.5" /> : s.number}
@@ -137,12 +137,12 @@ export function CreateProductModal({ onClose }: Props) {
               <span
                 className={cn(
                   'text-xs font-medium whitespace-nowrap',
-                  currentStep === s.number ? 'text-white font-semibold' : 'text-slate-500'
+                  currentStep === s.number ? 'text-slate-900 dark:text-white font-semibold' : 'text-slate-500 dark:text-slate-400'
                 )}
               >
                 {s.title}
               </span>
-              {s.number < 5 && <div className="w-4 h-0.5 bg-slate-800 hidden sm:block" />}
+              {s.number < 5 && <div className="w-4 h-0.5 bg-slate-200 dark:bg-slate-800 hidden sm:block" />}
             </div>
           ))}
         </div>
@@ -154,33 +154,33 @@ export function CreateProductModal({ onClose }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Product Code *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Product Code *</label>
                   <input
                     type="text"
                     placeholder="e.g. PERSONAL_PRIME_2026"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono placeholder-slate-500"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Product Name *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Product Name *</label>
                   <input
                     type="text"
                     placeholder="e.g. Prime Salaried Personal Loan"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase">Product Category</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Product Category</label>
                 <select
                   value={formData.productType}
                   onChange={(e) => setFormData({ ...formData, productType: e.target.value as any })}
-                  className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                 >
                   <option value="PERSONAL_LOAN">Personal Loan</option>
                   <option value="INSTANT_PERSONAL_LOAN">Instant Personal Loan (STP)</option>
@@ -194,13 +194,13 @@ export function CreateProductModal({ onClose }: Props) {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase">Description</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Description</label>
                 <textarea
                   rows={3}
                   placeholder="Describe target demographic, collateral requirements, and core value proposition..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-500"
                 />
               </div>
             </div>
@@ -211,53 +211,53 @@ export function CreateProductModal({ onClose }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Min Loan Amount (₹)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Min Loan Amount (₹)</label>
                   <input
                     type="number"
                     value={formData.minAmount}
                     onChange={(e) => setFormData({ ...formData, minAmount: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Max Loan Amount (₹)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Max Loan Amount (₹)</label>
                   <input
                     type="number"
                     value={formData.maxAmount}
                     onChange={(e) => setFormData({ ...formData, maxAmount: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Min Tenure (Months)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Min Tenure (Months)</label>
                   <input
                     type="number"
                     value={formData.minTenureMonths}
                     onChange={(e) => setFormData({ ...formData, minTenureMonths: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Max Tenure (Months)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Max Tenure (Months)</label>
                   <input
                     type="number"
                     value={formData.maxTenureMonths}
                     onChange={(e) => setFormData({ ...formData, maxTenureMonths: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Interest Model</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Interest Model</label>
                   <select
                     value={formData.interestModel}
                     onChange={(e) => setFormData({ ...formData, interestModel: e.target.value as any })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   >
                     <option value="REDUCING_BALANCE">Reducing Balance (Standard)</option>
                     <option value="FIXED_FLAT">Fixed Flat Rate</option>
@@ -265,13 +265,13 @@ export function CreateProductModal({ onClose }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Base Interest Rate (% p.a.)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Base Interest Rate (% p.a.)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formData.baseInterestRateAnnualPct}
                     onChange={(e) => setFormData({ ...formData, baseInterestRateAnnualPct: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -283,7 +283,7 @@ export function CreateProductModal({ onClose }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Processing Fee (%)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Processing Fee (%)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -294,11 +294,11 @@ export function CreateProductModal({ onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, processingFeePct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Min Processing Fee (₹)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Min Processing Fee (₹)</label>
                   <input
                     type="number"
                     value={formData.feeSchedule.processingFeeMinInr}
@@ -308,11 +308,11 @@ export function CreateProductModal({ onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, processingFeeMinInr: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Documentation Charges (₹)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Documentation Charges (₹)</label>
                   <input
                     type="number"
                     value={formData.feeSchedule.documentationChargesInr}
@@ -322,14 +322,14 @@ export function CreateProductModal({ onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, documentationChargesInr: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Foreclosure Penalty (%)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Foreclosure Penalty (%)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -340,11 +340,11 @@ export function CreateProductModal({ onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, foreclosurePenaltyPct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Lock-in Period (Months)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Lock-in Period (Months)</label>
                   <input
                     type="number"
                     value={formData.feeSchedule.lockInMonths}
@@ -354,11 +354,11 @@ export function CreateProductModal({ onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, lockInMonths: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Monthly Late Fee (%)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Monthly Late Fee (%)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -369,7 +369,7 @@ export function CreateProductModal({ onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, latePaymentPenaltyMonthlyPct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -381,7 +381,7 @@ export function CreateProductModal({ onClose }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Min Monthly Income (₹)</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Min Monthly Income (₹)</label>
                   <input
                     type="number"
                     value={formData.eligibility.minMonthlyIncome}
@@ -391,11 +391,11 @@ export function CreateProductModal({ onClose }: Props) {
                         eligibility: { ...formData.eligibility, minMonthlyIncome: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Min CIBIL Bureau Score</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Min CIBIL Bureau Score</label>
                   <input
                     type="number"
                     value={formData.creditPolicy.minCibilScore}
@@ -405,17 +405,17 @@ export function CreateProductModal({ onClose }: Props) {
                         creditPolicy: { ...formData.creditPolicy, minCibilScore: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase">Workflow Assignment</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Workflow Assignment</label>
                 <select
                   value={formData.workflowId}
                   onChange={(e) => setFormData({ ...formData, workflowId: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
                 >
                   <option value="wf-orig-standard">wf-orig-standard (Assisted Lending Flow)</option>
                   <option value="wf-orig-digital">wf-orig-digital (Instant Digital STP Flow)</option>
@@ -426,7 +426,7 @@ export function CreateProductModal({ onClose }: Props) {
 
           {/* STEP 5: REVIEW */}
           {currentStep === 5 && (
-            <div className="space-y-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
+            <div className="space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-blue-400" />
                 Review Product Configuration Summary
@@ -467,7 +467,7 @@ export function CreateProductModal({ onClose }: Props) {
         </div>
 
         {/* Footer Navigation */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"

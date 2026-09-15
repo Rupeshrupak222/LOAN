@@ -54,19 +54,19 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
   const isAllReady = readiness.isOverallReady;
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md">
+    <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl backdrop-blur-md">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800/80">
         <div>
           <div className="flex items-center gap-3">
-            <span className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <span className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
               <Sparkles className="w-6 h-6" />
             </span>
             <div>
-              <h3 className="text-xl font-bold text-white tracking-tight">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                 Tenant Readiness & Governance Engine
               </h3>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Multi-domain validation gate ensuring operational compliance before institution activation
               </p>
             </div>
@@ -75,10 +75,10 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
 
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="text-2xl font-black text-white">
+            <div className="text-2xl font-black text-slate-900 dark:text-white">
               {readiness.readinessScorePct}%
             </div>
-            <div className="text-xs text-slate-400 font-medium">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
               {readiness.passedDomainsCount} of {readiness.totalDomainsCount} Domains Ready
             </div>
           </div>
@@ -86,7 +86,7 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
           <div className="w-16 h-16 relative flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               <path
-                className="text-slate-800"
+                className="text-slate-200 dark:text-slate-800"
                 strokeWidth="3.5"
                 stroke="currentColor"
                 fill="none"
@@ -102,7 +102,7 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
             </svg>
-            <div className="absolute font-bold text-xs text-white">
+            <div className="absolute font-bold text-xs text-slate-900 dark:text-white">
               {readiness.readinessScorePct}%
             </div>
           </div>
@@ -110,16 +110,16 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
       </div>
 
       {/* Status Bar & Action Banner */}
-      <div className="mt-6 flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-slate-800 gap-3">
+      <div className="mt-6 flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 gap-3">
         <div className="flex items-center gap-3">
           {isAllReady ? (
-            <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 text-sm font-semibold">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               <span>Institutional Readiness: 100% Verified. Ready for live origination.</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm font-semibold">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <span>
                 Configuration Incomplete: {readiness.totalDomainsCount - readiness.passedDomainsCount} domain(s) require setup.
               </span>
@@ -131,10 +131,10 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
           <button
             onClick={() => activateMutation.mutate(readiness.tenantId)}
             disabled={!isAllReady || activateMutation.isPending}
-            className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center gap-2 cursor-pointer ${
               isAllReady
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700/50'
             }`}
           >
             {activateMutation.isPending ? (
@@ -158,27 +158,27 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
               key={check.domain}
               className={`p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
                 isDomainReady
-                  ? 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
-                  : 'bg-rose-950/20 border-rose-900/40 hover:border-rose-700/60'
+                  ? 'bg-slate-50/80 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                  : 'bg-rose-50/80 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 hover:border-rose-300 dark:hover:border-rose-700/60'
               }`}
             >
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className="p-2 rounded-lg bg-slate-800/80 border border-slate-700">
+                    <span className="p-2 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs">
                       {DOMAIN_ICONS[check.domain]}
                     </span>
                     <div>
-                      <h4 className="font-semibold text-slate-200 text-sm">{check.title}</h4>
-                      <span className="text-xs text-slate-400 font-mono uppercase">{check.domain}</span>
+                      <h4 className="font-semibold text-slate-900 dark:text-slate-200 text-sm">{check.title}</h4>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-mono uppercase">{check.domain}</span>
                     </div>
                   </div>
 
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                       isDomainReady
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20'
                     }`}
                   >
                     {isDomainReady ? (
@@ -195,21 +195,21 @@ export const TenantReadinessWidget: React.FC<TenantReadinessWidgetProps> = ({
                   </span>
                 </div>
 
-                <p className="mt-3 text-xs text-slate-400 leading-relaxed">{check.details}</p>
+                <p className="mt-3 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{check.details}</p>
 
                 {check.blockingReason && (
-                  <div className="mt-2.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                  <div className="mt-2.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" />
                     <span>{check.blockingReason}</span>
                   </div>
                 )}
               </div>
 
               {onNavigateTab && (
-                <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-end">
+                <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/60 flex items-center justify-end">
                   <button
                     onClick={() => onNavigateTab(DOMAIN_TAB_MAP[check.domain])}
-                    className="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <span>Configure in Studio</span>
                     <ArrowRight className="w-3.5 h-3.5" />

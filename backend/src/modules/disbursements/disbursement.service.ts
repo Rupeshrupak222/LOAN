@@ -146,18 +146,22 @@ export async function executeDisbursement(
 
   const principalNum = Number(app.requestedAmount);
 
+  // Segregation of Duties: Super Admin cannot execute operational disbursements
+  if (actor.roles?.includes('SUPER_ADMIN') && !actor.roles.some((r) => ['FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) {
+    throw new ForbiddenError(
+      'Access forbidden: Super Admin is a platform control-plane role and cannot execute operational disbursements.'
+    );
+  }
+
   // Enforce Payout Limits
-  const isSuperAdmin = actor.roles?.some((r) => r === 'SUPER_ADMIN');
-  if (!isSuperAdmin) {
-    let payoutLimit = 10000000; // Default ₹1 Crore for Finance Officer
-    if (actor.roles?.includes('DISBURSEMENT_OFFICER') && !actor.roles?.includes('FINANCE_OFFICER')) {
-      payoutLimit = 5000000; // ₹50 Lakhs for junior Disbursement Officer
-    }
-    if (principalNum > payoutLimit) {
-      throw new BadRequestError(
-        `Payout amount of ₹${principalNum.toLocaleString('en-IN')} exceeds authorized officer payout limit of ₹${payoutLimit.toLocaleString('en-IN')}. Requires senior committee authorization.`
-      );
-    }
+  let payoutLimit = 10000000; // Default ₹1 Crore for Finance Officer / Admin
+  if (actor.roles?.includes('DISBURSEMENT_OFFICER') && !actor.roles?.includes('FINANCE_OFFICER')) {
+    payoutLimit = 5000000; // ₹50 Lakhs for junior Disbursement Officer
+  }
+  if (principalNum > payoutLimit) {
+    throw new BadRequestError(
+      `Payout amount of ₹${principalNum.toLocaleString('en-IN')} exceeds authorized officer payout limit of ₹${payoutLimit.toLocaleString('en-IN')}. Requires senior committee authorization.`
+    );
   }
 
   const rateNum = Number(app.product.interestRate);

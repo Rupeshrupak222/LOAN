@@ -16,8 +16,17 @@ import { useOperationsOverview, useOperationsApplications, useTeamQueue } from '
 import { OverviewMetricsCards } from '@/components/operations/OverviewMetricsCards';
 import { RequiresAttentionTable } from '@/components/operations/RequiresAttentionTable';
 import { CreateApplicationModal } from '@/components/operations/CreateApplicationModal';
+import { useAuth } from '@/lib/auth';
+import { PlatformOperationsView } from '@/components/PlatformOperationsView';
 
 export default function OperationsOverviewPage() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
+
+  if (isSuperAdmin) {
+    return <PlatformOperationsView />;
+  }
+
   const { data: metrics, loading: metricsLoading, refetch: refetchMetrics } = useOperationsOverview();
   const { applications, loading: appsLoading, refetch: refetchApps } = useOperationsApplications({
     page: 1,

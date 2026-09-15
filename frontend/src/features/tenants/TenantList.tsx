@@ -99,14 +99,14 @@ export const TenantList: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <span className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <span className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
               <Building2 className="w-6 h-6" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
                 Multi-Tenant Institutions
               </h1>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Manage independent lender tenants, configure products, policies, and assess institutional readiness
               </p>
             </div>
@@ -115,7 +115,7 @@ export const TenantList: React.FC = () => {
 
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all"
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Onboard New Institution</span>
@@ -124,56 +124,56 @@ export const TenantList: React.FC = () => {
 
       {/* KPI Overview Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Total Institutions</span>
-            <Building2 className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Institutions</span>
+            <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl font-black text-white mt-2">
+          <div className="text-2xl font-black text-slate-900 dark:text-white mt-2">
             {overview?.totalTenants ?? tenants.length}
           </div>
-          <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-            <span className="text-blue-400 font-semibold">100% Isolated</span>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+            <span className="text-blue-600 dark:text-blue-400 font-semibold">100% Isolated</span>
             <span>PostgreSQL Scoped</span>
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Active Lenders</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Active Lenders</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-black text-emerald-400 mt-2">
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2">
             {overview?.activeTenantsCount ?? tenants.filter((t) => t.status === 'ACTIVE').length}
           </div>
-          <div className="text-xs text-slate-400 mt-1">Live origination and servicing</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Live origination and servicing</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Enterprise Tiers</span>
-            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Enterprise Tiers</span>
+            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-black text-purple-400 mt-2">
+          <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2">
             {overview?.enterpriseTierCount ?? tenants.filter((t) => t.tier === 'ENTERPRISE').length}
           </div>
-          <div className="text-xs text-slate-400 mt-1">Dedicated compute & policies</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Dedicated compute & policies</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Suspended Institutions</span>
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Suspended Institutions</span>
+            <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400" />
           </div>
-          <div className="text-2xl font-black text-rose-400 mt-2">
+          <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-2">
             {overview?.suspendedTenantsCount ?? tenants.filter((t) => t.status === 'SUSPENDED').length}
           </div>
-          <div className="text-xs text-slate-400 mt-1">Origination halted safely</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Origination halted safely</div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm dark:shadow-xl">
         <div className="relative w-full md:w-96">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 transform -translate-y-1/2" />
           <input
@@ -181,18 +181,18 @@ export const TenantList: React.FC = () => {
             placeholder="Search institutions by name, code, domain..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 focus:outline-none placeholder:text-slate-500"
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-xs text-slate-400">Tier:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Tier:</span>
             <select
               value={tierFilter}
               onChange={(e) => setTierFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 focus:outline-none"
+              className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
             >
               <option value="ALL">All Tiers</option>
               <option value="ENTERPRISE">Enterprise</option>
@@ -202,11 +202,11 @@ export const TenantList: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Status:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 focus:outline-none"
+              className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -218,10 +218,10 @@ export const TenantList: React.FC = () => {
       </div>
 
       {/* Directory Table */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/80 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
+          <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+            <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3.5 px-6">Institution</th>
                 <th className="py-3.5 px-4">Code</th>
@@ -232,66 +232,66 @@ export const TenantList: React.FC = () => {
                 <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {filteredTenants.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-500 dark:text-slate-400">
                     No institutions found matching the filter criteria.
                   </td>
                 </tr>
               ) : (
                 filteredTenants.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
                           {t.code.slice(0, 2)}
                         </div>
                         <div>
                           <Link
                             href={`/tenants/${t.id}`}
-                            className="font-bold text-white hover:text-blue-400 transition-colors text-sm"
+                            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-sm"
                           >
                             {t.name}
                           </Link>
-                          <div className="text-[11px] text-slate-400 font-mono mt-0.5">ID: {t.id}</div>
+                          <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">ID: {t.id}</div>
                         </div>
                       </div>
                     </td>
 
-                    <td className="py-4 px-4 font-mono font-bold text-blue-400">{t.code}</td>
+                    <td className="py-4 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">{t.code}</td>
 
                     <td className="py-4 px-4">
                       <span
                         className={`px-2.5 py-0.5 rounded-md font-semibold text-[11px] border ${
                           t.tier === 'ENTERPRISE'
-                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                            ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
                             : t.tier === 'GROWTH'
-                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                         }`}
                       >
                         {t.tier}
                       </span>
                     </td>
 
-                    <td className="py-4 px-4 text-slate-300 font-mono text-[11px]">
+                    <td className="py-4 px-4 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
                       {t.domain || 'institution.adyapan.dev'}
                     </td>
 
                     <td className="py-4 px-4">
-                      <div className="text-white">{t.contactEmail}</div>
-                      {t.supportPhone && <div className="text-[11px] text-slate-400">{t.supportPhone}</div>}
+                      <div className="text-slate-900 dark:text-white font-medium">{t.contactEmail}</div>
+                      {t.supportPhone && <div className="text-[11px] text-slate-500 dark:text-slate-400">{t.supportPhone}</div>}
                     </td>
 
                     <td className="py-4 px-4">
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
                           t.status === 'ACTIVE'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                             : t.status === 'SUSPENDED'
-                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                         }`}
                       >
                         {t.status}
@@ -302,7 +302,7 @@ export const TenantList: React.FC = () => {
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/tenants/${t.id}`}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                          className="px-3 py-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600 text-blue-600 dark:text-blue-400 hover:text-white border border-blue-500/20 font-semibold text-xs flex items-center gap-1.5 transition-all"
                         >
                           <Settings className="w-3.5 h-3.5" />
                           <span>Studio</span>
@@ -311,10 +311,10 @@ export const TenantList: React.FC = () => {
                         {t.id !== 'tenant-adyapan-default' && (
                           <button
                             onClick={() => handleToggleStatus(t)}
-                            className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all border ${
+                            className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all border cursor-pointer ${
                               t.status === 'ACTIVE'
-                                ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white border-rose-500/20'
-                                : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/20'
+                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border-rose-500/20'
+                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/20'
                             }`}
                           >
                             {t.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
@@ -332,13 +332,13 @@ export const TenantList: React.FC = () => {
 
       {/* MODAL: ONBOARD NEW INSTITUTION */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white">Onboard New Enterprise Institution</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Onboard New Enterprise Institution</h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-white text-sm"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm cursor-pointer"
               >
                 ✕
               </button>
@@ -347,23 +347,23 @@ export const TenantList: React.FC = () => {
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Institution Code</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Institution Code</label>
                   <input
                     type="text"
                     value={createForm.code}
                     onChange={(e) => setCreateForm({ ...createForm, code: e.target.value })}
                     placeholder="FINTECH_FINANCE"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm focus:border-blue-500 focus:outline-none uppercase"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:border-blue-500 focus:outline-none uppercase"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Tier</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Tier</label>
                   <select
                     value={createForm.tier}
                     onChange={(e) => setCreateForm({ ...createForm, tier: e.target.value as TenantTier })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   >
                     <option value="ENTERPRISE">Enterprise</option>
                     <option value="GROWTH">Growth</option>
@@ -373,89 +373,89 @@ export const TenantList: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Legal Entity Name</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Legal Entity Name</label>
                 <input
                   type="text"
                   value={createForm.name}
                   onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                   placeholder="Fintech Credit Solutions Ltd."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Contact Email</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Contact Email</label>
                   <input
                     type="email"
                     value={createForm.contactEmail}
                     onChange={(e) => setCreateForm({ ...createForm, contactEmail: e.target.value })}
                     placeholder="admin@fintechcredit.dev"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Support Phone</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Support Phone</label>
                   <input
                     type="tel"
                     value={createForm.supportPhone || ''}
                     onChange={(e) => setCreateForm({ ...createForm, supportPhone: e.target.value })}
                     placeholder="+91 1800 500 1000"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">CIN (Optional)</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">CIN (Optional)</label>
                   <input
                     type="text"
                     value={createForm.cinNumber || ''}
                     onChange={(e) => setCreateForm({ ...createForm, cinNumber: e.target.value })}
                     placeholder="U65999MH2024PTC123456"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">RBI Registration No.</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">RBI Registration No.</label>
                   <input
                     type="text"
                     value={createForm.rbiRegistrationNo || ''}
                     onChange={(e) => setCreateForm({ ...createForm, rbiRegistrationNo: e.target.value })}
                     placeholder="N-13.00999"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold text-white">Initialize Canonical Engines</div>
-                  <div className="text-[11px] text-slate-400">Seed default products, workflows, decision rules, and branch</div>
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white">Initialize Canonical Engines</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">Seed default products, workflows, decision rules, and branch</div>
                 </div>
                 <input
                   type="checkbox"
                   checked={createForm.seedDefaults}
                   onChange={(e) => setCreateForm({ ...createForm, seedDefaults: e.target.checked })}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-900 border-slate-700"
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 cursor-pointer"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createTenantMutation.isPending}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30 cursor-pointer transition-colors"
                 >
                   {createTenantMutation.isPending ? 'Provisioning...' : 'Provision Institution'}
                 </button>

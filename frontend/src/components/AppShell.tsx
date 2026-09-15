@@ -298,8 +298,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
-        {/* Workspace Switcher Pill (if user has access to multiple workspaces) */}
-        {authorizedWorkspaces.length > 1 && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && (
+        {/* Workspace Switcher Pill (hidden for SUPER_ADMIN, CUSTOMER, and focused operational desks) */}
+        {authorizedWorkspaces.length > 1 && primaryRole !== 'SUPER_ADMIN' && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && (
           <div className="relative px-3 pt-3 flex-none">
             <button
               type="button"
@@ -370,7 +370,52 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Nav List */}
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-[#1E2445]">
-          {primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' ? (
+          {primaryRole === 'SUPER_ADMIN' ? (
+            <div className="space-y-1">
+              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Platform Control-Plane
+              </p>
+              <div className="space-y-0.5 pt-1">
+                {[
+                  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+                  { label: 'Tenants', href: '/tenants', icon: Building2 },
+                  { label: 'Users & Access', href: '/users', icon: KeyRound },
+                  { label: 'Products & Policies', href: '/products', icon: Sliders },
+                  { label: 'Workflows & Approvals', href: '/workflows', icon: Workflow },
+                  { label: 'Integrations', href: '/integrations', icon: Cpu },
+                  { label: 'Platform Operations', href: '/operations', icon: Activity },
+                  { label: 'Governance & Audit', href: '/audit-logs', icon: ScrollText },
+                ].map((item) => {
+                  const active =
+                    pathname === item.href ||
+                    (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors',
+                        active
+                          ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-600/30'
+                          : 'text-slate-300 font-medium hover:bg-white/6 hover:text-white'
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          'h-4 w-4 flex-none transition-colors stroke-[2]',
+                          active ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                        )}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ) : primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' ? (
             <div className="space-y-1">
               <div className="space-y-0.5 pt-1">
                 {roleCfg.nav.map((navKey) => {

@@ -219,25 +219,25 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 text-slate-100">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl p-6 text-slate-800 dark:text-slate-100">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
               <Sliders className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                 {initialRule ? 'Edit Decision Rule' : 'Create New Decision Rule'}
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Configure deterministic underwriting policy logic for loan product evaluation
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -247,7 +247,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
           {/* Category & Code */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Rule Category
               </label>
               <select
@@ -258,7 +258,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                   const defaultField = FIELD_SUGGESTIONS[cat]?.[0];
                   if (defaultField) handleFieldSelect(defaultField.field);
                 }}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="ELIGIBILITY">Eligibility Criteria</option>
                 <option value="CREDIT">Credit Bureau & History</option>
@@ -271,7 +271,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Unique Rule Code
               </label>
               <input
@@ -280,7 +280,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder="e.g. MIN_CIBIL_SCORE"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -288,7 +288,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
           {/* Rule Name & Description */}
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Rule Name
               </label>
               <input
@@ -297,11 +297,11 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g. Minimum CIBIL Score Requirement"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Description & Underwriting Rationale
               </label>
               <input
@@ -309,21 +309,21 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Explain why this rule exists and when it blocks the loan"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
           {/* Field Selection & Operator */}
-          <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/90 space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-indigo-400 mb-1">
+          <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800/90 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
               <Sparkles className="w-3.5 h-3.5" />
               Evaluation Target & Condition
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Field / Context Path</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Field / Context Path</label>
                 <div className="space-y-1.5">
                   <select
                     value={
@@ -336,7 +336,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                         handleFieldSelect(e.target.value);
                       }
                     }}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
                   >
                     <optgroup label="Preset Standard Fields">
                       {(FIELD_SUGGESTIONS[formData.category || 'ELIGIBILITY'] || []).map((sug) => (
@@ -354,13 +354,13 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                     value={formData.field}
                     onChange={(e) => setFormData({ ...formData, field: e.target.value })}
                     placeholder="e.g. credit.bureauScore or financial.foir"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-indigo-300"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-indigo-600 dark:text-indigo-300"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Operator</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Operator</label>
                 <select
                   value={formData.operator}
                   onChange={(e) => {
@@ -370,7 +370,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                     else if (['IN', 'NOT_IN'].includes(op)) setValueType('array');
                     else if (['EXISTS', 'NOT_EXISTS'].includes(op)) setValueType('boolean');
                   }}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="GREATER_THAN_OR_EQUAL">&gt;= (Greater Than or Equal)</option>
                   <option value="LESS_THAN_OR_EQUAL">&lt;= (Less Than or Equal)</option>
@@ -388,30 +388,30 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
             </div>
 
             {/* Expected Value Input depending on Operator */}
-            <div className="pt-2 border-t border-slate-800/80">
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Expected Comparison Value
               </label>
 
               {formData.operator === 'BETWEEN' ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[11px] text-slate-400 block mb-0.5">Min Threshold:</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5">Min Threshold:</span>
                     <input
                       type="number"
                       value={rangeMin}
                       onChange={(e) => setRangeMin(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white"
                       placeholder="e.g. 21"
                     />
                   </div>
                   <div>
-                    <span className="text-[11px] text-slate-400 block mb-0.5">Max Threshold:</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5">Max Threshold:</span>
                     <input
                       type="number"
                       value={rangeMax}
                       onChange={(e) => setRangeMax(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white"
                       placeholder="e.g. 58"
                     />
                   </div>
@@ -423,19 +423,19 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                     value={arrayStr}
                     onChange={(e) => setArrayStr(e.target.value)}
                     placeholder="Comma separated values e.g. SALARIED, SELF_EMPLOYED, BUSINESS"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                   />
                   <p className="text-[10px] text-slate-500 mt-1">Separate acceptable values with commas.</p>
                 </div>
               ) : ['EXISTS', 'NOT_EXISTS'].includes(formData.operator || '') ? (
-                <div className="text-xs text-indigo-300 font-mono py-1.5 px-3 bg-indigo-950/40 rounded-lg border border-indigo-900/50">
+                <div className="text-xs text-indigo-700 dark:text-indigo-300 font-mono py-1.5 px-3 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-900/50">
                   Checks whether key exists and is non-empty in evaluation payload.
                 </div>
               ) : typeof formData.expectedValue === 'boolean' || valueType === 'boolean' ? (
                 <select
                   value={String(formData.expectedValue)}
                   onChange={(e) => setFormData({ ...formData, expectedValue: e.target.value === 'true' })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                 >
                   <option value="true">True / Positive Flag</option>
                   <option value="false">False / Negative Flag</option>
@@ -446,7 +446,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                   value={formData.expectedValue ?? ''}
                   onChange={(e) => setFormData({ ...formData, expectedValue: e.target.value })}
                   placeholder="e.g. 700 or 50000"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                 />
               )}
             </div>
@@ -455,13 +455,13 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
           {/* Severity, Action & Scoring Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Severity
               </label>
               <select
                 value={formData.severity}
                 onChange={(e) => setFormData({ ...formData, severity: e.target.value as RuleSeverity })}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               >
                 <option value="HARD_STOP">HARD STOP (Instant Reject)</option>
                 <option value="HIGH">HIGH (Major Defect)</option>
@@ -472,13 +472,13 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Action On Fail
               </label>
               <select
                 value={formData.actionOnFail}
                 onChange={(e) => setFormData({ ...formData, actionOnFail: e.target.value as RuleAction })}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               >
                 <option value="FAIL">FAIL (Block Application)</option>
                 <option value="REFER">REFER (Send to Manual Review)</option>
@@ -488,7 +488,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Risk Weight (+/- Pts)
               </label>
               <input
@@ -496,7 +496,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                 value={formData.weight}
                 onChange={(e) => setFormData({ ...formData, weight: parseInt(e.target.value) || 0 })}
                 placeholder="e.g. 20"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               />
             </div>
           </div>
@@ -504,7 +504,7 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
           {/* Reason Code & Customer Explanation */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Internal Reason Code
               </label>
               <input
@@ -513,11 +513,11 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                 value={formData.reasonCode}
                 onChange={(e) => setFormData({ ...formData, reasonCode: e.target.value })}
                 placeholder="e.g. CIBIL_BELOW_MINIMUM"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100 font-mono"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Customer-Facing Reason
               </label>
               <input
@@ -525,28 +525,28 @@ export const RuleBuilderModal: React.FC<RuleBuilderModalProps> = ({
                 value={formData.customerReason}
                 onChange={(e) => setFormData({ ...formData, customerReason: e.target.value })}
                 placeholder="e.g. Credit score does not meet product criteria"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100"
+                className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               />
             </div>
           </div>
 
           {/* Toggle Enabled & Priority */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.enabled}
                 onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700 focus:ring-indigo-500"
+                className="w-4 h-4 rounded text-indigo-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 focus:ring-indigo-500"
               />
-              <span className="text-xs font-medium text-slate-300">Rule Enabled for Active Evaluation</span>
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Rule Enabled for Active Evaluation</span>
             </label>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>
