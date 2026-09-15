@@ -41,7 +41,7 @@ export function DataTable<T extends { id: string }>({
     >
       {loading ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[850px] w-full text-left text-sm">
             <thead className={cn(
               "border-b text-[11px] font-bold uppercase tracking-wider",
               isDark
@@ -92,7 +92,7 @@ export function DataTable<T extends { id: string }>({
         <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[850px] w-full text-left text-sm">
             <thead className={cn(
               "border-b text-[11px] font-bold uppercase tracking-wider",
               isDark

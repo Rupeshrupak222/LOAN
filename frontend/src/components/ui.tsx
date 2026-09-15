@@ -35,15 +35,15 @@ export function Button({
   };
 
   const sizes = {
-    sm: 'h-8 px-3 text-xs gap-1.5 rounded-lg',
-    md: 'h-9 px-3.5 text-sm gap-2 rounded-xl',
-    lg: 'h-11 px-5 text-base gap-2.5 rounded-xl',
+    sm: 'min-h-[2rem] px-3 py-1.5 text-xs gap-1.5 rounded-lg whitespace-nowrap shrink-0',
+    md: 'min-h-[2.25rem] px-3.5 py-1.5 text-sm gap-2 rounded-xl whitespace-nowrap shrink-0',
+    lg: 'min-h-[2.75rem] px-5 py-2 text-base gap-2.5 rounded-xl whitespace-nowrap shrink-0',
   };
 
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:pointer-events-none cursor-pointer select-none',
+        'inline-flex items-center justify-center text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:pointer-events-none cursor-pointer select-none max-w-full',
         variants[variant],
         sizes[size],
         className
@@ -75,10 +75,12 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 Input.displayName = 'Input';
 
 export function Card({
+  id,
   className,
   children,
   noPadding = false,
 }: {
+  id?: string;
   className?: string;
   children: ReactNode;
   noPadding?: boolean;
@@ -87,6 +89,7 @@ export function Card({
 
   return (
     <div
+      id={id}
       className={cn(
         'rounded-2xl border transition-shadow',
         isDark
@@ -137,7 +140,10 @@ export function KpiCard({
     <Card className="p-4 sm:p-5 flex flex-col justify-between hover:shadow-card-hover transition-all">
       <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="min-w-0 flex-1">
-          <p className={cn("text-[11px] font-bold uppercase tracking-wider truncate", isDark ? "text-slate-400" : "text-slate-500")}>
+          <p
+            title={displayLabel}
+            className={cn("text-xs font-bold uppercase tracking-wider line-clamp-2 break-words", isDark ? "text-slate-400" : "text-slate-500")}
+          >
             {displayLabel}
           </p>
           <p className={cn("mt-1.5 text-xl sm:text-2xl font-bold tracking-tight truncate", isDark ? "text-white" : "text-slate-900")} title={value}>
@@ -172,7 +178,14 @@ export function KpiCard({
               {trend}
             </span>
           )}
-          {displayHint && <span className={cn("truncate", isDark ? "text-slate-400" : "text-slate-500")}>{displayHint}</span>}
+          {displayHint && (
+            <span
+              title={displayHint}
+              className={cn("break-words leading-tight line-clamp-2 text-xs", isDark ? "text-slate-400" : "text-slate-500")}
+            >
+              {displayHint}
+            </span>
+          )}
         </div>
       )}
     </Card>
@@ -274,12 +287,12 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold border',
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border',
         styles[key] ?? (isDark ? 'bg-[#16203D] text-slate-300 border-[#2B3566]' : 'bg-slate-100 text-slate-600 border-slate-200'),
         className
       )}
     >
-      {children || (status ? status.replace(/_/g, ' ') : '')}
+      {children || (status ? status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : '')}
     </span>
   );
 }

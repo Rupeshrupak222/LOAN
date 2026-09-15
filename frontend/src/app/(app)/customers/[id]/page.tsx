@@ -72,6 +72,9 @@ export default function CustomerDetailPage() {
   const isBranchManager = Boolean(user?.roles?.includes('BRANCH_MANAGER'));
   const isUnderwriter = Boolean(user?.roles?.includes('UNDERWRITER'));
   const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
+  const canManageAddresses = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
+  const canManageBankAccounts = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
+  const canOriginateApplication = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const [activeTab, setActiveTab] = useState<
     'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'communications' | 'bank_intelligence' | 'fraud'
   >('overview');
@@ -809,14 +812,16 @@ export default function CustomerDetailPage() {
                 </h3>
                 <p className="text-xs text-slate-500">Verified residential and permanent addresses</p>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="text-xs flex items-center gap-1 cursor-pointer"
-                onClick={() => setAddressModalOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Address
-              </Button>
+              {canManageAddresses && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="text-xs flex items-center gap-1 cursor-pointer"
+                  onClick={() => setAddressModalOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Address
+                </Button>
+              )}
             </div>
 
             {addresses.length > 0 ? (
@@ -843,14 +848,20 @@ export default function CustomerDetailPage() {
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center space-y-2">
                 <p className="text-xs font-semibold text-slate-700">No structured address records found.</p>
-                <p className="text-[11px] text-slate-400">Add an address to keep customer residence and correspondence records updated.</p>
-                <Button
-                  size="sm"
-                  className="text-xs text-white mt-1 cursor-pointer"
-                  onClick={() => setAddressModalOpen(true)}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Address
-                </Button>
+                <p className="text-[11px] text-slate-400">
+                  {canManageAddresses
+                    ? 'Add an address to keep customer residence and correspondence records updated.'
+                    : 'Customer correspondence address not recorded yet (Managed during intake).'}
+                </p>
+                {canManageAddresses && (
+                  <Button
+                    size="sm"
+                    className="text-xs text-white mt-1 cursor-pointer"
+                    onClick={() => setAddressModalOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Address
+                  </Button>
+                )}
               </div>
             )}
           </Card>
@@ -1035,17 +1046,19 @@ export default function CustomerDetailPage() {
                 </h3>
                 <p className="text-xs text-slate-500">Accounts verified for NEFT loan disbursements & repayments</p>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="text-xs flex items-center gap-1"
-                onClick={() => {
-                  setAccountHolderInput(`${data?.firstName || ''} ${data?.lastName || ''}`.trim());
-                  setBankModalOpen(true);
-                }}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Bank Account
-              </Button>
+              {canManageBankAccounts && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="text-xs flex items-center gap-1"
+                  onClick={() => {
+                    setAccountHolderInput(`${data?.firstName || ''} ${data?.lastName || ''}`.trim());
+                    setBankModalOpen(true);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Bank Account
+                </Button>
+              )}
             </div>
 
             {bankAccounts.length > 0 ? (
@@ -1116,17 +1129,23 @@ export default function CustomerDetailPage() {
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center space-y-2">
                 <Landmark className="h-8 w-8 text-slate-400 mx-auto" />
                 <p className="text-xs font-semibold text-slate-700">No bank accounts registered for this borrower yet.</p>
-                <p className="text-[11px] text-slate-400">Add a bank account to enable electronic NEFT payouts and repayment auto-debit.</p>
-                <Button
-                  size="sm"
-                  className="text-xs text-white mt-1"
-                  onClick={() => {
-                    setAccountHolderInput(`${data?.firstName || ''} ${data?.lastName || ''}`.trim());
-                    setBankModalOpen(true);
-                  }}
-                >
-                  + Add Bank Account
-                </Button>
+                <p className="text-[11px] text-slate-400">
+                  {canManageBankAccounts
+                    ? 'Add a bank account to enable electronic NEFT payouts and repayment auto-debit.'
+                    : 'Borrower bank details not registered yet (Captured during loan officer intake).'}
+                </p>
+                {canManageBankAccounts && (
+                  <Button
+                    size="sm"
+                    className="text-xs text-white mt-1 cursor-pointer"
+                    onClick={() => {
+                      setAccountHolderInput(`${data?.firstName || ''} ${data?.lastName || ''}`.trim());
+                      setBankModalOpen(true);
+                    }}
+                  >
+                    + Add Bank Account
+                  </Button>
+                )}
               </div>
             )}
           </Card>
@@ -1143,9 +1162,11 @@ export default function CustomerDetailPage() {
               </h3>
               <p className="text-xs text-slate-500">Track all origination and underwriting requests</p>
             </div>
-            <Link href={`/applications/new?customerId=${params.id}`}>
-              <Button size="sm">+ New Application</Button>
-            </Link>
+            {canOriginateApplication && (
+              <Link href={`/applications/new?customerId=${params.id}`}>
+                <Button size="sm">+ New Application</Button>
+              </Link>
+            )}
           </div>
 
           {applications.length > 0 ? (
@@ -1176,34 +1197,53 @@ export default function CustomerDetailPage() {
                               Review 360 →
                             </Button>
                           </Link>
-                          {app.status === 'DRAFT' ? (
-                            <Button
-                              size="sm"
-                              disabled={forwardAppMutation.isPending}
-                              onClick={() => {
-                                if (confirm(`Forward Application #${app.applicationNo} to Credit Analyst for appraisal?`)) {
-                                  forwardAppMutation.mutate(app.id);
-                                }
-                              }}
-                              className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
-                            >
-                              <Send className="w-3 h-3" /> Forward
-                            </Button>
-                          ) : ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={forwardAppMutation.isPending}
-                              onClick={() => {
-                                if (confirm(`Re-Forward Application #${app.applicationNo} to Credit Analyst queue?`)) {
-                                  forwardAppMutation.mutate(app.id);
-                                }
-                              }}
-                              className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer"
-                              title="Re-forward this application to Credit Analyst queue"
-                            >
-                              <RotateCcw className="w-3 h-3" /> Re-Forward
-                            </Button>
+                          {isLoanOfficer ? (
+                            app.status === 'DRAFT' ? (
+                              <Button
+                                size="sm"
+                                disabled={forwardAppMutation.isPending}
+                                onClick={() => {
+                                  if (confirm(`Forward Application #${app.applicationNo} to Credit Analyst for appraisal?`)) {
+                                    forwardAppMutation.mutate(app.id);
+                                  }
+                                }}
+                                className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+                              >
+                                <Send className="w-3 h-3" /> Forward
+                              </Button>
+                            ) : ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={forwardAppMutation.isPending}
+                                onClick={() => {
+                                  if (confirm(`Re-Forward Application #${app.applicationNo} to Credit Analyst queue?`)) {
+                                    forwardAppMutation.mutate(app.id);
+                                  }
+                                }}
+                                className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+                                title="Re-forward this application to Credit Analyst queue"
+                              >
+                                <RotateCcw className="w-3 h-3" /> Re-Forward
+                              </Button>
+                            ) : null
+                          ) : isCreditAnalyst ? (
+                            ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
+                              <Link href={`/credit-assessment?applicationId=${app.id}`}>
+                                <Button size="sm" className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0">
+                                  <span>Assess Credit</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </Button>
+                              </Link>
+                            ) : app.status === 'UNDERWRITING' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap">
+                                <Send className="w-3 h-3" /> In Underwriting
+                              </span>
+                            ) : ['APPROVED', 'DISBURSED', 'READY_FOR_DISBURSEMENT'].includes(app.status) ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
+                                <CheckCircle className="w-3 h-3" /> Sanctioned
+                              </span>
+                            ) : null
                           ) : null}
                         </div>
                       </td>

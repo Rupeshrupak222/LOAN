@@ -40,7 +40,7 @@ router.get(
 
 router.post(
   '/execute',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'),
+  authorize('COMPANY_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'DISBURSEMENT_OFFICER'),
   validate(executeDisbursementSchema),
   asyncHandler(async (req, res) => {
     const loan = await executeDisbursement(req.body, {

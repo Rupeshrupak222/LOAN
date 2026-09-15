@@ -170,22 +170,104 @@ export const PERMISSION_ALIAS_MAP: Record<string, string[]> = {
   'support.complaint.view': ['support.complaint.view', 'SUPPORT_COMPLAINT_VIEW'],
   'support.complaint.manage': ['support.complaint.manage', 'SUPPORT_COMPLAINT_MANAGE'],
 
-  // Administration & Governance
+  // Administration & Governance (Platform Control-Plane)
   'audit.view': ['audit.view', 'AUDIT_EXPORT_EVIDENCE_PACKAGE', 'AUDIT_VERIFY_CHAIN'],
   'audit.export': ['audit.export', 'AUDIT_EXPORT_EVIDENCE_PACKAGE'],
+  'security.view': ['security.view', 'audit.view', 'AUDIT_VERIFY_CHAIN'],
+  'configuration_history.view': ['configuration_history.view', 'audit.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'financial_control.view': ['financial_control.view', 'audit.view', 'ACCOUNTING_VIEW'],
+  'workflow_history.view': ['workflow_history.view', 'audit.view', 'APPLICATIONS_VIEW'],
   'compliance.view': ['compliance.view', 'CONFIGURATION_VIEW_POLICIES'],
   'privacy.manage': ['privacy.manage', 'PRIVACY_PURGE_PII'],
+  'privacy.view': ['privacy.view', 'PRIVACY_VIEW_CONSENT_REGISTRY'],
+  
+  // Tenant Management
   'tenant.view': ['tenant.view', 'TENANT_VIEW_OPERATIONS_CENTER'],
   'tenant.manage': ['tenant.manage', 'TENANT_MANAGE_USERS', 'TENANT_ASSIGN_ROLES'],
+  'tenant.create': ['tenant.create', 'tenant.manage', 'TENANT_MANAGE_USERS'],
+  'tenant.update': ['tenant.update', 'tenant.manage', 'TENANT_MANAGE_USERS'],
+  'tenant.activate': ['tenant.activate', 'tenant.manage', 'TENANT_MANAGE_USERS'],
+  'tenant.suspend': ['tenant.suspend', 'tenant.manage', 'TENANT_MANAGE_USERS'],
+  'tenant.configure': ['tenant.configure', 'tenant.manage', 'TENANT_CONFIGURE_BRANDING'],
+
+  // Branch Management
   'branch.view': ['branch.view', 'VIEW_BRANCH_APPLICATIONS'],
+  'branch.manage': ['branch.manage', 'branch.view', 'VIEW_BRANCH_APPLICATIONS'],
+  'branch.create': ['branch.create', 'branch.manage', 'VIEW_BRANCH_APPLICATIONS'],
+  'branch.update': ['branch.update', 'branch.manage', 'VIEW_BRANCH_APPLICATIONS'],
+  'branch.activate': ['branch.activate', 'branch.manage', 'VIEW_BRANCH_APPLICATIONS'],
+  'branch.suspend': ['branch.suspend', 'branch.manage', 'VIEW_BRANCH_APPLICATIONS'],
+
+  // User & Access Management
   'user.view': ['user.view', 'TENANT_MANAGE_USERS'],
   'user.manage': ['user.manage', 'TENANT_MANAGE_USERS'],
+  'user.create': ['user.create', 'user.manage', 'TENANT_MANAGE_USERS'],
+  'user.update': ['user.update', 'user.manage', 'TENANT_MANAGE_USERS'],
+  'user.activate': ['user.activate', 'user.manage', 'TENANT_MANAGE_USERS'],
+  'user.deactivate': ['user.deactivate', 'user.manage', 'TENANT_MANAGE_USERS'],
   'role.view': ['role.view', 'TENANT_ASSIGN_ROLES'],
   'role.manage': ['role.manage', 'TENANT_ASSIGN_ROLES'],
+  'role.assign': ['role.assign', 'role.manage', 'TENANT_ASSIGN_ROLES'],
+  'permission.view': ['permission.view', 'role.view', 'TENANT_ASSIGN_ROLES'],
+  'access.review': ['access.review', 'role.view', 'TENANT_ASSIGN_ROLES'],
+
+  // Product Management
+  'product.view': ['product.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'product.manage': ['product.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'product.create': ['product.create', 'product.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'product.update': ['product.update', 'product.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'product.version': ['product.version', 'product.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'product.publish': ['product.publish', 'product.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'product.retire': ['product.retire', 'product.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+
+  // Policy Management
+  'policy.view': ['policy.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'policy.manage': ['policy.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'policy.create': ['policy.create', 'policy.manage', 'CONFIGURATION_DRAFT_POLICY'],
+  'policy.update': ['policy.update', 'policy.manage', 'CONFIGURATION_DRAFT_POLICY'],
+  'policy.version': ['policy.version', 'policy.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'policy.publish': ['policy.publish', 'policy.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+  'policy.retire': ['policy.retire', 'policy.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+
+  // BRE Management
+  'bre.view': ['bre.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'bre.configure': ['bre.configure', 'CONFIGURATION_PUBLISH_POLICY'],
+  'bre.version': ['bre.version', 'CONFIGURATION_PUBLISH_POLICY'],
+  'bre.publish': ['bre.publish', 'CONFIGURATION_PUBLISH_POLICY'],
+
+  // Workflow Management
+  'workflow.view': ['workflow.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'workflow.configure': ['workflow.configure', 'CONFIGURATION_PUBLISH_POLICY'],
+  'workflow.version': ['workflow.version', 'CONFIGURATION_PUBLISH_POLICY'],
+  'workflow.publish': ['workflow.publish', 'CONFIGURATION_PUBLISH_POLICY'],
+
+  // Approval Configuration
+  'approval.configure': ['approval.configure', 'CONFIGURATION_PUBLISH_POLICY'],
+  'authority.view': ['authority.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'authority.configure': ['authority.configure', 'CONFIGURATION_PUBLISH_POLICY'],
+  'deviation.view': ['deviation.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'deviation.configure': ['deviation.configure', 'CONFIGURATION_PUBLISH_POLICY'],
+
+  // Integration Management
   'config.view': ['config.view', 'CONFIGURATION_VIEW_POLICIES'],
   'config.manage': ['config.manage', 'CONFIGURATION_PUBLISH_POLICY'],
   'integration.view': ['integration.view', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
   'integration.manage': ['integration.manage', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'integration.configure': ['integration.configure', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'integration.enable': ['integration.enable', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'integration.disable': ['integration.disable', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'webhook.view': ['webhook.view', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+  'webhook.configure': ['webhook.configure', 'CONFIGURATION_CONFIGURE_INTEGRATIONS'],
+
+  // Platform Operations
+  'platform.health.view': ['platform.health.view', 'ANALYTICS_VIEW', 'ANALYTICS_COMMAND_CENTER'],
+  'platform.jobs.view': ['platform.jobs.view', 'ANALYTICS_VIEW', 'ANALYTICS_COMMAND_CENTER'],
+  'platform.queues.view': ['platform.queues.view', 'ANALYTICS_VIEW', 'ANALYTICS_COMMAND_CENTER'],
+  'platform.alerts.view': ['platform.alerts.view', 'ANALYTICS_VIEW', 'ANALYTICS_COMMAND_CENTER'],
+  'platform.feature_flags.view': ['platform.feature_flags.view', 'CONFIGURATION_VIEW_POLICIES'],
+  'platform.feature_flags.manage': ['platform.feature_flags.manage', 'CONFIGURATION_PUBLISH_POLICY'],
+
+  // Analytics & Reporting
   'analytics.view': ['analytics.view', 'ANALYTICS_VIEW'],
   'analytics.command_center': ['analytics.command_center', 'ANALYTICS_COMMAND_CENTER'],
   'reports.view': ['reports.view', 'REPORT_VIEW'],
@@ -629,11 +711,62 @@ export class RolePermissionService {
         {
           code: 'SUPER_ADMIN',
           name: 'Platform Super Administrator',
-          description: 'Full platform governance, administration, and unrestricted operations',
-          permissions: [...allPerms],
+          description: 'Platform control-plane governance, tenant lifecycle, and system configuration oversight',
+          permissions: [
+            // 1. Tenant & Branch Administration
+            'TENANT_MANAGE_USERS',
+            'TENANT_ASSIGN_ROLES',
+            'TENANT_VIEW_OPERATIONS_CENTER',
+            'TENANT_CONFIGURE_BRANDING',
+            'VIEW_BRANCH_APPLICATIONS',
+            // 2. Configuration, Products, BRE & Policies
+            'CONFIGURATION_VIEW_POLICIES',
+            'CONFIGURATION_DRAFT_POLICY',
+            'CONFIGURATION_PUBLISH_POLICY',
+            'CONFIGURATION_CONFIGURE_INTEGRATIONS',
+            'COLLECTIONS_POLICY_VIEW',
+            'COLLECTIONS_POLICY_MANAGE',
+            'RISK_MANAGE_POLICIES',
+            'FRAUD_MANAGE_RULES',
+            // 3. Privacy, Audit & Cryptographic Verification
+            'PRIVACY_VIEW_CONSENT_REGISTRY',
+            'AUDIT_EXPORT_EVIDENCE_PACKAGE',
+            'AUDIT_VERIFY_CHAIN',
+            'PRIVACY_PURGE_PII',
+            // 4. Analytics & Command Center Observability
+            'ANALYTICS_VIEW',
+            'ANALYTICS_BRANCHES',
+            'ANALYTICS_PORTFOLIO',
+            'ANALYTICS_COLLECTIONS',
+            'COLLECTIONS_ANALYTICS_VIEW',
+            // 5. Read-Only Business Visibility (Oversight Only - No Operational Mutations)
+            'APPLICATIONS_VIEW',
+            'VIEW_CUSTOMER_DETAILS',
+            'VIEW_DOCUMENTS',
+            'VIEW_CREDIT_ANALYST_REPORT',
+            'VIEW_RISK_ASSESSMENT',
+            'VIEW_REPAYMENT_ASSESSMENT',
+            'CREDIT_ASSESSMENT_VIEW',
+            'UNDERWRITING_VIEW_BUREAU',
+            'COLLECTIONS_VIEW_DPD',
+            'PAYMENTS_VIEW',
+            'PAYOUTS_VIEW',
+            'RECONCILIATION_VIEW',
+            'SETTLEMENTS_VIEW',
+            'ACCOUNTING_VIEW',
+            'ACCOUNTING_DASHBOARD_VIEW',
+            'COA_VIEW',
+            'JOURNAL_VIEW',
+            'PERIOD_VIEW',
+            'RISK_VIEW_SIGNALS',
+            'FRAUD_VIEW_CASES',
+            'COMMUNICATIONS_VIEW',
+            'SUPPORT_VIEW',
+            'SUPPORT_COMPLAINT_VIEW',
+          ],
           scope: 'GLOBAL',
-          sanctionLimit: 1000000000,
-          payoutLimit: 1000000000,
+          sanctionLimit: 0,
+          payoutLimit: 0,
         },
         {
           code: 'COMPANY_ADMIN',
@@ -1507,10 +1640,6 @@ export class RolePermissionService {
     const roles = Array.isArray(userOrRoles) ? userOrRoles : userOrRoles.roles || [];
     const tenantId = Array.isArray(userOrRoles) ? 'tenant-adyapan-default' : userOrRoles.tenantId || 'tenant-adyapan-default';
 
-    if (roles.includes('SUPER_ADMIN')) {
-      return true;
-    }
-
     const effectivePermissions = this.getEffectivePermissions(roles, tenantId);
 
     // 1. Direct match
@@ -1537,12 +1666,17 @@ export class RolePermissionService {
 
   public validateRoleAssignment(
     actor: { id: string; roles: string[]; tenantId?: string },
-    targetRoleCode: string
+    targetRoleCode: string,
+    targetUserId?: string
   ): void {
     if (targetRoleCode.toUpperCase() === 'SUPER_ADMIN') {
       if (!actor.roles.includes('SUPER_ADMIN')) {
         throw new ForbiddenError('Privilege escalation denied: Only Super Admins can grant the SUPER_ADMIN role.');
       }
+    }
+    // Prevent self-escalation: Super Admin cannot assign operational lending roles to their own account
+    if (actor.roles.includes('SUPER_ADMIN') && targetUserId && targetUserId === actor.id && targetRoleCode.toUpperCase() !== 'SUPER_ADMIN') {
+      throw new ForbiddenError('Self-escalation denied: Super Admin cannot assign operational lending roles to their own account.');
     }
   }
 
@@ -1561,5 +1695,6 @@ export function validateRoleAssignment(
   targetRoleCode?: string
 ): void {
   const roleCode = targetRoleCode || targetUserIdOrRole;
-  rolePermissionService.validateRoleAssignment(actor, roleCode);
+  const targetUserId = targetRoleCode ? targetUserIdOrRole : undefined;
+  rolePermissionService.validateRoleAssignment(actor, roleCode, targetUserId);
 }

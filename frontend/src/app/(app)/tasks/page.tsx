@@ -276,20 +276,21 @@ export default function TasksPage() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">{task.reason}</p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                <Link href={task.actionHref}>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center w-full sm:w-auto">
+                <Link href={task.actionHref} className="w-full sm:w-auto">
                   <Button
                     size="sm"
                     className={cn(
-                      'gap-1.5 text-xs font-semibold text-white shadow-xs',
+                      'w-full sm:w-auto min-w-[195px] h-10 px-4 text-xs font-bold justify-center flex items-center gap-2 text-white shadow-xs cursor-pointer',
                       task.taskType === 'DOC_REUPLOAD'
                         ? 'bg-purple-600 hover:bg-purple-700'
                         : task.taskType === 'READY_TO_SUBMIT'
                         ? 'bg-emerald-600 hover:bg-emerald-700'
-                        : 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-[#2563EB] hover:bg-blue-700'
                     )}
                   >
-                    {task.actionLabel} <ArrowRight className="w-3.5 h-3.5" />
+                    <span>{task.actionLabel}</span>
+                    <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                   </Button>
                 </Link>
               </div>

@@ -134,11 +134,11 @@ export function ProductList() {
       {/* Top Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Package className="w-5 h-5 text-blue-400" />
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Lending Product Catalog & Engine
           </h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Configure loan products, pricing schedules, statutory KFS guidelines, and eligibility rules.
           </p>
         </div>
@@ -148,7 +148,7 @@ export function ProductList() {
             size="sm"
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="border-slate-700 bg-slate-800/60 hover:bg-slate-700 text-slate-200"
+            className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer"
           >
             <RefreshCw className={cn('w-4 h-4 mr-1.5', isRefetching && 'animate-spin')} />
             Refresh
@@ -156,7 +156,7 @@ export function ProductList() {
           {canCreate && (
             <Button
               onClick={() => setIsCreateModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 flex items-center gap-1.5 font-medium text-sm"
+              className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 flex items-center gap-1.5 font-medium text-sm cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               New Product Draft
@@ -170,31 +170,31 @@ export function ProductList() {
         <KpiCard
           title="Configured Products"
           value={String(totalProducts)}
-          icon={<Package className="w-5 h-5 text-blue-400" />}
+          icon={<Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
           subtext="Total tenant portfolio"
         />
         <KpiCard
           title="Active for Origination"
           value={String(activeProducts)}
-          icon={<CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+          icon={<CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />}
           subtext="Open for borrower intake"
         />
         <KpiCard
           title="Draft / Configuration"
           value={String(draftProducts)}
-          icon={<Clock className="w-5 h-5 text-amber-400" />}
+          icon={<Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
           subtext="Pending review & activation"
         />
         <KpiCard
           title="Average Base APR"
           value={`${avgApr}%`}
-          icon={<Percent className="w-5 h-5 text-purple-400" />}
+          icon={<Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
           subtext="Annualized portfolio base"
         />
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="p-4 bg-slate-900/60 border-slate-800/80 backdrop-blur-md">
+      <Card className="p-4 bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 shadow-sm backdrop-blur-md">
         <div className="flex flex-col md:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -203,7 +203,7 @@ export function ProductList() {
               placeholder="Search products by name, code, or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-800/70 border border-slate-700/80 rounded-lg text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -212,7 +212,7 @@ export function ProductList() {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="px-3 py-2 bg-slate-800/70 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 rounded-lg text-xs font-medium text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Categories</option>
               <option value="PERSONAL_LOAN">Personal Loan</option>
@@ -227,7 +227,7 @@ export function ProductList() {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 bg-slate-800/70 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 rounded-lg text-xs font-medium text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active Only</option>
@@ -240,7 +240,7 @@ export function ProductList() {
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
-              className="px-3 py-2 bg-slate-800/70 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 rounded-lg text-xs font-medium text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Channels</option>
               <option value="DIRECT_BORROWER">Borrower Direct</option>
@@ -260,16 +260,16 @@ export function ProductList() {
           <p className="mt-3 text-sm">Loading lending product catalog...</p>
         </div>
       ) : products.length === 0 ? (
-        <Card className="p-12 text-center bg-slate-900/40 border-slate-800/60">
-          <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-slate-300">No loan products found</h3>
-          <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+        <Card className="p-12 text-center bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800/60 shadow-sm">
+          <Package className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-slate-700 dark:text-slate-300">No loan products found</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
             Try adjusting your search criteria or create a new product draft to get started.
           </p>
           {canCreate && (
             <Button
               onClick={() => setIsCreateModalOpen(true)}
-              className="mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm"
+              className="mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm cursor-pointer"
             >
               Create Product Draft
             </Button>
@@ -284,7 +284,7 @@ export function ProductList() {
             return (
               <Card
                 key={product.id}
-                className="bg-slate-900/70 border-slate-800 hover:border-slate-700/80 transition-all duration-200 shadow-xl flex flex-col justify-between overflow-hidden relative group"
+                className="bg-white dark:bg-slate-900/70 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700/80 transition-all duration-200 shadow-sm dark:shadow-xl flex flex-col justify-between overflow-hidden relative group"
               >
                 {/* Top Accent Line */}
                 <div
@@ -292,8 +292,8 @@ export function ProductList() {
                     'h-1 w-full',
                     isActive && 'bg-gradient-to-r from-emerald-500 to-teal-500',
                     isDraft && 'bg-gradient-to-r from-amber-500 to-orange-500',
-                    product.status === 'INACTIVE' && 'bg-slate-700',
-                    product.status === 'ARCHIVED' && 'bg-rose-700'
+                    product.status === 'INACTIVE' && 'bg-slate-400 dark:bg-slate-700',
+                    product.status === 'ARCHIVED' && 'bg-rose-400 dark:bg-rose-700'
                   )}
                 />
 
@@ -304,38 +304,38 @@ export function ProductList() {
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         {getTypeBadge(product.productType)}
                         {getStatusBadge(product.status)}
-                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60">
+                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60">
                           v{product.version}
                         </span>
                       </div>
-                      <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {product.name}
                       </h3>
-                      <p className="text-xs font-mono text-slate-400">{product.code}</p>
+                      <p className="text-xs font-mono text-slate-500 dark:text-slate-400">{product.code}</p>
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                     {product.description}
                   </p>
 
                   {/* Financial Bounds Snapshot */}
-                  <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 text-center">
+                  <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-center">
                     <div>
-                      <p className="text-[10px] uppercase font-semibold text-slate-400">Amount Range</p>
-                      <p className="text-xs font-bold text-slate-100 mt-0.5">
+                      <p className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Amount Range</p>
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-0.5">
                         ₹{(product.minAmount / 1000).toFixed(0)}k - ₹{(product.maxAmount / 100000).toFixed(1)}L
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-semibold text-slate-400">Tenure</p>
-                      <p className="text-xs font-bold text-slate-100 mt-0.5">
+                      <p className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Tenure</p>
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-0.5">
                         {product.minTenureMonths} - {product.maxTenureMonths}m
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-semibold text-slate-400">Base Rate</p>
-                      <p className="text-xs font-bold text-emerald-400 mt-0.5">
+                      <p className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Base Rate</p>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                         {product.baseInterestRateAnnualPct}% p.a.
                       </p>
                     </div>
@@ -343,27 +343,27 @@ export function ProductList() {
 
                   {/* Features & Policies Pill Tags */}
                   <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-slate-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                       <span>Interest Model:</span>
-                      <span className="text-slate-200 font-medium font-mono text-[11px]">
+                      <span className="text-slate-700 dark:text-slate-200 font-medium font-mono text-[11px]">
                         {product.interestModel.replace(/_/g, ' ')}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                       <span>Min CIBIL Bureau:</span>
-                      <span className="text-slate-200 font-medium">
+                      <span className="text-slate-700 dark:text-slate-200 font-medium">
                         {product.creditPolicy?.minCibilScore || '650'}+
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                       <span>Processing Fee:</span>
-                      <span className="text-slate-200 font-medium">
+                      <span className="text-slate-700 dark:text-slate-200 font-medium">
                         {product.feeSchedule?.processingFeePct}% (min ₹{product.feeSchedule?.processingFeeMinInr})
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                       <span>Assigned Workflow:</span>
-                      <span className="text-blue-400 font-medium truncate max-w-[140px]">
+                      <span className="text-blue-600 dark:text-blue-400 font-medium truncate max-w-[140px]">
                         {product.workflowId}
                       </span>
                     </div>
@@ -371,12 +371,12 @@ export function ProductList() {
                 </div>
 
                 {/* Footer Action Buttons */}
-                <div className="p-4 bg-slate-950/40 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <div className="p-4 bg-slate-50/80 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setSelectedProductForView(product)}
-                    className="border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-200 text-xs flex items-center gap-1"
+                    className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs flex items-center gap-1 cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5 text-slate-400" />
                     Configure

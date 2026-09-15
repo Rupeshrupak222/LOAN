@@ -3,16 +3,19 @@ import { ApplicationStatus, KycStatus, RiskCategory } from '@prisma/client';
 export type CreditRecommendationType = 'RECOMMEND' | 'RECOMMEND_WITH_CONDITIONS' | 'SEND_BACK';
 
 export interface CreditAssessmentDashboardMetrics {
+  allProposals?: number;
   pendingAssessment: number;
   inProgress: number;
   inAssessment?: number;
   kycPending: number;
+  inUnderwriting?: number;
   completedAssessment: number;
   completedProposals?: number;
   totalVolume?: number;
   avgTicketSize?: number;
   sentBack: number;
   readyForUnderwriter: number;
+  approved?: number;
   financials: {
     totalApplications: number;
     totalRequestedAmount: number;
@@ -37,8 +40,10 @@ export interface CreditAssessmentQueueItem {
   applicationNo: string;
   customerId: string;
   borrowerName: string;
+  applicantName: string;
   customerCode: string;
   loanProduct: string;
+  productName: string;
   productCode: string;
   requestedAmount: number;
   tenureMonths: number;
@@ -53,6 +58,11 @@ export interface CreditAssessmentQueueItem {
   applicationAgeDays: number;
   assignedAnalyst: string | null;
   underwriterStatus: 'NOT_SENT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT_BACK';
+  employmentType: string | null;
+  mobile: string | null;
+  documentsCount: number;
+  verifiedDocumentsCount: number;
+  isReadyForUnderwriter?: boolean;
   createdAt: string;
   updatedAt: string;
 }

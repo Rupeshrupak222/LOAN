@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { rolePermissionService, PERMISSION_ALIAS_MAP } from './role-permission.service';
-import { assertMakerCheckerSeparation, assertAuditorReadOnly, assertBorrowerInternalRestriction } from './sod-validator';
+import {
+  assertMakerCheckerSeparation,
+  assertAuditorReadOnly,
+  assertBorrowerInternalRestriction,
+  assertSuperAdminOperationalSeparation,
+} from './sod-validator';
 import { resolveAuthorizedScope } from './scope-resolver';
 import { ForbiddenError, UnauthorizedError } from '../../common/errors';
 
@@ -31,11 +36,25 @@ describe('Phase P2: Role & Permission Normalization Suite', () => {
       expect(rolePermissionService.hasPermission(['CREDIT_ANALYST'], 'credit.assess')).toBe(true);
     });
 
-    it('should grant SuperAdmin full authorization across all canonical keys', () => {
-      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'application.create')).toBe(true);
-      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'underwriting.decide')).toBe(true);
-      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'payout.approve')).toBe(true);
-      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'accounting.journal.post')).toBe(true);
+    it('should grant SuperAdmin platform governance authorization but DENY operational lending mutations', () => {
+      // Platform administration permissions: GRANTED
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'tenant.view')).toBe(true);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'tenant.create')).toBe(true);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'product.create')).toBe(true);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'workflow.configure')).toBe(true);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'integration.configure')).toBe(true);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'platform.health.view')).toBe(true);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'audit.view')).toBe(true);
+
+      // Operational lending mutations: STRICTLY DENIED (Separation of Duties / No God Mode)
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'application.approve')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'application.create')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'underwriting.decide')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'payout.approve')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'disbursement.execute')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'accounting.journal.post')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'payment.post')).toBe(false);
+      expect(rolePermissionService.hasPermission(['SUPER_ADMIN'], 'collection.execute')).toBe(false);
     });
   });
 
@@ -76,6 +95,21 @@ describe('Phase P2: Role & Permission Normalization Suite', () => {
       );
       expect(blockedBeyondLimit).toBe(false);
     });
+
+    it('Super Admin should have ₹0 sanctionLimit and ₹0 payoutLimit (no operational sign-off authority)', () => {
+      const superAdminRole = rolePermissionService.getRole(defaultTenant, 'SUPER_ADMIN');
+      expect(superAdminRole).toBeDefined();
+      expect(superAdminRole.sanctionLimitAmount).toBe(0);
+      expect(superAdminRole.payoutLimitAmount).toBe(0);
+
+      // Attempting any sanction sign-off as SuperAdmin must be false
+      const allowedAnyAmount = rolePermissionService.hasPermission(
+        ['SUPER_ADMIN'],
+        'application.approve',
+        { requiredSanctionAmount: 1 }
+      );
+      expect(allowedAnyAmount).toBe(false);
+    });
   });
 
   // =========================================================================
@@ -103,6 +137,26 @@ describe('Phase P2: Role & Permission Normalization Suite', () => {
       ]);
       expect(conflictCheck.hasConflict).toBe(true);
       expect(conflictCheck.hasCriticalBlock).toBe(true);
+    });
+
+    it('should block SuperAdmin from executing operational lending actions under platform authority', () => {
+      expect(() => {
+        assertSuperAdminOperationalSeparation(['SUPER_ADMIN'], 'loan.approve');
+      }).toThrowError(/Platform Admin vs Lending Operative conflict/);
+
+      expect(() => {
+        assertSuperAdminOperationalSeparation(['SUPER_ADMIN'], 'disbursement.execute');
+      }).toThrowError(/Platform Admin vs Lending Operative conflict/);
+    });
+
+    it('should allow operational roles to execute operational actions', () => {
+      expect(() => {
+        assertSuperAdminOperationalSeparation(['UNDERWRITER'], 'loan.approve');
+      }).not.toThrow();
+
+      expect(() => {
+        assertSuperAdminOperationalSeparation(['FINANCE_OFFICER'], 'disbursement.execute');
+      }).not.toThrow();
     });
   });
 
@@ -236,7 +290,7 @@ describe('Phase P2: Role & Permission Normalization Suite', () => {
       }).toThrowError(/Privilege escalation denied/);
     });
 
-    it('should allow SuperAdmin to assign SUPER_ADMIN role', () => {
+    it('should allow SuperAdmin to assign SUPER_ADMIN role to another user', () => {
       const superActor = {
         id: 'usr_super_1',
         roles: ['SUPER_ADMIN'],
@@ -244,7 +298,24 @@ describe('Phase P2: Role & Permission Normalization Suite', () => {
       };
 
       expect(() => {
-        rolePermissionService.validateRoleAssignment(superActor, 'SUPER_ADMIN');
+        rolePermissionService.validateRoleAssignment(superActor, 'SUPER_ADMIN', 'usr_target_2');
+      }).not.toThrow();
+    });
+
+    it('should block SuperAdmin from assigning operational lending roles to their own account (Self-Escalation Defense)', () => {
+      const superActor = {
+        id: 'usr_super_1',
+        roles: ['SUPER_ADMIN'],
+        tenantId: 'tenant-adyapan-default',
+      };
+
+      expect(() => {
+        rolePermissionService.validateRoleAssignment(superActor, 'UNDERWRITER', 'usr_super_1');
+      }).toThrowError(/Self-escalation denied/);
+
+      // But assigning to another user is permitted
+      expect(() => {
+        rolePermissionService.validateRoleAssignment(superActor, 'UNDERWRITER', 'usr_target_2');
       }).not.toThrow();
     });
   });

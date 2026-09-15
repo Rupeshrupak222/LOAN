@@ -58,10 +58,10 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
   const sim = simulateMutation.data;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
               <Calculator className="w-5 h-5" />
@@ -80,20 +80,20 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-900/60">
+        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-white dark:bg-slate-900/60">
           {/* Left: Interactive Controls (5 cols) */}
           <div className="lg:col-span-5 space-y-5">
             {/* Loan Amount Slider */}
-            <div className="space-y-2 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
+            <div className="space-y-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-400 uppercase">Sanction Amount</label>
-                <span className="text-sm font-bold text-white font-mono">₹{loanAmount.toLocaleString('en-IN')}</span>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Sanction Amount</label>
+                <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">₹{loanAmount.toLocaleString('en-IN')}</span>
               </div>
               <input
                 type="range"
@@ -111,10 +111,10 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
             </div>
 
             {/* Tenure Slider */}
-            <div className="space-y-2 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
+            <div className="space-y-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-400 uppercase">Tenure (Months)</label>
-                <span className="text-sm font-bold text-white font-mono">{tenureMonths} Months</span>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Tenure (Months)</label>
+                <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">{tenureMonths} Months</span>
               </div>
               <input
                 type="range"
@@ -132,39 +132,39 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
             </div>
 
             {/* Applicant Bureau Profile */}
-            <div className="space-y-3 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+            <div className="space-y-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 Borrower Assessment Profile
               </h4>
 
               <div>
-                <label className="text-[11px] text-slate-400">CIBIL Bureau Score</label>
+                <label className="text-[11px] text-slate-600 dark:text-slate-400">CIBIL Bureau Score</label>
                 <input
                   type="number"
                   value={cibilScore}
                   onChange={(e) => setCibilScore(Number(e.target.value))}
-                  className="w-full mt-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
+                  className="w-full mt-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400">Monthly Net Income (₹)</label>
+                <label className="text-[11px] text-slate-600 dark:text-slate-400">Monthly Net Income (₹)</label>
                 <input
                   type="number"
                   value={monthlyIncome}
                   onChange={(e) => setMonthlyIncome(Number(e.target.value))}
-                  className="w-full mt-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
+                  className="w-full mt-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400">Existing Monthly Obligations / EMIs (₹)</label>
+                <label className="text-[11px] text-slate-600 dark:text-slate-400">Existing Monthly Obligations / EMIs (₹)</label>
                 <input
                   type="number"
                   value={existingEmis}
                   onChange={(e) => setExistingEmis(Number(e.target.value))}
-                  className="w-full mt-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
+                  className="w-full mt-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white"
                 />
               </div>
             </div>
@@ -180,66 +180,66 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
             ) : sim ? (
               <>
                 {/* Main KPI Highlight Banner */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-950/40 via-slate-900 to-indigo-950/40 border border-blue-500/20 shadow-lg text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50 dark:from-blue-950/40 dark:via-slate-900 dark:to-indigo-950/40 border border-blue-200 dark:border-blue-500/20 shadow-sm dark:shadow-lg text-center">
                   <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">Monthly EMI</p>
-                    <p className="text-xl font-extrabold text-blue-400 mt-1">₹{sim.monthlyEmi.toLocaleString('en-IN')}</p>
-                    <p className="text-[10px] text-slate-500">per month</p>
+                    <p className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Monthly EMI</p>
+                    <p className="text-xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">₹{sim.monthlyEmi.toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">per month</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">Statutory APR</p>
-                    <p className="text-xl font-extrabold text-emerald-400 mt-1">{sim.annualPercentageRateApr}%</p>
-                    <p className="text-[10px] text-slate-500">effective annual</p>
+                    <p className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Statutory APR</p>
+                    <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{sim.annualPercentageRateApr}%</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">effective annual</p>
                   </div>
                   <div className="col-span-2 sm:col-span-1">
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">Net Disbursement</p>
-                    <p className="text-xl font-extrabold text-white mt-1">₹{sim.netDisbursedAmount.toLocaleString('en-IN')}</p>
-                    <p className="text-[10px] text-slate-500">post fee deduction</p>
+                    <p className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Net Disbursement</p>
+                    <p className="text-xl font-extrabold text-slate-900 dark:text-white mt-1">₹{sim.netDisbursedAmount.toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">post fee deduction</p>
                   </div>
                 </div>
 
                 {/* Key Fact Statement (KFS) Table */}
-                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2.5">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <Receipt className="w-3.5 h-3.5 text-blue-400" />
+                      <Receipt className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       Key Fact Statement (KFS)
                     </span>
-                    <span className="text-[10px] font-normal text-slate-400">RBI Regulatory Format</span>
+                    <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">RBI Regulatory Format</span>
                   </h4>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs divide-y divide-slate-800">
+                  <div className="grid grid-cols-2 gap-2 text-xs divide-y divide-slate-200 dark:divide-slate-800">
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Sanction Amount:</span>
-                      <span className="font-semibold text-white">₹{sim.loanAmount.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Sanction Amount:</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">₹{sim.loanAmount.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Interest Type:</span>
-                      <span className="font-semibold text-slate-200">{sim.keyFactStatement.rateOfInterestType}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Interest Type:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{sim.keyFactStatement.rateOfInterestType}</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Applied Interest Rate:</span>
-                      <span className="font-semibold text-emerald-400">{sim.appliedInterestRateAnnualPct}% p.a.</span>
+                      <span className="text-slate-500 dark:text-slate-400">Applied Interest Rate:</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{sim.appliedInterestRateAnnualPct}% p.a.</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Total Interest Payable:</span>
-                      <span className="font-semibold text-white">₹{sim.totalInterest.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Total Interest Payable:</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">₹{sim.totalInterest.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Processing Fee (incl. 18% GST):</span>
-                      <span className="font-semibold text-slate-200">₹{sim.keyFactStatement.processingFeeWithGst}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Processing Fee (incl. 18% GST):</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">₹{sim.keyFactStatement.processingFeeWithGst}</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Documentation Fee:</span>
-                      <span className="font-semibold text-slate-200">₹{sim.keyFactStatement.documentationFee}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Documentation Fee:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">₹{sim.keyFactStatement.documentationFee}</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Total Repayment:</span>
-                      <span className="font-bold text-blue-300">₹{sim.totalRepaymentAmount.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Total Repayment:</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-300">₹{sim.totalRepaymentAmount.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="pt-1.5 flex justify-between">
-                      <span className="text-slate-400">Cooling-off Period:</span>
-                      <span className="font-semibold text-slate-200">{sim.keyFactStatement.coolingOffPeriodDays} Business Days</span>
+                      <span className="text-slate-500 dark:text-slate-400">Cooling-off Period:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{sim.keyFactStatement.coolingOffPeriodDays} Business Days</span>
                     </div>
                   </div>
                 </div>

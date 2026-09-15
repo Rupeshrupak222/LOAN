@@ -33,7 +33,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     iconName: 'FileText',
     defaultRoute: '/applications',
     primaryRoles: ['LOAN_OFFICER', 'BRANCH_MANAGER'],
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'AUDITOR'],
+    allowedRoles: ['ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'AUDITOR'],
   },
   CREDIT: {
     id: 'CREDIT',
@@ -43,7 +43,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     iconName: 'ShieldCheck',
     defaultRoute: '/credit-assessment',
     primaryRoles: ['CREDIT_ANALYST', 'UNDERWRITER', 'RISK_MANAGER', 'BRANCH_MANAGER'],
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'RISK_MANAGER', 'RISK_ANALYST', 'FRAUD_ANALYST', 'AUDITOR'],
+    allowedRoles: ['ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'RISK_MANAGER', 'RISK_ANALYST', 'FRAUD_ANALYST', 'AUDITOR'],
   },
   FINANCE: {
     id: 'FINANCE',
@@ -53,7 +53,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     iconName: 'DollarSign',
     defaultRoute: '/disbursements',
     primaryRoles: ['FINANCE_OFFICER'],
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'FINANCE_OFFICER', 'AUDITOR'],
+    allowedRoles: ['ADMIN', 'FINANCE_OFFICER', 'AUDITOR'],
   },
   COLLECTIONS: {
     id: 'COLLECTIONS',
@@ -63,7 +63,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     iconName: 'AlertTriangle',
     defaultRoute: '/collections',
     primaryRoles: ['COLLECTION_OFFICER', 'BRANCH_MANAGER'],
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'],
+    allowedRoles: ['ADMIN', 'COLLECTION_OFFICER', 'BRANCH_MANAGER', 'AUDITOR'],
   },
   PARTNER: {
     id: 'PARTNER',
@@ -73,7 +73,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     iconName: 'Handshake',
     defaultRoute: '/partners',
     primaryRoles: ['BRANCH_MANAGER'],
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'],
+    allowedRoles: ['ADMIN', 'BRANCH_MANAGER', 'AUDITOR'],
   },
   SUPPORT: {
     id: 'SUPPORT',
@@ -83,7 +83,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     iconName: 'Headphones',
     defaultRoute: '/communications',
     primaryRoles: ['BRANCH_MANAGER', 'LOAN_OFFICER'],
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'AUDITOR'],
+    allowedRoles: ['ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'AUDITOR'],
   },
   PLATFORM: {
     id: 'PLATFORM',
@@ -91,7 +91,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     shortLabel: 'Platform & Admin',
     description: 'Multi-tenant institutions, branch hierarchy, staff users, RBAC roles & permissions, workflows, integrations, and audit trail',
     iconName: 'Layers',
-    defaultRoute: '/command-center',
+    defaultRoute: '/dashboard',
     primaryRoles: ['SUPER_ADMIN', 'ADMIN'],
     allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'AUDITOR'],
   },

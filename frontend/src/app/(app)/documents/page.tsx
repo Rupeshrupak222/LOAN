@@ -1,368 +1,884 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  FileCheck,
+  FileText,
   Search,
   CheckCircle2,
   XCircle,
   Clock,
-  AlertTriangle,
   Eye,
-  FileText,
-  Filter,
   Download,
-  Building2,
+  RefreshCw,
+  ExternalLink,
+  Filter,
+  ArrowLeft,
+  ArrowRight,
+  ShieldAlert,
+  AlertTriangle,
   User,
-  ShieldCheck,
+  Phone,
+  FileCheck
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { useTheme } from '@/lib/theme';
 import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
-import { Card, Button, Badge, Spinner, Input } from '@/components/ui';
+import { Card, Button } from '@/components/ui';
 import { TableSkeleton } from '@/components/LoadingSkeletons';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, formatMoney, cn } from '@/lib/utils';
+
+// Standard 5 Mandatory Underwriting Documents
+const MANDATORY_DOCUMENTS = [
+  {
+    key: 'IDENTITY_PROOF',
+    label: 'Identity Proof (PAN Card)',
+    description: 'Government issued PAN Card or official photo identity',
+    matches: (doc: any) => {
+      const c = (doc.category || '').toUpperCase();
+      const t = (doc.documentType || '').toUpperCase();
+      const n = (doc.fileName || '').toUpperCase();
+      return ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(c) ||
+        ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID'].includes(t) ||
+        n.includes('PAN') || n.includes('AADHAAR');
+    }
+  },
+  {
+    key: 'ADDRESS_PROOF',
+    label: 'Proof of Address',
+    description: 'Residential address proof (Aadhaar, Electricity Bill, Rent Agreement)',
+    matches: (doc: any) => {
+      const c = (doc.category || '').toUpperCase();
+      const t = (doc.documentType || '').toUpperCase();
+      const n = (doc.fileName || '').toUpperCase();
+      return ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(c) ||
+        ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'RENT_AGREEMENT', 'UTILITY_BILL', 'AADHAAR'].includes(t) ||
+        n.includes('ADDRESS') || n.includes('BILL') || n.includes('AADHAAR');
+    }
+  },
+  {
+    key: 'APPLICANT_PHOTO',
+    label: 'Applicant Photograph / Selfie',
+    description: 'Recent portrait photo or live customer selfie',
+    matches: (doc: any) => {
+      const c = (doc.category || '').toUpperCase();
+      const t = (doc.documentType || '').toUpperCase();
+      const n = (doc.fileName || '').toUpperCase();
+      return ['APPLICANT_PHOTO', 'PHOTO'].includes(c) ||
+        ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PASSPORT_PHOTO'].includes(t) ||
+        n.includes('PHOTO') || n.includes('SELFIE');
+    }
+  },
+  {
+    key: 'INCOME_PROOF',
+    label: 'Proof of Income / Salary Slip',
+    description: 'Recent 3 months salary slips, ITR, or Form 16',
+    matches: (doc: any) => {
+      const c = (doc.category || '').toUpperCase();
+      const t = (doc.documentType || '').toUpperCase();
+      const n = (doc.fileName || '').toUpperCase();
+      return ['INCOME_PROOF', 'FINANCIAL'].includes(c) ||
+        ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(t) ||
+        n.includes('SALARY') || n.includes('SLIP') || n.includes('INCOME') || n.includes('ITR');
+    }
+  },
+  {
+    key: 'BANK_STATEMENT',
+    label: 'Bank Statement (6 Months)',
+    description: 'Latest 6 months bank statement or Account Aggregator data',
+    matches: (doc: any) => {
+      const c = (doc.category || '').toUpperCase();
+      const t = (doc.documentType || '').toUpperCase();
+      const n = (doc.fileName || '').toUpperCase();
+      return ['BANK_STATEMENT'].includes(c) ||
+        ['BANK_STATEMENT', 'BANK_PASSBOOK', 'E_STATEMENT'].includes(t) ||
+        n.includes('BANK') || n.includes('STATEMENT') || n.includes('PASSBOOK');
+    }
+  }
+];
 
 export default function DocumentsWorkspacePage() {
-  const { user } = useAuth();
-  const { isDark } = useTheme();
   const toast = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
+  // Active Borrower Case Selection (null = list of all borrowers, string = view specific borrower's documents page)
+  const initialAppId = searchParams.get('applicationId');
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(initialAppId);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'REJECTED'>('ALL');
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [selectedDoc, setSelectedDoc] = useState<any | null>(null);
+  const [filterMode, setFilterMode] = useState<'ALL' | 'MISSING' | 'PENDING' | 'COMPLETED'>('ALL');
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
-  const isBorrower = user?.roles?.length === 1 && user.roles[0] === 'CUSTOMER';
-
-  const { data: docs = [], isLoading, refetch } = useQuery({
+  // 1. Fetch all documents from live database
+  const { data: docs = [], isLoading: docsLoading, refetch: refetchDocs, isRefetching } = useQuery({
     queryKey: ['documents-workspace'],
     queryFn: async () => {
       const res = await api.get('/documents');
       return Array.isArray(res.data?.data) ? res.data.data : [];
     },
+    refetchInterval: 10000,
   });
 
+  // 2. Fetch applications to map loan proposals
+  const { data: apps = [] } = useQuery({
+    queryKey: ['documents-apps-mapping'],
+    queryFn: async () => {
+      const res = await api.get('/applications', { params: { pageSize: 100 } });
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+    refetchInterval: 15000,
+  });
+
+  // Build a map of customerId -> application
+  const customerAppMap = useMemo(() => {
+    const map = new Map<string, any>();
+    apps.forEach((a: any) => {
+      const cId = a.customerId || a.customer?.id;
+      if (cId && !map.has(cId)) {
+        map.set(cId, a);
+      }
+    });
+    return map;
+  }, [apps]);
+
+  // Verification Mutation (calls PATCH /documents/:id/verify)
   const verifyDocMutation = useMutation({
     mutationFn: async ({ docId, status, remarks }: { docId: string; status: 'VERIFIED' | 'REJECTED'; remarks?: string }) => {
-      return api.post(`/documents/${docId}/verify`, { status, rejectionReason: remarks });
+      return api.patch(`/documents/${docId}/verify`, { status, rejectionReason: remarks });
     },
     onSuccess: (_, variables) => {
       toast.success(`Document marked as ${variables.status}`);
       queryClient.invalidateQueries({ queryKey: ['documents-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-apps-mapping'] });
       queryClient.invalidateQueries({ queryKey: ['credit-assessment'] });
-      setSelectedDoc(null);
+      queryClient.invalidateQueries({ queryKey: ['credit-assessment-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-assessment-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-360'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      if (previewDoc && previewDoc.id === variables.docId) {
+        setPreviewDoc((prev: any) => prev ? { ...prev, status: variables.status, verified: variables.status === 'VERIFIED' } : null);
+      }
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err));
     },
   });
 
-  if (isLoading) return <TableSkeleton rows={8} cols={7} />;
+  // Group all documents by Borrower Proposal Case
+  const borrowerCases = useMemo(() => {
+    const caseMap = new Map<string, {
+      id: string;
+      application?: any;
+      customer: any;
+      docs: any[];
+      checklist: Array<{
+        key: string;
+        label: string;
+        description: string;
+        status: 'VERIFIED' | 'PENDING' | 'MISSING';
+        matchingDoc?: any;
+      }>;
+      missingCount: number;
+      pendingCount: number;
+      verifiedCount: number;
+    }>();
 
-  const filteredDocs = docs.filter((doc: any) => {
-    const term = searchTerm.toLowerCase();
-    const docName = (doc.fileName || doc.documentType || doc.name || '').toLowerCase();
-    const customerName = `${doc.customer?.firstName || ''} ${doc.customer?.lastName || ''}`.toLowerCase();
-    const customerCode = (doc.customer?.customerCode || '').toLowerCase();
-    const matchesSearch = !term || docName.includes(term) || customerName.includes(term) || customerCode.includes(term);
+    // Initialize from applications
+    apps.forEach((app: any) => {
+      const caseId = app.id;
+      caseMap.set(caseId, {
+        id: caseId,
+        application: app,
+        customer: app.customer || { firstName: 'Valued', lastName: 'Borrower', customerCode: 'KYC Vault' },
+        docs: [],
+        checklist: [],
+        missingCount: 0,
+        pendingCount: 0,
+        verifiedCount: 0,
+      });
+    });
 
-    const isDocVerified = doc.verified || doc.status === 'VERIFIED';
-    const isDocRejected = doc.status === 'REJECTED';
-    const matchesStatus =
-      statusFilter === 'ALL' ||
-      (statusFilter === 'VERIFIED' && isDocVerified) ||
-      (statusFilter === 'REJECTED' && isDocRejected) ||
-      (statusFilter === 'PENDING' && !isDocVerified && !isDocRejected);
+    // Attach documents to their matching case
+    docs.forEach((doc: any) => {
+      const linkedApp = doc.application || customerAppMap.get(doc.customerId);
+      const caseId = linkedApp?.id || doc.customerId || doc.customer?.id || doc.id;
 
-    const docCategory = (doc.category || '').toUpperCase();
-    const matchesCategory = categoryFilter === 'ALL' || docCategory === categoryFilter;
+      if (!caseMap.has(caseId)) {
+        caseMap.set(caseId, {
+          id: caseId,
+          application: linkedApp,
+          customer: doc.customer || { firstName: 'Valued', lastName: 'Borrower', customerCode: 'KYC Vault' },
+          docs: [],
+          checklist: [],
+          missingCount: 0,
+          pendingCount: 0,
+          verifiedCount: 0,
+        });
+      }
 
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
+      const c = caseMap.get(caseId)!;
+      c.docs.push(doc);
+    });
 
-  const verifiedCount = docs.filter((d: any) => d.verified || d.status === 'VERIFIED').length;
-  const pendingCount = docs.filter((d: any) => !d.verified && d.status !== 'VERIFIED' && d.status !== 'REJECTED').length;
-  const rejectedCount = docs.filter((d: any) => d.status === 'REJECTED').length;
+    // Compute checklist and gap status for each borrower case
+    caseMap.forEach((c) => {
+      let missing = 0;
+      let pending = 0;
+      let verified = 0;
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        breadcrumb="Lending / Documents Review Desk"
-        title="Document Review & Verification Workspace"
-        subtitle="Review, inspect, validate, and audit borrower intake and KYC compliance documents across loan applications"
-      />
+      c.checklist = MANDATORY_DOCUMENTS.map((req) => {
+        const matchingDoc = c.docs.find((d) => req.matches(d));
+        if (!matchingDoc) {
+          missing++;
+          return { ...req, status: 'MISSING' as const };
+        }
+        const isVer = matchingDoc.verified || matchingDoc.status === 'VERIFIED';
+        if (isVer) {
+          verified++;
+          return { ...req, status: 'VERIFIED' as const, matchingDoc };
+        } else {
+          pending++;
+          return { ...req, status: 'PENDING' as const, matchingDoc };
+        }
+      });
 
-      {/* KPI Counters */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Documents</p>
-            <p className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{docs.length}</p>
-          </div>
-          <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl">
-            <FileText className="w-5 h-5" />
-          </div>
-        </Card>
+      c.missingCount = missing;
+      c.pendingCount = pending;
+      c.verifiedCount = verified;
+    });
 
-        <Card className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Verified Documents</p>
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{verifiedCount}</p>
-          </div>
-          <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </Card>
+    return Array.from(caseMap.values());
+  }, [apps, docs, customerAppMap]);
 
-        <Card className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending Review</p>
-            <p className="text-2xl font-bold text-amber-500 mt-1">{pendingCount}</p>
-          </div>
-          <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl">
-            <Clock className="w-5 h-5" />
-          </div>
-        </Card>
+  // Filtered borrower cases for the main list view
+  const filteredCases = useMemo(() => {
+    return borrowerCases.filter((c) => {
+      const term = searchTerm.toLowerCase().trim();
+      const name = `${c.customer?.firstName || ''} ${c.customer?.lastName || ''}`.toLowerCase();
+      const code = (c.customer?.customerCode || '').toLowerCase();
+      const mobile = (c.customer?.mobile || '').toLowerCase();
+      const appNo = (c.application?.applicationNo || '').toLowerCase();
 
-        <Card className="p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Rejected / Anomalies</p>
-            <p className="text-2xl font-bold text-rose-500 mt-1">{rejectedCount}</p>
-          </div>
-          <div className="p-3 bg-rose-500/10 text-rose-500 rounded-xl">
-            <XCircle className="w-5 h-5" />
-          </div>
-        </Card>
-      </div>
+      const matchesSearch = !term || name.includes(term) || code.includes(term) || mobile.includes(term) || appNo.includes(term);
 
-      {/* Main Table Card */}
-      <Card noPadding className="p-5 space-y-4">
-        {/* Controls Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-4 border-slate-100 dark:border-[#2B3566]">
-          <div className="flex items-center gap-2">
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search document, applicant..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-transparent text-xs focus:outline-none focus:border-blue-500"
-              />
+      if (!matchesSearch) return false;
+
+      if (filterMode === 'MISSING') return c.missingCount > 0;
+      if (filterMode === 'PENDING') return c.pendingCount > 0;
+      if (filterMode === 'COMPLETED') return c.missingCount === 0 && c.pendingCount === 0;
+
+      return true;
+    });
+  }, [borrowerCases, searchTerm, filterMode]);
+
+  // Active case for dedicated single-page view
+  const activeCase = useMemo(() => {
+    if (!selectedCaseId) return null;
+    return borrowerCases.find((c) => c.id === selectedCaseId || c.application?.id === selectedCaseId) || null;
+  }, [selectedCaseId, borrowerCases]);
+
+  // Handler to open a borrower's document page
+  const openBorrowerDocumentsPage = (caseId: string) => {
+    setSelectedCaseId(caseId);
+    setPreviewDoc(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handler to return to main borrowers list
+  const closeBorrowerDocumentsPage = () => {
+    setSelectedCaseId(null);
+    setPreviewDoc(null);
+  };
+
+  // =========================================================================
+  // VIEW 2: DEDICATED FULL PAGE FOR BORROWER DOCUMENTS & REQUIRED CHECKLIST
+  // (Zero Popups! Opens directly on the page as requested by user)
+  // =========================================================================
+  if (activeCase) {
+    const customer = activeCase.customer;
+    const app = activeCase.application;
+    const customerName = `${customer?.firstName || 'Borrower'} ${customer?.lastName || ''}`.trim();
+
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto">
+        {/* Back Navigation Button */}
+        <div>
+          <button
+            onClick={closeBorrowerDocumentsPage}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to All Borrowers</span>
+          </button>
+        </div>
+
+        {/* Borrower Overview Banner */}
+        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-[#1E2445] bg-white dark:bg-[#0C152B] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-2xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
+              {customerName.charAt(0).toUpperCase()}
             </div>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#2B3566] bg-transparent text-xs focus:outline-none focus:border-blue-500"
-            >
-              <option value="ALL">All Categories</option>
-              <option value="IDENTITY_PROOF">Identity Proof (PoI)</option>
-              <option value="ADDRESS_PROOF">Address Proof (PoA)</option>
-              <option value="APPLICANT_PHOTO">Applicant Photo</option>
-              <option value="INCOME_PROOF">Income Proof</option>
-              <option value="BANK_STATEMENT">Bank Statement</option>
-              <option value="BUSINESS_PROOF">Business Proof</option>
-            </select>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg font-bold text-slate-900 dark:text-white">{customerName}</h1>
+                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  {customer?.customerCode || 'KYC Vault'}
+                </span>
+                {app?.status && (
+                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                    {app.status}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>Application #{app?.applicationNo || 'Direct KYC'}</span>
+                {customer?.mobile && <span>· Phone: {customer.mobile}</span>}
+                {app?.requestedAmount && <span>· Loan: <strong className="text-slate-800 dark:text-slate-200">{formatMoney(app.requestedAmount)}</strong></span>}
+              </p>
+            </div>
           </div>
 
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#1E2445] text-xs font-semibold">
-            {(['ALL', 'VERIFIED', 'PENDING', 'REJECTED'] as const).map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg transition-all',
-                  statusFilter === st
-                    ? isDark
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                )}
-              >
-                {st}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            {app && (
+              <Link href={`/credit-assessment?applicationId=${app.id}`}>
+                <Button size="sm" className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer h-9">
+                  <span>Start Credit Assessment</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 dark:border-[#2B3566] text-slate-400 uppercase tracking-wider font-semibold">
-                <th className="py-3 px-3">Document Name / Type</th>
-                <th className="py-3 px-3">Applicant / Customer</th>
-                <th className="py-3 px-3">Category</th>
-                <th className="py-3 px-3">Uploaded Date</th>
-                <th className="py-3 px-3">Verification Status</th>
-                <th className="py-3 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#2B3566]">
-              {filteredDocs.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    No documents found matching the filter criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredDocs.map((doc: any) => {
-                  const isVerified = doc.verified || doc.status === 'VERIFIED';
-                  const isRejected = doc.status === 'REJECTED';
+        {/* SECTION 1: REQUIRED DOCUMENTS CHECKLIST & GAP ANALYSIS */}
+        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-[#1E2445] bg-white dark:bg-[#0C152B] shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-blue-500" />
+                <span>Required Underwriting Documents Checklist</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Mandatory document checks required for credit policy sanction
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="text-emerald-600 dark:text-emerald-400">{activeCase.verifiedCount} Verified</span>
+              <span>·</span>
+              <span className="text-amber-500">{activeCase.pendingCount} Pending</span>
+              <span>·</span>
+              <span className="text-rose-600 dark:text-rose-400">{activeCase.missingCount} Missing</span>
+            </div>
+          </div>
 
-                  return (
-                    <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-[#1E2445]/50 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-500 flex-none" />
-                          <div>
-                            <p className="font-bold leading-tight">{doc.fileName || doc.documentType || 'Uploaded Document'}</p>
-                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">{doc.documentType || doc.code || 'ID: ' + doc.id.slice(-8)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">
-                          {doc.customer ? `${doc.customer.firstName} ${doc.customer.lastName || ''}` : 'Borrower'}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-mono">{doc.customer?.customerCode || '-'}</p>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          {doc.category || 'GENERAL'}
+          {/* 5-Point Mandatory Items Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            {activeCase.checklist.map((item) => {
+              const isMissing = item.status === 'MISSING';
+              const isVerified = item.status === 'VERIFIED';
+              const isPending = item.status === 'PENDING';
+
+              return (
+                <div
+                  key={item.key}
+                  className={cn(
+                    'p-3.5 rounded-xl border flex flex-col justify-between space-y-2.5 transition',
+                    isVerified
+                      ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20'
+                      : isPending
+                      ? 'border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20'
+                      : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20'
+                  )}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-1.5">
+                      <p className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                        {item.label}
+                      </p>
+                      {isVerified ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      ) : isPending ? (
+                        <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  <div>
+                    {isVerified ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/80 dark:text-emerald-200">
+                        ✓ Uploaded &amp; Verified
+                      </span>
+                    ) : isPending ? (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/80 dark:text-amber-200">
+                          ⏳ Pending Review
                         </span>
-                      </td>
-                      <td className="py-3 px-3 text-slate-500">
-                        {doc.createdAt ? formatDate(doc.createdAt) : '-'}
-                      </td>
-                      <td className="py-3 px-3">
-                        {isVerified ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Verified
-                          </span>
-                        ) : isRejected ? (
-                          <span className="inline-flex items-center gap-1 text-rose-500 font-bold text-[11px]">
-                            <XCircle className="w-3.5 h-3.5" /> Rejected
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-500 font-bold text-[11px]">
-                            <Clock className="w-3.5 h-3.5" /> Pending Review
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => setSelectedDoc(doc)}
-                            className="text-xs h-7 px-2"
+                        {item.matchingDoc && (
+                          <button
+                            onClick={() => verifyDocMutation.mutate({ docId: item.matchingDoc.id, status: 'VERIFIED' })}
+                            className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
                           >
-                            <Eye className="w-3 h-3 mr-1" /> Inspect
-                          </Button>
-                          {!isVerified && (
+                            Verify
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/80 dark:text-rose-200">
+                        ✕ Missing Document
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* SECTION 2: ALL UPLOADED DOCUMENTS TABLE */}
+        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-[#1E2445] bg-white dark:bg-[#0C152B] shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <FileText className="w-4 h-4 text-blue-500" />
+              <span>Uploaded Borrower Documents ({activeCase.docs.length})</span>
+            </h2>
+            <span className="text-xs text-slate-400">
+              Click &quot;Preview&quot; to review file artifacts in-page
+            </span>
+          </div>
+
+          {activeCase.docs.length === 0 ? (
+            <div className="py-12 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+              <AlertTriangle className="w-8 h-8 mx-auto text-amber-500" />
+              <p className="font-bold text-xs text-slate-800 dark:text-slate-200">No documents uploaded yet</p>
+              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                The loan officer has not yet uploaded files for this borrower proposal.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200 dark:border-[#1E2445] rounded-xl">
+              <table className="min-w-[720px] w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-[#2B3566] bg-slate-50 dark:bg-[#1E2445]/50 text-slate-400 uppercase tracking-wider font-semibold text-[10px]">
+                    <th className="py-3 px-3 min-w-[180px]">File Name</th>
+                    <th className="py-3 px-3 min-w-[120px]">Category</th>
+                    <th className="py-3 px-3 min-w-[110px]">Uploaded Date</th>
+                    <th className="py-3 px-3 min-w-[130px]">Verification Status</th>
+                    <th className="py-3 px-3 text-right min-w-[180px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-[#2B3566]">
+                  {activeCase.docs.map((doc: any) => {
+                    const isVerified = doc.verified || doc.status === 'VERIFIED';
+                    const isRejected = doc.status === 'REJECTED';
+                    const isSelected = previewDoc?.id === doc.id;
+
+                    return (
+                      <tr
+                        key={doc.id}
+                        className={cn(
+                          'transition-colors',
+                          isSelected
+                            ? 'bg-blue-50/70 dark:bg-blue-950/40'
+                            : 'hover:bg-slate-50 dark:hover:bg-[#1E2445]/50'
+                        )}
+                      >
+                        {/* File Name */}
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+                              <FileText className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white text-xs">
+                                {doc.fileName || doc.documentType || 'Uploaded Document'}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-mono">
+                                {doc.documentType || doc.id?.slice(0, 8)}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Category */}
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {doc.category || 'GENERAL'}
+                          </span>
+                        </td>
+
+                        {/* Upload Date */}
+                        <td className="py-3 px-3 text-slate-500 text-xs">
+                          {doc.createdAt ? formatDate(doc.createdAt) : '-'}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3 px-3">
+                          {isVerified ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                            </span>
+                          ) : isRejected ? (
+                            <span className="inline-flex items-center gap-1 text-rose-500 font-bold text-xs">
+                              <XCircle className="w-3.5 h-3.5" /> Rejected
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-amber-500 font-bold text-xs">
+                              <Clock className="w-3.5 h-3.5" /> Pending Review
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3 px-3 text-right whitespace-nowrap min-w-[180px]">
+                          <div className="flex items-center justify-end gap-1.5 flex-nowrap">
                             <Button
                               size="sm"
-                              onClick={() => verifyDocMutation.mutate({ docId: doc.id, status: 'VERIFIED' })}
-                              className="text-xs h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                              variant={isSelected ? 'primary' : 'secondary'}
+                              onClick={() => setPreviewDoc(doc)}
+                              className="text-xs px-2.5 cursor-pointer font-semibold whitespace-nowrap shrink-0"
                             >
-                              Verify
+                              <Eye className="w-3 h-3 mr-1 shrink-0" />
+                              {isSelected ? 'Viewing' : 'Preview'}
                             </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                            {!isVerified && (
+                              <Button
+                                size="sm"
+                                onClick={() => verifyDocMutation.mutate({ docId: doc.id, status: 'VERIFIED' })}
+                                className="text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer font-semibold whitespace-nowrap shrink-0"
+                              >
+                                Verify
+                              </Button>
+                            )}
+                            {!isRejected && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => verifyDocMutation.mutate({ docId: doc.id, status: 'REJECTED', remarks: 'Deficient document artifact' })}
+                                className="text-xs px-2 border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer font-semibold whitespace-nowrap shrink-0"
+                              >
+                                Reject
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* SECTION 3: IN-PAGE PREVIEW PANE (Opens Directly in Page, Zero Popups!) */}
+          {previewDoc && (
+            <div className="mt-5 p-5 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/20 dark:bg-[#1E2445]/30 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Document Preview: {previewDoc.fileName || previewDoc.documentType}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Category: {previewDoc.category || 'GENERAL'} · Status: {previewDoc.verified ? 'VERIFIED' : previewDoc.status || 'PENDING'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer text-xs font-bold"
+                >
+                  ✕ Close Preview
+                </button>
+              </div>
+
+              {/* Document Image/Artifact View */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0C152B] text-center space-y-3">
+                {previewDoc.fileUrl ? (
+                  previewDoc.fileUrl.match(/\.(jpeg|jpg|png|webp|gif)/i) ? (
+                    <div className="max-h-96 overflow-hidden rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5">
+                      <img
+                        src={previewDoc.fileUrl}
+                        alt="Document Artifact"
+                        className="max-h-96 object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="py-8 space-y-2">
+                      <FileText className="w-12 h-12 mx-auto text-blue-500" />
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {previewDoc.fileName || 'PDF Document Artifact'}
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <div className="py-8 text-slate-400 text-xs">
+                    Document URL not available in test sandbox mode.
+                  </div>
+                )}
+
+                {previewDoc.fileUrl && (
+                  <a
+                    href={previewDoc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-bold"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download / View Original File
+                  </a>
+                )}
+              </div>
+
+              {/* Quick Actions Footer inside In-Page Preview */}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                {!previewDoc.verified && previewDoc.status !== 'VERIFIED' && (
+                  <Button
+                    size="sm"
+                    onClick={() => verifyDocMutation.mutate({ docId: previewDoc.id, status: 'VERIFIED' })}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer text-xs font-semibold"
+                  >
+                    Approve &amp; Mark Verified
+                  </Button>
+                )}
+                {previewDoc.status !== 'REJECTED' && (
+                  <Button
+                    size="sm"
+                    onClick={() => verifyDocMutation.mutate({ docId: previewDoc.id, status: 'REJECTED', remarks: 'Deficient document' })}
+                    className="bg-rose-600 hover:bg-rose-700 text-white cursor-pointer text-xs font-semibold"
+                  >
+                    Reject Document
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 1: MAIN BORROWERS LIST (Clean, Simple, Uncluttered)
+  // =========================================================================
+  return (
+    <div className="space-y-5 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <PageHeader
+        breadcrumb="Lending / Document Vault"
+        title="Borrower Document Dossiers"
+        subtitle="Select a borrower to review uploaded files, identify missing required documents, and complete verification"
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                refetchDocs();
+                toast.info('Refreshed', 'Borrower documents synchronized with database.');
+              }}
+              disabled={isRefetching}
+              className="gap-1.5 text-xs font-semibold cursor-pointer"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', isRefetching && 'animate-spin')} />
+              Sync Database
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Filter Tabs & Search Bar */}
+      <Card noPadding className="p-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Quick Filter Tabs */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#1E2445] text-xs font-bold w-fit flex-wrap">
+            <button
+              onClick={() => setFilterMode('ALL')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                filterMode === 'ALL'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               )}
-            </tbody>
-          </table>
+            >
+              All Borrowers ({borrowerCases.length})
+            </button>
+            <button
+              onClick={() => setFilterMode('MISSING')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                filterMode === 'MISSING'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              )}
+            >
+              Missing Documents ({borrowerCases.filter((c) => c.missingCount > 0).length})
+            </button>
+            <button
+              onClick={() => setFilterMode('PENDING')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                filterMode === 'PENDING'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              )}
+            >
+              Pending Verification ({borrowerCases.filter((c) => c.pendingCount > 0).length})
+            </button>
+            <button
+              onClick={() => setFilterMode('COMPLETED')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg transition-all cursor-pointer',
+                filterMode === 'COMPLETED'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              )}
+            >
+              Fully Complete ({borrowerCases.filter((c) => c.missingCount === 0 && c.pendingCount === 0).length})
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by borrower, app #, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-1.5 border border-slate-200 dark:border-[#1E2445] rounded-xl text-xs bg-slate-50 dark:bg-[#0C152B] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </Card>
 
-      {/* Document Inspection Modal */}
-      {selectedDoc && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <Card className="max-w-xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-blue-500" />
-                Inspect Document Dossier
-              </h3>
-              <button
-                onClick={() => setSelectedDoc(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Main Borrowers List Table */}
+      <Card noPadding className="p-4">
+        {docsLoading ? (
+          <TableSkeleton rows={6} cols={6} />
+        ) : filteredCases.length === 0 ? (
+          <div className="py-16 text-center space-y-2.5">
+            <User className="w-10 h-10 mx-auto text-slate-400" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">No Borrower Cases Found</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              No borrower cases matched your current search or status filter.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-[860px] w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-[#2B3566] text-slate-400 uppercase tracking-wider font-semibold text-[10px]">
+                  <th className="py-3 px-3 min-w-[180px]">Borrower / Applicant</th>
+                  <th className="py-3 px-3 min-w-[140px]">Application #</th>
+                  <th className="py-3 px-3 min-w-[120px]">Requested Loan</th>
+                  <th className="py-3 px-3 min-w-[130px]">Uploaded Files</th>
+                  <th className="py-3 px-3 min-w-[160px]">Checklist Status</th>
+                  <th className="py-3 px-3 text-right min-w-[160px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#2B3566]">
+                {filteredCases.map((c) => {
+                  const customerName = `${c.customer?.firstName || 'Borrower'} ${c.customer?.lastName || ''}`.trim();
+                  const appNo = c.application?.applicationNo;
+                  const requestedAmount = c.application?.requestedAmount;
 
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                <div>
-                  <p className="text-slate-400 font-medium">Document Name</p>
-                  <p className="font-bold text-slate-800 dark:text-white">{selectedDoc.fileName || selectedDoc.documentType}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 font-medium">Document Category</p>
-                  <p className="font-bold text-slate-800 dark:text-white">{selectedDoc.category || 'GENERAL'}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 font-medium">Applicant</p>
-                  <p className="font-bold text-slate-800 dark:text-white">
-                    {selectedDoc.customer?.firstName} {selectedDoc.customer?.lastName || ''}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-400 font-medium">Status</p>
-                  <p className="font-bold text-slate-800 dark:text-white">{selectedDoc.status || 'UPLOADED'}</p>
-                </div>
-              </div>
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-[#1E2445]/50 transition-colors">
+                      {/* Borrower Info */}
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                            {customerName.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-white text-xs">{customerName}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5">
+                              <span>{c.customer?.customerCode || 'KYC Vault'}</span>
+                              {c.customer?.mobile && (
+                                <>
+                                  <span>·</span>
+                                  <span>{c.customer.mobile}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
 
-              {selectedDoc.fileUrl && (
-                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-center space-y-2">
-                  <p className="text-slate-400 text-xs">Storage Key: {selectedDoc.storageKey || selectedDoc.id}</p>
-                  <a
-                    href={selectedDoc.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:underline font-bold"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Open / Download Original Artifact
-                  </a>
-                </div>
-              )}
-            </div>
+                      {/* Application # */}
+                      <td className="py-3.5 px-3">
+                        {appNo ? (
+                          <span className="font-bold text-blue-600 dark:text-blue-400 font-mono text-xs">
+                            #{appNo}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-xs">Direct Customer Vault</span>
+                        )}
+                      </td>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-              <Button size="sm" variant="secondary" onClick={() => setSelectedDoc(null)}>
-                Close
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => verifyDocMutation.mutate({ docId: selectedDoc.id, status: 'REJECTED', remarks: 'Failed authenticity verification' })}
-                className="bg-rose-600 hover:bg-rose-700 text-white"
-              >
-                Reject Document
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => verifyDocMutation.mutate({ docId: selectedDoc.id, status: 'VERIFIED' })}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Approve & Mark Verified
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+                      {/* Loan Amount */}
+                      <td className="py-3.5 px-3 font-semibold text-slate-900 dark:text-white text-xs">
+                        {requestedAmount ? formatMoney(requestedAmount) : 'N/A'}
+                      </td>
+
+                      {/* Uploaded Files Count */}
+                      <td className="py-3.5 px-3">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {c.docs.length} Uploaded
+                        </span>
+                        <p className="text-[10px] text-slate-400">
+                          {c.verifiedCount} Verified · {c.pendingCount} Pending
+                        </p>
+                      </td>
+
+                      {/* Checklist Gap Status */}
+                      <td className="py-3.5 px-3">
+                        {c.missingCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                            <AlertTriangle className="w-3 h-3" />
+                            {c.missingCount} Missing Required
+                          </span>
+                        ) : c.pendingCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            <Clock className="w-3 h-3" />
+                            {c.pendingCount} Pending Review
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <CheckCircle2 className="w-3 h-3" />
+                            All Documents Complete
+                          </span>
+                        )}
+                      </td>
+
+                      {/* View Documents Action Button */}
+                      <td className="py-3.5 px-3 text-right whitespace-nowrap min-w-[160px]">
+                        <Button
+                          size="sm"
+                          onClick={() => openBorrowerDocumentsPage(c.id)}
+                          className="gap-1.5 text-xs font-semibold bg-[#2563EB] hover:bg-blue-700 text-white px-3 cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+                        >
+                          <span>View Documents</span>
+                          <ArrowRight className="w-3 h-3 shrink-0" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

@@ -68,13 +68,13 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
 
   if (!task) {
     return (
-      <div className="p-12 text-center bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400 space-y-3">
+      <div className="p-12 text-center bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 space-y-3 shadow-sm dark:shadow-none">
         <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
-        <h3 className="text-base font-bold text-white">Approval Task Not Found</h3>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white">Approval Task Not Found</h3>
         <p className="text-xs text-slate-500">The requested approval task could not be located or has expired.</p>
         <button
           onClick={() => router.push('/approval-queue')}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-200 hover:bg-slate-700"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
         >
           Back to Approval Queue
         </button>
@@ -125,7 +125,7 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.push('/approval-queue')}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Approval Authority Queue
@@ -135,30 +135,30 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
       </div>
 
       {/* 1. Step-By-Step Workflow State Stepper (Section 25) */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+      <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-3">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-bold uppercase tracking-wider text-slate-400">
+          <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Approval Lifecycle Progression
           </span>
-          <span className="text-indigo-400 font-mono">Stage Gate: {task.levelName}</span>
+          <span className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold">Stage Gate: {task.levelName}</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs pt-1">
           {/* Step 1: Origination & KYC */}
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-emerald-500/30 flex items-start gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="p-3 bg-emerald-50/50 dark:bg-slate-950/60 rounded-xl border border-emerald-500/30 flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-white block">1. Intake & KYC</span>
-              <span className="text-[10px] text-emerald-400 font-medium">Completed & Verified</span>
+              <span className="font-bold text-slate-900 dark:text-white block">1. Intake & KYC</span>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">Completed & Verified</span>
             </div>
           </div>
 
           {/* Step 2: BRE Engine */}
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-emerald-500/30 flex items-start gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="p-3 bg-emerald-50/50 dark:bg-slate-950/60 rounded-xl border border-emerald-500/30 flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-white block">2. BRE Underwriting</span>
-              <span className="text-[10px] text-emerald-400 font-medium">Verdict: {task.breDecision}</span>
+              <span className="font-bold text-slate-900 dark:text-white block">2. BRE Underwriting</span>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">Verdict: {task.breDecision}</span>
             </div>
           </div>
 
@@ -166,27 +166,27 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
           <div
             className={`p-3 rounded-xl border flex items-start gap-2.5 ${
               isFinalized
-                ? 'bg-slate-950/60 border-emerald-500/30'
-                : 'bg-indigo-950/40 border-indigo-500/50 shadow-lg shadow-indigo-950/40'
+                ? 'bg-emerald-50/50 dark:bg-slate-950/60 border-emerald-500/30'
+                : 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-500/50 shadow-sm dark:shadow-lg dark:shadow-indigo-950/40'
             }`}
           >
-            <div className="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-[9px] font-black text-white shrink-0 mt-0.5">
+            <div className="w-4 h-4 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-[9px] font-black text-white shrink-0 mt-0.5">
               3
             </div>
             <div>
-              <span className="font-bold text-white block">3. Level {task.level} Sanction</span>
-              <span className="text-[10px] text-indigo-300 font-medium">
+              <span className="font-bold text-slate-900 dark:text-white block">3. Level {task.level} Sanction</span>
+              <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">
                 {isFinalized ? task.status : 'Awaiting Your Decision'}
               </span>
             </div>
           </div>
 
           {/* Step 4: Final Payout */}
-          <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-800 opacity-60 flex items-start gap-2.5">
-            <Lock className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800 opacity-60 flex items-start gap-2.5">
+            <Lock className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-slate-400 block">4. Finance Payout</span>
-              <span className="text-[10px] text-slate-500">Locked until approvals pass</span>
+              <span className="font-bold text-slate-500 dark:text-slate-400 block">4. Finance Payout</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">Locked until approvals pass</span>
             </div>
           </div>
         </div>
@@ -197,23 +197,23 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
         {/* Left Column: Proposal & Credit Summary (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
           {/* Header Proposal Card */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+          <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <span className="text-xs font-mono font-bold text-indigo-400">
+                <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
                   {task.applicationNo}
                 </span>
-                <h2 className="text-xl font-black text-white tracking-tight mt-0.5">
+                <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
                   {task.customerName}
                 </h2>
-                <p className="text-xs text-slate-400">Product: {task.productCode}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Product: {task.productCode}</p>
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block">
                   Requested Loan Facility
                 </span>
-                <div className="text-2xl font-black font-mono text-emerald-400">
+                <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
                   {formatMoney(task.amount)}
                 </div>
               </div>
@@ -221,71 +221,71 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
 
             {/* Financial & Risk Metrics Matrix */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Max Eligible</span>
-                <span className="font-bold font-mono text-indigo-300">{formatMoney(task.eligibleAmount)}</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Max Eligible</span>
+                <span className="font-bold font-mono text-indigo-700 dark:text-indigo-300">{formatMoney(task.eligibleAmount)}</span>
               </div>
 
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Risk Grade</span>
-                <span className="font-bold text-white">Grade {task.riskGrade}</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Risk Grade</span>
+                <span className="font-bold text-slate-900 dark:text-white">Grade {task.riskGrade}</span>
               </div>
 
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">BRE Decision</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">BRE Decision</span>
                 <span
                   className={`font-bold ${
                     task.breDecision === 'APPROVE'
-                      ? 'text-emerald-400'
+                      ? 'text-emerald-600 dark:text-emerald-400'
                       : task.breDecision === 'REFER'
-                      ? 'text-amber-400'
-                      : 'text-rose-400'
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-rose-600 dark:text-rose-400'
                   }`}
                 >
                   {task.breDecision}
                 </span>
               </div>
 
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Assigned Level</span>
-                <span className="font-bold text-purple-300">Level {task.level}</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Assigned Level</span>
+                <span className="font-bold text-purple-700 dark:text-purple-300">Level {task.level}</span>
               </div>
             </div>
           </div>
 
           {/* Historical Approval Timeline */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-indigo-400" />
+          <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-300 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               Sanction Audit History ({history.length})
             </h3>
 
             {history.length === 0 ? (
-              <div className="text-center py-6 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+              <div className="text-center py-6 text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                 No prior approval actions recorded for this application.
               </div>
             ) : (
               <div className="space-y-2.5">
                 {history.map((h, i) => (
-                  <div key={h.id} className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs space-y-1">
+                  <div key={h.id} className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
                           className={`w-2 h-2 rounded-full ${
                             h.action === 'APPROVE'
-                              ? 'bg-emerald-400'
+                              ? 'bg-emerald-500 dark:bg-emerald-400'
                               : h.action === 'REJECT'
-                              ? 'bg-rose-400'
-                              : 'bg-amber-400'
+                              ? 'bg-rose-500 dark:bg-rose-400'
+                              : 'bg-amber-500 dark:bg-amber-400'
                           }`}
                         />
-                        <span className="font-bold text-white">{h.actionByName}</span>
-                        <span className="text-[11px] text-slate-400 font-mono">({h.actionByRole})</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{h.actionByName}</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">({h.actionByRole})</span>
                       </div>
-                      <span className="font-bold text-indigo-300">{h.action}</span>
+                      <span className="font-bold text-indigo-600 dark:text-indigo-300">{h.action}</span>
                     </div>
-                    {h.comments && <p className="text-[11px] text-slate-300 italic">{h.comments}</p>}
-                    <span className="text-[10px] text-slate-500 block">{formatDateTime(h.timestamp)}</span>
+                    {h.comments && <p className="text-[11px] text-slate-700 dark:text-slate-300 italic">{h.comments}</p>}
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">{formatDateTime(h.timestamp)}</span>
                   </div>
                 ))}
               </div>
@@ -295,24 +295,24 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
 
         {/* Right Column: Action Decision Desk (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 pb-2 border-b border-slate-800">
+          <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
               <UserCheck className="w-4 h-4" />
               Sanction Action Desk
             </span>
 
             {isFinalized ? (
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-xs space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
-                <h4 className="font-bold text-white">Action Finalized</h4>
-                <p className="text-slate-400 text-[11px]">
-                  This task was marked <strong className="text-white">{task.status}</strong> by {task.actionByName} at{' '}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-center text-xs space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mx-auto" />
+                <h4 className="font-bold text-slate-900 dark:text-white">Action Finalized</h4>
+                <p className="text-slate-600 dark:text-slate-400 text-[11px]">
+                  This task was marked <strong className="text-slate-900 dark:text-white">{task.status}</strong> by {task.actionByName} at{' '}
                   {formatDateTime(task.actionAt || task.updatedAt)}.
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Select your authoritative decision for this loan proposal within your delegated authority limit:
                 </p>
 
@@ -329,7 +329,7 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
                 {canSendBack && (
                   <button
                     onClick={() => handleOpenAction('SEND_BACK')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 transition-all active:scale-95"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition-all active:scale-95"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Send Back For Clarification
@@ -339,7 +339,7 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
                 {canEscalate && (
                   <button
                     onClick={() => handleOpenAction('ESCALATE')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 transition-all active:scale-95"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 transition-all active:scale-95"
                   >
                     <ArrowRight className="w-4 h-4" />
                     Escalate to Higher Authority
@@ -349,7 +349,7 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
                 {canReject && (
                   <button
                     onClick={() => handleOpenAction('REJECT')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 transition-all active:scale-95"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-all active:scale-95"
                   >
                     <XCircle className="w-4 h-4" />
                     Decline Proposal
@@ -363,31 +363,31 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
 
       {/* Decision Execution Modal */}
       {isActionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4 text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4 text-slate-900 dark:text-white">
             <h3 className="text-base font-bold">
               Commit Action: {selectedAction}
             </h3>
 
             <form onSubmit={handleExecuteAction} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1">Reason Code</label>
+                <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Reason Code</label>
                 <input
                   type="text"
                   required
                   value={actionReason}
                   onChange={(e) => setActionReason(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               {selectedAction === 'SEND_BACK' && (
                 <div>
-                  <label className="block text-slate-400 mb-1">Send Back Target Stage</label>
+                  <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Send Back Target Stage</label>
                   <select
                     value={sendBackTarget}
                     onChange={(e) => setSendBackTarget(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="CREDIT_ASSESSMENT">Credit Assessment</option>
                     <option value="KYC_PENDING">KYC Verification</option>
@@ -397,7 +397,7 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
               )}
 
               <div>
-                <label className="block text-slate-400 mb-1">
+                <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">
                   Mandatory Underwriting Comments & Justification
                 </label>
                 <textarea
@@ -406,15 +406,15 @@ export const ApprovalDetailView: React.FC<Props> = ({ taskId }) => {
                   value={actionComments}
                   onChange={(e) => setActionComments(e.target.value)}
                   placeholder="State clear reasons for your approval/rejection decision..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsActionModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
                   Cancel
                 </button>

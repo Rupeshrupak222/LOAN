@@ -18,6 +18,7 @@ import {
   CLIENT_WORKSPACES,
   DEFAULT_CLIENT_FEATURE_FLAGS,
 } from './workspace.config';
+import { getEffectivePermissions } from '../permissions/role-permissions';
 
 interface WorkspaceContextValue {
   context: UserAccessContext | null;
@@ -88,8 +89,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           status: 'ACTIVE',
         },
         department: {
-          key: 'OPERATIONS',
-          name: 'Operations',
+          key: isSuperAdmin ? 'ADMINISTRATION' : 'OPERATIONS',
+          name: isSuperAdmin ? 'Administration' : 'Operations',
         },
         roles,
         primaryRole,
@@ -97,7 +98,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         availableWorkspaces: Object.values(CLIENT_WORKSPACES),
         activePortal: CLIENT_PORTALS[defaultWs.portal] || CLIENT_PORTALS.OPERATIONS,
         activeWorkspace: defaultWs,
-        permissions: isSuperAdmin ? ['*'] : [],
+        permissions: getEffectivePermissions(roles),
         navigation: {
           items: [],
           groups: [],
@@ -149,15 +150,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = useCallback((permission: string): boolean => {
     if (!context) return false;
-    if (context.roles.includes('SUPER_ADMIN')) return true;
-    if (context.permissions.includes('*')) return true;
     return context.permissions.includes(permission);
   }, [context]);
 
   const hasAnyPermission = useCallback((perms: string[]): boolean => {
     if (!context) return false;
-    if (context.roles.includes('SUPER_ADMIN')) return true;
-    if (context.permissions.includes('*')) return true;
     return perms.some((p) => context.permissions.includes(p));
   }, [context]);
 

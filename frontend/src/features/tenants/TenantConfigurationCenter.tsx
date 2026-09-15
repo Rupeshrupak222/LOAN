@@ -132,7 +132,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
   return (
     <div className="space-y-6">
       {/* Institution Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl backdrop-blur-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div
@@ -143,7 +143,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white tracking-tight">{tenant.name}</h1>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{tenant.name}</h1>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase ${
                     tenant.status === 'ACTIVE'
@@ -159,8 +159,8 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                   {tenant.tier} TIER
                 </span>
               </div>
-              <p className="text-sm text-slate-400 mt-1 flex items-center gap-4">
-                <span className="font-mono text-slate-300">CODE: {tenant.code}</span>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-4">
+                <span className="font-mono text-slate-700 dark:text-slate-300">CODE: {tenant.code}</span>
                 <span>•</span>
                 <span>ID: {tenant.id}</span>
                 <span>•</span>
@@ -170,15 +170,15 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-right">
-              <div className="text-xs text-slate-400 font-medium">Readiness Score</div>
+            <div className="px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-right">
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Readiness Score</div>
               <div className="text-lg font-bold text-emerald-400">{readiness.readinessScorePct}% Verified</div>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="mt-8 flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-800 scrollbar-thin">
+        <div className="mt-8 flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800 scrollbar-thin">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
@@ -188,7 +188,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                 className={`px-4 py-2.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all duration-200 flex items-center gap-2 ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                    : 'bg-slate-950/40 text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'bg-slate-100 dark:bg-slate-950/40 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800/60'
                 }`}
               >
                 {tab.icon}
@@ -196,7 +196,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                 {tab.count !== undefined && (
                   <span
                     className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                      isActive ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-300'
+                      isActive ? 'bg-blue-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                     }`}
                   >
                     {tab.count}
@@ -230,10 +230,10 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 2. PROFILE & STATUTORY */}
       {activeTab === 'profile' && (
-        <form onSubmit={handleSaveProfile} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <form onSubmit={handleSaveProfile} className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Institutional Statutory Profile</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Institutional Statutory Profile</h3>
               <p className="text-xs text-slate-400">Core legal registration, contact parameters, and base currency configuration</p>
             </div>
             <button
@@ -248,88 +248,88 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Institution / Legal Entity Name</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Institution / Legal Entity Name</label>
               <input
                 type="text"
                 value={profileForm.name}
                 onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Corporate Identity Number (CIN)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Corporate Identity Number (CIN)</label>
               <input
                 type="text"
                 value={profileForm.cinNumber}
                 onChange={(e) => setProfileForm({ ...profileForm, cinNumber: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none font-mono"
                 placeholder="U65999MH2024PTC123456"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">RBI NBFC Registration Certificate No.</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">RBI NBFC Registration Certificate No.</label>
               <input
                 type="text"
                 value={profileForm.rbiRegistrationNo}
                 onChange={(e) => setProfileForm({ ...profileForm, rbiRegistrationNo: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none font-mono"
                 placeholder="N-13.00123"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Official Portal Domain / Subdomain</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Official Portal Domain / Subdomain</label>
               <input
                 type="text"
                 value={profileForm.domain}
                 onChange={(e) => setProfileForm({ ...profileForm, domain: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                 placeholder="institution.adyapan.dev"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Primary Institutional Contact Email</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Primary Institutional Contact Email</label>
               <input
                 type="email"
                 value={profileForm.contactEmail}
                 onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Support Phone Number</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Support Phone Number</label>
               <input
                 type="tel"
                 value={profileForm.supportPhone}
                 onChange={(e) => setProfileForm({ ...profileForm, supportPhone: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                 placeholder="+91 1800 200 1000"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Base Currency</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Base Currency</label>
               <input
                 type="text"
                 value={profileForm.baseCurrency}
                 onChange={(e) => setProfileForm({ ...profileForm, baseCurrency: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none font-mono uppercase"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none font-mono uppercase"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Operating Timezone</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Operating Timezone</label>
               <input
                 type="text"
                 value={profileForm.timezone}
                 onChange={(e) => setProfileForm({ ...profileForm, timezone: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
               />
             </div>
           </div>
@@ -338,10 +338,10 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 3. OPERATING BRANCHES */}
       {activeTab === 'branches' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Operating Branches & Jurisdictions</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Operating Branches & Jurisdictions</h3>
               <p className="text-xs text-slate-400">Manage physical branch locations and branch isolation boundaries</p>
             </div>
             <button
@@ -355,7 +355,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {branches.map((b) => (
-              <div key={b.id} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between">
+              <div key={b.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
@@ -365,13 +365,13 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         b.isActive
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-slate-800 text-slate-400'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                       }`}
                     >
                       {b.isActive ? 'ACTIVE' : 'INACTIVE'}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-white mt-2">{b.name}</h4>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-2">{b.name}</h4>
                   <p className="text-xs text-slate-400 mt-1">
                     {b.city || 'City N/A'}, {b.state || 'State N/A'}
                   </p>
@@ -384,10 +384,10 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 4. STAFF USERS */}
       {activeTab === 'users' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Staff Users & Administrative Roster</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Staff Users & Administrative Roster</h3>
               <p className="text-xs text-slate-400">Scoped staff members with RBAC role assignments for this tenant</p>
             </div>
             <button
@@ -400,8 +400,8 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950/60 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
+            <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3 px-4">User</th>
                   <th className="py-3 px-4">Email</th>
@@ -409,13 +409,13 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                   <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/30">
-                    <td className="py-3 px-4 font-medium text-white">
+                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
                       {u.firstName} {u.lastName}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-300">{u.email}</td>
+                    <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300">{u.email}</td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold text-[11px]">
                         {u.roles?.join(', ') || 'STAFF'}
@@ -436,17 +436,17 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 5. LOAN PRODUCTS */}
       {activeTab === 'products' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Configured Loan Products</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Configured Loan Products</h3>
               <p className="text-xs text-slate-400">Available lending products scoped to {tenant.name}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {productsSummary.products.map((p) => (
-              <div key={p.id} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between">
+              <div key={p.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
@@ -456,13 +456,13 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                       {p.isActive ? 'ACTIVE' : 'INACTIVE'}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-white mt-2">{p.name}</h4>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-2">{p.name}</h4>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                       <div className="text-slate-400 text-[10px]">Product Type</div>
                       <div className="text-white font-semibold">{p.productType}</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                       <div className="text-slate-400 text-[10px]">Interest Rate</div>
                       <div className="text-emerald-400 font-bold">{p.interestRate}% p.a.</div>
                     </div>
@@ -476,17 +476,17 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 6. WORKFLOWS */}
       {activeTab === 'workflows' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Origination & Servicing Workflows</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Origination & Servicing Workflows</h3>
               <p className="text-xs text-slate-400">Configured stages and transition gate rules</p>
             </div>
           </div>
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-bold text-white">Standard Digital Loan Origination Workflow</h4>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Standard Digital Loan Origination Workflow</h4>
                 <p className="text-xs text-slate-400 mt-1">Multi-stage pipeline with automated bureau pulls and underwriting gates</p>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -494,19 +494,19 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
               </span>
             </div>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="text-slate-400">Total Stages</div>
-                <div className="text-lg font-bold text-white mt-1">{workflowsSummary.stagesCount || 7} Stages</div>
+                <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">{workflowsSummary.stagesCount || 7} Stages</div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="text-slate-400">Default SLA</div>
                 <div className="text-lg font-bold text-blue-400 mt-1">24 Hours</div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="text-slate-400">Four-Eyes Gate</div>
                 <div className="text-lg font-bold text-purple-400 mt-1">Enforced</div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="text-slate-400">Status</div>
                 <div className="text-lg font-bold text-emerald-400 mt-1">100% Active</div>
               </div>
@@ -517,25 +517,25 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 7. BRE & DECISION ENGINE */}
       {activeTab === 'bre' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Business Rules Engine (BRE) Policies</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Business Rules Engine (BRE) Policies</h3>
               <p className="text-xs text-slate-400">Deterministic credit underwriting rules and risk grading policies</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Active Rule Groups</div>
               <div className="text-2xl font-black text-purple-400 mt-1">7 Policy Domains</div>
               <p className="text-xs text-slate-400 mt-2">FOIR/DTI, Bureau CIBIL, Age, Income, Employment, Banking, Fraud</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Total Configured Rules</div>
               <div className="text-2xl font-black text-blue-400 mt-1">{decisionPoliciesSummary.totalRules || 21} Active Rules</div>
               <p className="text-xs text-slate-400 mt-2">Zero hardcoded credit parameters</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Risk Matrix Grading</div>
               <div className="text-2xl font-black text-emerald-400 mt-1">Tier A through E</div>
               <p className="text-xs text-slate-400 mt-2">Automated risk-based pricing mapping</p>
@@ -546,27 +546,27 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 8. APPROVAL AUTHORITY MATRIX */}
       {activeTab === 'approval' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Approval Authority & Four-Eyes Governance</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Approval Authority & Four-Eyes Governance</h3>
               <p className="text-xs text-slate-400">Tiered delegated sanction limits and escalation matrices</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Authority Levels</div>
               <div className="text-2xl font-black text-amber-400 mt-1">{approvalMatrixSummary.levelsCount || 4} Tiers</div>
               <p className="text-xs text-slate-400 mt-2">Branch Manager → Underwriter → Credit Committee → Board</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Max Sanction Limit</div>
               <div className="text-2xl font-black text-white mt-1">
                 ₹{(approvalMatrixSummary.maxApprovalLimit / 100000).toFixed(1)} Lakhs
               </div>
               <p className="text-xs text-slate-400 mt-2">Autonomous credit limits with SoD enforcement</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Configured Roles</div>
               <div className="text-sm font-mono text-purple-400 mt-2 flex flex-wrap gap-1">
                 {approvalMatrixSummary.rolesConfigured?.map((r) => (
@@ -582,15 +582,15 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 9. CREDIT LIMITS */}
       {activeTab === 'credit-limits' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">Credit Facility & Multi-Cap Exposure Limits</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Credit Facility & Multi-Cap Exposure Limits</h3>
               <p className="text-xs text-slate-400">Revolving credit lines and borrower aggregate exposure caps</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Configured Facility Types</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {creditLimitsSummary.facilityTypesConfigured?.map((f) => (
@@ -600,7 +600,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                 ))}
               </div>
             </div>
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               <div className="text-xs text-slate-400">Max System Exposure Cap</div>
               <div className="text-2xl font-black text-rose-400 mt-1">₹5,00,00,000</div>
               <p className="text-xs text-slate-400 mt-2">Strict multi-product customer exposure ceiling</p>
@@ -611,10 +611,10 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* 10. WHITE-LABEL BRANDING */}
       {activeTab === 'branding' && (
-        <form onSubmit={handleSaveBranding} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <form onSubmit={handleSaveBranding} className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white">White-Label Branding Studio</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">White-Label Branding Studio</h3>
               <p className="text-xs text-slate-400">Configure visual themes, custom colors, portal domains, and WCAG-compliant styling</p>
             </div>
             <button
@@ -631,30 +631,30 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
             {/* Form Fields */}
             <div className="lg:col-span-2 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-2">Display Institution Name</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Display Institution Name</label>
                 <input
                   type="text"
                   value={brandingForm.institutionName}
                   onChange={(e) => setBrandingForm({ ...brandingForm, institutionName: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-2">Tagline / Slogan</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Tagline / Slogan</label>
                 <input
                   type="text"
                   value={brandingForm.tagline || ''}
                   onChange={(e) => setBrandingForm({ ...brandingForm, tagline: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   placeholder="e.g. Next-Gen Credit Intelligence"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">Primary Brand Color</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Primary Brand Color</label>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
@@ -666,13 +666,13 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                       type="text"
                       value={brandingForm.primaryColor || '#2563EB'}
                       onChange={(e) => setBrandingForm({ ...brandingForm, primaryColor: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm uppercase focus:border-blue-500 focus:outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm uppercase focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">Secondary / Accent Color</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Secondary / Accent Color</label>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
@@ -684,7 +684,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                       type="text"
                       value={brandingForm.secondaryColor || '#1D4ED8'}
                       onChange={(e) => setBrandingForm({ ...brandingForm, secondaryColor: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm uppercase focus:border-blue-500 focus:outline-none"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm uppercase focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -692,44 +692,44 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">Logo Asset URL</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo Asset URL</label>
                   <input
                     type="text"
                     value={brandingForm.logoUrl || ''}
                     onChange={(e) => setBrandingForm({ ...brandingForm, logoUrl: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="/logos/custom-logo.svg"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">Favicon URL</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Favicon URL</label>
                   <input
                     type="text"
                     value={brandingForm.faviconUrl || ''}
                     onChange={(e) => setBrandingForm({ ...brandingForm, faviconUrl: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="/favicon.ico"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-2">Email Notification Signature</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Email Notification Signature</label>
                 <input
                   type="text"
                   value={brandingForm.emailSignature || ''}
                   onChange={(e) => setBrandingForm({ ...brandingForm, emailSignature: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   placeholder="Operations Desk <support@institution.dev>"
                 />
               </div>
             </div>
 
             {/* Live Visual Preview */}
-            <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
               <div>
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
                   Live Customer Portal Preview
                 </div>
 
@@ -752,7 +752,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                   </div>
                 </div>
 
-                <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <div className="mt-4 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-xs text-slate-400">WCAG 2.1 Contrast Safety:</span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -767,62 +767,62 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* MODAL: ADD BRANCH */}
       {isBranchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white">Add Operating Branch</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Add Operating Branch</h3>
             <form onSubmit={handleCreateBranch} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Code</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Branch Code</label>
                 <input
                   type="text"
                   value={branchForm.code}
                   onChange={(e) => setBranchForm({ ...branchForm, code: e.target.value })}
                   placeholder="MUM_NORTH"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm focus:border-blue-500 focus:outline-none uppercase"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:border-blue-500 focus:outline-none uppercase"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Name</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Branch Name</label>
                 <input
                   type="text"
                   value={branchForm.name}
                   onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })}
                   placeholder="Mumbai North Regional Office"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">City</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">City</label>
                   <input
                     type="text"
                     value={branchForm.city || ''}
                     onChange={(e) => setBranchForm({ ...branchForm, city: e.target.value })}
                     placeholder="Mumbai"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">State</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">State</label>
                   <input
                     type="text"
                     value={branchForm.state || ''}
                     onChange={(e) => setBranchForm({ ...branchForm, state: e.target.value })}
                     placeholder="Maharashtra"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsBranchModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold"
                 >
                   Cancel
                 </button>
@@ -841,53 +841,53 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
       {/* MODAL: INVITE STAFF */}
       {isUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white">Invite / Provision Staff User</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Invite / Provision Staff User</h3>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Staff Email Address</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Staff Email Address</label>
                 <input
                   type="email"
                   value={userForm.email}
                   onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                   placeholder="officer@institution.dev"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">First Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">First Name</label>
                   <input
                     type="text"
                     value={userForm.firstName}
                     onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
                     placeholder="Priya"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Last Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Last Name</label>
                   <input
                     type="text"
                     value={userForm.lastName}
                     onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
                     placeholder="Sharma"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Assigned Institutional Role</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Assigned Institutional Role</label>
                 <select
                   value={userForm.role}
                   onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                 >
                   <option value="LOAN_OFFICER">Loan Officer (Origination & Verification)</option>
                   <option value="UNDERWRITER">Underwriter (Risk & Sanction)</option>
@@ -898,11 +898,11 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Operating Branch</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Operating Branch</label>
                 <select
                   value={userForm.branchId || ''}
                   onChange={(e) => setUserForm({ ...userForm, branchId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm focus:border-blue-500 focus:outline-none"
                 >
                   <option value="">Head Office (All Branches)</option>
                   {branches.map((b) => (
@@ -913,11 +913,11 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
                 </select>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsUserModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold"
                 >
                   Cancel
                 </button>

@@ -30,7 +30,8 @@ export async function listDocuments(
   return prisma.document.findMany({
     where,
     include: {
-      customer: { select: { firstName: true, lastName: true, customerCode: true, tenantId: true } },
+      customer: { select: { id: true, firstName: true, lastName: true, customerCode: true, tenantId: true, mobile: true } },
+      application: { select: { id: true, applicationNo: true, requestedAmount: true, status: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -248,6 +249,71 @@ export async function verifyDocument(
       verifiedAt: new Date(),
     },
   });
+
+  // Synchronize Customer KYC status and Application status across the platform
+  const targetCustomerId = updated.customerId || (existing as any).customerId;
+  const targetAppId = updated.applicationId || (existing as any).applicationId;
+
+  if (targetCustomerId) {
+    try {
+      const allCustomerDocs = await prisma.document.findMany({
+        where: { customerId: targetCustomerId },
+      });
+
+      const hasAnyRejected = allCustomerDocs.some((d) => d.status === 'REJECTED');
+      const hasVerifiedId = allCustomerDocs.some(
+        (d) =>
+          (d.status === 'VERIFIED' || d.verified) &&
+          (['IDENTITY_PROOF', 'PAN_CARD', 'AADHAAR'].includes(d.category || '') ||
+            ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID'].includes(d.documentType || ''))
+      );
+      const hasVerifiedAddress = allCustomerDocs.some(
+        (d) =>
+          (d.status === 'VERIFIED' || d.verified) &&
+          (['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category || '') ||
+            ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'AADHAAR'].includes(d.documentType || ''))
+      );
+      const hasVerifiedPhoto = allCustomerDocs.some(
+        (d) =>
+          (d.status === 'VERIFIED' || d.verified) &&
+          (['APPLICANT_PHOTO', 'PHOTO'].includes(d.category || '') ||
+            ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO'].includes(d.documentType || ''))
+      );
+
+      if (hasAnyRejected) {
+        await prisma.customer.update({
+          where: { id: targetCustomerId },
+          data: { kycStatus: 'REJECTED' },
+        });
+      } else if (hasVerifiedId && hasVerifiedAddress && hasVerifiedPhoto) {
+        await prisma.customer.update({
+          where: { id: targetCustomerId },
+          data: { kycStatus: 'VERIFIED', status: 'ACTIVE' },
+        });
+
+        // If in-flight application was KYC_PENDING, advance it to KYC_VERIFIED
+        if (targetAppId) {
+          const app = await prisma.loanApplication.findUnique({
+            where: { id: targetAppId },
+            select: { status: true },
+          });
+          if (app && app.status === 'KYC_PENDING') {
+            await prisma.loanApplication.update({
+              where: { id: targetAppId },
+              data: { status: 'KYC_VERIFIED' },
+            });
+          }
+        }
+      } else if (allCustomerDocs.some((d) => d.status === 'VERIFIED' || d.status === 'UNDER_REVIEW')) {
+        await prisma.customer.update({
+          where: { id: targetCustomerId },
+          data: { kycStatus: 'UNDER_REVIEW' },
+        });
+      }
+    } catch (syncErr) {
+      console.error('[DocumentService] Failed to synchronize customer KYC status:', syncErr);
+    }
+  }
 
   await logAudit({
     userId: actorUserId,

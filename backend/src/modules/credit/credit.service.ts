@@ -1239,38 +1239,46 @@ export async function getCreditQueue(tab?: string) {
     orderBy: { updatedAt: 'desc' },
   });
 
-  // Calculate workflow categories for each app
-  const isKycPending = (app: any) => app.customer?.kycStatus !== 'VERIFIED';
+  // Calculate accurate workflow categories for each app
+  const isCompletedOrSanctioned = (app: any) => {
+    return ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status);
+  };
+
+  const isKycPending = (app: any) => {
+    if (isCompletedOrSanctioned(app)) return false;
+    return app.customer?.kycStatus !== 'VERIFIED';
+  };
   
   const isDocsPending = (app: any) => {
-    if (app.customer?.kycStatus !== 'VERIFIED') return false;
+    if (isCompletedOrSanctioned(app)) return false;
+    if (isKycPending(app)) return false;
     const docs = [...(app.customer?.documents || []), ...(app.documents || [])];
-    const mandatoryCategories = ['IDENTITY', 'ADDRESS', 'INCOME', 'BANK_STATEMENT', 'EMPLOYMENT_BUSINESS'];
-    for (const cat of mandatoryCategories) {
-      const matching = docs.filter((d) => mapDocumentCategory(d) === cat);
-      if (matching.length === 0 || !matching.some((d) => d.status === 'VERIFIED' || d.verified)) {
-        return true;
-      }
-    }
-    return false;
+    if (docs.length === 0) return true;
+    return docs.some((d: any) => !d.verified && d.status !== 'VERIFIED');
+  };
+
+  const isVerificationPending = (app: any) => {
+    return isKycPending(app) || isDocsPending(app);
   };
 
   const isFinancialPending = (app: any) => {
-    return !isKycPending(app) && !isDocsPending(app) && !app.eligibility;
+    if (isCompletedOrSanctioned(app)) return false;
+    return !isVerificationPending(app) && !app.eligibility;
   };
 
   const isCreditPending = (app: any) => {
+    if (isCompletedOrSanctioned(app)) return false;
     return (
-      !isKycPending(app) &&
-      !isDocsPending(app) &&
+      !isVerificationPending(app) &&
       !!app.eligibility &&
       app.eligibility?.result !== 'NOT_ELIGIBLE' &&
       app.eligibility?.result !== 'FURTHER_REVIEW' &&
-      (!app.riskAssessment || app.status === 'CREDIT_ASSESSMENT')
+      (!app.riskAssessment || app.riskAssessment.score == null)
     );
   };
 
   const isFurtherReview = (app: any) => {
+    if (isCompletedOrSanctioned(app)) return false;
     return (
       app.eligibility?.result === 'FURTHER_REVIEW' ||
       (app.eligibility?.result as string) === 'REQUEST_ADDITIONAL_DOCS' ||
@@ -1279,14 +1287,16 @@ export async function getCreditQueue(tab?: string) {
   };
 
   const isEligibleOrReadyForUnderwriter = (app: any) => {
+    if (isCompletedOrSanctioned(app)) return false;
     return (
       app.status === 'UNDERWRITING' ||
-      app.eligibility?.result === 'ELIGIBLE' ||
+      (app.eligibility?.result === 'ELIGIBLE' && app.riskAssessment?.score != null) ||
       (app.eligibility?.factors as any)?.decision === 'ELIGIBLE'
     );
   };
 
   const isNotEligible = (app: any) => {
+    if (isCompletedOrSanctioned(app)) return false;
     return (
       app.eligibility?.result === 'NOT_ELIGIBLE' ||
       (app.eligibility?.factors as any)?.decision === 'NOT_ELIGIBLE' ||
@@ -1296,7 +1306,9 @@ export async function getCreditQueue(tab?: string) {
 
   // Group items by tab
   let items = allApps;
-  if (tab === 'PENDING_KYC') {
+  if (tab === 'PENDING_VERIFICATION') {
+    items = allApps.filter(isVerificationPending);
+  } else if (tab === 'PENDING_KYC') {
     items = allApps.filter(isKycPending);
   } else if (tab === 'PENDING_DOCS') {
     items = allApps.filter(isDocsPending);
@@ -1310,19 +1322,14 @@ export async function getCreditQueue(tab?: string) {
     items = allApps.filter(isEligibleOrReadyForUnderwriter);
   } else if (tab === 'NOT_ELIGIBLE') {
     items = allApps.filter(isNotEligible);
+  } else if (tab === 'COMPLETED' || tab === 'SANCTIONED') {
+    items = allApps.filter(isCompletedOrSanctioned);
   }
 
   return {
     metrics: {
       applicationsAssigned: allApps.length,
-      pendingAssessments:
-        allApps.filter(isKycPending).length +
-        allApps.filter(isDocsPending).length +
-        allApps.filter(isFinancialPending).length +
-        allApps.filter(isCreditPending).length,
-      assessmentsCompleted:
-        allApps.filter(isEligibleOrReadyForUnderwriter).length +
-        allApps.filter(isNotEligible).length,
+      pendingVerification: allApps.filter(isVerificationPending).length,
       pendingKyc: allApps.filter(isKycPending).length,
       pendingDocs: allApps.filter(isDocsPending).length,
       pendingFinancial: allApps.filter(isFinancialPending).length,
@@ -1330,6 +1337,15 @@ export async function getCreditQueue(tab?: string) {
       furtherReview: allApps.filter(isFurtherReview).length,
       eligibleApplications: allApps.filter(isEligibleOrReadyForUnderwriter).length,
       notEligibleApplications: allApps.filter(isNotEligible).length,
+      completedApplications: allApps.filter(isCompletedOrSanctioned).length,
+      pendingAssessments:
+        allApps.filter(isVerificationPending).length +
+        allApps.filter(isFinancialPending).length +
+        allApps.filter(isCreditPending).length,
+      assessmentsCompleted:
+        allApps.filter(isEligibleOrReadyForUnderwriter).length +
+        allApps.filter(isNotEligible).length +
+        allApps.filter(isCompletedOrSanctioned).length,
     },
     items,
   };
