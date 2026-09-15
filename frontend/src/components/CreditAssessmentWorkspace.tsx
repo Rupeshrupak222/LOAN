@@ -74,8 +74,15 @@ export function CreditAssessmentWorkspace({
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  // Active step in stepper
-  const [activeStep, setActiveStep] = useState<StepNumber>(1);
+  // Active step in stepper (defaults to step in search params if provided)
+  const [activeStep, setActiveStep] = useState<StepNumber>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('step');
+      const parsed = Number(p);
+      if ([1, 2, 3, 4, 5, 6].includes(parsed)) return parsed as StepNumber;
+    }
+    return 1;
+  });
 
   // Return to Loan Officer Modal state
   const [returnModalOpen, setReturnModalOpen] = useState(false);
@@ -215,7 +222,7 @@ export function CreditAssessmentWorkspace({
 
   const unverifiedDocs = documents.filter((d) => !d.verified && d.status !== 'VERIFIED');
   const isKycPending = customer?.kycStatus !== 'VERIFIED';
-  const isReturnedToLo = app?.status === 'SUBMITTED' || (app as any)?.underwriting?.decision === 'SEND_BACK';
+  const isReturnedToLo = app?.status === 'RETURNED' || (app as any)?.underwriting?.decision === 'SEND_BACK';
 
   const hasDeficiencies =
     missingMandatoryDocs.length > 0 ||
@@ -306,7 +313,7 @@ export function CreditAssessmentWorkspace({
     app?.status === 'UNDERWRITING' || ['APPROVED', 'REJECTED', 'DISBURSED'].includes(app?.status)
   );
 
-  // Check if a step is unlocked - Strict sequential gating: Steps 3-6 require Step 2 100% complete
+  // Strict sequential gating: A step is only unlocked when the previous step is complete!
   const isStepUnlocked = (step: StepNumber): boolean => {
     if (step === 1) return true;
     if (step === 2) return isStep1Complete;
@@ -317,42 +324,60 @@ export function CreditAssessmentWorkspace({
     return false;
   };
 
-  // Stepper Click Interceptor with user-friendly error notices
+  // Stepper Click Handler with clear guidance if locked
   const handleStepClick = (stepNum: StepNumber) => {
     if (!isStepUnlocked(stepNum)) {
-      if (!isStep1Complete) {
-        toast.warning('Please initiate Step 1 proposal appraisal before assessing documents.');
-      } else if (!isStep2Complete) {
-        if (isReturnedToLo) {
-          toast.error('Assessment Blocked: Application is currently returned to Loan Officer / Customer for rectification.');
-        } else if (ageError) {
-          toast.error(`Assessment Blocked: Age policy violation (${ageError}). Proposal must be returned to Loan Officer.`);
-        } else if (missingMandatoryDocs.length > 0) {
-          toast.error(`Assessment Blocked: Missing mandatory intake documents (${missingMandatoryDocs.join(', ')}). Proposal must be returned to Loan Officer / Customer.`);
+      if (stepNum === 2 && !isStep1Complete) {
+        toast.warning('Step 1 (Application Intake) review must be completed first.');
+      } else if (stepNum >= 3 && !isStep2Complete) {
+        if (missingMandatoryDocs.length > 0) {
+          toast.warning(`Step 2 Incomplete: Missing mandatory documents (${missingMandatoryDocs.join(', ')}). All mandatory documents must be uploaded and verified to unlock Step ${stepNum}.`);
         } else if (unverifiedDocs.length > 0) {
-          toast.error(`Assessment Blocked: ${unverifiedDocs.length} uploaded document(s) pending inspection & verification.`);
+          toast.warning(`Step 2 Incomplete: ${unverifiedDocs.length} uploaded document(s) pending review. Verify all documents to unlock Step ${stepNum}.`);
+        } else if (customer?.kycStatus !== 'VERIFIED') {
+          toast.warning(`Step 2 Incomplete: Borrower KYC status is ${customer?.kycStatus || 'PENDING'}. Mark KYC Verified to unlock Step ${stepNum}.`);
+        } else if (!isAgeValid) {
+          toast.warning(`Step 2 Incomplete: Age criteria violation (${ageError}).`);
         } else {
-          toast.error('Assessment Blocked: All KYC compliance criteria and mandatory documents must be complete & verified.');
+          toast.warning(`Step 2 (KYC & Documents) must be fully verified and complete before proceeding to Step ${stepNum}.`);
         }
-      } else {
-        toast.warning(`Please complete Step ${stepNum - 1} before proceeding to Step ${stepNum}.`);
+      } else if (stepNum >= 4 && !isStep3Complete) {
+        toast.warning(`Step 3 (Financial & FOIR) must be evaluated with Policy Eligibility Engine before unlocking Step ${stepNum}.`);
+      } else if (stepNum >= 5 && !isStep4Complete) {
+        toast.warning(`Step 4 (Credit & Bureau Risk) score must be evaluated before recording your recommendation.`);
+      } else if (stepNum >= 6 && !isStep5Complete) {
+        toast.warning(`Step 5 (Analyst Recommendation) must be submitted before Underwriter Handover.`);
       }
       return;
     }
     setActiveStep(stepNum);
   };
 
-  // Synchronize active step on load: STRICT gating - never bypass an incomplete step!
+  // Synchronize initial active step once on load
+  const [initialStepDone, setInitialStepDone] = useState(false);
   useEffect(() => {
-    if (app) {
+    if (app && !initialStepDone) {
       if (!isStep1Complete) setActiveStep(1);
-      else if (!isStep2Complete) setActiveStep(2); // If Step 2 has deficiencies, STAY ON STEP 2!
+      else if (!isStep2Complete) setActiveStep(2);
       else if (!isStep3Complete) setActiveStep(3);
       else if (!isStep4Complete) setActiveStep(4);
       else if (!isStep5Complete) setActiveStep(5);
       else setActiveStep(6);
+      setInitialStepDone(true);
     }
-  }, [isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete]);
+  }, [app, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete]);
+
+  // Fallback if activeStep becomes locked
+  useEffect(() => {
+    if (initialStepDone && !isStepUnlocked(activeStep)) {
+      if (isStep5Complete) setActiveStep(6);
+      else if (isStep4Complete) setActiveStep(5);
+      else if (isStep3Complete) setActiveStep(4);
+      else if (isStep2Complete) setActiveStep(3);
+      else if (isStep1Complete) setActiveStep(2);
+      else setActiveStep(1);
+    }
+  }, [activeStep, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete]);
 
   // ---------------------------------------------------------------------------
   // MUTATIONS
@@ -675,80 +700,111 @@ export function CreditAssessmentWorkspace({
       {/* -----------------------------------------------------------------------
           TOP HEADER: BACK BUTTON, APPLICATION TITLE & ACTIONS
       ----------------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-3">
-          {onBack && (
+      {/* -----------------------------------------------------------------------
+          TOP COMMAND HEADER: CASE IDENTITY, KPIS & ACTIONS
+      ----------------------------------------------------------------------- */}
+      <div className="rounded-2xl border border-slate-200/80 dark:border-[#1E284D] bg-white dark:bg-[#0C152B] p-5 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            {onBack && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onBack}
+                className="gap-1.5 font-semibold text-xs cursor-pointer shadow-xs shrink-0"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Queue
+              </Button>
+            )}
+
+            <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold text-sm flex items-center justify-center shrink-0 border border-blue-500/20">
+              {customer?.firstName?.[0] || 'B'}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Credit Appraisal: #{app?.applicationNo || applicationId}
+                </h2>
+                <Badge status={app?.status} />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>Borrower: <strong className="text-slate-800 dark:text-slate-200">{customer?.firstName} {customer?.lastName}</strong> ({customer?.customerCode})</span>
+                <span>•</span>
+                <span>Product: <strong className="text-slate-800 dark:text-slate-200">{product?.name || 'Loan'}</strong></span>
+                <span>•</span>
+                <span>Tenor: {app?.tenureMonths || 12} Mos</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
+            <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 dark:bg-[#0F1A36] border border-slate-200/70 dark:border-[#1E284D] text-right shrink-0">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block leading-none">Requested Amount</span>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">{formatMoney(app?.requestedAmount)}</span>
+            </div>
+
             <Button
               size="sm"
               variant="secondary"
-              onClick={onBack}
-              className="gap-1.5 font-semibold text-xs cursor-pointer shadow-xs"
+              onClick={openReturnModalWithDeficiencies}
+              className="gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 cursor-pointer shadow-xs whitespace-nowrap shrink-0"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back to Assessment Queue
+              <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Return to Loan Officer
             </Button>
-          )}
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Credit Assessment: #{app?.applicationNo || applicationId}
-              </h2>
-              <Badge status={app?.status} />
-            </div>
-            <p className="text-xs text-slate-400">
-              Borrower: <span className="font-semibold text-slate-700 dark:text-slate-200">{customer?.firstName} {customer?.lastName}</span> ({customer?.customerCode}) · Product: {product?.name}
-            </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={openReturnModalWithDeficiencies}
-            className="gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Return to Loan Officer
-          </Button>
         </div>
       </div>
 
       {/* -----------------------------------------------------------------------
-          APPLICATION RETURNED / DEFICIENCY PAUSED BANNER
+          STATUS CONTEXT BANNER (ONLY FOR TRUE RETURN OR INCOMING PROPOSAL)
       ----------------------------------------------------------------------- */}
-      {isReturnedToLo && (
-        <div className="p-4 rounded-xl border border-amber-300 bg-amber-50/90 dark:bg-amber-950/40 dark:border-amber-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+      {isReturnedToLo ? (
+        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
           <div className="flex items-start gap-3">
-            <RotateCcw className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <RotateCcw className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-amber-950 dark:text-amber-200">
+              <h4 className="text-sm font-bold">
                 Application Returned to Loan Officer / Customer for Rectification
               </h4>
-              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                This proposal is currently in <strong>{app?.status}</strong> status. Credit appraisal is strictly paused awaiting Loan Officer or Customer to complete missing intake documents or criteria and resubmit the application.
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                This proposal is currently in <strong>{app?.status}</strong> status awaiting rectification. Credit appraisal will proceed once resubmitted.
               </p>
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-200 text-amber-900 border border-amber-300 dark:bg-amber-900/60 dark:text-amber-200 shrink-0">
-            WAITING FOR RESUBMISSION
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+            Awaiting Resubmission
           </span>
         </div>
-      )}
+      ) : app?.status === 'SUBMITTED' ? (
+        <div className="p-3.5 rounded-xl border border-blue-500/25 bg-blue-500/10 text-blue-900 dark:text-blue-200 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+            <p className="text-xs">
+              <strong>Incoming Proposal Forwarded by Loan Officer</strong> — Ready for Credit Appraisal. Review customer intake, verify compliance documents, and evaluate debt capacity.
+            </p>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-500 border border-blue-500/30 shrink-0">
+            Intake Review
+          </span>
+        </div>
+      ) : null}
 
       {/* -----------------------------------------------------------------------
-          6-STEP STRICT SEQUENTIAL TRACKER / STEPPER
+          6-STEP WORKFLOW STEPPER
       ----------------------------------------------------------------------- */}
-      <div className="bg-white dark:bg-[#1E2445] p-3 rounded-2xl border border-slate-200 dark:border-[#2B3566] shadow-xs">
+      <div className="bg-white dark:bg-[#0C152B] p-2.5 rounded-2xl border border-slate-200/80 dark:border-[#1E284D] shadow-sm">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {[
-            { step: 1, label: '1. Application & Eligibility', isComplete: isStep1Complete },
-            { step: 2, label: '2. KYC / Identity & Docs', isComplete: isStep2Complete },
-            { step: 3, label: '3. Financial Assessment', isComplete: isStep3Complete },
-            { step: 4, label: '4. Credit / Risk', isComplete: isStep4Complete },
+            { step: 1, label: '1. Application Intake', isComplete: isStep1Complete },
+            { step: 2, label: '2. KYC & Documents', isComplete: isStep2Complete },
+            { step: 3, label: '3. Debt Capacity & FOIR', isComplete: isStep3Complete },
+            { step: 4, label: '4. Credit & Bureau Risk', isComplete: isStep4Complete },
             { step: 5, label: '5. Recommendation', isComplete: isStep5Complete },
-            { step: 6, label: '6. Underwriter Handoff', isComplete: isStep6Complete },
+            { step: 6, label: '6. Underwriter Handover', isComplete: isStep6Complete },
           ].map((item) => {
             const stepNum = item.step as StepNumber;
-            const unlocked = isStepUnlocked(stepNum);
+            const isUnlocked = isStepUnlocked(stepNum);
             const isCurrent = activeStep === stepNum;
 
             return (
@@ -756,40 +812,44 @@ export function CreditAssessmentWorkspace({
                 key={item.step}
                 type="button"
                 onClick={() => handleStepClick(stepNum)}
-                title={
-                  unlocked
-                    ? item.label
-                    : !isStep2Complete
-                    ? 'Locked: Step 2 KYC, age verification, and all 5 mandatory intake documents must be verified first'
-                    : `Locked: Step ${item.step - 1} must be completed first`
-                }
                 className={cn(
-                  'p-2.5 rounded-xl border text-left transition-all relative flex flex-col justify-between',
-                  unlocked ? 'cursor-pointer' : 'opacity-50 bg-slate-50/50 dark:bg-slate-900/30 border-dashed border-slate-200 dark:border-slate-800 cursor-not-allowed',
-                  isCurrent
-                    ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20 bg-blue-50/40 dark:bg-blue-950/20'
+                  'p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between',
+                  !isUnlocked
+                    ? 'opacity-40 bg-slate-50/40 dark:bg-[#0C152B]/40 border-dashed border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                    : isCurrent
+                    ? 'border-blue-500 bg-blue-600/10 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs cursor-pointer'
                     : item.isComplete
-                    ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/10'
-                    : 'border-slate-200 dark:border-slate-800'
+                    ? 'border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-pointer'
+                    : 'border-slate-200/80 dark:border-[#1E284D] bg-slate-50/50 dark:bg-[#0F1A36]/50 hover:bg-slate-100 dark:hover:bg-[#131E3D] text-slate-500 dark:text-slate-400 cursor-pointer'
                 )}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  <span className={cn(
+                    'text-[10px] font-bold uppercase tracking-wider',
+                    !isUnlocked ? 'text-slate-400 dark:text-slate-600' :
+                    isCurrent ? 'text-blue-600 dark:text-blue-400' :
+                    item.isComplete ? 'text-emerald-600 dark:text-emerald-400' :
+                    'text-slate-400'
+                  )}>
                     Step {item.step}
                   </span>
                   {item.isComplete ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  ) : unlocked ? (
-                    <Unlock className="w-3.5 h-3.5 text-blue-500" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  ) : !isUnlocked ? (
+                    <Lock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600" />
                   ) : (
-                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                    <span className={cn(
+                      'w-2 h-2 rounded-full',
+                      isCurrent ? 'bg-blue-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-700'
+                    )} />
                   )}
                 </div>
                 <p className={cn(
-                  'text-xs font-bold truncate leading-tight',
-                  isCurrent ? 'text-[#2563EB] dark:text-blue-400' :
-                  item.isComplete ? 'text-slate-800 dark:text-slate-200' :
-                  'text-slate-500'
+                  'text-xs font-bold leading-snug break-words mt-0.5 line-clamp-2',
+                  !isUnlocked ? 'text-slate-400 dark:text-slate-600 font-medium' :
+                  isCurrent ? 'text-blue-600 dark:text-blue-300 font-extrabold' :
+                  item.isComplete ? 'text-slate-800 dark:text-slate-200 font-bold' :
+                  'text-slate-600 dark:text-slate-400 font-medium'
                 )}>
                   {item.label}
                 </p>
@@ -932,7 +992,7 @@ export function CreditAssessmentWorkspace({
 
           {/* Customer Summary & Customer 360 Toggle (INLINE - NO NEW TAB) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-1">
+            <div className="p-3.5 rounded-xl border border-slate-200/60 dark:border-[#1E284D] bg-slate-50/60 dark:bg-[#0F1A36] space-y-1">
               <span className="text-slate-400 font-medium">Borrower Name & Code</span>
               <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
                 {customer?.firstName} {customer?.lastName}
@@ -940,7 +1000,7 @@ export function CreditAssessmentWorkspace({
               <p className="text-[11px] text-slate-400 font-mono">{customer?.customerCode || 'CUST'}</p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-1">
+            <div className="p-3.5 rounded-xl border border-slate-200/60 dark:border-[#1E284D] bg-slate-50/60 dark:bg-[#0F1A36] space-y-1">
               <span className="text-slate-400 font-medium">Date of Birth & Age</span>
               <div className="flex items-center gap-1.5">
                 <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
@@ -962,25 +1022,25 @@ export function CreditAssessmentWorkspace({
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-1">
+            <div className="p-3.5 rounded-xl border border-slate-200/60 dark:border-[#1E284D] bg-slate-50/60 dark:bg-[#0F1A36] space-y-1">
               <span className="text-slate-400 font-medium">Government ID & PAN</span>
               <p className="font-bold text-slate-800 dark:text-slate-200 text-sm font-mono">
                 {customer?.panNumber ? `PAN: ${customer.panNumber}` : 'Govt ID Provided'}
               </p>
-              <p className="text-[11px] text-emerald-600 font-semibold">
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                 {customer?.kycStatus === 'VERIFIED' ? '✓ Verified in DB' : 'Pending Verification'}
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 space-y-1 flex flex-col justify-between">
-              <span className="text-slate-500 font-medium flex items-center gap-1">
-                <Users className="w-3.5 h-3.5 text-[#2563EB]" /> Customer 360 Dossier
+            <div className="p-3.5 rounded-xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 space-y-1 flex flex-col justify-between">
+              <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
+                <Users className="w-3.5 h-3.5 text-blue-500" /> Customer 360 Dossier
               </span>
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={() => setCustomer360Open(!customer360Open)}
-                className="gap-1.5 font-bold text-xs text-[#2563EB] border-blue-300 dark:border-blue-800 hover:bg-blue-100/60 mt-1 cursor-pointer w-full justify-between shadow-xs"
+                className="gap-1.5 font-bold text-xs text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 mt-1 cursor-pointer w-full justify-between shadow-xs"
               >
                 <span>{customer360Open ? 'Hide Customer 360' : 'Open Customer 360'}</span>
                 {customer360Open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -1151,24 +1211,25 @@ export function CreditAssessmentWorkspace({
               DEFICIENCY & PENDING REQUIREMENTS ALERT (WITH RETURN TO LO BUTTON)
           ------------------------------------------------------------------- */}
           {hasDeficiencies && (
-            <div className="p-4 rounded-xl border border-amber-300 bg-amber-50/80 dark:bg-amber-950/30 dark:border-amber-900/50 space-y-3">
+            <div className="p-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 dark:bg-amber-950/20 space-y-3 shadow-xs">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-sm font-bold text-amber-950 dark:text-amber-200">
-                      Mandatory KYC & Document Deficiencies Detected
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Document Verification Checkpoint
                     </h4>
-                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                      The proposal has incomplete verification or missing intake documents. Complete verification or return the proposal to the Loan Officer.
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                      Proposal has pending documents or unverified proofs. You can verify documents below or return the proposal to the Loan Officer.
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="sm"
+                    variant="secondary"
                     onClick={openReturnModalWithDeficiencies}
-                    className="gap-1.5 text-xs font-semibold text-amber-950 dark:text-amber-100 border border-amber-400 bg-amber-300 hover:bg-amber-400 dark:bg-amber-900/60 dark:hover:bg-amber-900/80 dark:border-amber-700 cursor-pointer shadow-xs"
+                    className="gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 border-amber-400/40 hover:bg-amber-100/50 dark:hover:bg-amber-950/40 cursor-pointer shadow-xs"
                   >
                     <RotateCcw className="w-3.5 h-3.5" /> Return to Loan Officer
                   </Button>
@@ -1176,65 +1237,65 @@ export function CreditAssessmentWorkspace({
               </div>
 
               {/* 4-Column Breakdown of Deficiencies */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 text-xs border-t border-amber-200 dark:border-amber-900/40">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 text-xs border-t border-amber-500/20">
                 {/* 1. Missing Mandatory Documents */}
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-900/50 border border-amber-200 dark:border-amber-900/30 space-y-1">
-                  <span className="text-[11px] font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1">
-                    <XCircle className="w-3.5 h-3.5" /> Missing Mandatory Docs ({missingMandatoryDocs.length})
+                <div className="p-3 rounded-xl bg-white dark:bg-[#080E1E] border border-slate-200/80 dark:border-[#1E284D] space-y-1">
+                  <span className="text-[11px] font-bold text-rose-500 flex items-center gap-1">
+                    <XCircle className="w-3.5 h-3.5" /> Missing Docs ({missingMandatoryDocs.length})
                   </span>
                   {missingMandatoryDocs.length === 0 ? (
-                    <p className="text-emerald-600 dark:text-emerald-400 text-[11px]">All mandatory categories uploaded</p>
+                    <p className="text-emerald-500 text-[11px]">All mandatory categories uploaded</p>
                   ) : (
-                    <ul className="list-disc list-inside text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
+                    <ul className="list-disc list-inside text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
                       {missingMandatoryDocs.map((c, i) => (
-                        <li key={i}>{c}</li>
+                        <li key={i} className="truncate">{c}</li>
                       ))}
                     </ul>
                   )}
                 </div>
 
                 {/* 2. Pending Document Verification */}
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-900/50 border border-amber-200 dark:border-amber-900/30 space-y-1">
-                  <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                <div className="p-3 rounded-xl bg-white dark:bg-[#080E1E] border border-slate-200/80 dark:border-[#1E284D] space-y-1">
+                  <span className="text-[11px] font-bold text-amber-500 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" /> Pending Verification ({unverifiedDocs.length})
                   </span>
                   {unverifiedDocs.length === 0 ? (
-                    <p className="text-emerald-600 dark:text-emerald-400 text-[11px]">All uploaded documents verified</p>
+                    <p className="text-emerald-500 text-[11px]">All uploaded documents verified ✓</p>
                   ) : (
-                    <ul className="list-disc list-inside text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
-                      {unverifiedDocs.slice(0, 4).map((d: any, i: number) => (
-                        <li key={i}>{d.documentType || d.fileName}</li>
+                    <ul className="list-disc list-inside text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
+                      {unverifiedDocs.slice(0, 3).map((d: any, i: number) => (
+                        <li key={i} className="truncate">{d.documentType || d.fileName}</li>
                       ))}
-                      {unverifiedDocs.length > 4 && (
-                        <li className="text-slate-400">+ {unverifiedDocs.length - 4} more</li>
+                      {unverifiedDocs.length > 3 && (
+                        <li className="text-slate-400 list-none">+ {unverifiedDocs.length - 3} more file(s)</li>
                       )}
                     </ul>
                   )}
                 </div>
 
                 {/* 3. Age Policy Check */}
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-900/50 border border-amber-200 dark:border-amber-900/30 space-y-1">
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-[#2563EB]" /> Age Policy Match
+                <div className="p-3 rounded-xl bg-white dark:bg-[#080E1E] border border-slate-200/80 dark:border-[#1E284D] space-y-1">
+                  <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5" /> Age Policy Match
                   </span>
                   <p className="text-[11px] text-slate-700 dark:text-slate-300">
                     Age: <strong>{borrowerAge !== null ? `${borrowerAge} yrs` : 'Missing DOB'}</strong> (Req: {minPolicyAge}–{maxPolicyAge} yrs)
                   </p>
                   {isAgeValid ? (
-                    <p className="text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓ Age criteria matched</p>
+                    <p className="text-emerald-500 text-[10px] font-bold">✓ Policy matched</p>
                   ) : (
-                    <p className="text-rose-600 dark:text-rose-400 text-[10px] font-bold">🔴 {ageError}</p>
+                    <p className="text-rose-500 text-[10px] font-bold">🔴 {ageError}</p>
                   )}
                 </div>
 
-                {/* 4. KYC Verification Action */}
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-900/50 border border-amber-200 dark:border-amber-900/30 space-y-1.5 flex flex-col justify-between">
+                {/* 4. Identity KYC Status */}
+                <div className="p-3 rounded-xl bg-white dark:bg-[#080E1E] border border-slate-200/80 dark:border-[#1E284D] space-y-1.5 flex flex-col justify-between">
                   <div>
-                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <UserCheck className="w-3.5 h-3.5 text-blue-500" /> Identity KYC Status
+                    <span className="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Identity KYC Status
                     </span>
-                    <p className="text-[11px] mt-0.5">
-                      Status: <strong className={customer?.kycStatus === 'VERIFIED' ? 'text-emerald-600' : 'text-amber-600'}>{customer?.kycStatus || 'PENDING'}</strong>
+                    <p className="text-[11px] text-slate-800 dark:text-slate-200 mt-0.5">
+                      Status: <span className={customer?.kycStatus === 'VERIFIED' ? 'text-emerald-500 font-bold' : 'text-amber-500 font-bold'}>{customer?.kycStatus || 'PENDING'}</span>
                     </p>
                   </div>
                   {customer?.kycStatus !== 'VERIFIED' && (
@@ -1242,7 +1303,7 @@ export function CreditAssessmentWorkspace({
                       size="sm"
                       onClick={() => verifyKycMutation.mutate()}
                       disabled={verifyKycMutation.isPending}
-                      className="gap-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto self-start"
+                      className="gap-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto self-start shadow-xs"
                     >
                       <Check className="w-3 h-3" /> Mark KYC Verified
                     </Button>
@@ -1280,15 +1341,15 @@ export function CreditAssessmentWorkspace({
                   </Button>
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="min-w-[750px] w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b text-[11px] font-bold uppercase text-slate-400 bg-slate-50 dark:bg-slate-900/40">
-                      <th className="py-2.5 px-3">Document Category</th>
-                      <th className="py-2.5 px-3">File Name</th>
-                      <th className="py-2.5 px-3">Requirement</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Preview</th>
-                      <th className="py-2.5 px-3 text-right">Verification Action</th>
+                      <th className="py-2.5 px-3 min-w-[140px]">Document Category</th>
+                      <th className="py-2.5 px-3 min-w-[150px]">File Name</th>
+                      <th className="py-2.5 px-3 min-w-[100px]">Requirement</th>
+                      <th className="py-2.5 px-3 min-w-[120px]">Status</th>
+                      <th className="py-2.5 px-3 min-w-[100px]">Preview</th>
+                      <th className="py-2.5 px-3 text-right min-w-[160px]">Verification Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1323,19 +1384,19 @@ export function CreditAssessmentWorkspace({
                               size="sm"
                               variant="secondary"
                               onClick={() => setPreviewDoc(doc)}
-                              className="gap-1 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-700 py-1 px-2.5 h-auto"
+                              className="gap-1 text-xs font-semibold cursor-pointer border-slate-200 dark:border-slate-700 py-1 px-2.5 h-auto whitespace-nowrap shrink-0"
                             >
                               <Eye className="w-3.5 h-3.5 text-[#2563EB]" />
                               <span>Preview</span>
                             </Button>
                           </td>
-                          <td className="py-3 px-3 text-right">
+                          <td className="py-3 px-3 text-right whitespace-nowrap min-w-[160px]">
                             {!isDocVerified ? (
                               <Button
                                 size="sm"
                                 onClick={() => verifyDocMutation.mutate(doc.id)}
                                 disabled={verifyDocMutation.isPending}
-                                className="gap-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto shadow-xs"
+                                className="gap-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto shadow-xs whitespace-nowrap shrink-0"
                               >
                                 <Check className="w-3 h-3" /> Verify Document
                               </Button>
@@ -2047,16 +2108,21 @@ export function CreditAssessmentWorkspace({
                 Forwarding transitions proposal status to <span className="font-semibold">UNDERWRITING</span> and assigns the dossier to the Sanction Committee for final sanction.
               </p>
             </div>
-            <Button
-              onClick={() => forwardToUnderwritingMutation.mutate()}
-              disabled={forwardToUnderwritingMutation.isPending || app?.status === 'UNDERWRITING'}
-              className="gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm"
-            >
-              <Send className="w-4 h-4" />
-              {app?.status === 'UNDERWRITING' ? 'Already Forwarded to Underwriter' :
-               forwardToUnderwritingMutation.isPending ? 'Forwarding Dossier...' :
-               'Forward to Underwriter →'}
-            </Button>
+            {app?.status === 'UNDERWRITING' || app?.status === 'APPROVED' || app?.status === 'SANCTIONED' || app?.status === 'DISBURSED' || app?.status === 'REJECTED' ? (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs border border-emerald-300/60 dark:border-emerald-800/40 shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Handed Over to Underwriting ({app?.status})</span>
+              </div>
+            ) : (
+              <Button
+                onClick={() => forwardToUnderwritingMutation.mutate()}
+                disabled={forwardToUnderwritingMutation.isPending}
+                className="gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm"
+              >
+                <Send className="w-4 h-4" />
+                {forwardToUnderwritingMutation.isPending ? 'Forwarding Dossier...' : 'Forward to Underwriter →'}
+              </Button>
+            )}
           </div>
         </Card>
       )}

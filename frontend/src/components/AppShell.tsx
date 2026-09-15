@@ -282,17 +282,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div>
               <p className="text-sm font-bold text-white tracking-tight leading-none truncate max-w-[170px]">
                 {primaryRole === 'CUSTOMER'
-                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} PORTAL`
+                  ? `${branding?.institutionName ? branding.institutionName.split(' ')[0] : 'Adyapan'} Portal`
                   : primaryRole === 'AUDITOR'
-                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} AUDIT`
-                  : (branding.portalTitle || branding.institutionName).toUpperCase()}
+                    ? `${branding?.institutionName ? branding.institutionName.split(' ')[0] : 'Adyapan'} Audit`
+                    : (branding?.portalTitle || branding?.institutionName || 'Adyapan Enterprise LMS')}
               </p>
-              <p className="text-[10px] font-medium text-slate-400 mt-0.5 truncate max-w-[170px]">
+              <p className="text-xs font-medium text-slate-400 mt-0.5 truncate max-w-[170px]">
                 {primaryRole === 'CUSTOMER'
                   ? 'Borrower Self-Service'
                   : primaryRole === 'AUDITOR'
-                  ? 'Compliance & Audit'
-                  : branding.tagline || roleCfg.label}
+                    ? 'Compliance & Audit'
+                    : branding?.tagline || roleCfg.label}
               </p>
             </div>
           </Link>

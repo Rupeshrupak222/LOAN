@@ -21,7 +21,7 @@ export function PageHeader({
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
         {breadcrumb && (
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-0.5" aria-label="Breadcrumb">
             {breadcrumb}
           </p>
         )}

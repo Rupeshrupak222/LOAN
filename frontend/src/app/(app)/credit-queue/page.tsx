@@ -1,137 +1,77 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Inbox, 
   Search, 
-  Filter, 
   Clock, 
   AlertCircle, 
-  CheckCircle2, 
   ArrowRight, 
   ShieldAlert, 
-  User, 
-  Building,
   RefreshCw,
   FileText
 } from 'lucide-react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
-
-interface CreditQueueItem {
-  id: string;
-  applicationNumber: string;
-  applicantName: string;
-  customerType: 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
-  productName: string;
-  requestedAmount: number;
-  workflowStage: string;
-  status: string;
-  slaRemainingHours: number;
-  documentsStatus: 'COMPLETE' | 'PENDING' | 'DISCREPANCY';
-  kycStatus: 'VERIFIED' | 'PENDING' | 'FAILED';
-  financialStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  bureauScore?: number;
-  assignedTo?: string;
-  submittedAt: string;
-}
+import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { TableSkeleton } from '@/components/LoadingSkeletons';
 
 export default function CreditQueuePage() {
   const { user } = useAuth();
   const toast = useToast();
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [customerTypeFilter, setCustomerTypeFilter] = useState('ALL');
 
-  const [queueItems, setQueueItems] = useState<CreditQueueItem[]>([
-    {
-      id: 'app-salaried-01',
-      applicationNumber: 'APP-2026-9001',
-      applicantName: 'Vikramaditya Singhania',
-      customerType: 'SALARIED',
-      productName: 'Personal Express Loan',
-      requestedAmount: 500000,
-      workflowStage: 'CREDIT_ASSESSMENT',
-      status: 'UNDER_REVIEW',
-      slaRemainingHours: 4.5,
-      documentsStatus: 'COMPLETE',
-      kycStatus: 'VERIFIED',
-      financialStatus: 'IN_PROGRESS',
-      bureauScore: 780,
-      submittedAt: '2026-09-13T08:30:00Z'
+  const { data, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: ['credit-queue-live', statusFilter, searchTerm],
+    queryFn: async () => {
+      const res = await api.get('/credit-assessment/queue', {
+        params: {
+          tab: statusFilter,
+          search: searchTerm || undefined,
+        },
+      });
+      return res.data?.data || [];
     },
-    {
-      id: 'app-selfemp-02',
-      applicationNumber: 'APP-2026-9002',
-      applicantName: 'Priya Sharma & Co',
-      customerType: 'SELF_EMPLOYED',
-      productName: 'SME Working Capital',
-      requestedAmount: 1500000,
-      workflowStage: 'CREDIT_ASSESSMENT',
-      status: 'UNDER_REVIEW',
-      slaRemainingHours: 1.2,
-      documentsStatus: 'PENDING',
-      kycStatus: 'VERIFIED',
-      financialStatus: 'NOT_STARTED',
-      bureauScore: 710,
-      submittedAt: '2026-09-13T09:15:00Z'
-    },
-    {
-      id: 'app-student-03',
-      applicationNumber: 'APP-2026-9003',
-      applicantName: 'Aarav Mehta',
-      customerType: 'STUDENT',
-      productName: 'Higher Education Loan',
-      requestedAmount: 850000,
-      workflowStage: 'CREDIT_ASSESSMENT',
-      status: 'UNDER_REVIEW',
-      slaRemainingHours: 6.0,
-      documentsStatus: 'COMPLETE',
-      kycStatus: 'VERIFIED',
-      financialStatus: 'NOT_STARTED',
-      bureauScore: undefined,
-      submittedAt: '2026-09-13T10:00:00Z'
-    }
-  ]);
+  });
 
-  useEffect(() => {
-    // In production, sync with /api/credit/queue or /api/applications?stage=CREDIT_ASSESSMENT
-    setLoading(false);
-  }, []);
+  const rawItems: any[] = Array.isArray(data) ? data : [];
 
-  const filtered = queueItems.filter((item) => {
-    const matchesSearch = 
-      item.applicantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.applicationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
-    const matchesType = customerTypeFilter === 'ALL' || item.customerType === customerTypeFilter;
-    return matchesSearch && matchesStatus && matchesType;
+  const queueItems = rawItems.filter((item) => {
+    if (customerTypeFilter === 'ALL') return true;
+    const emp = (item.employmentType || '').toUpperCase();
+    return emp.includes(customerTypeFilter);
   });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Credit Queue</h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-              {filtered.length} Applications Actionable
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-slate-100">Credit Queue</h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
+              {queueItems.length} Applications Actionable
             </span>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            Assigned applications awaiting sequential credit assessment, KYC verification, and recommendation handoff.
+          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+            Real-time assigned applications awaiting sequential credit assessment, KYC verification, and recommendation handoff.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => toast.info('Refreshed', 'Credit queue updated with latest loan applications.')}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm"
+            onClick={() => {
+              refetch();
+              toast.info('Refreshed', 'Credit queue updated with latest live proposals.');
+            }}
+            disabled={isRefetching}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 bg-white dark:bg-[#1E2445] border border-gray-300 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-[#1E2445]/80 shadow-xs cursor-pointer"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={cn("w-4 h-4", isRefetching && "animate-spin")} />
             Refresh Queue
           </button>
         </div>
@@ -139,148 +79,183 @@ export default function CreditQueuePage() {
 
       {/* Queue Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="p-4 bg-white dark:bg-[#0C152B] border border-gray-200 dark:border-[#1E2445] rounded-xl shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Awaiting Step 1 Review</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase">Awaiting Assessment</span>
             <Inbox className="w-5 h-5 text-indigo-500" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-gray-900">1</div>
-          <p className="text-xs text-gray-400 mt-1">Application &amp; Eligibility</p>
+          <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100">
+            {queueItems.filter((i) => ['SUBMITTED', 'UNDER_REVIEW'].includes(i.status)).length}
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Pending Initial Credit Intake</p>
         </div>
 
-        <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="p-4 bg-white dark:bg-[#0C152B] border border-gray-200 dark:border-[#1E2445] rounded-xl shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Assessment In Progress</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase">Assessment In Progress</span>
             <Clock className="w-5 h-5 text-amber-500" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-gray-900">2</div>
-          <p className="text-xs text-gray-400 mt-1">Steps 2 to 5 Active</p>
+          <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100">
+            {queueItems.filter((i) => i.status === 'CREDIT_ASSESSMENT').length}
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Active Financial &amp; Risk Scoring</p>
         </div>
 
-        <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="p-4 bg-white dark:bg-[#0C152B] border border-gray-200 dark:border-[#1E2445] rounded-xl shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 uppercase">SLA Urgent (&lt; 2h)</span>
-            <ShieldAlert className="w-5 h-5 text-red-500" />
+            <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase">KYC Pending</span>
+            <ShieldAlert className="w-5 h-5 text-rose-500" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-red-600">1</div>
-          <p className="text-xs text-red-400 mt-1">Requires immediate attention</p>
+          <div className="mt-2 text-2xl font-bold text-rose-600 dark:text-rose-400">
+            {queueItems.filter((i) => i.kycStatus !== 'VERIFIED').length}
+          </div>
+          <p className="text-xs text-rose-400 mt-1">Unverified Aadhaar/PAN Verification</p>
         </div>
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="bg-white dark:bg-[#0C152B] p-4 rounded-xl border border-gray-200 dark:border-[#1E2445] shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search queue by applicant or ID..."
+            placeholder="Search queue by applicant, code, or application #..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#1E2445] text-gray-900 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <select
             value={customerTypeFilter}
             onChange={(e) => setCustomerTypeFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-indigo-500"
+            className="border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-[#1E2445] focus:ring-2 focus:ring-indigo-500"
           >
             <option value="ALL">All Borrower Types</option>
             <option value="SALARIED">Salaried</option>
-            <option value="SELF_EMPLOYED">Self Employed</option>
+            <option value="SELF">Self-Employed / Non-Salaried</option>
             <option value="STUDENT">Student</option>
           </select>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-indigo-500"
+            className="border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-[#1E2445] focus:ring-2 focus:ring-indigo-500"
           >
-            <option value="ALL">All Statuses</option>
-            <option value="UNDER_REVIEW">Under Review</option>
-            <option value="PENDING">Pending Documents</option>
-            <option value="DISCREPANCY">Discrepancy</option>
+            <option value="ALL">All Queue Items</option>
+            <option value="PENDING">Pending Assessment Intake</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="KYC_PENDING">KYC Pending</option>
+            <option value="COMPLETED">Ready / Completed</option>
+            <option value="SENT_BACK">Returned to Loan Officer</option>
           </select>
         </div>
       </div>
 
       {/* Applications Queue Table */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50/75 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <th className="py-3 px-4">Application</th>
-              <th className="py-3 px-4">Applicant &amp; Type</th>
-              <th className="py-3 px-4">Product &amp; Amount</th>
-              <th className="py-3 px-4">KYC / Docs</th>
-              <th className="py-3 px-4">Bureau</th>
-              <th className="py-3 px-4">SLA</th>
-              <th className="py-3 px-4 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 text-sm">
-            {filtered.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50/60 transition">
-                <td className="py-3.5 px-4">
-                  <div className="font-semibold text-gray-900">{item.applicationNumber}</div>
-                  <div className="text-xs text-gray-400">
-                    {new Date(item.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </td>
-                <td className="py-3.5 px-4">
-                  <div className="font-medium text-gray-900">{item.applicantName}</div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                    {item.customerType.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="py-3.5 px-4">
-                  <div className="text-gray-900 font-medium">₹{item.requestedAmount.toLocaleString('en-IN')}</div>
-                  <div className="text-xs text-gray-500">{item.productName}</div>
-                </td>
-                <td className="py-3.5 px-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      item.kycStatus === 'VERIFIED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                      KYC: {item.kycStatus}
-                    </span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      item.documentsStatus === 'COMPLETE' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
-                    }`}>
-                      Docs: {item.documentsStatus}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3.5 px-4">
-                  {item.bureauScore ? (
-                    <span className="font-semibold text-gray-900">
-                      {item.bureauScore} <span className="text-xs text-emerald-600 font-normal">(CIBIL)</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-400">NTC / Excluded</span>
-                  )}
-                </td>
-                <td className="py-3.5 px-4">
-                  <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                    item.slaRemainingHours < 2 ? 'text-red-600' : 'text-gray-700'
-                  }`}>
-                    <Clock className="w-3.5 h-3.5" />
-                    {item.slaRemainingHours}h remaining
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 text-right">
-                  <Link
-                    href={`/credit-assessment?applicationId=${item.id}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition"
-                  >
-                    Start Assessment
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {isLoading ? (
+        <TableSkeleton rows={5} cols={7} />
+      ) : queueItems.length === 0 ? (
+        <div className="p-12 text-center bg-white dark:bg-[#0C152B] border border-gray-200 dark:border-[#1E2445] rounded-xl space-y-3">
+          <Inbox className="w-10 h-10 mx-auto text-slate-400" />
+          <h3 className="text-base font-bold text-gray-900 dark:text-slate-100">No Applications in Credit Queue</h3>
+          <p className="text-xs text-gray-500 dark:text-slate-400 max-w-md mx-auto">
+            There are currently no proposals matching your filter. Submitting proposals from the Loan Officer portal will automatically populate this queue in real-time.
+          </p>
+          <Link href="/applications">
+            <button className="inline-flex items-center gap-1.5 px-4 py-2 mt-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer">
+              <FileText className="w-4 h-4" /> View All Applications Repository
+            </button>
+          </Link>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#0C152B] border border-gray-200 dark:border-[#1E2445] rounded-xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/75 dark:bg-[#1E2445]/60 border-b border-gray-200 dark:border-[#1E2445] text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                  <th className="py-3 px-4">Application #</th>
+                  <th className="py-3 px-4">Applicant</th>
+                  <th className="py-3 px-4">Product &amp; Amount</th>
+                  <th className="py-3 px-4">KYC Status</th>
+                  <th className="py-3 px-4">Docs Verified</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-sm">
+                {queueItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50/60 dark:hover:bg-[#1E2445]/40 transition">
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-indigo-600 dark:text-indigo-400">{item.applicationNo || 'N/A'}</div>
+                      <div className="text-xs text-gray-400">
+                        {item.createdAt ? formatDate(item.createdAt) : 'N/A'}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-gray-900 dark:text-slate-100">{item.applicantName || 'Applicant'}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {item.employmentType || 'GENERAL'}
+                        </span>
+                        {item.mobile && <span>· {item.mobile}</span>}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="text-gray-900 dark:text-slate-100 font-bold">{formatMoney(item.requestedAmount || 0)}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400">{item.productName || 'Loan Product'}</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        item.kycStatus === 'VERIFIED'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                          : item.kycStatus === 'UNDER_REVIEW'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300'
+                          : item.kycStatus === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300'
+                          : item.kycStatus === 'NOT_STARTED'
+                          ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+                      }`}>
+                        {item.kycStatus === 'VERIFIED'
+                          ? '✓ VERIFIED'
+                          : item.kycStatus === 'UNDER_REVIEW'
+                          ? 'UNDER REVIEW'
+                          : item.kycStatus === 'REJECTED'
+                          ? '✕ REJECTED'
+                          : item.kycStatus === 'NOT_STARTED'
+                          ? 'NOT STARTED'
+                          : 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {Number(item.documentsCount || 0) === 0
+                          ? '0 Uploaded'
+                          : `${item.verifiedDocumentsCount || 0} / ${item.documentsCount} Verified`}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <Link
+                        href={`/credit-assessment?applicationId=${item.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs transition cursor-pointer"
+                      >
+                        Start Assessment
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

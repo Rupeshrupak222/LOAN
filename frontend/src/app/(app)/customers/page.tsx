@@ -13,6 +13,8 @@ import { Badge, Button, Input, Card } from '@/components/ui';
 import { DataTable, Column } from '@/components/DataTable';
 import { formatDate, formatDateTime, cn } from '@/lib/utils';
 
+import { CreditAnalystCustomersView } from '@/components/CreditAnalystCustomersView';
+
 interface CustomerRow {
   id: string;
   customerCode: string;
@@ -28,7 +30,7 @@ interface CustomerRow {
   createdAt: string;
 }
 
-export default function CustomersPage() {
+function StandardCustomersDirectoryView() {
   const { user } = useAuth();
   const isLoanOfficer = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
 
@@ -181,9 +183,10 @@ export default function CustomersPage() {
       key: 'id',
       header: 'Action',
       align: 'right',
+      className: 'min-w-[150px] whitespace-nowrap text-right',
       render: (r) => (
         <Link href={`/customers/${r.id}`}>
-          <Button size="sm" variant="secondary" className="text-xs">
+          <Button size="sm" variant="secondary" className="text-xs whitespace-nowrap shrink-0">
             Borrower 360 →
           </Button>
         </Link>
@@ -342,4 +345,15 @@ export default function CustomersPage() {
       )}
     </div>
   );
+}
+
+export default function CustomersPage() {
+  const { user } = useAuth();
+  const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+
+  if (isCreditAnalyst) {
+    return <CreditAnalystCustomersView />;
+  }
+
+  return <StandardCustomersDirectoryView />;
 }

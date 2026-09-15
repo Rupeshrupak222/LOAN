@@ -289,11 +289,9 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Credit assessment, policy eligibility scoring, and repayment capacity evaluation',
     nav: [
       'dashboard',
-      'credit-queue',
-      'applications',
-      'credit-assessment',
+      'customers',
       'documents',
-      'verifications',
+      'credit-assessment',
       'tasks',
       'support',
     ],

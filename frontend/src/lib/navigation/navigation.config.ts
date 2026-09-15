@@ -110,7 +110,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     description: 'Corrections and resubmission desk for underwriter-returned proposals',
   },
 
-  // ─── HUB 2: CREDIT & ASSESSMENT (EXACT 8 AUTHORITATIVE ITEMS) ───
+  // ─── HUB 2: CREDIT & ASSESSMENT (EXACT 6 AUTHORITATIVE ITEMS) ───
   {
     key: 'dashboard',
     label: 'Dashboard',
@@ -120,24 +120,24 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     group: 'OVERVIEW',
   },
   {
-    key: 'credit-queue',
-    label: 'Credit Queue',
-    href: '/credit-queue',
-    iconName: 'Inbox',
+    key: 'customers',
+    label: 'Customers',
+    href: '/customers',
+    iconName: 'Users',
     workspace: 'CREDIT',
     group: 'OVERVIEW',
-    requiredPermission: 'credit.view',
-    description: 'Triage queue of assigned proposals awaiting credit assessment',
+    requiredPermission: 'customer.view',
+    description: 'Borrower proposals forwarded by Loan Officers for credit assessment',
   },
   {
-    key: 'applications',
-    label: 'Applications',
-    href: '/applications',
-    iconName: 'FileText',
+    key: 'documents',
+    label: 'Documents',
+    href: '/documents',
+    iconName: 'FileCheck',
     workspace: 'CREDIT',
     group: 'OVERVIEW',
     requiredPermission: 'application.view',
-    description: 'Loan applications assigned for review and verification',
+    description: 'Borrower case dossiers, verification checklist, and document inspection',
   },
   {
     key: 'credit-assessment',
