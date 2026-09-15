@@ -52,34 +52,34 @@ export function SettlementRequestModal({ isOpen, onClose, caseItem }: Settlement
   if (!isOpen || !caseItem) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-lg border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-6">
-        <h3 className="text-base font-bold text-amber-400 mb-1 flex items-center gap-1.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      <Card className="w-full max-w-lg shadow-2xl p-6">
+        <h3 className="text-base font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1.5">
           Propose One-Time Debt Settlement (OTS)
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Initiate debt settlement for <span className="font-semibold text-slate-200">{caseItem.customerName}</span> ({caseItem.caseNo}). Subject to Maker-Checker approval.
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Initiate debt settlement for <span className="font-semibold text-slate-800 dark:text-slate-200">{caseItem.customerName}</span> ({caseItem.caseNo}). Subject to Maker-Checker approval.
         </p>
 
         <div className="space-y-4">
           {/* Outstanding Summary */}
-          <div className="rounded-md border border-slate-800 bg-slate-950 p-3 grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 grid grid-cols-3 gap-2 text-center text-xs">
             <div>
               <div className="text-slate-500 text-[10px]">Total Overdue</div>
-              <div className="font-bold text-rose-400 text-sm mt-0.5">₹{totalOverdue.toLocaleString()}</div>
+              <div className="font-bold text-rose-600 dark:text-rose-400 text-sm mt-0.5">₹{totalOverdue.toLocaleString()}</div>
             </div>
             <div>
               <div className="text-slate-500 text-[10px]">Proposed Recovery</div>
-              <div className="font-bold text-emerald-400 text-sm mt-0.5">₹{settlementVal.toLocaleString()}</div>
+              <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">₹{settlementVal.toLocaleString()}</div>
             </div>
             <div>
               <div className="text-slate-500 text-[10px]">Waiver / Discount</div>
-              <div className="font-bold text-amber-400 text-sm mt-0.5">{discountPct}% (₹{waiverAmount.toLocaleString()})</div>
+              <div className="font-bold text-amber-600 dark:text-amber-400 text-sm mt-0.5">{discountPct}% (₹{waiverAmount.toLocaleString()})</div>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Agreed Settlement Lump-Sum Amount (₹) *
             </label>
             <input
@@ -87,18 +87,18 @@ export function SettlementRequestModal({ isOpen, onClose, caseItem }: Settlement
               placeholder="e.g. 35000"
               value={proposedSettlementAmount}
               onChange={(e) => setProposedSettlementAmount(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Settlement Offer Validity (Days)
             </label>
             <select
               value={validityDays}
               onChange={(e) => setValidityDays(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="15">15 Days</option>
               <option value="30">30 Days (Standard)</option>
@@ -108,7 +108,7 @@ export function SettlementRequestModal({ isOpen, onClose, caseItem }: Settlement
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Settlement Justification & Hardship Evidence *
             </label>
             <textarea
@@ -116,11 +116,11 @@ export function SettlementRequestModal({ isOpen, onClose, caseItem }: Settlement
               onChange={(e) => setReason(e.target.value)}
               placeholder="Document borrower hardship reasons (loss of job, medical emergency), recovery risk, and committee rationale..."
               rows={3}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" size="sm" onClick={onClose} disabled={settlementMutation.isPending}>
               Cancel
             </Button>

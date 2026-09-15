@@ -168,7 +168,7 @@ export const SupportTicketsView: React.FC<Props> = ({
   return (
     <div className="space-y-4">
       {/* Action and Filter Toolbar */}
-      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
           <div className="relative flex-1 max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -177,7 +177,7 @@ export const SupportTicketsView: React.FC<Props> = ({
               placeholder="Search by ticket #, customer, loan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
             />
           </div>
 
@@ -185,7 +185,7 @@ export const SupportTicketsView: React.FC<Props> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Statuses</option>
               <option value="OPEN">Open</option>
@@ -198,7 +198,7 @@ export const SupportTicketsView: React.FC<Props> = ({
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Priorities</option>
               <option value="URGENT">Urgent</option>
@@ -213,7 +213,7 @@ export const SupportTicketsView: React.FC<Props> = ({
           <button
             onClick={onRefresh}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition"
+            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
@@ -229,10 +229,10 @@ export const SupportTicketsView: React.FC<Props> = ({
       </div>
 
       {/* Tickets Table / List */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-100 dark:bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">Ticket Number</th>
                 <th className="py-3 px-4">Borrower Details</th>
@@ -243,7 +243,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
               {filteredTickets.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-500">
@@ -270,12 +270,12 @@ export const SupportTicketsView: React.FC<Props> = ({
                       </td>
 
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-200">{t.customerName}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{t.customerName}</div>
                         <div className="text-[11px] text-slate-400 font-mono">{t.customerId}</div>
                       </td>
 
                       <td className="py-3 px-4 max-w-xs">
-                        <div className="font-medium text-slate-200 truncate">{t.subject}</div>
+                        <div className="font-medium text-slate-800 dark:text-slate-200 truncate">{t.subject}</div>
                         <div className="text-[10px] text-indigo-400 font-mono mt-0.5">
                           {t.category} {t.loanId ? `• Loan #${t.loanId}` : ''}
                         </div>
@@ -339,17 +339,17 @@ export const SupportTicketsView: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={handleCreateSubmit}
-            className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Headphones className="w-4 h-4 text-indigo-400" />
                 Open Support Ticket
               </h3>
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -364,7 +364,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                     required
                     value={formCustId}
                     onChange={(e) => setFormCustId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
                 <div>
@@ -374,7 +374,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                     required
                     value={formCustName}
                     onChange={(e) => setFormCustName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
@@ -385,7 +385,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value as SupportCategory)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   >
                     <option value="DISBURSEMENT_QUERY">DISBURSEMENT QUERY</option>
                     <option value="PAYMENT_DISPUTE">PAYMENT DISPUTE</option>
@@ -402,7 +402,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                   <select
                     value={formPriority}
                     onChange={(e) => setFormPriority(e.target.value as SupportPriority)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   >
                     <option value="LOW">LOW</option>
                     <option value="MEDIUM">MEDIUM</option>
@@ -420,7 +420,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                   placeholder="e.g. Disbursement delayed for loan approval"
                   value={formSubject}
                   onChange={(e) => setFormSubject(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -432,7 +432,7 @@ export const SupportTicketsView: React.FC<Props> = ({
                   placeholder="Provide customer inquiry context..."
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -442,12 +442,12 @@ export const SupportTicketsView: React.FC<Props> = ({
                   type="text"
                   value={formLoanId}
                   onChange={(e) => setFormLoanId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}

@@ -53,17 +53,17 @@ export function StrategyConfigModal({ isOpen, onClose }: StrategyConfigModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-lg border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-6">
-        <h3 className="text-base font-bold text-slate-100 mb-1">
+      <Card className="w-full max-w-lg shadow-2xl p-6">
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
           Draft Collection Strategy Version
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
           Configure multi-factor priority weights and bucket outreach rules.
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Strategy Policy Name *
             </label>
             <input
@@ -71,12 +71,12 @@ export function StrategyConfigModal({ isOpen, onClose }: StrategyConfigModalProp
               placeholder="e.g. Instant Micro-Loan Aggressive Recovery v2"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Policy Description & Target Segments
             </label>
             <textarea
@@ -84,63 +84,63 @@ export function StrategyConfigModal({ isOpen, onClose }: StrategyConfigModalProp
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Detail delinquency triggers, communication cadences, and target loan products..."
               rows={2}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           {/* Priority Weighting Sliders / Percentages */}
-          <div className="rounded-md border border-slate-800 bg-slate-950 p-3 space-y-2 text-xs">
-            <h4 className="font-semibold text-slate-200 text-xs mb-2">Priority Score Calibration Weights (Total = 100%)</h4>
+          <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-2 text-xs">
+            <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-xs mb-2">Priority Score Calibration Weights (Total = 100%)</h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] text-slate-400">DPD Factor (%)</label>
+                <label className="text-[11px] text-slate-500 dark:text-slate-400">DPD Factor (%)</label>
                 <input
                   type="number"
                   value={dpdWeight}
                   onChange={(e) => setDpdWeight(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 mt-0.5"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-slate-200 mt-0.5"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400">Overdue Amount (%)</label>
+                <label className="text-[11px] text-slate-500 dark:text-slate-400">Overdue Amount (%)</label>
                 <input
                   type="number"
                   value={overdueWeight}
                   onChange={(e) => setOverdueWeight(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 mt-0.5"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-slate-200 mt-0.5"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400">Risk Grade / Score (%)</label>
+                <label className="text-[11px] text-slate-500 dark:text-slate-400">Risk Grade / Score (%)</label>
                 <input
                   type="number"
                   value={riskGradeWeight}
                   onChange={(e) => setRiskGradeWeight(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 mt-0.5"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-slate-200 mt-0.5"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400">Broken PTPs (%)</label>
+                <label className="text-[11px] text-slate-500 dark:text-slate-400">Broken PTPs (%)</label>
                 <input
                   type="number"
                   value={brokenPtpWeight}
                   onChange={(e) => setBrokenPtpWeight(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 mt-0.5"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-slate-200 mt-0.5"
                 />
               </div>
             </div>
             <div>
-              <label className="text-[11px] text-slate-400">Failed Contactability (%)</label>
+              <label className="text-[11px] text-slate-500 dark:text-slate-400">Failed Contactability (%)</label>
               <input
                 type="number"
                 value={contactWeight}
                 onChange={(e) => setContactWeight(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 mt-0.5"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-slate-900 dark:text-slate-200 mt-0.5"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" size="sm" onClick={onClose} disabled={createMutation.isPending}>
               Cancel
             </Button>

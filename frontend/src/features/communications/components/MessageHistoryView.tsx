@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type {
@@ -143,7 +143,7 @@ export const MessageHistoryView: React.FC<Props> = ({
   return (
     <div className="space-y-4">
       {/* Filter Toolbar */}
-      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
           <div className="relative flex-1 max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -152,7 +152,7 @@ export const MessageHistoryView: React.FC<Props> = ({
               placeholder="Search by customer, phone, event..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
             />
           </div>
 
@@ -161,7 +161,7 @@ export const MessageHistoryView: React.FC<Props> = ({
             <select
               value={channelFilter}
               onChange={(e) => setChannelFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Channels</option>
               <option value="SMS">SMS</option>
@@ -175,7 +175,7 @@ export const MessageHistoryView: React.FC<Props> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Statuses</option>
               <option value="DELIVERED">Delivered</option>
@@ -192,7 +192,7 @@ export const MessageHistoryView: React.FC<Props> = ({
           <button
             onClick={onRefresh}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition"
+            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
@@ -201,10 +201,10 @@ export const MessageHistoryView: React.FC<Props> = ({
       </div>
 
       {/* Messages Table */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-100 dark:bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">Event / Category</th>
                 <th className="py-3 px-4">Channel & Recipient</th>
@@ -214,7 +214,7 @@ export const MessageHistoryView: React.FC<Props> = ({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
               {filteredMessages.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">
@@ -225,7 +225,7 @@ export const MessageHistoryView: React.FC<Props> = ({
                 filteredMessages.map((msg) => (
                   <tr key={msg.id} className="hover:bg-slate-850/50 transition">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-200">{msg.eventCode}</div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">{msg.eventCode}</div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-indigo-400 font-mono">{msg.category}</span>
                         <span className="text-[10px] text-slate-500">v{msg.templateVersion || 1}</span>
@@ -242,7 +242,7 @@ export const MessageHistoryView: React.FC<Props> = ({
                     </td>
                     <td className="py-3 px-4 max-w-sm">
                       {msg.subject ? (
-                        <div className="font-semibold text-slate-200 truncate">{msg.subject}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">{msg.subject}</div>
                       ) : null}
                       <div className="text-slate-400 truncate text-[11px]">{msg.body}</div>
                     </td>
@@ -292,10 +292,10 @@ export const MessageHistoryView: React.FC<Props> = ({
       {/* Message Detail Modal */}
       {selectedMessage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Mail className="w-4 h-4 text-indigo-400" />
                   Dispatched Message Audit Detail
                 </h3>
@@ -311,7 +311,7 @@ export const MessageHistoryView: React.FC<Props> = ({
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                   <span className="text-[10px] text-slate-400 uppercase font-medium">Channel</span>
                   <div className="flex items-center gap-1.5 mt-1 font-semibold text-white">
                     {getChannelIcon(selectedMessage.channel)}
@@ -319,12 +319,12 @@ export const MessageHistoryView: React.FC<Props> = ({
                   </div>
                 </div>
 
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                   <span className="text-[10px] text-slate-400 uppercase font-medium">Status</span>
                   <div className="mt-1">{getStatusBadge(selectedMessage.status)}</div>
                 </div>
 
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                   <span className="text-[10px] text-slate-400 uppercase font-medium">External ID</span>
                   <div className="text-xs font-mono text-slate-300 mt-1 truncate">
                     {selectedMessage.externalMessageId || 'N/A'}
@@ -333,7 +333,7 @@ export const MessageHistoryView: React.FC<Props> = ({
               </div>
 
               {/* Rendered Body */}
-              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-2">
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
                 <span className="text-[10px] text-slate-400 uppercase font-medium block">
                   Delivered Content (PII Scrubbed)
                 </span>
@@ -348,7 +348,7 @@ export const MessageHistoryView: React.FC<Props> = ({
               </div>
 
               {/* Idempotency Key */}
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-medium block">
                     Idempotency Hash (SHA256)
@@ -375,7 +375,7 @@ export const MessageHistoryView: React.FC<Props> = ({
               ) : null}
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-between">
               <span className="text-xs text-slate-400">
                 Created: {new Date(selectedMessage.createdAt).toLocaleString()}
               </span>

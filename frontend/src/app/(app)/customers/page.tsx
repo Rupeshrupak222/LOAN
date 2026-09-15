@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Search, ShieldCheck, Phone, Trash2, CheckSquare, X, AlertTriangle } from 'lucide-react';
+import { UserPlus, Plus, Search, ShieldCheck, Phone, Trash2, CheckSquare, X, AlertTriangle, User } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -40,26 +40,40 @@ function StandardCustomersDirectoryView() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['customers', search, kycFilter],
+  const { data: responseData, isLoading } = useQuery({
+    queryKey: ['customers', search, kycFilter, page, pageSize],
     queryFn: async () => {
       const res = await api.get('/customers', {
         params: {
           search: search || undefined,
           kycStatus: kycFilter || undefined,
+          page,
+          pageSize,
         },
       });
       const rows = res.data?.data;
-      return (Array.isArray(rows) ? rows : []) as CustomerRow[];
+      const pagination = res.data?.pagination || {
+        page,
+        pageSize,
+        total: Array.isArray(rows) ? rows.length : 0,
+        totalPages: 1,
+      };
+      return {
+        rows: (Array.isArray(rows) ? rows : []) as CustomerRow[],
+        pagination,
+      };
     },
   });
 
-  const customersList = data || [];
+  const customersList = responseData?.rows || [];
+  const pagination = responseData?.pagination;
   const allIds = customersList.map((r) => r.id);
   const isAllSelected = customersList.length > 0 && selectedIds.length === customersList.length;
 
@@ -181,15 +195,38 @@ function StandardCustomersDirectoryView() {
     },
     {
       key: 'id',
-      header: 'Action',
+      header: 'Actions',
       align: 'right',
-      className: 'min-w-[150px] whitespace-nowrap text-right',
+      className: 'min-w-[240px] whitespace-nowrap text-right',
       render: (r) => (
-        <Link href={`/customers/${r.id}`}>
-          <Button size="sm" variant="secondary" className="text-xs whitespace-nowrap shrink-0">
-            Borrower 360 →
-          </Button>
-        </Link>
+        <div className="flex items-center justify-end gap-2">
+          <Link href={`/customers/${r.id}`}>
+            <Button size="sm" variant="outline" className="text-xs whitespace-nowrap shrink-0 gap-1">
+              <User className="w-3.5 h-3.5" /> View Profile
+            </Button>
+          </Link>
+          {isLoanOfficer && (
+            <Link href={`/applications/new?customerId=${r.id}`}>
+              <Button size="sm" className="text-xs whitespace-nowrap shrink-0 gap-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-2xs">
+                <Plus className="w-3.5 h-3.5" /> Originate Application
+              </Button>
+            </Link>
+          )}
+          {isLoanOfficer && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSelectedIds([r.id]);
+                setDeleteModalOpen(true);
+              }}
+              className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg shrink-0 cursor-pointer"
+              title="Delete Candidate Record"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       ),
     },
   ];
@@ -233,14 +270,14 @@ function StandardCustomersDirectoryView() {
           </div>
 
           <div className="flex items-center gap-2">
-            {user?.roles?.includes('SUPER_ADMIN') && (
+            {isLoanOfficer && (
               <Button
                 size="sm"
                 onClick={() => setDeleteModalOpen(true)}
-                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
+                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete Selected Candidate{selectedIds.length > 1 ? 's' : ''}</span>
+                <span>Delete Candidate{selectedIds.length > 1 ? 's' : ''}</span>
               </Button>
             )}
 
@@ -248,7 +285,7 @@ function StandardCustomersDirectoryView() {
               size="sm"
               variant="secondary"
               onClick={() => setSelectedIds([])}
-              className="flex items-center gap-1 text-xs"
+              className="flex items-center gap-1 text-xs cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
               <span>Clear Selection</span>
@@ -263,12 +300,18 @@ function StandardCustomersDirectoryView() {
           <Input
             placeholder="Search by name, ID, phone, or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
         <select
           value={kycFilter}
-          onChange={(e) => setKycFilter(e.target.value)}
+          onChange={(e) => {
+            setKycFilter(e.target.value);
+            setPage(1);
+          }}
           className={cn(
             "h-9 rounded-xl border px-3 text-xs font-semibold shadow-sm focus:border-[#2563EB] focus:outline-none",
             isDark
@@ -287,8 +330,15 @@ function StandardCustomersDirectoryView() {
       {/* Data Table */}
       <DataTable
         columns={columns}
-        rows={data}
+        rows={customersList}
         loading={isLoading}
+        pagination={{
+          page,
+          pageSize,
+          total: pagination?.total ?? customersList.length,
+          totalPages: pagination?.totalPages ?? Math.max(1, Math.ceil((pagination?.total ?? customersList.length) / pageSize)),
+          onPageChange: (newPage) => setPage(newPage),
+        }}
         emptyTitle="No borrowers found"
         emptyDescription="Start by onboarding a new customer into the LMS."
         emptyAction={
@@ -309,13 +359,17 @@ function StandardCustomersDirectoryView() {
                 <Trash2 className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Delete Selected Candidates</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Permanently erase {selectedIds.length} candidate(s) from database</p>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Permanently Delete Candidate{selectedIds.length > 1 ? 's' : ''}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Permanently wipe {selectedIds.length} candidate(s) from database
+                </p>
               </div>
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              Are you sure you want to permanently delete the <strong>{selectedIds.length} selected customer(s)</strong>? This will permanently wipe their customer profiles, uploaded documents, bank details, and borrower portal logins from the database.
+              Are you sure you want to permanently delete the <strong>{selectedIds.length} selected candidate(s)</strong>? This will completely wipe all profiles, uploaded documents, bank details, loan applications, and login accounts from the database. It will be as if they never existed.
             </p>
 
             {deleteError && (
@@ -333,11 +387,11 @@ function StandardCustomersDirectoryView() {
               </Button>
               <Button
                 size="sm"
-                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
                 onClick={handleBulkDelete}
                 disabled={isDeleting}
               >
-                {isDeleting ? 'Deleting...' : `Yes, Delete (${selectedIds.length}) Candidates`}
+                {isDeleting ? 'Deleting...' : `Yes, Permanently Delete (${selectedIds.length})`}
               </Button>
             </div>
           </Card>

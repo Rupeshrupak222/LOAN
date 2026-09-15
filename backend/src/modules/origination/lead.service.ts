@@ -91,28 +91,7 @@ class LeadStore {
   }
 
   private seedInitialLeads() {
-    const seed: LeadEntity = {
-      id: 'lead-sourcing-001',
-      leadCode: 'LEAD-2026-00101',
-      tenantId: 'tenant-adyapan-default',
-      branchId: 'branch-south-mumbai',
-      assignedOfficerId: 'user-loan-officer-1',
-      assignedOfficerName: 'Rohan Sharma',
-      firstName: 'Vikram',
-      lastName: 'Mehta',
-      mobile: '9876543210',
-      email: 'vikram.mehta@example.com',
-      employmentType: 'SALARIED',
-      employerName: 'Tata Consultancy Services',
-      monthlyIncome: 85000,
-      requestedAmount: 500000,
-      source: 'DIGITAL',
-      status: 'NEW',
-      notes: 'Customer submitted initial inquiry on web portal for Personal Loan.',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    this.leads.set(seed.id, seed);
+    // Clean empty store
   }
 
   public getAll(): LeadEntity[] {

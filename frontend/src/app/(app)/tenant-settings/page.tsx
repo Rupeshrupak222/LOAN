@@ -14,8 +14,8 @@ export default function TenantSettingsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-32 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
-        <div className="h-96 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+        <div className="h-32 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl animate-pulse" />
+        <div className="h-96 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl animate-pulse" />
       </div>
     );
   }

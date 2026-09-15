@@ -76,7 +76,6 @@ export class LifecycleService {
           stage: targetStage,
           status: legacyStatus,
           submittedAt: targetStage === 'APPLICATION_SUBMITTED' ? new Date() : undefined,
-          closedAt: ['CLOSED', 'REJECTED', 'CANCELLED', 'WITHDRAWN'].includes(targetStage) ? new Date() : undefined,
           updatedAt: new Date(),
         },
       });

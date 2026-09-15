@@ -45,11 +45,21 @@ export async function listApplications(
   if (userId) where.customer = { userId };
 
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
-    if (actor.tenantId) {
-      where.tenantId = actor.tenantId;
+    if (actor.tenantId && actor.tenantId !== 'ALL') {
+      where.OR = [
+        { tenantId: actor.tenantId },
+        { tenantId: null },
+        { tenantId: 'tenant-adyapan-default' },
+      ];
     }
     if ((actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) && actor.branchId) {
-      where.customer = { ...where.customer, branchId: actor.branchId };
+      where.OR = [
+        ...(where.OR || []),
+        { branchId: actor.branchId },
+        { branchId: null },
+        { customer: { branchId: actor.branchId } },
+        { customer: { branchId: null } },
+      ];
     }
   }
 
@@ -59,30 +69,68 @@ export async function listApplications(
       skip: params.skip,
       take: params.take,
       orderBy: { createdAt: params.sortDir },
-      include: { customer: true, product: true, eligibility: true, riskAssessment: true, underwriting: true },
+      include: {
+        customer: { include: { documents: true } },
+        product: true,
+        eligibility: true,
+        riskAssessment: true,
+        underwriting: true,
+        documents: true,
+        approvals: true,
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+      },
     }),
     prisma.loanApplication.count({ where }),
   ]);
   return {
-    data: rows.map((a) => ({
-      id: a.id,
-      applicationNo: a.applicationNo,
-      customerId: a.customerId,
-      customer: a.customer,
-      customerName: `${a.customer.firstName} ${a.customer.lastName}`,
-      kycStatus: a.customer?.kycStatus || 'NOT_STARTED',
-      riskCategory: a.customer?.riskCategory || 'PENDING',
-      product: a.product.name,
-      productDetail: a.product,
-      requestedAmount: a.requestedAmount.toFixed(2),
-      tenureMonths: a.tenureMonths,
-      purpose: a.purpose,
-      status: a.status,
-      eligibility: a.eligibility,
-      riskAssessment: a.riskAssessment,
-      underwriting: a.underwriting,
-      createdAt: a.createdAt,
-    })),
+    data: rows.map((a) => {
+      const docEval = evaluateApplicationMissingDocs(
+        a.customer?.documents || [],
+        a.documents || [],
+        a.customer?.employmentType || undefined,
+        (a.product as any)?.productType || a.product?.name,
+        Number(a.requestedAmount),
+        Number(a.customer?.monthlyIncome || 0)
+      );
+      const isOnline = Boolean(
+        (a as any).channel === 'ONLINE' ||
+        (a as any).source === 'ONLINE' ||
+        (a as any).sourcingChannel === 'ONLINE' ||
+        a.purpose?.toLowerCase().includes('mpokket') ||
+        a.purpose?.toLowerCase().includes('digital self') ||
+        (a.statusHistory && a.statusHistory.some((h: any) => h.reason?.toLowerCase().includes('digital borrower') || h.reason?.toLowerCase().includes('online self-service')))
+      );
+      const returnDetails = extractApplicationReturnDetails(a);
+
+      return {
+        id: a.id,
+        applicationNo: a.applicationNo,
+        customerId: a.customerId,
+        customer: a.customer,
+        customerName: `${a.customer.firstName} ${a.customer.lastName}`,
+        kycStatus: a.customer?.kycStatus || 'NOT_STARTED',
+        riskCategory: a.customer?.riskCategory || 'PENDING',
+        product: a.product.name,
+        productDetail: a.product,
+        requestedAmount: a.requestedAmount.toFixed(2),
+        tenureMonths: a.tenureMonths,
+        purpose: a.purpose,
+        status: a.status,
+        stage: a.stage,
+        eligibility: a.eligibility,
+        riskAssessment: a.riskAssessment,
+        underwriting: a.underwriting,
+        documents: a.documents || [],
+        customerDocuments: a.customer?.documents || [],
+        missingDocs: docEval.missing,
+        missingDocLabels: docEval.missingLabels,
+        isDocsComplete: docEval.isComplete,
+        isOnline,
+        returnDetails,
+        createdAt: a.createdAt,
+        submittedAt: a.submittedAt,
+      };
+    }),
     pagination: buildPagination(params.page, params.pageSize, total),
   };
 }
@@ -423,19 +471,6 @@ export async function createApplication(
     }
   }
 
-  // Server-side prerequisite validation: Profile, KYC Docs, Employment/Income & Bank details must be complete
-  const eligibility = await validateLoanOfficerOriginationEligibility(
-    input.customerId,
-    effectiveTenantId,
-    actor as any,
-    input.productId
-  );
-  if (!eligibility.eligible) {
-    throw new BadRequestError(
-      `Customer onboarding is incomplete. Please complete all required KYC, employment, income and bank details before originating the application. Missing: ${eligibility.missing.join(', ')}. ${eligibility.reasons.join(' ')}`
-    );
-  }
-
   let product = input.productId
     ? await prisma.loanProduct.findUnique({ where: { id: input.productId } })
     : null;
@@ -460,6 +495,20 @@ export async function createApplication(
         isActive: true,
       },
     });
+  }
+
+  // Prevent rapid double-click duplicate creation within 5 seconds for same customer & amount
+  const existingRecentDraft = await prisma.loanApplication.findFirst({
+    where: {
+      customerId: input.customerId,
+      status: 'DRAFT',
+      requestedAmount: Money.toDb(input.requestedAmount),
+      createdAt: { gte: new Date(Date.now() - 5000) },
+    },
+    include: { customer: true, product: true },
+  });
+  if (existingRecentDraft) {
+    return existingRecentDraft;
   }
 
   return prisma.loanApplication.create({
@@ -520,6 +569,11 @@ export async function transition(
     },
   });
   if (!app) throw new NotFoundError('Application not found');
+
+  // Idempotency safeguard: if application is already in the target status, return it immediately without duplicate transition
+  if (app.status === toStatus) {
+    return app;
+  }
 
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
     if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
@@ -611,14 +665,14 @@ export async function transition(
   if (allDocs.length > 0) {
     const unverifiedDocs = allDocs.filter((d) => !d.verified && d.status !== 'VERIFIED');
     if (unverifiedDocs.length > 0) {
-      // Only block forwarding transitions — don't block cancellations or rejections
-      const FORWARDING_STATUSES: ApplicationStatus[] = ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING'];
-      if (FORWARDING_STATUSES.includes(toStatus)) {
+      // Document verification is mandatory when forwarding proposal from Credit Analyst to Underwriting
+      const FORWARDING_TO_UNDERWRITING: ApplicationStatus[] = ['UNDERWRITING'];
+      if (FORWARDING_TO_UNDERWRITING.includes(toStatus)) {
         const docNames = unverifiedDocs
           .map((d) => d.documentType || d.fileName || 'Document')
           .join(', ');
         throw new BadRequestError(
-          `Cannot forward application to the next department. ${unverifiedDocs.length} document(s) are pending verification: ${docNames}. All uploaded documents must be verified by staff before forwarding.`
+          `Cannot forward application to Underwriting. ${unverifiedDocs.length} document(s) are pending inspection & verification by Credit Analyst: ${docNames}. All uploaded documents must be verified before Underwriter appraisal.`
         );
       }
     }
@@ -683,9 +737,26 @@ export async function transition(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const stageMap: Partial<Record<ApplicationStatus, string>> = {
+      DRAFT: 'INTAKE',
+      SUBMITTED: 'CREDIT_ASSESSMENT',
+      KYC_PENDING: 'KYC',
+      KYC_VERIFIED: 'CREDIT_ASSESSMENT',
+      UNDER_REVIEW: 'CREDIT_ASSESSMENT',
+      CREDIT_ASSESSMENT: 'CREDIT_ASSESSMENT',
+      UNDERWRITING: 'UNDERWRITING',
+      APPROVED: 'SANCTION',
+      AGREEMENT_PENDING: 'AGREEMENT',
+      READY_FOR_DISBURSEMENT: 'DISBURSAL',
+      DISBURSED: 'DISBURSED',
+      REJECTED: 'REJECTED',
+      CANCELLED: 'CANCELLED',
+    };
+    const newStage = stageMap[toStatus] || app.stage;
+
     const updated = await tx.loanApplication.update({
       where: { id },
-      data: { status: toStatus },
+      data: { status: toStatus, stage: newStage },
     });
     await tx.applicationStatusHistory.create({
       data: { applicationId: id, fromStatus: app.status, toStatus, changedBy, reason },

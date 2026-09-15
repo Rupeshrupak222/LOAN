@@ -472,6 +472,59 @@ export default function ApplicationDetailPage() {
     onAutoResolve: () => Promise<void>
   ) => {
     const items: PendingWorkItem[] = [];
+    const isLoanOfficerHandoff = targetDept.includes('Credit Assessment') || sourceDept.includes('Loan Officer');
+
+    if (isLoanOfficerHandoff) {
+      // ── Loan Officer to Credit Analyst Handoff ──────────────────────────
+      // Loan Officer is responsible for uploading mandatory profile documents.
+      // Loan Officer does NOT verify KYC (Credit Analyst/KYC engine does verification).
+      const missingDocs = mandatoryChecklist.filter((m) => !m.uploaded);
+      const isDocsComplete = missingDocs.length === 0;
+
+      if (!isDocsComplete) {
+        missingDocs.forEach((m) => {
+          items.push({
+            id: `missing-doc-${m.id}`,
+            title: `Missing Document: ${m.title}`,
+            description: `${m.desc} is required before submitting to Credit Analyst.`,
+            category: 'DOCUMENTS',
+            isDone: false,
+          });
+        });
+      } else {
+        items.push({
+          id: 'docs-complete',
+          title: `All Mandatory Documents Uploaded (${mandatoryChecklist.length}/${mandatoryChecklist.length})`,
+          description: 'All mandatory profile documents are attached and ready for credit assessment.',
+          category: 'DOCUMENTS',
+          isDone: true,
+        });
+      }
+
+      // Information about KYC status (informational only for LO desk)
+      const isKycDone = data?.customer?.kycStatus === 'VERIFIED';
+      items.push({
+        id: 'kyc-info',
+        title: isKycDone ? 'Borrower KYC Verified' : 'Borrower KYC In Progress / Queued',
+        description: isKycDone
+          ? 'Customer KYC is already verified'
+          : 'KYC status will be verified downstream by Credit Analyst / Automated Engine',
+        category: 'KYC',
+        isDone: true, // Non-blocking for Loan Officer intake submission
+      });
+
+      const hasAnyPending = items.some((i) => !i.isDone);
+      if (hasAnyPending) {
+        setPendingWorkList(items);
+        setWarningSourceDept(sourceDept);
+        setWarningTargetDept(targetDept);
+        setOnWarningConfirmAction(null); // Cannot bypass missing mandatory documents
+        setWarningModalOpen(true);
+      } else {
+        onProceedDirectly();
+      }
+      return;
+    }
 
     // ── 1. KYC Verification ──────────────────────────────────────────────
     const isKycDone = data?.customer?.kycStatus === 'VERIFIED';
@@ -1130,18 +1183,20 @@ export default function ApplicationDetailPage() {
           <Card className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Borrower Profile</h3>
-              <button
-                onClick={() => {
-                  setKycStatusInput(customer.kycStatus || 'VERIFIED');
-                  setRiskCategoryInput(customer.riskCategory || 'LOW');
-                  setKycRemarks('');
-                  setKycModalOpen(true);
-                }}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                Update KYC
-              </button>
+              {Boolean(!isOnlyLoanOfficer && isCreditAnalystOrHigher) && (
+                <button
+                  onClick={() => {
+                    setKycStatusInput(customer.kycStatus || 'NOT_STARTED');
+                    setRiskCategoryInput(customer.riskCategory || 'LOW');
+                    setKycRemarks('');
+                    setKycModalOpen(true);
+                  }}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  Update KYC
+                </button>
+              )}
             </div>
             <dl className="divide-y divide-slate-100 text-xs dark:divide-[#2B3566]">
               <Row label="Customer ID" value={<span className="font-mono font-bold text-blue-600">{customer.customerCode}</span>} />
@@ -1153,22 +1208,24 @@ export default function ApplicationDetailPage() {
               <Row label="Risk Category" value={<Badge status={customer.riskCategory || 'PENDING'} />} />
             </dl>
             <div className="pt-2 flex flex-col sm:flex-row gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  setKycStatusInput(customer.kycStatus || 'VERIFIED');
-                  setRiskCategoryInput(customer.riskCategory || 'LOW');
-                  setKycRemarks('');
-                  setKycModalOpen(true);
-                }}
-                className="flex-1 text-xs gap-1.5 cursor-pointer text-blue-600 dark:text-blue-400 font-semibold"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                Verify / Update KYC
-              </Button>
+              {Boolean(!isOnlyLoanOfficer && isCreditAnalystOrHigher) && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setKycStatusInput(customer.kycStatus || 'NOT_STARTED');
+                    setRiskCategoryInput(customer.riskCategory || 'LOW');
+                    setKycRemarks('');
+                    setKycModalOpen(true);
+                  }}
+                  className="flex-1 text-xs gap-1.5 cursor-pointer text-blue-600 dark:text-blue-400 font-semibold"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  Verify / Update KYC
+                </Button>
+              )}
               <Link href={`/customers/${customer.id}`} className="flex-1">
-                <Button size="sm" variant="ghost" className="w-full text-xs">View Customer 360 →</Button>
+                <Button size="sm" variant="outline" className="w-full text-xs font-semibold">View Customer 360 →</Button>
               </Link>
             </div>
           </Card>

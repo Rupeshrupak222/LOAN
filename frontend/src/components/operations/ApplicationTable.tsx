@@ -1,18 +1,51 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { User, ChevronLeft, ChevronRight, Eye, MoreHorizontal } from 'lucide-react';
+import { User, ChevronLeft, ChevronRight, Eye, Send, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils';
+import { api, apiErrorMessage } from '@/lib/api';
+import { useToast } from '@/lib/toast';
+import { Button } from '@/components/ui';
 
 interface Props {
   applications: any[];
   meta: { page: number; pageSize: number; total: number; totalPages: number };
   loading: boolean;
   onPageChange: (page: number) => void;
+  onRefetch?: () => void;
 }
 
-export function ApplicationTable({ applications, meta, loading, onPageChange }: Props) {
+export function ApplicationTable({ applications, meta, loading, onPageChange, onRefetch }: Props) {
+  const toast = useToast();
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  async function handleSendToCredit(app: any) {
+    if (sendingId) return;
+    setSendingId(app.id);
+    try {
+      try {
+        await api.post(`/applications/${app.id}/submit`, {
+          reason: 'Loan Officer verified all required documents and submitted for credit assessment',
+        });
+      } catch {
+        await api.post(`/applications/${app.id}/transition`, {
+          toStatus: 'SUBMITTED',
+          reason: 'Loan Officer forwarded application to Credit Analyst review queue',
+        });
+      }
+      toast.success(
+        'Forwarded to Credit Analyst',
+        `Application ${app.applicationNo || ''} has been assigned to Credit Review queue.`
+      );
+      onRefetch?.();
+    } catch (err) {
+      toast.error('Submission Notice', apiErrorMessage(err));
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   const priorityBadges: Record<string, { bg: string; text: string }> = {
     URGENT: { bg: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/40', text: 'URGENT' },
     HIGH: { bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40', text: 'HIGH' },
@@ -72,7 +105,13 @@ export function ApplicationTable({ applications, meta, loading, onPageChange }: 
             ) : (
               applications.map((app) => {
                 const priority = priorityBadges[app.priority || 'MEDIUM'] || priorityBadges.MEDIUM;
-                const stage = stageBadges[app.stage || 'LEAD'] || { bg: 'bg-slate-100 text-slate-700', text: app.stage };
+                const stage = stageBadges[app.stage || 'LEAD'] || { bg: 'bg-slate-100 text-slate-700', text: app.stage || app.status };
+                const isDraftOrPending =
+                  app.status === 'DRAFT' ||
+                  app.status === 'KYC_PENDING' ||
+                  app.stage === 'LEAD' ||
+                  app.stage === 'APPLICATION_STARTED' ||
+                  !['SUBMITTED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'DISBURSED', 'REJECTED'].includes(app.status);
 
                 return (
                   <tr
@@ -87,10 +126,10 @@ export function ApplicationTable({ applications, meta, loading, onPageChange }: 
 
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-slate-900 dark:text-slate-100">
-                        {app.customer?.firstName} {app.customer?.lastName}
+                        {app.customerName || `${app.customer?.firstName || ''} ${app.customer?.lastName || ''}`.trim() || 'Borrower'}
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                        {app.customer?.customerCode} • {app.customer?.mobile}
+                        {app.customer?.customerCode || '—'} • {app.customer?.mobile || app.customerMobile || '—'}
                       </div>
                     </td>
 
@@ -99,7 +138,7 @@ export function ApplicationTable({ applications, meta, loading, onPageChange }: 
                         ₹{Number(app.requestedAmount).toLocaleString('en-IN')}
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {app.product?.name || 'Personal Loan'} ({app.tenureMonths}m)
+                        {typeof app.product === 'string' ? app.product : app.product?.name || app.productName || 'Personal Loan'} ({app.tenureMonths}m)
                       </div>
                     </td>
 
@@ -135,13 +174,46 @@ export function ApplicationTable({ applications, meta, loading, onPageChange }: 
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <Link
-                        href={`/applications/${app.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
-                      >
-                        <Eye className="h-3 w-3" />
-                        <span>View</span>
-                      </Link>
+                      <div className="flex items-center justify-end gap-2 flex-nowrap">
+                        {/* 1. View Customer 360 Profile */}
+                        {Boolean(app.customerId || app.customer?.id) && (
+                          <Link
+                            href={`/customers/${app.customerId || app.customer?.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs hover:border-slate-300 transition-all shrink-0"
+                            title="View Customer 360 Profile"
+                          >
+                            <User className="h-3.5 w-3.5 text-blue-500" />
+                            <span>View Profile</span>
+                          </Link>
+                        )}
+
+                        {/* 2. Send to Credit Analyst / Status */}
+                        {isDraftOrPending ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSendToCredit(app)}
+                            disabled={sendingId === app.id}
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white shadow-2xs transition-all shrink-0 cursor-pointer"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            <span>{sendingId === app.id ? 'Sending...' : 'Send to Credit'}</span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2 text-xs font-semibold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0 whitespace-nowrap">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span>In Review</span>
+                          </span>
+                        )}
+
+                        {/* 3. View Application Details */}
+                        <Link
+                          href={`/applications/${app.id}`}
+                          className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-blue-600 hover:border-slate-300 dark:hover:bg-blue-950/40 transition-colors shrink-0"
+                          title="Open Application Workspace"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );

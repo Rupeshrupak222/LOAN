@@ -54,6 +54,19 @@ export const operationsApi = {
 
   // 2. Applications Directory
   listApplications: async (params?: ListApplicationsQuery) => {
+    try {
+      const res = await api.get('/applications', { params: { pageSize: params?.pageSize || 20, page: params?.page || 1, status: params?.status, search: params?.search } });
+      const rows = res.data?.data;
+      const pagination = res.data?.pagination || res.data?.meta;
+      if (Array.isArray(rows)) {
+        return {
+          data: rows,
+          meta: pagination || { page: 1, pageSize: 20, total: rows.length, totalPages: 1 },
+        };
+      }
+    } catch {
+      // fallback to operations endpoint
+    }
     const res = await api.get('/operations/applications', { params });
     return {
       data: res.data?.data || [],
