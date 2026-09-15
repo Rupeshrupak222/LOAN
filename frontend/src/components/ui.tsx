@@ -140,7 +140,10 @@ export function KpiCard({
     <Card className="p-4 sm:p-5 flex flex-col justify-between hover:shadow-card-hover transition-all">
       <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="min-w-0 flex-1">
-          <p className={cn("text-[11px] font-bold uppercase tracking-wider truncate", isDark ? "text-slate-400" : "text-slate-500")}>
+          <p
+            title={displayLabel}
+            className={cn("text-xs font-bold uppercase tracking-wider line-clamp-2 break-words", isDark ? "text-slate-400" : "text-slate-500")}
+          >
             {displayLabel}
           </p>
           <p className={cn("mt-1.5 text-xl sm:text-2xl font-bold tracking-tight truncate", isDark ? "text-white" : "text-slate-900")} title={value}>
@@ -175,7 +178,14 @@ export function KpiCard({
               {trend}
             </span>
           )}
-          {displayHint && <span className={cn("truncate", isDark ? "text-slate-400" : "text-slate-500")}>{displayHint}</span>}
+          {displayHint && (
+            <span
+              title={displayHint}
+              className={cn("break-words leading-tight line-clamp-2 text-xs", isDark ? "text-slate-400" : "text-slate-500")}
+            >
+              {displayHint}
+            </span>
+          )}
         </div>
       )}
     </Card>
@@ -277,12 +287,12 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold border',
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border',
         styles[key] ?? (isDark ? 'bg-[#16203D] text-slate-300 border-[#2B3566]' : 'bg-slate-100 text-slate-600 border-slate-200'),
         className
       )}
     >
-      {children || (status ? status.replace(/_/g, ' ') : '')}
+      {children || (status ? status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : '')}
     </span>
   );
 }
