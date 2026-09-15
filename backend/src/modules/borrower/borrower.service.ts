@@ -129,31 +129,46 @@ export class BorrowerService {
 
     let activeAppSummary = undefined;
     if (latestApplication && latestApplication.status !== 'DISBURSED' && latestApplication.status !== 'CANCELLED') {
-      let currentStage = 'Under Review';
+      let currentStage = 'UNDER REVIEW';
       let progressPercent = 30;
-      let nextAction = 'Wait for Underwriting Decision';
+      let nextAction = 'No action required — application under review';
       let actionUrl = `/borrower/apply`;
 
       if (latestApplication.status === 'DRAFT') {
-        currentStage = 'Draft Application';
+        currentStage = 'APPLICATION STARTED';
         progressPercent = 20;
-        nextAction = 'Complete & Submit Application';
+        nextAction = 'Complete your profile and application';
         actionUrl = `/borrower/apply`;
-      } else if (latestApplication.status === 'SUBMITTED' || latestApplication.status === 'UNDER_REVIEW' || latestApplication.status === 'CREDIT_ASSESSMENT') {
-        currentStage = 'Credit & Risk Evaluation';
-        progressPercent = 50;
-        nextAction = 'AI Decisioning in progress';
+      } else if (latestApplication.status === 'KYC_PENDING') {
+        currentStage = 'DOCUMENTS REQUIRED';
+        progressPercent = 40;
+        nextAction = 'Upload required documents';
+        actionUrl = `/borrower/documents`;
+      } else if (latestApplication.status === 'SUBMITTED' || latestApplication.status === 'UNDER_REVIEW' || latestApplication.status === 'CREDIT_ASSESSMENT' || latestApplication.status === 'UNDERWRITING' || latestApplication.status === 'KYC_VERIFIED') {
+        currentStage = 'UNDER REVIEW';
+        progressPercent = 60;
+        nextAction = 'No action required — application under review';
         actionUrl = `/borrower`;
       } else if (latestApplication.status === 'APPROVED') {
-        currentStage = 'Offer Ready';
+        currentStage = 'OFFER READY';
         progressPercent = 75;
-        nextAction = 'Review & Accept Sanction Offer';
-        actionUrl = `/borrower/offers/off-${latestApplication.id.slice(0, 8)}`;
+        nextAction = 'Review your offer';
+        actionUrl = `/borrower/offers`;
       } else if (latestApplication.status === 'AGREEMENT_PENDING') {
-        currentStage = 'Digital Contract eSign';
+        currentStage = 'AGREEMENT REQUIRED';
         progressPercent = 85;
-        nextAction = 'Sign Loan Agreement via Aadhaar OTP';
-        actionUrl = `/borrower/offers/off-${latestApplication.id.slice(0, 8)}`;
+        nextAction = 'Sign your agreement';
+        actionUrl = `/borrower/offers`;
+      } else if (latestApplication.status === 'READY_FOR_DISBURSEMENT') {
+        currentStage = 'READY FOR DISBURSEMENT';
+        progressPercent = 95;
+        nextAction = 'Set up repayment mandate';
+        actionUrl = `/borrower/offers`;
+      } else if (latestApplication.status === 'REJECTED') {
+        currentStage = 'REJECTED';
+        progressPercent = 100;
+        nextAction = 'Application declined';
+        actionUrl = `/borrower/apply`;
       }
 
       activeAppSummary = {
@@ -161,7 +176,7 @@ export class BorrowerService {
         applicationNumber: latestApplication.applicationNo,
         productName: latestApplication.product?.name || 'Digital Loan',
         requestedAmount: Number(latestApplication.requestedAmount),
-        status: latestApplication.status,
+        status: currentStage, // Expose customer-safe status instead of internal status
         currentStage,
         progressPercent,
         nextRequiredAction: nextAction,

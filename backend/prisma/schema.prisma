@@ -63,6 +63,10 @@ model Tenant {
   AnalyticsDashboardLayout AnalyticsDashboardLayout[]
   CustomerConsent          CustomerConsent[]
   CreditReassessment       CreditReassessment[]
+  WorkQueue                WorkQueue[]
+  Task                     Task[]
+  ActivityLog              ActivityLog[]
+  Approval                 Approval[]
 
   @@index([code])
   @@index([status])
@@ -257,8 +261,9 @@ model Customer {
   lifecycleHistory   CustomerLifecycleHistory[]
   reassessments      CreditReassessment[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  CustomerIdentifier CustomerIdentifier[]
 
   @@index([mobile])
   @@index([email])
@@ -318,7 +323,7 @@ model CustomerIdentifier {
   id                 String    @id @default(uuid())
   customerId         String
   customer           Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  idType             String    // PAN, AADHAAR, PASSPORT, VOTER_ID, DRIVING_LICENSE, GSTIN
+  idType             String // PAN, AADHAAR, PASSPORT, VOTER_ID, DRIVING_LICENSE, GSTIN
   maskedValue        String
   idHash             String?
   encryptedValue     String?
@@ -403,12 +408,14 @@ model LoanApplication {
   branchId      String?
   branch        Branch?     @relation(fields: [branchId], references: [id])
 
-  requestedAmount Decimal           @db.Decimal(14, 2)
-  tenureMonths    Int
-  purpose         String?
-  status          ApplicationStatus @default(DRAFT)
-  stage           String?
-  priority        String?
+  requestedAmount  Decimal           @db.Decimal(14, 2)
+  tenureMonths     Int
+  purpose          String?
+  status           ApplicationStatus @default(DRAFT)
+  stage            String?
+  priority         String?
+  assignedToUserId String?
+  queueId          String?
 
   statusHistory  ApplicationStatusHistory[]
   eligibility    EligibilityAssessment?
@@ -418,8 +425,13 @@ model LoanApplication {
   documents      Document[]
   loan           Loan?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  version               Int                     @default(1)
+  ApplicationAssignment ApplicationAssignment[]
+  Task                  Task[]
+  CreditReview          CreditReview[]
+  Approval              Approval[]
 
   @@index([applicationNo])
   @@index([customerId])
@@ -502,9 +514,9 @@ model WorkQueue {
   tenantId    String?
   tenant      Tenant?  @relation(fields: [tenantId], references: [id])
   name        String
-  key         String   // OPERATIONS_QUEUE, CREDIT_REVIEW_QUEUE, RISK_QUEUE, APPROVAL_QUEUE, COLLECTIONS_QUEUE, FINANCE_QUEUE
-  department  String   // OPERATIONS, CREDIT, COLLECTIONS, FINANCE, MANAGEMENT, ADMIN
-  workspace   String   // WorkspaceKey
+  key         String // OPERATIONS_QUEUE, CREDIT_REVIEW_QUEUE, RISK_QUEUE, APPROVAL_QUEUE, COLLECTIONS_QUEUE, FINANCE_QUEUE
+  department  String // OPERATIONS, CREDIT, COLLECTIONS, FINANCE, MANAGEMENT, ADMIN
+  workspace   String // WorkspaceKey
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -526,8 +538,8 @@ model ApplicationAssignment {
   assignedByUserId String?
   queueId          String?
   queue            WorkQueue?      @relation(fields: [queueId], references: [id])
-  department       String          // OPERATIONS, CREDIT, COLLECTIONS, etc.
-  workspace        String?         // WorkspaceKey
+  department       String // OPERATIONS, CREDIT, COLLECTIONS, etc.
+  workspace        String? // WorkspaceKey
   assignmentType   String          @default("INDIVIDUAL") // INDIVIDUAL, QUEUE, TEAM
   status           String          @default("ACTIVE") // ACTIVE, COMPLETED, REASSIGNED, RELEASED
   assignedAt       DateTime        @default(now())
@@ -546,8 +558,8 @@ model Task {
   tenant            Tenant?          @relation(fields: [tenantId], references: [id])
   title             String
   description       String?
-  taskType          String           // DOCUMENT_VERIFICATION, CREDIT_REVIEW, RISK_ASSESSMENT, UNDERWRITING_DECISION, SANCTION_APPROVAL, DISBURSEMENT_CHECK, COLLECTION_FOLLOWUP, CUSTOMER_KYC
-  entityType        String           // APPLICATION, CUSTOMER, LOAN, COLLECTION_CASE, DOCUMENT, APPROVAL
+  taskType          String // DOCUMENT_VERIFICATION, CREDIT_REVIEW, RISK_ASSESSMENT, UNDERWRITING_DECISION, SANCTION_APPROVAL, DISBURSEMENT_CHECK, COLLECTION_FOLLOWUP, CUSTOMER_KYC
+  entityType        String // APPLICATION, CUSTOMER, LOAN, COLLECTION_CASE, DOCUMENT, APPROVAL
   entityId          String
   applicationId     String?
   application       LoanApplication? @relation(fields: [applicationId], references: [id])
@@ -579,9 +591,9 @@ model ActivityLog {
   id              String   @id @default(uuid())
   tenantId        String?
   tenant          Tenant?  @relation(fields: [tenantId], references: [id])
-  entityType      String   // APPLICATION, CUSTOMER, LOAN, COLLECTION_CASE, DOCUMENT, APPROVAL, TASK
+  entityType      String // APPLICATION, CUSTOMER, LOAN, COLLECTION_CASE, DOCUMENT, APPROVAL, TASK
   entityId        String
-  activityType    String   // NOTE, COMMENT, CALL, FOLLOWUP, STATUS_CHANGE, ASSIGNMENT, STAGE_TRANSITION, SYSTEM_EVENT
+  activityType    String // NOTE, COMMENT, CALL, FOLLOWUP, STATUS_CHANGE, ASSIGNMENT, STAGE_TRANSITION, SYSTEM_EVENT
   title           String?
   message         String
   metadata        Json?
@@ -624,9 +636,9 @@ model Approval {
   entityId          String
   applicationId     String?
   application       LoanApplication?  @relation(fields: [applicationId], references: [id])
-  approvalType      String            // SANCTION, DISBURSEMENT, RESTRUCTURE, SETTLEMENT, WAIVER, POLICY_OVERRIDE
+  approvalType      String // SANCTION, DISBURSEMENT, RESTRUCTURE, SETTLEMENT, WAIVER, POLICY_OVERRIDE
   level             Int               @default(1)
-  approverRole      String?           // UNDERWRITER, BRANCH_MANAGER, CREDIT_HEAD, CRO, CFO, COMMITTEE
+  approverRole      String? // UNDERWRITER, BRANCH_MANAGER, CREDIT_HEAD, CRO, CFO, COMMITTEE
   requestedByUserId String?
   assignedToUserId  String?
   status            String            @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
@@ -1145,19 +1157,19 @@ model AnalyticsDashboardLayout {
 // ---------------------------------------------------------------------------
 
 model CustomerConsent {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   tenantId    String?
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
-  consentType String   // AADHAAR_KYC, CREDIT_BUREAU, LOAN_AGREEMENT, ENACH_MANDATE, DATA_PRIVACY, MARKETING_COMMUNICATION
-  version     String   @default("v1.0")
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
+  consentType String // AADHAAR_KYC, CREDIT_BUREAU, LOAN_AGREEMENT, ENACH_MANDATE, DATA_PRIVACY, MARKETING_COMMUNICATION
+  version     String    @default("v1.0")
   purpose     String
-  granted     Boolean  @default(true)
+  granted     Boolean   @default(true)
   ipAddress   String?
   userAgent   String?
-  channel     String   @default("DIRECT_WEB") // DIRECT_WEB, MOBILE_APP, BRANCH_PORTAL
-  grantedAt   DateTime @default(now())
+  channel     String    @default("DIRECT_WEB") // DIRECT_WEB, MOBILE_APP, BRANCH_PORTAL
+  grantedAt   DateTime  @default(now())
   revokedAt   DateTime?
 
   @@index([customerId])
@@ -1170,7 +1182,7 @@ model CustomerLifecycleHistory {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   fromState  String?
-  toState    String   // NEW, PROFILE_INCOMPLETE, KYC_PENDING, KYC_VERIFIED, ELIGIBILITY_PENDING, ELIGIBLE, ACTIVE_BORROWER, REPEAT_BORROWER, CREDIT_LINE_CUSTOMER, SUSPENDED
+  toState    String // NEW, PROFILE_INCOMPLETE, KYC_PENDING, KYC_VERIFIED, ELIGIBILITY_PENDING, ELIGIBLE, ACTIVE_BORROWER, REPEAT_BORROWER, CREDIT_LINE_CUSTOMER, SUSPENDED
   reason     String?
   metadata   Json?
   actorId    String?

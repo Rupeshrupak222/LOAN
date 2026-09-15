@@ -54,6 +54,7 @@ export default function ApplicationDetailPage() {
   const { isDark } = useTheme();
 
   const [uwWizardOpen, setUwWizardOpen] = useState(false);
+  const [activeAppTab, setActiveAppTab] = useState<'PROFILE' | 'DOCUMENTS' | 'REVIEW'>('PROFILE');
 
   // Modals state
   const [decisionModalOpen, setDecisionModalOpen] = useState(false);
@@ -427,7 +428,7 @@ export default function ApplicationDetailPage() {
 
   const missingMandatoryDocs = mandatoryChecklist.filter((m) => !m.uploaded);
   const isReturned = data.underwriting?.decision === 'SEND_BACK';
-  const hasDeficiencies = isReturned ? (missingMandatoryDocs.length > 0 || !isAgeValid) : false;
+  const hasDeficiencies = missingMandatoryDocs.length > 0 || !isAgeValid;
 
   const hasCreditScore = Boolean(
     data.riskAssessment &&
@@ -710,106 +711,6 @@ export default function ApplicationDetailPage() {
             </div>
           )}
 
-          {/* Mandatory Documents Checklist & Direct Upload Action Grid */}
-          <div className="pt-2">
-            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2.5 flex items-center gap-1.5">
-              <FileCheck className="w-4 h-4 text-brand-600" />
-              Mandatory Documents Checklist ({5 - missingMandatoryDocs.length} of 5 Ready)
-            </h5>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {mandatoryChecklist.map((item) => {
-                const isUploading = uploadingDocId === item.category;
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      'p-3 rounded-xl border flex flex-col justify-between gap-2.5 transition-all',
-                      item.uploaded
-                        ? 'bg-white/80 dark:bg-slate-900/80 border-emerald-300 dark:border-emerald-800/60'
-                        : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900/50'
-                    )}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          {item.title}
-                        </span>
-                        {item.uploaded ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shrink-0">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-900 flex items-center gap-1 shrink-0">
-                            <XCircle className="w-3 h-3 text-rose-600" /> Missing
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                        {item.desc}
-                      </p>
-                      {item.uploaded && item.doc && (
-                        <p className="text-[10px] font-mono text-slate-400 truncate">
-                          📄 {item.doc.fileName || item.doc.storageKey || 'Document on file'}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Upload / Replace Action Button */}
-                    <div className="pt-1 flex items-center gap-2">
-                      <label
-                        className={cn(
-                          'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs select-none',
-                          isUploading
-                            ? 'bg-slate-200 text-slate-500 cursor-wait dark:bg-slate-800 dark:text-slate-400'
-                            : item.uploaded
-                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                            : 'bg-[#2563EB] hover:bg-blue-700 text-white'
-                        )}
-                      >
-                        {isUploading ? (
-                          <>
-                            <Spinner size="sm" /> Uploading...
-                          </>
-                        ) : item.uploaded ? (
-                          <>
-                            <FileUp className="w-3 h-3 text-slate-500" /> Replace Document
-                          </>
-                        ) : (
-                          <>
-                            <FileUp className="w-3 h-3 text-white" /> + Upload {item.title}
-                          </>
-                        )}
-                        <input
-                          key={`${fileInputKey}-${item.id}`}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          disabled={isUploading}
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleUploadDocument(item.category, item.defaultDocType, file);
-                            }
-                          }}
-                        />
-                      </label>
-                      {item.uploaded && item.doc?.storageKey && (
-                        <a
-                          href={item.doc.storageKey}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2 py-1.5 rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 border border-transparent hover:border-blue-200"
-                          title="View document"
-                        >
-                          View
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
       )}
 
@@ -1114,8 +1015,19 @@ export default function ApplicationDetailPage() {
         )}
       </div>
 
+
+      {isOnlyLoanOfficer && (
+        <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
+          <button onClick={() => setActiveAppTab('PROFILE')} className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-colors", activeAppTab === 'PROFILE' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800")}>Borrower Profile</button>
+          <button onClick={() => setActiveAppTab('DOCUMENTS')} className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-colors", activeAppTab === 'DOCUMENTS' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800")}>Document Collection</button>
+          <button onClick={() => setActiveAppTab('REVIEW')} className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-colors", activeAppTab === 'REVIEW' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800")}>Application Review</button>
+        </div>
+      )}
+
       {/* Main Application Details & Intelligence Sections */}
       <div className="space-y-6">
+{(!isOnlyLoanOfficer || activeAppTab === 'PROFILE') && (
+        <>
         {/* Top Row: Borrower Profile & Loan Product Terms (Side-by-side) */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Borrower Profile Card */}
@@ -1180,8 +1092,126 @@ export default function ApplicationDetailPage() {
           </Card>
         </div>
 
+  </>
+      )}
+
+
+      {(!isOnlyLoanOfficer || activeAppTab === 'DOCUMENTS') && (
+        <div className="mt-6">
+          <Card className="space-y-4 p-5 shadow-sm border-slate-200 dark:border-slate-800">
+             <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-[#2B3566]">
+                <div>
+                  <h3 className="text-sm font-bold">Document Collection</h3>
+                  <p className="text-xs text-slate-400">Strictly gated document requirement collection.</p>
+                </div>
+              </div>
+              
+              <div className="pt-2">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2.5 flex items-center gap-1.5">
+                  <FileCheck className="w-4 h-4 text-brand-600" />
+                  Mandatory Documents Checklist ({5 - missingMandatoryDocs.length} of 5 Ready)
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {mandatoryChecklist.map((item) => {
+                    const isUploading = uploadingDocId === item.category;
+                    return (
+                      <div
+                        key={item.id}
+                        className={cn(
+                          'p-3 rounded-xl border flex flex-col justify-between gap-2.5 transition-all',
+                          item.uploaded
+                            ? 'bg-white/80 dark:bg-slate-900/80 border-emerald-300 dark:border-emerald-800/60'
+                            : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900/50'
+                        )}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              {item.title}
+                            </span>
+                            {item.uploaded ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shrink-0">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Uploaded
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-900 flex items-center gap-1 shrink-0">
+                                <XCircle className="w-3 h-3 text-rose-600" /> Missing
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                            {item.desc}
+                          </p>
+                          {item.uploaded && item.doc && (
+                            <p className="text-[10px] font-mono text-slate-400 truncate">
+                              📄 {item.doc.fileName || item.doc.storageKey || 'Document on file'}
+                            </p>
+                          )}
+                        </div>
+    
+                        {/* Upload / Replace Action Button */}
+                        <div className="pt-1 flex items-center gap-2">
+                          <label
+                            className={cn(
+                              'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs select-none',
+                              isUploading
+                                ? 'bg-slate-200 text-slate-500 cursor-wait dark:bg-slate-800 dark:text-slate-400'
+                                : item.uploaded
+                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                : 'bg-[#2563EB] hover:bg-blue-700 text-white'
+                            )}
+                          >
+                            {isUploading ? (
+                              <>
+                                <Spinner size="sm" /> Uploading...
+                              </>
+                            ) : item.uploaded ? (
+                              <>
+                                <FileUp className="w-3 h-3 text-slate-500" /> Replace Document
+                              </>
+                            ) : (
+                              <>
+                                <FileUp className="w-3 h-3 text-white" /> + Upload {item.title}
+                              </>
+                            )}
+                            <input
+                              key={`${fileInputKey}-${item.id}`}
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              disabled={isUploading}
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleUploadDocument(item.category, item.defaultDocType, file);
+                                }
+                              }}
+                            />
+                          </label>
+                          {item.uploaded && item.doc?.storageKey && (
+                            <a
+                              href={item.doc.storageKey}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2 py-1.5 rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 border border-transparent hover:border-blue-200"
+                              title="View document"
+                            >
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+          </Card>
+        </div>
+      )}
+
         {/* FOR LOAN OFFICER: Show strictly Proposal Intake Details & Lifecycle Audit Trail */}
         {isOnlyLoanOfficer ? (
+          activeAppTab === 'REVIEW' && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
             <Card className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-[#2B3566]">
@@ -1201,24 +1231,28 @@ export default function ApplicationDetailPage() {
                 <Row label="Purpose" value={data.purpose || 'General Financing'} />
               </dl>
 
-              {canLoanOfficerSubmit && (
+{canLoanOfficerSubmit && (
                 <div className="mt-4 rounded-xl bg-blue-50/60 dark:bg-[#1E2445] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-blue-100 dark:border-blue-900/30">
                   <div className="space-y-0.5">
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Ready for Credit Assessment?</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Forward this proposal to the Credit Analyst desk for appraisal and eligibility verification.
+                      {hasDeficiencies 
+                        ? `Locked: Please resolve the following missing requirements: ${missingMandatoryDocs.map(m => m.title).join(', ')} ${!isAgeValid ? ', KYC Age Verification' : ''}`
+                        : 'Forward this proposal to the Credit Analyst desk for appraisal and eligibility verification.'}
                     </p>
                   </div>
                   <Button
                     size="sm"
+                    variant={hasDeficiencies ? 'outline' : 'primary'}
+                    disabled={hasDeficiencies}
                     onClick={() => {
                       setSubmitReason('Initial completed intake submitted for credit appraisal');
                       setSubmitModalOpen(true);
                     }}
-                    className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shrink-0 cursor-pointer shadow-sm"
+                    className={cn("gap-1.5 font-semibold text-xs shrink-0 transition-all shadow-sm", hasDeficiencies ? "cursor-not-allowed opacity-60 text-slate-500" : "bg-[#2563EB] hover:bg-blue-700 text-white cursor-pointer")}
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    Forward to Credit Analyst
+                    {hasDeficiencies ? <Lock className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                    Forward to Credit Analyst {hasDeficiencies && '(Locked)'}
                   </Button>
                 </div>
               )}
@@ -1286,7 +1320,7 @@ export default function ApplicationDetailPage() {
               </div>
             </Card>
           </div>
-        ) : (
+        ) ) : (
           /* FOR CREDIT ANALYST, UNDERWRITER & STAFF: Full Credit Appraisal and Intelligence Suite */
           <>
             {/* Credit Appraisal & Assessment Results Summary */}

@@ -121,8 +121,8 @@ export class WorkspaceService {
         activeWorkspace = MASTER_WORKSPACES.BORROWER_SELF_SERVICE;
       } else if (roles.includes('PARTNER')) {
         activeWorkspace = MASTER_WORKSPACES.PARTNER_EMBEDDED_HUB;
-      } else if (isSuperAdmin || roles.includes('ADMIN')) {
-        activeWorkspace = MASTER_WORKSPACES.ADMIN_ACCESS_CONTROL;
+      } else if (isSuperAdmin || roles.includes('SYSTEM_ADMIN')) {
+        activeWorkspace = MASTER_WORKSPACES.SYSTEM_ADMIN_WORKSPACE;
       } else if (roles.includes('CREDIT_ANALYST') || roles.includes('UNDERWRITER')) {
         activeWorkspace = MASTER_WORKSPACES.CREDIT_ASSESSMENT;
       } else if (roles.includes('COLLECTION_OFFICER') || roles.includes('COLLECTIONS_MANAGER')) {
@@ -136,10 +136,10 @@ export class WorkspaceService {
       }
     }
 
-    const activePortal = MASTER_PORTALS[activeWorkspace.portal] || availablePortals[0] || MASTER_PORTALS.OPERATIONS;
+    const activePortal = activeWorkspace ? (MASTER_PORTALS[activeWorkspace.portal] || availablePortals[0] || MASTER_PORTALS.OPERATIONS) : (availablePortals[0] || MASTER_PORTALS.OPERATIONS);
 
     // Generate Dynamic Access-Aware Navigation Tree for Active Workspace / Portal
-    const navigationItems = this.generateNavigationForUser(user.id, activeWorkspace, roles, permissions);
+    const navigationItems = activeWorkspace ? this.generateNavigationForUser(user.id, activeWorkspace, roles, permissions) : [];
 
     // Group items for sidebar consumption
     const groupsMap = new Map<string, NavigationItemModel[]>();
@@ -206,11 +206,13 @@ export class WorkspaceService {
    * 3. Helper: Generate Filtered Navigation Items
    */
   private generateNavigationForUser(
-    _userId: string,
-    activeWorkspace: WorkspaceDefinition,
+    userId: string,
+    activeWorkspace: WorkspaceDefinition | undefined,
     roles: string[],
     permissions: string[]
   ): NavigationItemModel[] {
+    if (!activeWorkspace) return [];
+
     const isSuperAdmin = roles.includes('SUPER_ADMIN');
     const permSet = new Set(permissions);
 
