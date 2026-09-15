@@ -254,17 +254,40 @@ export default function BorrowerHomePage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-4 w-full sm:w-auto">
-              <div className="hidden md:block text-right">
-                <div className="text-xs text-slate-400">Progress</div>
-                <div className="text-sm font-bold text-white">{activeApp.progressPercent}%</div>
-              </div>
+            <div className="flex flex-col sm:items-end w-full sm:w-auto mt-4 sm:mt-0 gap-3">
               <Link href={activeApp.actionUrl} className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white">
-                  Continue Application <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                <Button className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-500 text-sm font-bold text-white px-6 py-5 shadow-lg shadow-blue-500/20">
+                  {activeApp.nextRequiredAction} <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
             </div>
+          </div>
+
+          {/* Journey Component */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-medium max-w-2xl">
+             <div className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle2 className="w-4 h-4" /> Application Started
+             </div>
+             <div className="flex-1 h-px bg-slate-800 mx-2" />
+             <div className={`flex items-center gap-1.5 ${activeApp.progressPercent >= 40 ? 'text-emerald-400' : activeApp.progressPercent >= 20 ? 'text-blue-400' : 'text-slate-500'}`}>
+                {activeApp.progressPercent >= 40 ? <CheckCircle2 className="w-4 h-4" /> : activeApp.progressPercent >= 20 ? <span className="w-2 h-2 rounded-full bg-blue-500 mx-1" /> : <span className="w-2 h-2 rounded-full border border-slate-600 mx-1" />}
+                Documents & KYC
+             </div>
+             <div className="flex-1 h-px bg-slate-800 mx-2" />
+             <div className={`flex items-center gap-1.5 ${activeApp.progressPercent >= 75 ? 'text-emerald-400' : activeApp.progressPercent >= 40 ? 'text-blue-400' : 'text-slate-500'}`}>
+                {activeApp.progressPercent >= 75 ? <CheckCircle2 className="w-4 h-4" /> : activeApp.progressPercent >= 40 ? <span className="w-2 h-2 rounded-full bg-blue-500 mx-1" /> : <span className="w-2 h-2 rounded-full border border-slate-600 mx-1" />}
+                Underwriting
+             </div>
+             <div className="flex-1 h-px bg-slate-800 mx-2" />
+             <div className={`flex items-center gap-1.5 ${activeApp.progressPercent >= 95 ? 'text-emerald-400' : activeApp.progressPercent >= 75 ? 'text-blue-400' : 'text-slate-500'}`}>
+                {activeApp.progressPercent >= 95 ? <CheckCircle2 className="w-4 h-4" /> : activeApp.progressPercent >= 75 ? <span className="w-2 h-2 rounded-full bg-blue-500 mx-1" /> : <span>🔒</span>}
+                Offer & Agreement
+             </div>
+             <div className="flex-1 h-px bg-slate-800 mx-2" />
+             <div className={`flex items-center gap-1.5 ${activeApp.progressPercent === 100 ? 'text-emerald-400' : activeApp.progressPercent >= 95 ? 'text-blue-400' : 'text-slate-500'}`}>
+                {activeApp.progressPercent === 100 ? <CheckCircle2 className="w-4 h-4" /> : activeApp.progressPercent >= 95 ? <span className="w-2 h-2 rounded-full bg-blue-500 mx-1" /> : <span>🔒</span>}
+                Disbursement
+             </div>
           </div>
         </div>
       )}

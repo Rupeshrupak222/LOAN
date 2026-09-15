@@ -7,6 +7,7 @@ import { Money } from '../finance/money';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
 import { validateLoanOfficerOriginationEligibility } from '../customer/customer.service';
+import { validateCustomerDocumentFulfillment } from '../documents/document-rules';
 import type { CreateApplicationInput } from './application.schema';
 
 export interface ApplicationActorContext {
@@ -86,45 +87,38 @@ export async function listApplications(
   };
 }
 
-export function evaluateApplicationMissingDocs(customerDocs: any[] = [], appDocs: any[] = []) {
+export function evaluateApplicationMissingDocs(
+  customerDocs: any[] = [], 
+  appDocs: any[] = [],
+  employmentTypeRaw?: string,
+  productTypeRaw?: string,
+  requestedAmount?: number,
+  monthlyIncome?: number
+) {
   const allDocs = [...customerDocs, ...appDocs];
-  const hasIdentity = allDocs.some((d) =>
-    ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
-  );
-  const hasPhoto = allDocs.some((d) =>
-    ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
-  );
-  const hasAddress = allDocs.some((d) =>
-    ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
-    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
-  );
-  const hasIncome = allDocs.some((d) =>
-    ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
-    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
-  );
-  const hasBank = allDocs.some((d) =>
-    ['BANK_STATEMENT'].includes(d.category) ||
-    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
-  );
+  const fulfillment = validateCustomerDocumentFulfillment(allDocs, employmentTypeRaw, productTypeRaw, {
+    requestedAmount,
+    monthlyIncome,
+  });
 
-  const missing: { key: string; label: string; defaultDocType: string }[] = [];
-  if (!hasIdentity) missing.push({ key: 'IDENTITY_PROOF', label: 'Identity Proof (PAN / Aadhaar)', defaultDocType: 'PAN_CARD' });
-  if (!hasPhoto) missing.push({ key: 'APPLICANT_PHOTO', label: 'Applicant Photo / Selfie', defaultDocType: 'CUSTOMER_SELFIE_PHOTO' });
-  if (!hasAddress) missing.push({ key: 'ADDRESS_PROOF', label: 'Address Proof (Electricity / Passport / Rent)', defaultDocType: 'ELECTRICITY_BILL' });
-  if (!hasIncome) missing.push({ key: 'INCOME_PROOF', label: 'Income Proof (Salary Slip / 3M Pay Slip / ITR)', defaultDocType: 'SALARY_SLIP' });
-  if (!hasBank) missing.push({ key: 'BANK_STATEMENT', label: 'Bank Statement (Latest 6 Months)', defaultDocType: 'BANK_STATEMENT' });
+  const missing = fulfillment.checklistStatus
+    .filter((status) => !status.isSatisfied)
+    .map((status) => ({
+      key: status.rule.code,
+      label: status.rule.name,
+      defaultDocType: status.rule.defaultDocumentType,
+      category: status.rule.category,
+    }));
 
   return {
     missing,
     missingLabels: missing.map((m) => m.label),
-    isComplete: missing.length === 0,
-    hasIdentity,
-    hasPhoto,
-    hasAddress,
-    hasIncome,
-    hasBank,
+    isComplete: fulfillment.isComplete,
+    hasIdentity: !missing.some(m => m.category === 'IDENTITY_PROOF'),
+    hasPhoto: !missing.some(m => m.category === 'APPLICANT_PHOTO'),
+    hasAddress: !missing.some(m => m.category === 'ADDRESS_PROOF'),
+    hasIncome: !missing.some(m => m.category === 'INCOME_PROOF'),
+    hasBank: !missing.some(m => m.category === 'INCOME_PROOF' || m.category === 'BANK_STATEMENT'),
   };
 }
 
@@ -283,7 +277,14 @@ export async function listReturnedApplications(
   // Enrich each application with return metadata and missing document assessment
   const enrichedApps = allReturnedApps.map((a) => {
     const returnDetails = extractApplicationReturnDetails(a);
-    const docAssessment = evaluateApplicationMissingDocs(a.customer?.documents || [], a.documents || []);
+    const docAssessment = evaluateApplicationMissingDocs(
+      a.customer?.documents || [], 
+      a.documents || [],
+      a.customer?.employmentDetails?.[0]?.employmentType,
+      a.product?.productType,
+      Number(a.requestedAmount),
+      a.customer?.employmentDetails?.[0]?.monthlyIncome ? Number(a.customer.employmentDetails[0].monthlyIncome) : undefined
+    );
 
     return {
       id: a.id,
@@ -511,8 +512,9 @@ export async function transition(
   const app = await prisma.loanApplication.findUnique({
     where: { id },
     include: {
-      customer: { include: { documents: true } },
+      customer: { include: { documents: true, employmentDetails: true } },
       documents: true,
+      product: true,
       riskAssessment: true,
       underwriting: true,
     },
@@ -661,39 +663,21 @@ export async function transition(
 
   const isResubmittingReturned = toStatus === 'SUBMITTED' && app.underwriting?.decision === 'SEND_BACK';
 
-  if (isResubmittingReturned) {
+  if (isResubmittingReturned || toStatus === 'SUBMITTED') {
     const allDocs = [...(app.customer?.documents || []), ...(app.documents || [])];
-    const hasIdentity = allDocs.some((d) =>
-      ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-      ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
-    );
-    const hasPhoto = allDocs.some((d) =>
-      ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-      ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
-    );
-    const hasAddress = allDocs.some((d) =>
-      ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
-      ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
-    );
-    const hasIncome = allDocs.some((d) =>
-      ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
-      ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
-    );
-    const hasBank = allDocs.some((d) =>
-      ['BANK_STATEMENT'].includes(d.category) ||
-      ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
+    const fulfillment = validateCustomerDocumentFulfillment(
+      allDocs,
+      app.customer?.employmentDetails?.[0]?.employmentType,
+      app.product?.productType,
+      {
+        requestedAmount: Number(app.requestedAmount),
+        monthlyIncome: app.customer?.employmentDetails?.[0]?.monthlyIncome ? Number(app.customer.employmentDetails[0].monthlyIncome) : undefined
+      }
     );
 
-    const missingMandatory: string[] = [];
-    if (!hasIdentity) missingMandatory.push('Identity Proof (PAN Card / Aadhaar)');
-    if (!hasPhoto) missingMandatory.push('Applicant Photo / Selfie');
-    if (!hasAddress) missingMandatory.push('Address Proof (Electricity Bill / Passport)');
-    if (!hasIncome) missingMandatory.push('Income Proof (Salary Slip / 3 Months Pay slips / ITR)');
-    if (!hasBank) missingMandatory.push('Bank Statement (Latest 6 Months)');
-
-    if (missingMandatory.length > 0) {
+    if (!fulfillment.isComplete) {
       throw new BadRequestError(
-        `Cannot resend application to Credit Analyst. The application was returned for corrections and is still missing mandatory documents: ${missingMandatory.join(', ')}. Please upload all mandatory documents before resubmitting.`
+        `Cannot submit application to Credit Analyst. The application is missing mandatory profile-specific documents: ${fulfillment.missingNames.join(', ')}. Please upload all mandatory documents before submitting.`
       );
     }
   }
