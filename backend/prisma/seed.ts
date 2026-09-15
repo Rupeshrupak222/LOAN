@@ -231,6 +231,7 @@ async function main() {
   await createStaffUser('finance@adyapan.dev', 'Farah', 'Khan', 'FINANCE_OFFICER', 'EMP007');
   await createStaffUser('collections@adyapan.dev', 'Rahul', 'Verma', 'COLLECTION_OFFICER', 'EMP008');
   await createStaffUser('auditor@adyapan.dev', 'Asha', 'Iyer', 'AUDITOR', 'EMP009');
+  await createStaffUser('customer@adyapan.dev', 'Priya', 'Sharma', 'CUSTOMER', 'EMP013');
 
   // Standardize password for ALL users in the database to the uniform password
   await prisma.user.updateMany({

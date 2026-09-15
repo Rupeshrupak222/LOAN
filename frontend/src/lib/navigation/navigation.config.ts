@@ -503,7 +503,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-dashboard',
     label: 'Borrower Overview',
-    href: '/customer/dashboard',
+    href: '/borrower',
     iconName: 'LayoutDashboard',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
@@ -511,7 +511,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-apply',
     label: 'Apply for Loan',
-    href: '/customer/apply',
+    href: '/borrower/apply',
     iconName: 'FileText',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
@@ -519,7 +519,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-credit',
     label: 'Credit Line & Limits',
-    href: '/customer/credit',
+    href: '/borrower/loans',
     iconName: 'CreditCard',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
@@ -527,7 +527,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-documents',
     label: 'My Documents & KYC',
-    href: '/customer/documents',
+    href: '/borrower/documents',
     iconName: 'FileCheck',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
@@ -535,7 +535,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-loans',
     label: 'Active Loans & Statements',
-    href: '/customer/loan',
+    href: '/borrower/loans',
     iconName: 'DollarSign',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
@@ -543,7 +543,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-payments',
     label: 'Repayments & Pre-closure',
-    href: '/customer/payments',
+    href: '/borrower/payments',
     iconName: 'Receipt',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
@@ -551,7 +551,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
   {
     key: 'customer-support',
     label: 'Help & Grievances',
-    href: '/customer/support',
+    href: '/borrower/support',
     iconName: 'Headphones',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
