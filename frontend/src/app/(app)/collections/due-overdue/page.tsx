@@ -1,16 +1,37 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
-import { Card } from '@/components/ui';
+import { collectionsApi } from '@/features/collections/api';
+import { CollectionQueueTable } from '@/features/collections/CollectionQueueTable';
+import { ContactActivityModal } from '@/features/collections/ContactActivityModal';
+import { PtpModal } from '@/features/collections/PtpModal';
+import { AssignmentModal } from '@/features/collections/AssignmentModal';
+import { EscalationModal } from '@/features/collections/EscalationModal';
+import type { CollectionCaseSummary } from '@/features/collections/types';
 
 export default function CollectionDueOverduePage() {
+  const [selectedBucket, setSelectedBucket] = useState('SMA-0');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [selectedCase, setSelectedCase] = useState<CollectionCaseSummary | null>(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [ptpModalOpen, setPtpModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
+
+  const { data: casesData, isLoading } = useQuery({
+    queryKey: ['collection-cases', selectedBucket, 'ALL', searchQuery],
+    queryFn: () => collectionsApi.listCases({ bucket: selectedBucket, search: searchQuery || undefined }),
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       <PageHeader
         breadcrumb="Collections / Due & Overdue"
-        title="Due & Overdue Servicing"
-        subtitle="Monitor upcoming dues, early delinquency, and severe delinquency cases."
+        title="Due & Overdue Cases"
+        subtitle="View and manage cases based on delinquency buckets (SMA-0, SMA-1, SMA-2)."
       />
       <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
         <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">

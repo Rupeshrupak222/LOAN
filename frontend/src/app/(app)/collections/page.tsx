@@ -1,70 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  Users,
-  PieChart,
-  Settings,
-  PlusCircle,
-  RefreshCw,
-  TrendingUp,
   Clock,
+  TrendingUp,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { Button, Card, KpiCard } from '@/components/ui';
+import { Button, KpiCard } from '@/components/ui';
 import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { collectionsApi } from '@/features/collections/api';
-import { CollectionQueueTable } from '@/features/collections/CollectionQueueTable';
 import { CollectionAnalyticsView } from '@/features/collections/CollectionAnalyticsView';
-import { ContactActivityModal } from '@/features/collections/ContactActivityModal';
-import { PtpModal } from '@/features/collections/PtpModal';
-import { AssignmentModal } from '@/features/collections/AssignmentModal';
-import { EscalationModal } from '@/features/collections/EscalationModal';
-import { StrategyConfigModal } from '@/features/collections/StrategyConfigModal';
-import type { CollectionCaseSummary } from '@/features/collections/types';
 
-export default function CollectionsPage() {
+export default function CollectionsDashboardPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'QUEUE' | 'ANALYTICS' | 'STRATEGIES'>('QUEUE');
-  const [queueType, setQueueType] = useState<'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL'>('ALL');
-  const [selectedBucket, setSelectedBucket] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Selected case for action modals
-  const [selectedCase, setSelectedCase] = useState<CollectionCaseSummary | null>(null);
-  const [activityModalOpen, setActivityModalOpen] = useState(false);
-  const [ptpModalOpen, setPtpModalOpen] = useState(false);
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
-  const [strategyModalOpen, setStrategyModalOpen] = useState(false);
 
   // Dashboard Data
   const { data: dashboard, isLoading: dashboardLoading } = useQuery({
     queryKey: ['collection-dashboard'],
     queryFn: () => collectionsApi.getDashboard(),
-  });
-
-  // Cases List
-  const { data: casesData, isLoading: casesLoading } = useQuery({
-    queryKey: ['collection-cases', selectedBucket, queueType, searchQuery],
-    queryFn: () =>
-      collectionsApi.listCases({
-        bucket: selectedBucket || undefined,
-        queueType: queueType === 'ALL' ? undefined : queueType,
-        search: searchQuery || undefined,
-      }),
-  });
-
-  // Strategies List
-  const { data: strategies, isLoading: strategiesLoading } = useQuery({
-    queryKey: ['collection-strategies'],
-    queryFn: () => collectionsApi.listStrategies(),
-    enabled: activeTab === 'STRATEGIES',
   });
 
   // Auto Assign Mutation
@@ -93,14 +52,6 @@ export default function CollectionsPage() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", autoAssignMutation.isPending && "animate-spin")} />
               {autoAssignMutation.isPending ? 'Assigning...' : 'Auto-Assign Queue'}
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => setStrategyModalOpen(true)}
-            >
-              <Settings className="h-3.5 w-3.5 mr-1.5" />
-              New Strategy Version
             </Button>
           </div>
         }
