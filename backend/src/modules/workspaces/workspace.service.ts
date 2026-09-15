@@ -89,17 +89,11 @@ export class WorkspaceService {
       }
     }
 
-    // Auto-grant administrative wildcard permissions for SUPER_ADMIN
-    if (isSuperAdmin) {
-      permissionsSet.add('*');
-    }
-
     const permissions = Array.from(permissionsSet);
 
     // Filter Available Portals for user
     const availablePortals = Object.values(MASTER_PORTALS).filter((portal) => {
       if (!portal.isEnabled) return false;
-      if (isSuperAdmin) return true;
       if (portal.allowedRoles.includes('*')) return true;
       return portal.allowedRoles.some((r) => roles.includes(r));
     });
@@ -107,7 +101,6 @@ export class WorkspaceService {
     // Filter Available Workspaces for user
     const availableWorkspaces = Object.values(MASTER_WORKSPACES).filter((ws) => {
       if (ws.status !== 'ACTIVE') return false;
-      if (isSuperAdmin) return true;
       return ws.allowedRoles.some((r) => roles.includes(r));
     });
 
@@ -220,19 +213,16 @@ export class WorkspaceService {
 
       // Match workspace or portal scope
       const matchesWorkspace = item.workspace === activeWorkspace.key || item.portal === activeWorkspace.portal;
-      if (!matchesWorkspace && !isSuperAdmin) return false;
-
-      // Super admin sees all items
-      if (isSuperAdmin) return true;
+      if (!matchesWorkspace) return false;
 
       // If specific permission required, enforce it
-      if (item.permission && !permSet.has(item.permission) && !permSet.has('*')) {
+      if (item.permission && !permSet.has(item.permission)) {
         return false;
       }
 
       // If any of listed permissions required
       if (item.requiredAnyPermissions && item.requiredAnyPermissions.length > 0) {
-        const hasAny = item.requiredAnyPermissions.some((p) => permSet.has(p) || permSet.has('*'));
+        const hasAny = item.requiredAnyPermissions.some((p) => permSet.has(p));
         if (!hasAny) return false;
       }
 

@@ -51,7 +51,7 @@ router.get(
 // 3. Deviations Resolution
 router.post(
   '/:applicationId/deviations/:deviationId/resolve',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD'),
+  authorize('COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD'),
   validate(resolveDeviationSchema),
   asyncHandler(async (req, res) => {
     const resolved = await resolveApplicationDeviation(
@@ -73,7 +73,7 @@ router.post(
 // 4. Underwriting Decision Commit
 router.post(
   '/:applicationId/decision',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),
+  authorize('COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),
   validate(underwritingDecisionSchema),
   asyncHandler(async (req, res) => {
     const result = await submitUnderwritingDecision(

@@ -124,13 +124,13 @@ export const AuthorityMatrixManagement: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 p-5 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900/70 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-indigo-400" />
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             Approval Authority Matrix Configuration
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Configure hierarchical delegated sanction limits, risk grade boundaries, and Segregation of Duties (SoD) rules
           </p>
         </div>
@@ -138,7 +138,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => refetch()}
-            className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+            className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
             title="Refresh policies"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -201,7 +201,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Matrix Selector (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -209,7 +209,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
                 placeholder="Search authority policies..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
@@ -220,8 +220,8 @@ export const AuthorityMatrixManagement: React.FC = () => {
                   onClick={() => setStatusFilter(st)}
                   className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
                     statusFilter === st
-                      ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                      : 'text-slate-400 hover:bg-slate-800'
+                      ? 'bg-indigo-50 dark:bg-indigo-600/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/40 font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   {st}
@@ -232,7 +232,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
             {/* List of Authority Matrices */}
             <div className="space-y-2 max-h-[580px] overflow-y-auto pr-1">
               {filteredPolicies.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-500">
+                <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500">
                   No matching authority matrices found.
                 </div>
               ) : (
@@ -244,27 +244,27 @@ export const AuthorityMatrixManagement: React.FC = () => {
                       onClick={() => setSelectedPolicyId(pol.id)}
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-950/40 border-indigo-500/60 shadow-lg shadow-indigo-950/50'
-                          : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                          ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-500/60 shadow-sm dark:shadow-lg dark:shadow-indigo-950/50'
+                          : 'bg-slate-50/50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-900/60'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="font-bold text-xs text-white truncate">{pol.name}</span>
+                        <span className="font-bold text-xs text-slate-900 dark:text-white truncate">{pol.name}</span>
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
                             pol.status === 'ACTIVE'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-500/30'
                               : pol.status === 'DRAFT'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              : 'bg-slate-800 text-slate-400'
+                              ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-500/30'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
                           {pol.status} v{pol.version}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                        <span className="text-indigo-300/80">{pol.code}</span>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                        <span className="text-indigo-600 dark:text-indigo-300/80 font-semibold">{pol.code}</span>
                         <span>{pol.levels?.length || 0} Approval Levels</span>
                       </div>
                     </div>
@@ -280,18 +280,18 @@ export const AuthorityMatrixManagement: React.FC = () => {
           {activePolicy ? (
             <div className="space-y-4">
               {/* Policy Header Card */}
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+              <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <div className="flex items-center gap-2.5">
-                      <h2 className="text-lg font-bold text-white tracking-tight">
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                         {activePolicy.name}
                       </h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                         Version {activePolicy.version}.0
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">{activePolicy.description}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{activePolicy.description}</p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -307,7 +307,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
 
                     <button
                       onClick={() => handleCreateNewVersion(activePolicy.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all active:scale-95"
                       title="Clone as new version"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -317,7 +317,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
                     {activePolicy.status !== 'ARCHIVED' && (
                       <button
                         onClick={() => handleArchive(activePolicy.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-xl hover:bg-slate-800 border border-slate-800 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-colors"
                         title="Archive version"
                       >
                         <Archive className="w-4 h-4" />
@@ -328,35 +328,35 @@ export const AuthorityMatrixManagement: React.FC = () => {
 
                 {/* Governance & SoD strip */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Multi-Level Mode</span>
-                    <span className="font-semibold text-emerald-400">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Multi-Level Mode</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                       {activePolicy.multiLevelApprovalEnabled ? 'Sequential Stage-Gated' : 'Single-Tier Direct'}
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Max Delegation</span>
-                    <span className="font-semibold text-indigo-300">{activePolicy.maxDelegationDays} Days Limit</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Max Delegation</span>
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">{activePolicy.maxDelegationDays} Days Limit</span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Applicant SoD</span>
-                    <span className="font-semibold text-white">Self-Approval Blocked</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Applicant SoD</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">Self-Approval Blocked</span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Four-Eyes Check</span>
-                    <span className="font-semibold text-purple-300">Enforced on High Risk</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-0.5">Four-Eyes Check</span>
+                    <span className="font-semibold text-purple-700 dark:text-purple-300">Enforced on High Risk</span>
                   </div>
                 </div>
               </div>
 
               {/* Hierarchy Levels Card */}
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     Approval Hierarchy Levels ({activePolicy.levels?.length || 0})
                   </h3>
 
@@ -382,7 +382,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
                       });
                       setIsLevelModalOpen(true);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 transition-all active:scale-95"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Hierarchy Level
@@ -394,19 +394,19 @@ export const AuthorityMatrixManagement: React.FC = () => {
                   {activePolicy.levels?.map((lvl) => (
                     <div
                       key={lvl.level}
-                      className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition-all space-y-3"
+                      className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all space-y-3"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/40 text-xs font-black text-indigo-300">
+                          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-600/20 border border-indigo-200 dark:border-indigo-500/40 text-xs font-black text-indigo-700 dark:text-indigo-300">
                             L{lvl.level}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-bold text-white">{lvl.name}</h4>
-                              <span className="font-mono text-[11px] text-slate-400">({lvl.code})</span>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white">{lvl.name}</h4>
+                              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">({lvl.code})</span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-0.5">{lvl.description}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{lvl.description}</p>
                           </div>
                         </div>
 
@@ -416,14 +416,14 @@ export const AuthorityMatrixManagement: React.FC = () => {
                               setEditingLevel(lvl);
                               setIsLevelModalOpen(true);
                             }}
-                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                            className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             title="Edit level"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteLevel(lvl.level)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             title="Delete level"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -432,31 +432,31 @@ export const AuthorityMatrixManagement: React.FC = () => {
                       </div>
 
                       {/* Level Attributes Matrix */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-900 text-xs">
-                        <div className="p-2 bg-slate-900/60 rounded-lg">
-                          <span className="text-[10px] text-slate-400 block mb-0.5">Amount Band:</span>
-                          <span className="font-mono text-emerald-300 font-semibold">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
+                        <div className="p-2 bg-white dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800/60">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-0.5">Amount Band:</span>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-300 font-semibold">
                             {formatMoney(lvl.minAmount)} – {formatMoney(lvl.maxAmount)}
                           </span>
                         </div>
 
-                        <div className="p-2 bg-slate-900/60 rounded-lg">
-                          <span className="text-[10px] text-slate-400 block mb-0.5">Authorized Roles:</span>
-                          <span className="font-mono text-indigo-300 font-semibold truncate block">
+                        <div className="p-2 bg-white dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800/60">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-0.5">Authorized Roles:</span>
+                          <span className="font-mono text-indigo-700 dark:text-indigo-300 font-semibold truncate block">
                             {lvl.roles.join(', ')}
                           </span>
                         </div>
 
-                        <div className="p-2 bg-slate-900/60 rounded-lg">
-                          <span className="text-[10px] text-slate-400 block mb-0.5">Permitted Risk:</span>
-                          <span className="text-amber-300 font-semibold">
+                        <div className="p-2 bg-white dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800/60">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-0.5">Permitted Risk:</span>
+                          <span className="text-amber-700 dark:text-amber-300 font-semibold">
                             Grades {lvl.allowedRiskGrades.join(', ')}
                           </span>
                         </div>
 
-                        <div className="p-2 bg-slate-900/60 rounded-lg">
-                          <span className="text-[10px] text-slate-400 block mb-0.5">SLA Turnaround:</span>
-                          <span className="text-slate-200 font-semibold flex items-center gap-1">
+                        <div className="p-2 bg-white dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800/60">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-0.5">SLA Turnaround:</span>
+                          <span className="text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1">
                             <Clock className="w-3 h-3 text-slate-400" />
                             {lvl.slaHours} Hours
                           </span>
@@ -468,7 +468,7 @@ export const AuthorityMatrixManagement: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="p-12 text-center bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400">
+            <div className="p-12 text-center bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
               Select or create an Approval Authority Policy to view configuration.
             </div>
           )}
@@ -477,46 +477,46 @@ export const AuthorityMatrixManagement: React.FC = () => {
 
       {/* Add / Edit Level Modal */}
       {isLevelModalOpen && editingLevel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
               Configure Approval Level {editingLevel.level}
             </h3>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1">Level Name</label>
+                <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Level Name</label>
                 <input
                   type="text"
                   value={editingLevel.name}
                   onChange={(e) => setEditingLevel({ ...editingLevel, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">Min Amount (₹)</label>
+                  <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Min Amount (₹)</label>
                   <input
                     type="number"
                     value={editingLevel.minAmount}
                     onChange={(e) => setEditingLevel({ ...editingLevel, minAmount: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Max Amount (₹)</label>
+                  <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Max Amount (₹)</label>
                   <input
                     type="number"
                     value={editingLevel.maxAmount}
                     onChange={(e) => setEditingLevel({ ...editingLevel, maxAmount: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Authorized Roles (comma separated)</label>
+                <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Authorized Roles (comma separated)</label>
                 <input
                   type="text"
                   value={editingLevel.roles.join(', ')}
@@ -526,27 +526,27 @@ export const AuthorityMatrixManagement: React.FC = () => {
                       roles: e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
                     })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="BRANCH_MANAGER, UNDERWRITER"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">SLA Turnaround (Hours)</label>
+                  <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">SLA Turnaround (Hours)</label>
                   <input
                     type="number"
                     value={editingLevel.slaHours}
                     onChange={(e) => setEditingLevel({ ...editingLevel, slaHours: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Scope Jurisdiction</label>
+                  <label className="block text-slate-700 dark:text-slate-400 mb-1 font-medium">Scope Jurisdiction</label>
                   <select
                     value={editingLevel.scope}
                     onChange={(e) => setEditingLevel({ ...editingLevel, scope: e.target.value as AuthorityScope })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="BRANCH">BRANCH (Local)</option>
                     <option value="TENANT">TENANT (Global)</option>
@@ -554,39 +554,39 @@ export const AuthorityMatrixManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-800 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
                   <input
                     type="checkbox"
                     checked={editingLevel.branchRestricted}
                     onChange={(e) => setEditingLevel({ ...editingLevel, branchRestricted: e.target.checked })}
-                    className="rounded text-indigo-600 bg-slate-800 border-slate-700"
+                    className="rounded text-indigo-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                   />
                   <span>Branch Restricted (Actor branch must match application branch)</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
                   <input
                     type="checkbox"
                     checked={editingLevel.canOverrideBreRejection}
                     onChange={(e) => setEditingLevel({ ...editingLevel, canOverrideBreRejection: e.target.checked })}
-                    className="rounded text-indigo-600 bg-slate-800 border-slate-700"
+                    className="rounded text-indigo-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                   />
                   <span>Permitted to Override BRE Knockout Decisions</span>
                 </label>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => setIsLevelModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleSaveLevel(editingLevel)}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20"
               >
                 Save Level
               </button>

@@ -16,6 +16,9 @@ const ROLES = [
   'BRANCH_MANAGER',
   'AUDITOR',
   'CUSTOMER',
+  'RISK_ANALYST',
+  'FRAUD_ANALYST',
+  'RISK_MANAGER',
 ];
 
 const PERMISSIONS = [
@@ -222,6 +225,9 @@ async function main() {
   await createStaffUser('officer@adyapan.dev', 'Loan', 'Officer', 'LOAN_OFFICER', 'EMP004');
   await createStaffUser('analyst@adyapan.dev', 'Anita', 'Rao', 'CREDIT_ANALYST', 'EMP005');
   await createStaffUser('underwriter@adyapan.dev', 'Vikram', 'Shah', 'UNDERWRITER', 'EMP006');
+  await createStaffUser('risk.analyst@adyapan.dev', 'Rohan', 'Deshmukh', 'RISK_ANALYST', 'EMP010');
+  await createStaffUser('fraud.investigator@adyapan.dev', 'Kabir', 'Mehta', 'FRAUD_ANALYST', 'EMP011');
+  await createStaffUser('risk.manager@adyapan.dev', 'Sunil', 'Kulkarni', 'RISK_MANAGER', 'EMP012');
   await createStaffUser('finance@adyapan.dev', 'Farah', 'Khan', 'FINANCE_OFFICER', 'EMP007');
   await createStaffUser('collections@adyapan.dev', 'Rahul', 'Verma', 'COLLECTION_OFFICER', 'EMP008');
   await createStaffUser('auditor@adyapan.dev', 'Asha', 'Iyer', 'AUDITOR', 'EMP009');

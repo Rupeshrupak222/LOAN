@@ -515,7 +515,7 @@ export async function resolveApplicationDeviation(
   // Level check: Underwriters cannot waive LEVEL_3_CREDIT_HEAD deviations
   if (
     target.requiresAuthority === 'LEVEL_3_CREDIT_HEAD' &&
-    !actor.roles.some((r) => ['SUPER_ADMIN', 'CREDIT_HEAD', 'COMPANY_ADMIN'].includes(r))
+    !actor.roles.some((r) => ['CREDIT_HEAD', 'COMPANY_ADMIN'].includes(r))
   ) {
     throw new ForbiddenError('Delegated Authority limitation: This critical deviation requires Level 3 Credit Head approval.');
   }
@@ -548,8 +548,15 @@ export async function submitUnderwritingDecision(
   input: UnderwritingDecisionInput,
   actor: UnderwriterActorContext
 ) {
+  // Segregation of Duties: Super Admin is a platform control role and cannot commit operational underwriting decisions
+  if (actor.roles?.includes('SUPER_ADMIN') && !actor.roles.some((r) => ['UNDERWRITER', 'CREDIT_HEAD', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) {
+    throw new ForbiddenError(
+      'Access forbidden: Super Admin is a platform control-plane role and cannot commit operational underwriting decisions.'
+    );
+  }
+
   // Service layer defense-in-depth: Credit Analysts, Loan Officers, and non-deciders cannot commit underwriting decisions
-  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'COMPANY_ADMIN', 'ADMIN'];
   const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
   if (!isAuthorizedDecider) {
     throw new ForbiddenError(
@@ -626,7 +633,7 @@ export async function submitUnderwritingDecision(
   const requestedAmount = Number(app.requestedAmount);
   const LEVEL_2_UNDERWRITER_LIMIT = 2500000;
 
-  if (isApprovalDecision && !actor.roles.includes('SUPER_ADMIN')) {
+  if (isApprovalDecision) {
     if (requestedAmount > LEVEL_2_UNDERWRITER_LIMIT) {
       throw new BadRequestError(
         `Approval authority exceeded: Proposal of ₹${requestedAmount.toLocaleString(

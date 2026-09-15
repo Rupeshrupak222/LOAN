@@ -96,33 +96,33 @@ export function ProductConfigModal({ product, onClose }: Props) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
               <Package className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">{formData.name}</h2>
-                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">{formData.name}</h2>
+                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                   v{formData.version}
                 </span>
                 <span
                   className={cn(
                     'text-xs font-semibold px-2 py-0.5 rounded-full border',
-                    formData.status === 'ACTIVE' && 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-                    formData.status === 'DRAFT' && 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-                    formData.status === 'INACTIVE' && 'bg-slate-700/30 text-slate-400 border-slate-600',
-                    formData.status === 'ARCHIVED' && 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    formData.status === 'ACTIVE' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+                    formData.status === 'DRAFT' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+                    formData.status === 'INACTIVE' && 'bg-slate-100 dark:bg-slate-700/30 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600',
+                    formData.status === 'ARCHIVED' && 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                   )}
                 >
                   {formData.status}
                 </span>
               </div>
-              <p className="text-xs font-mono text-slate-400 mt-0.5">{formData.code} • Tenant: {formData.tenantId}</p>
+              <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">{formData.code} • Tenant: {formData.tenantId}</p>
             </div>
           </div>
 
@@ -132,7 +132,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditing(true)}
-                className="border-slate-700 text-slate-200 hover:bg-slate-800 text-xs"
+                className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs cursor-pointer"
               >
                 Edit Configuration
               </Button>
@@ -146,7 +146,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     setFormData({ ...product });
                     setIsEditing(false);
                   }}
-                  className="text-slate-400 text-xs"
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs cursor-pointer"
                 >
                   Cancel
                 </Button>
@@ -154,7 +154,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                   size="sm"
                   onClick={handleSave}
                   disabled={updateMutation.isPending}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs flex items-center gap-1.5"
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   {product.status === 'ACTIVE' ? 'Save New Version' : 'Save Changes'}
@@ -163,7 +163,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-2"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-2 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -171,7 +171,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 px-4 pt-2 border-b border-slate-800 bg-slate-950/40 overflow-x-auto">
+        <div className="flex items-center gap-1 px-4 pt-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isCurrent = activeTab === tab.key;
@@ -183,7 +183,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                   'flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors',
                   isCurrent
                     ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/40'
                 )}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -194,44 +194,44 @@ export function ProductConfigModal({ product, onClose }: Props) {
         </div>
 
         {/* Modal Tab Content */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-slate-900/60">
+        <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-white dark:bg-slate-900/60">
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'OVERVIEW' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Product Name</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Product Name</label>
                   <input
                     disabled={!isEditing}
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white disabled:opacity-60"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-60"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Product Unique Code</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Product Unique Code</label>
                   <input
                     disabled
                     type="text"
                     value={formData.code}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/40 border border-slate-700/60 rounded-lg text-sm font-mono text-slate-400"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 rounded-lg text-sm font-mono text-slate-400"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase">Description</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Description</label>
                 <textarea
                   disabled={!isEditing}
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white disabled:opacity-60"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-60"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700/60">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
                 <div>
                   <p className="text-xs text-slate-400">Product Category</p>
                   <p className="text-sm font-bold text-white mt-0.5">{formData.productType}</p>
@@ -260,7 +260,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     type="number"
                     value={formData.minAmount}
                     onChange={(e) => setFormData({ ...formData, minAmount: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -270,7 +270,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     type="number"
                     value={formData.maxAmount}
                     onChange={(e) => setFormData({ ...formData, maxAmount: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -280,7 +280,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     type="number"
                     value={formData.amountIncrement || 1000}
                     onChange={(e) => setFormData({ ...formData, amountIncrement: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -294,7 +294,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     type="number"
                     value={formData.minTenureMonths}
                     onChange={(e) => setFormData({ ...formData, minTenureMonths: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -304,7 +304,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     type="number"
                     value={formData.maxTenureMonths}
                     onChange={(e) => setFormData({ ...formData, maxTenureMonths: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -321,7 +321,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                       allowedTenures: e.target.value.split(',').map((v) => Number(v.trim())).filter(Boolean),
                     })
                   }
-                  className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white font-mono"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
                 />
               </div>
             </div>
@@ -337,7 +337,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     disabled={!isEditing}
                     value={formData.interestModel}
                     onChange={(e) => setFormData({ ...formData, interestModel: e.target.value as any })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   >
                     <option value="REDUCING_BALANCE">Reducing Balance (Standard Annuity)</option>
                     <option value="FIXED_FLAT">Fixed Flat Rate</option>
@@ -352,7 +352,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     step="0.1"
                     value={formData.baseInterestRateAnnualPct}
                     onChange={(e) => setFormData({ ...formData, baseInterestRateAnnualPct: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -366,7 +366,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     step="0.1"
                     value={formData.mclrSpreadAnnualPct || 0}
                     onChange={(e) => setFormData({ ...formData, mclrSpreadAnnualPct: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               )}
@@ -391,7 +391,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, processingFeePct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -406,7 +406,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, processingFeeMinInr: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -421,7 +421,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, documentationChargesInr: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -443,7 +443,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, foreclosurePenaltyPct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -458,7 +458,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, lockInMonths: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -474,7 +474,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         feeSchedule: { ...formData.feeSchedule, latePaymentPenaltyMonthlyPct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -497,7 +497,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         eligibility: { ...formData.eligibility, minAge: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -512,7 +512,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         eligibility: { ...formData.eligibility, maxAge: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -527,7 +527,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         eligibility: { ...formData.eligibility, minMonthlyIncome: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -543,8 +543,8 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         className={cn(
                           'px-3 py-1 rounded-lg text-xs font-semibold border',
                           selected
-                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                            ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/40'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                         )}
                       >
                         {emp}
@@ -559,24 +559,24 @@ export function ProductConfigModal({ product, onClose }: Props) {
           {/* TAB 6: DOCUMENT CHECKLIST */}
           {activeTab === 'DOCUMENTS' && (
             <div className="space-y-4">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Documents required for straight-through-processing (STP) and assisted loan origination.
               </p>
               <div className="space-y-2">
                 {formData.documents?.map((doc, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-800/40 border border-slate-700/60"
+                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60"
                   >
                     <div className="flex items-center gap-3">
-                      <FileCheck className="w-4 h-4 text-blue-400" />
+                      <FileCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <div>
-                        <p className="text-xs font-bold text-white">{doc.documentType}</p>
-                        <p className="text-[11px] text-slate-400">{doc.description}</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">{doc.documentType}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{doc.description}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                         {doc.category}
                       </span>
                       {doc.mandatory ? (
@@ -612,7 +612,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         creditPolicy: { ...formData.creditPolicy, minCibilScore: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -627,7 +627,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         creditPolicy: { ...formData.creditPolicy, maxFoirPct: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -636,7 +636,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     disabled
                     type="text"
                     value={formData.creditPolicy.bureauProvider || 'CIBIL'}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/40 border border-slate-700 rounded-lg text-sm font-mono text-slate-300"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono text-slate-300"
                   />
                 </div>
               </div>
@@ -651,7 +651,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                     disabled
                     type="text"
                     value={formData.riskPolicy.riskGrade}
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/40 border border-slate-700 rounded-lg text-sm font-mono text-slate-300"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono text-slate-300"
                   />
                 </div>
                 <div>
@@ -666,7 +666,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         riskPolicy: { ...formData.riskPolicy, maxFraudScore: Number(e.target.value) },
                       })
                     }
-                    className="w-full mt-1 px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
                 <div className="flex items-center gap-3 pt-4">
@@ -681,8 +681,8 @@ export function ProductConfigModal({ product, onClose }: Props) {
           {activeTab === 'WORKFLOW' && (
             <div className="space-y-6">
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase">Assigned Workflow Definition</label>
-                <div className="mt-2 p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Assigned Workflow Definition</label>
+                <div className="mt-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <GitBranch className="w-5 h-5 text-blue-400" />
                     <div>
@@ -695,7 +695,7 @@ export function ProductConfigModal({ product, onClose }: Props) {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase">Enabled Lending Channels</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Enabled Lending Channels</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
                   {['DIRECT_BORROWER', 'LOAN_OFFICER', 'BRANCH', 'PARTNER', 'API'].map((ch) => {
                     const active = formData.allowedChannels?.includes(ch as any);
@@ -705,11 +705,11 @@ export function ProductConfigModal({ product, onClose }: Props) {
                         className={cn(
                           'p-3 rounded-lg border text-xs font-medium flex items-center gap-2',
                           active
-                            ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-                            : 'bg-slate-800/30 text-slate-500 border-slate-800'
+                            ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                            : 'bg-slate-50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
                         )}
                       >
-                        <CheckCircle2 className={cn('w-4 h-4', active ? 'text-blue-400' : 'text-slate-600')} />
+                        <CheckCircle2 className={cn('w-4 h-4', active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-600')} />
                         {ch.replace(/_/g, ' ')}
                       </div>
                     );

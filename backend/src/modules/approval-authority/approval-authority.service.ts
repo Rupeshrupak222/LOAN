@@ -770,7 +770,15 @@ export class ApprovalAuthorityService {
     const hasRole = task.assignedRoles.some((r) => actor.roles.includes(r));
     const hasDelegation = activeDelegations.some((d) => task.assignedRoles.includes(d.delegatorRole));
 
-    if (!isSuperAdmin && !isAdmin && !hasRole && !hasDelegation) {
+    // Platform Control-Plane SoD: Super Admin cannot approve loans under Super Admin authority
+    if (isSuperAdmin && !hasRole && !hasDelegation) {
+      return {
+        eligible: false,
+        reason: 'SoD Conflict: Super Admin is a platform control-plane role and cannot approve loans. Operational approval requires an assigned credit authority role.',
+      };
+    }
+
+    if (!isAdmin && !hasRole && !hasDelegation) {
       return {
         eligible: false,
         reason: `Insufficient approval authority: Task requires role [${task.assignedRoles.join(', ')}].`,

@@ -39,50 +39,50 @@ export const ApprovalQueueView: React.FC = () => {
     <div className="space-y-6">
       {/* Metrics Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Pending Approvals
             </span>
-            <div className="text-2xl font-black text-white mt-0.5">{pendingCount}</div>
-            <p className="text-[10px] text-slate-500 mt-0.5">Awaiting sanction decision</p>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{pendingCount}</div>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Awaiting sanction decision</p>
           </div>
-          <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20">
             <Inbox className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
               High Risk Proposals
             </span>
-            <div className="text-2xl font-black text-amber-300 mt-0.5">{highRiskCount}</div>
-            <p className="text-[10px] text-slate-500 mt-0.5">Risk Grades C, D & E</p>
+            <div className="text-2xl font-black text-amber-600 dark:text-amber-300 mt-0.5">{highRiskCount}</div>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Risk Grades C, D & E</p>
           </div>
-          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20">
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
               SLA Breached
             </span>
-            <div className="text-2xl font-black text-rose-300 mt-0.5">{breachedCount}</div>
-            <p className="text-[10px] text-slate-500 mt-0.5">Exceeded turnaround threshold</p>
+            <div className="text-2xl font-black text-rose-600 dark:text-rose-300 mt-0.5">{breachedCount}</div>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Exceeded turnaround threshold</p>
           </div>
-          <div className="p-3 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
             <Clock className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Main Queue Card */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
+      <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-2xl space-y-4">
         {/* Filter and Search Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
             {[
               { id: 'PENDING', label: 'Pending Action' },
@@ -97,7 +97,7 @@ export const ApprovalQueueView: React.FC = () => {
                 className={`px-3.5 py-1.5 rounded-xl font-bold transition-all ${
                   selectedTab === tab.id
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 {tab.label}
@@ -113,13 +113,13 @@ export const ApprovalQueueView: React.FC = () => {
                 placeholder="Search applicant or loan #..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-56 bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-56 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
             <button
               onClick={() => refetch()}
-              className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700"
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
               title="Refresh queue"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -134,9 +134,9 @@ export const ApprovalQueueView: React.FC = () => {
             <p className="text-xs text-slate-400 mt-3">Loading approval authority queue...</p>
           </div>
         ) : tasks.length === 0 ? (
-          <div className="p-12 text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-400 space-y-2">
-            <ShieldCheck className="w-10 h-10 text-slate-600 mx-auto" />
-            <h3 className="text-sm font-semibold text-slate-300">No Proposals in Queue</h3>
+          <div className="p-12 text-center bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 space-y-2">
+            <ShieldCheck className="w-10 h-10 text-slate-400 dark:text-slate-600 mx-auto" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No Proposals in Queue</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               There are no loan applications currently pending your delegated authority level.
             </p>
@@ -148,41 +148,41 @@ export const ApprovalQueueView: React.FC = () => {
                 key={task.id}
                 className={`p-4 rounded-xl border transition-all ${
                   task.slaBreached
-                    ? 'bg-rose-950/20 border-rose-500/40'
-                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/40'
+                    : 'bg-slate-50/50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-900/60'
                 }`}
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   {/* Left: Applicant & Amount Info */}
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-bold text-indigo-300">
+                      <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-300">
                         {task.applicationNo}
                       </span>
-                      <span className="text-sm font-bold text-white">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
                         {task.customerName}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                         {task.productCode}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
+                    <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-mono">
                       <span>
-                        Requested: <strong className="text-white">{formatMoney(task.amount)}</strong>
+                        Requested: <strong className="text-slate-900 dark:text-white">{formatMoney(task.amount)}</strong>
                       </span>
                       <span>
-                        Eligible: <strong className="text-emerald-300">{formatMoney(task.eligibleAmount)}</strong>
+                        Eligible: <strong className="text-emerald-600 dark:text-emerald-300">{formatMoney(task.eligibleAmount)}</strong>
                       </span>
                       <span>
                         BRE Verdict:{' '}
                         <strong
                           className={
                             task.breDecision === 'APPROVE'
-                              ? 'text-emerald-400'
+                              ? 'text-emerald-600 dark:text-emerald-400'
                               : task.breDecision === 'REFER'
-                              ? 'text-amber-400'
-                              : 'text-rose-400'
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-rose-600 dark:text-rose-400'
                           }
                         >
                           {task.breDecision}
@@ -195,15 +195,15 @@ export const ApprovalQueueView: React.FC = () => {
                   <div className="flex items-center gap-4 self-end md:self-center">
                     <div className="text-right text-xs">
                       <div className="flex items-center gap-1.5 justify-end">
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Authority:</span>
-                        <span className="px-2 py-0.5 rounded font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">Authority:</span>
+                        <span className="px-2 py-0.5 rounded font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                           L{task.level} • {task.levelName}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-1 justify-end">
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-1 justify-end">
                         <Clock className="w-3 h-3" />
-                        <span className={task.slaBreached ? 'text-rose-400 font-bold' : ''}>
+                        <span className={task.slaBreached ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
                           {task.slaBreached ? 'SLA Breached' : `Due: ${new Date(task.slaDueAt).toLocaleTimeString()}`}
                         </span>
                       </div>
