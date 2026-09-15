@@ -70,6 +70,7 @@ import { RoleName } from '@/lib/roles';
 import { DecisionIntelligenceCard } from '@/components/DecisionIntelligenceCard';
 import { BorrowerDashboardView } from '@/features/borrower';
 import { LoanOfficerDashboardView } from '@/features/origination';
+import { CreditAnalystDashboardView } from '@/components/CreditAnalystDashboardView';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -366,6 +367,10 @@ export default function DashboardPage() {
 
   if (primaryRole === 'LOAN_OFFICER') {
     return <LoanOfficerDashboardView />;
+  }
+
+  if (primaryRole === 'CREDIT_ANALYST') {
+    return <CreditAnalystDashboardView />;
   }
 
   const cardBgClass = isDark
@@ -902,132 +907,7 @@ export default function DashboardPage() {
 
 
 
-      {/* C. CREDIT ANALYST WORKSPACE */}
-      {primaryRole === 'CREDIT_ANALYST' && (() => {
-        const m = creditQueueData?.metrics;
-        const pendingAssessmentsCount =
-          m?.pendingAssessments ??
-          ((m?.pendingCredit !== undefined || m?.pendingFinancial !== undefined || m?.pendingDocs !== undefined || m?.pendingKyc !== undefined)
-            ? ((m?.pendingCredit ?? 0) + (m?.pendingFinancial ?? 0) + (m?.pendingDocs ?? 0) + (m?.pendingKyc ?? 0))
-            : creditAwaitingCount);
-        const completedAssessmentsCount =
-          m?.assessmentsCompleted ??
-          ((m?.eligibleApplications !== undefined || m?.notEligibleApplications !== undefined)
-            ? ((m?.eligibleApplications ?? 0) + (m?.notEligibleApplications ?? 0) + (m?.furtherReview ?? 0))
-            : creditEvaluatedCount);
 
-        const cqMetrics = {
-          applicationsAssigned: m?.applicationsAssigned ?? creditQueueData?.items?.length ?? appsList.length,
-          pendingAssessments: pendingAssessmentsCount,
-          assessmentsCompleted: completedAssessmentsCount,
-          eligibleApplications: m?.eligibleApplications ?? appsList.filter((a: any) => a.eligibility?.result === 'ELIGIBLE').length,
-          notEligibleApplications: m?.notEligibleApplications ?? appsList.filter((a: any) => a.eligibility?.result === 'NOT_ELIGIBLE').length,
-          pendingDocuments: m?.pendingDocs ?? m?.pendingDocuments ?? appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
-          highRiskCases: m?.highRiskCases ?? highRiskCount,
-        };
-
-        const creditProposals = creditQueueData?.items?.length ? creditQueueData.items : appsList;
-
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-              <KpiItem
-                label="APPLICATIONS ASSIGNED"
-                value={String(cqMetrics.applicationsAssigned)}
-                hint="In assessment pool"
-                icon={<FileText className="h-4 w-4" />}
-                iconColor="blue"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-              />
-              <KpiItem
-                label="PENDING ASSESSMENTS"
-                value={String(cqMetrics.pendingAssessments)}
-                hint="Awaiting capacity review"
-                icon={<Clock className="h-4 w-4" />}
-                iconColor="amber"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-                highlightText={cqMetrics.pendingAssessments > 0 ? `${cqMetrics.pendingAssessments} pending` : undefined}
-              />
-              <KpiItem
-                label="ASSESSMENTS COMPLETED"
-                value={String(cqMetrics.assessmentsCompleted)}
-                hint="Evaluated proposals"
-                icon={<CheckCircle2 className="h-4 w-4" />}
-                iconColor="emerald"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-              />
-              <KpiItem
-                label="ELIGIBLE APPLICATIONS"
-                value={String(cqMetrics.eligibleApplications)}
-                hint="Repayment verified"
-                icon={<ShieldCheck className="h-4 w-4" />}
-                iconColor="emerald"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-              />
-              <KpiItem
-                label="NOT ELIGIBLE"
-                value={String(cqMetrics.notEligibleApplications)}
-                hint="Criteria / FOIR failed"
-                icon={<XCircle className="h-4 w-4" />}
-                iconColor="rose"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-              />
-              <KpiItem
-                label="PENDING DOCUMENTS"
-                value={String(cqMetrics.pendingDocuments)}
-                hint="Missing KYC / income proofs"
-                icon={<FileCheck className="h-4 w-4" />}
-                iconColor="amber"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-              />
-              <KpiItem
-                label="HIGH RISK CASES"
-                value={String(cqMetrics.highRiskCases)}
-                hint="Tier 3 / FOIR > 60%"
-                icon={<AlertTriangle className="h-4 w-4" />}
-                iconColor="rose"
-                cardBgClass={cardBgClass}
-                isDark={isDark}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <div className={cn('lg:col-span-8 rounded-2xl border p-5 space-y-4', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">Credit Evaluation & Risk Assessment Queue</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Assess repayment capacity, calculate FOIR/DTI, and forward recommendation</p>
-                  </div>
-                  <Link href="/credit-assessment" className="text-xs font-bold text-brand-700 dark:text-blue-400 hover:underline">Credit Assessment →</Link>
-                </div>
-                <ApplicationsTable items={creditProposals} isDark={isDark} actionLabel="Assess Credit →" />
-              </div>
-
-              <div className={cn('lg:col-span-4 rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight">4-Pillar Risk Engine Breakdown</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Scoring weights allocation</p>
-                  <div className="space-y-3 pt-3 text-xs">
-                    <div className="flex justify-between items-center"><span className="text-slate-400">1. Debt Service Capacity (DTI)</span><span className="font-bold">30%</span></div>
-                    <div className="flex justify-between items-center"><span className="text-slate-400">2. Credit & Bureau History</span><span className="font-bold">25%</span></div>
-                    <div className="flex justify-between items-center"><span className="text-slate-400">3. Employment & Vintage</span><span className="font-bold">25%</span></div>
-                    <div className="flex justify-between items-center"><span className="text-slate-400">4. Document Completeness</span><span className="font-bold">20%</span></div>
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <Link href="/credit-assessment" className="block"><Button size="sm" className="w-full text-xs text-white">Open Credit Assessment</Button></Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* D. UNDERWRITER WORKSPACE */}
       {primaryRole === 'UNDERWRITER' && (

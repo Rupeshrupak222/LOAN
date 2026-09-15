@@ -32,13 +32,13 @@ import { CreditAssessmentWorkspace } from '@/components/CreditAssessmentWorkspac
 
 type TabKey =
   | 'ALL'
-  | 'PENDING_KYC'
-  | 'PENDING_DOCS'
+  | 'PENDING_VERIFICATION'
   | 'PENDING_FINANCIAL'
   | 'PENDING_CREDIT'
-  | 'FURTHER_REVIEW'
   | 'ELIGIBLE'
-  | 'NOT_ELIGIBLE';
+  | 'FURTHER_REVIEW'
+  | 'NOT_ELIGIBLE'
+  | 'COMPLETED';
 
 function CreditAssessmentQueueContent() {
   const { isDark } = useTheme();
@@ -76,7 +76,7 @@ function CreditAssessmentQueueContent() {
     );
   }
 
-  // If an application is selected, render the dedicated 7-step assessment workspace
+  // If an application is selected, render the dedicated assessment workspace
   if (selectedAppId) {
     return (
       <CreditAssessmentWorkspace
@@ -92,6 +92,7 @@ function CreditAssessmentQueueContent() {
   const items = Array.isArray(data?.items) ? data.items : [];
   const metrics = data?.metrics || {
     applicationsAssigned: items.length,
+    pendingVerification: 0,
     pendingKyc: 0,
     pendingDocs: 0,
     pendingFinancial: 0,
@@ -99,6 +100,7 @@ function CreditAssessmentQueueContent() {
     furtherReview: 0,
     eligibleApplications: 0,
     notEligibleApplications: 0,
+    completedApplications: 0,
   };
 
   const filteredItems = items.filter((app: any) => {
@@ -113,28 +115,64 @@ function CreditAssessmentQueueContent() {
 
   // Determines current workflow checkpoint for each application (6-step flow)
   const getAppWorkflowStage = (app: any) => {
-    if (app.status === 'UNDERWRITING' || (app.eligibility?.factors as any)?.decision === 'ELIGIBLE') {
-      return { label: 'Ready for Underwriter', color: 'emerald', step: 6 };
+    // 1. Completed / Sanctioned / Disbursed
+    if (['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)) {
+      if (app.status === 'DISBURSED') {
+        return { label: 'Disbursed', color: 'emerald', step: 6, actionText: 'View Dossier' };
+      }
+      if (app.status === 'READY_FOR_DISBURSEMENT') {
+        return { label: 'Ready for Payout', color: 'blue', step: 6, actionText: 'View Dossier' };
+      }
+      if (app.status === 'AGREEMENT_PENDING') {
+        return { label: 'Agreement Signing', color: 'indigo', step: 6, actionText: 'View Dossier' };
+      }
+      return { label: 'Approved by Underwriter', color: 'emerald', step: 6, actionText: 'View Dossier' };
     }
-    if (app.eligibility?.result === 'NOT_ELIGIBLE' || app.status === 'REJECTED') {
-      return { label: 'Not Eligible', color: 'rose', step: 5 };
+
+    // 2. Sent Back or Clarifications
+    if (
+      app.eligibility?.result === 'FURTHER_REVIEW' ||
+      (app.eligibility?.result as string) === 'REQUEST_ADDITIONAL_DOCS' ||
+      app.underwriting?.decision === 'SEND_BACK'
+    ) {
+      return { label: 'Further Review (Send Back)', color: 'amber', step: 5, actionText: 'Review Corrections' };
     }
-    if (app.eligibility?.result === 'FURTHER_REVIEW' || app.underwriting?.decision === 'SEND_BACK') {
-      return { label: 'Further Review', color: 'amber', step: 5 };
+
+    // 3. Not Eligible / Declined
+    if (app.eligibility?.result === 'NOT_ELIGIBLE' || (app.eligibility?.factors as any)?.decision === 'NOT_ELIGIBLE' || app.status === 'REJECTED') {
+      return { label: 'Not Eligible / Declined', color: 'rose', step: 5, actionText: 'View Assessment' };
     }
-    // Check if KYC and documents are verified
+
+    // 4. Ready for Underwriting (Passed Financials and Risk Score)
+    if (
+      app.status === 'UNDERWRITING' ||
+      (app.eligibility?.result === 'ELIGIBLE' && app.riskAssessment?.score != null) ||
+      (app.eligibility?.factors as any)?.decision === 'ELIGIBLE'
+    ) {
+      return { label: 'Ready for Underwriter', color: 'emerald', step: 6, actionText: 'Forward to Underwriter' };
+    }
+
+    // 5. Verification Check (KYC and Documents)
     const allDocs = [...(app.customer?.documents || []), ...(app.documents || [])];
-    const hasUnverifiedDocs = allDocs.some((d: any) => !d.verified || d.status !== 'VERIFIED');
-    if (app.customer?.kycStatus !== 'VERIFIED' || hasUnverifiedDocs || allDocs.length === 0) {
-      return { label: 'Step 2: KYC & Docs Pending', color: 'amber', step: 2 };
+    const hasUnverifiedDocs = allDocs.some((d: any) => !d.verified && d.status !== 'VERIFIED');
+    if (app.customer?.kycStatus !== 'VERIFIED') {
+      return { label: 'Step 2: KYC Pending', color: 'amber', step: 2, actionText: 'Verify KYC' };
     }
+    if (allDocs.length === 0 || hasUnverifiedDocs) {
+      return { label: 'Step 2: Docs Pending', color: 'amber', step: 2, actionText: 'Verify Documents' };
+    }
+
+    // 6. Financial Check Pending
     if (!app.eligibility) {
-      return { label: 'Step 3: Financial Check', color: 'blue', step: 3 };
+      return { label: 'Step 3: Financial Check', color: 'blue', step: 3, actionText: 'Evaluate Financials' };
     }
-    if (!app.riskAssessment || app.status === 'CREDIT_ASSESSMENT') {
-      return { label: 'Step 4: Credit Risk Check', color: 'blue', step: 4 };
+
+    // 7. Risk Scoring Pending
+    if (!app.riskAssessment || app.riskAssessment?.score == null) {
+      return { label: 'Step 4: Risk Scoring', color: 'blue', step: 4, actionText: 'Assess Risk' };
     }
-    return { label: 'Step 5: Decision Pending', color: 'purple', step: 5 };
+
+    return { label: 'Step 5: Decision Pending', color: 'purple', step: 5, actionText: 'Submit Decision' };
   };
 
   return (
@@ -150,38 +188,38 @@ function CreditAssessmentQueueContent() {
         <KpiCard
           label="Total Inflow"
           value={String(metrics.applicationsAssigned)}
-          hint="Assigned proposals"
+          hint="All active proposals"
           icon={<FileText className="h-4 w-4 text-[#2563EB]" />}
         />
         <KpiCard
-          label="Pending KYC"
-          value={String(metrics.pendingKyc)}
-          hint="Step 2 checkpoint"
-          icon={<UserCheck className="h-4 w-4 text-amber-500" />}
-        />
-        <KpiCard
-          label="Pending Docs"
-          value={String(metrics.pendingDocs)}
-          hint="Step 3 checklist"
+          label="Pending KYC & Docs"
+          value={String(metrics.pendingVerification ?? (metrics.pendingKyc + metrics.pendingDocs))}
+          hint="Step 2 verification checkpoint"
           icon={<FileCheck className="h-4 w-4 text-amber-500" />}
         />
         <KpiCard
           label="Pending Financial"
           value={String(metrics.pendingFinancial)}
-          hint="Step 4 FOIR & DTI"
+          hint="Step 3 FOIR & capacity check"
           icon={<Calculator className="h-4 w-4 text-[#2563EB]" />}
         />
         <KpiCard
           label="Further Review"
           value={String(metrics.furtherReview)}
-          hint="Clarifications requested"
+          hint="Underwriter corrections / send back"
           icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
         />
         <KpiCard
           label="Ready for Underwriter"
           value={String(metrics.eligibleApplications)}
-          hint="Forwarded for sanction"
+          hint="Completed & ready for sanction"
           icon={<ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-[#10B981]" />}
+        />
+        <KpiCard
+          label="Sanctioned / Disbursed"
+          value={String(metrics.completedApplications ?? 0)}
+          hint="Approved & portfolio loans"
+          icon={<CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-[#10B981]" />}
         />
       </div>
 
@@ -189,9 +227,14 @@ function CreditAssessmentQueueContent() {
         {/* Filter & Search Bar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-4 border-slate-100 dark:border-[#2B3566]">
           <div>
-            <h3 className={cn('text-sm font-bold tracking-tight', isDark ? 'text-white' : 'text-slate-900')}>
-              Credit Assessment Queue ({filteredItems.length})
-            </h3>
+            <div className="flex items-center gap-2.5">
+              <h3 className={cn('text-sm font-bold tracking-tight', isDark ? 'text-white' : 'text-slate-900')}>
+                Credit Assessment Queue
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#2563EB] border border-blue-200 dark:bg-[#1E2445] dark:text-[#60A5FA] dark:border-[#2B3566]">
+                {filteredItems.length} {filteredItems.length === 1 ? 'proposal' : 'proposals'}
+              </span>
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
               Select a workflow stage below to inspect proposals awaiting specific verification steps
             </p>
@@ -219,23 +262,24 @@ function CreditAssessmentQueueContent() {
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#1E2445] text-xs font-semibold overflow-x-auto">
           {[
             { key: 'ALL', label: `All Proposals (${metrics.applicationsAssigned})` },
-            { key: 'PENDING_KYC', label: `Pending KYC (${metrics.pendingKyc})` },
-            { key: 'PENDING_DOCS', label: `Pending Documents (${metrics.pendingDocs})` },
+            {
+              key: 'PENDING_VERIFICATION',
+              label: `Pending KYC & Docs (${metrics.pendingVerification ?? (metrics.pendingKyc + metrics.pendingDocs)})`,
+            },
             { key: 'PENDING_FINANCIAL', label: `Pending Financial (${metrics.pendingFinancial})` },
-            { key: 'PENDING_CREDIT', label: `Pending Risk/Decision (${metrics.pendingCredit})` },
+            { key: 'PENDING_CREDIT', label: `Pending Risk Scoring (${metrics.pendingCredit})` },
+            { key: 'ELIGIBLE', label: `Ready for Underwriter (${metrics.eligibleApplications})` },
             { key: 'FURTHER_REVIEW', label: `Further Review (${metrics.furtherReview})` },
-            { key: 'ELIGIBLE', label: `Eligible / Ready for Underwriter (${metrics.eligibleApplications})` },
             { key: 'NOT_ELIGIBLE', label: `Not Eligible (${metrics.notEligibleApplications})` },
+            { key: 'COMPLETED', label: `Sanctioned & Disbursed (${metrics.completedApplications ?? 0})` },
           ].map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key as TabKey)}
               className={cn(
-                'px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                'px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0',
                 activeTab === t.key
-                  ? isDark
-                    ? 'bg-[#2563EB] text-white shadow-sm'
-                    : 'bg-white text-slate-900 shadow-sm'
+                  ? 'bg-[#2563EB] text-white shadow-sm font-bold'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               )}
             >
@@ -251,7 +295,7 @@ function CreditAssessmentQueueContent() {
               No proposals match the selected workflow filter.
             </div>
           ) : (
-            <table className="w-full text-left border-collapse">
+            <table className="min-w-[1050px] w-full text-left border-collapse">
               <thead
                 className={cn(
                   'border-b text-[11px] font-bold uppercase',
@@ -259,15 +303,15 @@ function CreditAssessmentQueueContent() {
                 )}
               >
                 <tr>
-                  <th className="py-2.5 px-3">Application</th>
-                  <th className="py-2.5 px-3">Borrower</th>
-                  <th className="py-2.5 px-3">Product</th>
-                  <th className="py-2.5 px-3">Requested Loan</th>
-                  <th className="py-2.5 px-3">Workflow Stage</th>
-                  <th className="py-2.5 px-3">Eligibility Check</th>
-                  <th className="py-2.5 px-3">Credit Risk</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Sequential Action</th>
+                  <th className="py-2.5 px-3 min-w-[140px]">Application</th>
+                  <th className="py-2.5 px-3 min-w-[160px]">Borrower</th>
+                  <th className="py-2.5 px-3 min-w-[130px]">Product</th>
+                  <th className="py-2.5 px-3 min-w-[120px]">Requested Loan</th>
+                  <th className="py-2.5 px-3 min-w-[160px]">Workflow Stage</th>
+                  <th className="py-2.5 px-3 min-w-[120px]">Eligibility Check</th>
+                  <th className="py-2.5 px-3 min-w-[120px]">Credit Risk</th>
+                  <th className="py-2.5 px-3 min-w-[110px]">Status</th>
+                  <th className="py-2.5 px-3 text-right min-w-[190px]">Action</th>
                 </tr>
               </thead>
               <tbody
@@ -288,7 +332,7 @@ function CreditAssessmentQueueContent() {
                     >
                       <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#60A5FA]">
                         <button
-                          onClick={() => router.push(`/credit-assessment?applicationId=${app.id}`)}
+                          onClick={() => router.push(`/credit-assessment?applicationId=${app.id}&step=${stage.step}`)}
                           className="hover:underline cursor-pointer text-left"
                         >
                           {app.applicationNo || 'N/A'}
@@ -298,7 +342,12 @@ function CreditAssessmentQueueContent() {
                         <p className={cn('font-semibold leading-tight', isDark ? 'text-white' : 'text-slate-900')}>
                           {app.customer?.firstName || 'Borrower'} {app.customer?.lastName || ''}
                         </p>
-                        <p className="text-[11px] text-slate-400 font-mono">{app.customer?.customerCode || '-'}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[11px] text-slate-400 font-mono">{app.customer?.customerCode || '-'}</span>
+                          {app.customer?.kycStatus === 'VERIFIED' && (
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">● KYC OK</span>
+                          )}
+                        </div>
                       </td>
                       <td className={cn('py-3 px-3 font-medium', isDark ? 'text-slate-300' : 'text-slate-700')}>
                         {app.product?.name || 'Loan'}
@@ -316,6 +365,8 @@ function CreditAssessmentQueueContent() {
                               ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300'
                               : stage.color === 'amber'
                               ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300'
+                              : stage.color === 'indigo'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300'
                               : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300'
                           )}
                         >
@@ -337,43 +388,37 @@ function CreditAssessmentQueueContent() {
                             {app.eligibility.result}
                           </span>
                         ) : (
-                          <span className="text-[11px] text-slate-400">Step 4 Pending</span>
+                          <span className="text-[11px] text-slate-400">
+                            {['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)
+                              ? 'Pre-approved'
+                              : 'Step 3 Pending'}
+                          </span>
                         )}
                       </td>
                       <td className="py-3 px-3">
-                        {app.riskAssessment ? (
+                        {app.riskAssessment?.score != null ? (
                           <span className="font-bold text-[#2563EB] dark:text-[#60A5FA] text-xs">
                             {app.riskAssessment.score}/100 ({app.riskAssessment.category || 'LOW'})
                           </span>
                         ) : (
-                          <span className="text-[11px] text-slate-400">Step 5 Pending</span>
+                          <span className="text-[11px] text-slate-400">
+                            {['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)
+                              ? 'Evaluated'
+                              : 'Step 4 Pending'}
+                          </span>
                         )}
                       </td>
                       <td className="py-3 px-3">
                         <Badge status={app.status} />
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className="py-3 px-3 text-right whitespace-nowrap min-w-[190px]">
                         <Button
                           size="sm"
-                          onClick={() => router.push(`/credit-assessment?applicationId=${app.id}`)}
-                          className={cn(
-                            'text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1 ml-auto',
-                            stage.step === 6
-                              ? 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-[#1E2445] dark:text-slate-200 dark:hover:bg-[#2B3566]'
-                              : 'bg-[#2563EB] hover:bg-blue-700 text-white'
-                          )}
+                          onClick={() => router.push(`/credit-assessment?applicationId=${app.id}&step=${stage.step}`)}
+                          className="text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5 ml-auto bg-[#2563EB] hover:bg-blue-700 text-white whitespace-nowrap shrink-0"
                         >
-                          {stage.step === 6 ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Handover Dossier →</span>
-                            </>
-                          ) : (
-                            <>
-                              <Calculator className="w-3.5 h-3.5" />
-                              <span>Assess Credit →</span>
-                            </>
-                          )}
+                          <Calculator className="w-3.5 h-3.5 shrink-0" />
+                          <span>{stage.actionText} →</span>
                         </Button>
                       </td>
                     </tr>

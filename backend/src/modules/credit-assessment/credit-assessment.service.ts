@@ -43,6 +43,11 @@ export async function getAssessmentDashboardMetrics(
     }
   }
 
+  // Only proposals submitted into credit lifecycle (exclude draft)
+  where.status = {
+    in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED'],
+  };
+
   const applications = await prisma.loanApplication.findMany({
     where,
     include: {
@@ -58,9 +63,9 @@ export async function getAssessmentDashboardMetrics(
   let pendingAssessment = 0;
   let inProgress = 0;
   let kycPending = 0;
-  let completedAssessment = 0;
+  let inUnderwriting = 0;
+  let approved = 0;
   let sentBack = 0;
-  let readyForUnderwriter = 0;
 
   let lowRisk = 0;
   let mediumRisk = 0;
@@ -71,28 +76,24 @@ export async function getAssessmentDashboardMetrics(
     totalRequestedAmount += amt;
 
     const isKycVerified = app.customer?.kycStatus === 'VERIFIED';
-    const isSubmitted = app.status === 'SUBMITTED' || app.status === 'UNDER_REVIEW';
-    const isInAssessment = app.status === 'CREDIT_ASSESSMENT';
-    const isUnderwriting = ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status);
     const isSentBack = app.underwriting?.decision === 'SEND_BACK';
-
-    if (!isKycVerified) {
-      kycPending++;
-    }
+    const isAppApproved = app.status === 'APPROVED';
+    const isAssessmentComplete = isKycVerified && Boolean(app.eligibility) && Boolean(app.riskAssessment);
 
     if (isSentBack) {
       sentBack++;
+    } else if (isAppApproved) {
+      approved++;
+    } else if (isAssessmentComplete || app.status === 'UNDERWRITING') {
+      inUnderwriting++;
+    } else if (app.status === 'CREDIT_ASSESSMENT') {
+      inProgress++;
+    } else if (['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW'].includes(app.status)) {
+      pendingAssessment++;
     }
 
-    if (isSubmitted) {
-      pendingAssessment++;
-    } else if (isInAssessment) {
-      inProgress++;
-      if (isKycVerified && (app.eligibility || app.riskAssessment)) {
-        readyForUnderwriter++;
-      }
-    } else if (isUnderwriting) {
-      completedAssessment++;
+    if (!isKycVerified && ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(app.status)) {
+      kycPending++;
     }
 
     const riskCat = app.riskAssessment?.category || app.customer?.riskCategory;
@@ -104,14 +105,17 @@ export async function getAssessmentDashboardMetrics(
   const averageRequestedAmount = totalApplications > 0 ? Math.round(totalRequestedAmount / totalApplications) : 0;
 
   return {
+    allProposals: totalApplications,
     pendingAssessment,
     inProgress,
     inAssessment: inProgress,
     kycPending,
-    completedAssessment,
-    completedProposals: completedAssessment,
+    inUnderwriting,
+    completedAssessment: approved + inUnderwriting,
+    completedProposals: approved,
     sentBack,
-    readyForUnderwriter,
+    readyForUnderwriter: inUnderwriting,
+    approved,
     totalVolume: totalRequestedAmount,
     avgTicketSize: averageRequestedAmount,
     financials: {
@@ -164,22 +168,46 @@ export async function getAssessmentQueue(
   }
 
   // Active Assessment Queue Tab Scoping
-  if (tab === 'PENDING') {
-    where.status = { in: ['SUBMITTED', 'UNDER_REVIEW'] };
-  } else if (tab === 'IN_PROGRESS') {
+  if (tab === 'AWAITING_INTAKE' || tab === 'PENDING') {
+    // New submitted proposals awaiting credit analyst intake (unassessed, not sent back)
+    where.status = { in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW'] };
+    where.eligibility = null;
+    where.OR = [
+      { underwriting: null },
+      { underwriting: { decision: { not: 'SEND_BACK' } } },
+    ];
+  } else if (tab === 'IN_ASSESSMENT' || tab === 'IN_PROGRESS') {
+    // Proposals actively being evaluated (assessment in progress)
     where.status = 'CREDIT_ASSESSMENT';
+    where.OR = [
+      { eligibility: null },
+      { riskAssessment: null },
+    ];
   } else if (tab === 'KYC_PENDING') {
+    // Proposals with deficient/unverified KYC
+    where.status = { in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'] };
     where.customer = {
       ...where.customer,
-      kycStatus: { in: ['NOT_STARTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW'] },
+      kycStatus: { in: ['NOT_STARTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REJECTED'] },
     };
-  } else if (tab === 'COMPLETED') {
-    where.status = { in: ['CREDIT_ASSESSMENT', 'UNDERWRITING'] };
+  } else if (tab === 'UNDERWRITING' || tab === 'FORWARDED_TO_UNDERWRITER' || tab === 'FORWARDED' || tab === 'READY_FOR_UNDERWRITER') {
+    // In Underwriting / Ready for Underwriter: KYC verified + assessment (eligibility + risk) completed
+    where.customer = { ...where.customer, kycStatus: 'VERIFIED' };
     where.eligibility = { isNot: null };
+    where.riskAssessment = { isNot: null };
+    where.status = { in: ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING'] };
+    where.OR = [
+      { underwriting: null },
+      { underwriting: { decision: { notIn: ['SEND_BACK', 'APPROVE', 'REJECT'] } } },
+    ];
   } else if (tab === 'SENT_BACK') {
+    // Sent back by Underwriter or Credit Head for corrections
     where.underwriting = { decision: 'SEND_BACK' };
+  } else if (tab === 'APPROVED' || tab === 'COMPLETED') {
+    // Approved by Underwriter / Sanctioned
+    where.status = 'APPROVED';
   } else {
-    // Default ALL: show all proposals in credit lifecycle
+    // Default ALL: All proposals in credit lifecycle (NEVER DRAFT)
     where.status = {
       in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED'],
     };
@@ -195,10 +223,29 @@ export async function getAssessmentQueue(
           lastName: true,
           customerCode: true,
           mobile: true,
+          employmentType: true,
           monthlyIncome: true,
           existingObligations: true,
           kycStatus: true,
           riskCategory: true,
+          documents: {
+            select: {
+              id: true,
+              category: true,
+              documentType: true,
+              status: true,
+              verified: true,
+            },
+          },
+        },
+      },
+      documents: {
+        select: {
+          id: true,
+          category: true,
+          documentType: true,
+          status: true,
+          verified: true,
         },
       },
       product: { select: { name: true, code: true, interestRate: true } },
@@ -245,17 +292,49 @@ export async function getAssessmentQueue(
 
     const riskGrade = (app.riskAssessment?.category || app.customer?.riskCategory || 'PENDING') as any;
 
+    // Deduplicate documents across customer and application records
+    const docMap = new Map<string, { id: string; category?: string; documentType?: string | null; status: string; verified: boolean }>();
+    for (const d of app.customer?.documents || []) {
+      docMap.set(d.id, d);
+    }
+    for (const d of app.documents || []) {
+      docMap.set(d.id, d);
+    }
+    const combinedDocs = Array.from(docMap.values());
+    const documentsCount = combinedDocs.length;
+    const verifiedDocumentsCount = combinedDocs.filter(
+      (d) => d.verified || d.status === 'VERIFIED'
+    ).length;
+
+    const applicantName = `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim();
+    const productName = app.product?.name || 'Loan Product';
+    const employmentType = app.customer?.employmentType || null;
+    const mobile = app.customer?.mobile || null;
+    const kycStatus = app.customer?.kycStatus || 'NOT_STARTED';
+
+    const isAssessmentComplete =
+      app.customer?.kycStatus === 'VERIFIED' &&
+      Boolean(app.eligibility) &&
+      Boolean(app.riskAssessment);
+    const isReadyForUnderwriter =
+      isAssessmentComplete &&
+      app.status !== 'UNDERWRITING' &&
+      app.underwriting?.decision !== 'SEND_BACK' &&
+      app.status !== 'APPROVED';
+
     return {
       id: app.id,
       applicationNo: app.applicationNo,
       customerId: app.customer?.id || app.customerId,
-      borrowerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
+      borrowerName: applicantName,
+      applicantName,
       customerCode: app.customer?.customerCode || 'CUST',
-      loanProduct: app.product?.name || 'Loan',
+      loanProduct: productName,
+      productName,
       productCode: app.product?.code || 'LN',
       requestedAmount,
       tenureMonths,
-      kycStatus: app.customer?.kycStatus || 'NOT_STARTED',
+      kycStatus,
       status: app.status,
       creditAnalysisStatus,
       creditScore: null, // Bureau live data (no fake scores)
@@ -266,6 +345,11 @@ export async function getAssessmentQueue(
       applicationAgeDays: ageDays,
       assignedAnalyst: null,
       underwriterStatus,
+      employmentType,
+      mobile,
+      documentsCount,
+      verifiedDocumentsCount,
+      isReadyForUnderwriter,
       createdAt: app.createdAt.toISOString(),
       updatedAt: app.updatedAt.toISOString(),
     };

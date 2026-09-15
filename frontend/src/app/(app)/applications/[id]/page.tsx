@@ -762,8 +762,8 @@ export default function ApplicationDetailPage() {
                           isUploading
                             ? 'bg-slate-200 text-slate-500 cursor-wait dark:bg-slate-800 dark:text-slate-400'
                             : item.uploaded
-                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                            : 'bg-[#2563EB] hover:bg-blue-700 text-white'
+                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              : 'bg-[#2563EB] hover:bg-blue-700 text-white'
                         )}
                       >
                         {isUploading ? (
@@ -838,14 +838,14 @@ export default function ApplicationDetailPage() {
           {/* Credit Assessment Link (Credit Analysts / Staff only) */}
           {canAssessCredit && (
             <Link href={`/credit-assessment?applicationId=${data.id}`}>
-              <Button size="sm" className="gap-1.5 text-xs font-semibold bg-[#2563EB] hover:bg-blue-700 text-white shadow-sm cursor-pointer">
-                <Calculator className="w-3.5 h-3.5" /> Open Credit Assessment
+              <Button size="sm" className="gap-1.5 text-xs font-semibold bg-[#2563EB] hover:bg-blue-700 text-white shadow-sm cursor-pointer whitespace-nowrap shrink-0">
+                <Calculator className="w-3.5 h-3.5 shrink-0" /> Open Credit Assessment
               </Button>
             </Link>
           )}
 
-          {/* Button 1: Forward / Re-Forward to Underwriting (Credit Analysts only) */}
-          {canForwardToUnderwriting && (
+          {/* Button 1: Forward / Re-Forward to Underwriting (Non-Credit Analysts / Admins only) */}
+          {canForwardToUnderwriting && !isCreditAnalyst && (
             <Button
               size="sm"
               onClick={() => {
@@ -875,7 +875,7 @@ export default function ApplicationDetailPage() {
                   }
                 );
               }}
-              className="gap-1.5 font-semibold text-xs shadow-sm cursor-pointer transition-all bg-[#2563EB] hover:bg-blue-700 text-white"
+              className="gap-1.5 font-semibold text-xs shadow-sm cursor-pointer transition-all bg-[#2563EB] hover:bg-blue-700 text-white whitespace-nowrap shrink-0"
               title={
                 isForwardedToUnderwriting
                   ? 'Proposal already forwarded. Click to re-forward / resend.'
@@ -884,18 +884,18 @@ export default function ApplicationDetailPage() {
             >
               {isForwardedToUnderwriting ? (
                 <>
-                  <RotateCcw className="w-3.5 h-3.5" /> Re-Forward to Underwriter
+                  <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Underwriter
                 </>
               ) : (
                 <>
-                  <Send className="w-3.5 h-3.5" /> Forward to Underwriter
+                  <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Underwriter
                 </>
               )}
             </Button>
           )}
 
-          {/* Button 2: Reject Application (Credit Analysts only) */}
-          {canReject && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
+          {/* Button 2: Reject Application (Non-Credit Analysts / Admins only) */}
+          {canReject && !isCreditAnalyst && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
             <Button
               size="sm"
               variant="outline-danger"
@@ -903,11 +903,19 @@ export default function ApplicationDetailPage() {
                 setRejectReason('');
                 setRejectModalOpen(true);
               }}
-              className="gap-1.5 font-semibold text-xs cursor-pointer border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              className="gap-1.5 font-semibold text-xs cursor-pointer border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40 whitespace-nowrap shrink-0"
               title="Reject this loan application proposal"
             >
-              <XCircle className="w-3.5 h-3.5 text-rose-500" /> Reject Application
+              <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" /> Reject Application
             </Button>
+          )}
+
+          {/* Read-Only Status Indicator for Staff (e.g. Credit Analysts) when in Underwriting Queue */}
+          {!isUnderwriter && !isSuperAdmin && !isAdmin && !canMakeUnderwritingDecision && data.status === 'UNDERWRITING' && (
+            <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              Underwriting In Review (Sanction Committee)
+            </span>
           )}
 
           {/* Loan Officer Forward / Resend Button */}
@@ -928,9 +936,9 @@ export default function ApplicationDetailPage() {
                     }
                   );
                 }}
-                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm cursor-pointer"
+                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold shadow-sm cursor-pointer whitespace-nowrap shrink-0"
               >
-                <Send className="w-3.5 h-3.5" /> Forward to Credit Analyst
+                <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Credit Analyst
               </Button>
             ) : canLoanOfficerReForward ? (
               <Button
@@ -961,7 +969,7 @@ export default function ApplicationDetailPage() {
                   );
                 }}
                 className={cn(
-                  'gap-1.5 font-semibold text-xs shadow-xs transition-all',
+                  'gap-1.5 font-semibold text-xs shadow-xs transition-all whitespace-nowrap shrink-0',
                   hasDeficiencies
                     ? 'opacity-60 cursor-not-allowed border-slate-300 text-slate-400 dark:border-slate-700 dark:text-slate-500'
                     : 'text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 cursor-pointer'
@@ -972,14 +980,14 @@ export default function ApplicationDetailPage() {
                     : 'Resend proposal to Credit Analyst queue'
                 }
               >
-                {hasDeficiencies ? <Lock className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                {hasDeficiencies ? <Lock className="w-3.5 h-3.5 shrink-0" /> : <RotateCcw className="w-3.5 h-3.5 shrink-0" />}
                 Resend to Credit Analyst {hasDeficiencies && '(Locked)'}
               </Button>
             ) : null
           )}
 
-          {/* Direct Underwriter Decision Actions & Forward to Finance Officer */}
-          {(isUnderwriter || isSuperAdmin || isAdmin || canMakeUnderwritingDecision || data.status === 'UNDERWRITING') && data.status !== 'APPROVED' && data.status !== 'REJECTED' && (
+          {/* Direct Underwriter Decision Actions & Forward to Finance Officer (Authorized Deciders Only) */}
+          {(isUnderwriter || isSuperAdmin || isAdmin || canMakeUnderwritingDecision) && !isCreditAnalyst && data.status !== 'APPROVED' && data.status !== 'REJECTED' && (
             <Button
               size="sm"
               onClick={() => {
@@ -1005,21 +1013,21 @@ export default function ApplicationDetailPage() {
                   }
                 );
               }}
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer whitespace-nowrap shrink-0"
               title="Sanction loan proposal and forward documents to Finance Officer for disbursal"
             >
-              <Send className="w-3.5 h-3.5" /> Forward to Finance Officer
+              <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Finance Officer
             </Button>
           )}
 
-          {canMakeUnderwritingDecision && (
+          {canMakeUnderwritingDecision && !isCreditAnalyst && (
             <>
               <Button
                 size="sm"
                 onClick={() => setUwWizardOpen(true)}
-                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-bold shadow-sm cursor-pointer"
+                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-bold shadow-sm cursor-pointer whitespace-nowrap shrink-0"
               >
-                <ShieldCheck className="w-3.5 h-3.5" /> Step-by-Step Verification Desk →
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Step-by-Step Verification Desk →
               </Button>
 
               <Button
@@ -1031,9 +1039,9 @@ export default function ApplicationDetailPage() {
                   setConditions('');
                   setDecisionModalOpen(true);
                 }}
-                className="gap-1.5 cursor-pointer"
+                className="gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
               >
-                <XCircle className="w-3.5 h-3.5 text-rose-500" /> Reject Loan
+                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" /> Reject Loan
               </Button>
             </>
           )}
@@ -1306,8 +1314,8 @@ export default function ApplicationDetailPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge status={data.status} />
-                    <Link href="/underwriting">
-                      <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold">
+                    <Link href={isCreditAnalyst ? `/credit-assessment?applicationId=${data.id}` : "/underwriting"}>
+                      <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold cursor-pointer">
                         <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Open Assessment Desk
                       </Button>
                     </Link>
@@ -1394,9 +1402,9 @@ export default function ApplicationDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <Link href="/underwriting">
-                      <Button size="sm" className="gap-1.5 font-semibold text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0">
-                        <Calculator className="w-3.5 h-3.5" /> Run Credit Score in Desk →
+                    <Link href={isUnderwriter || isSuperAdmin ? "/underwriting" : `/credit-assessment?applicationId=${params.id}&step=4`}>
+                      <Button size="sm" className="gap-1.5 font-semibold text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 whitespace-nowrap">
+                        <Calculator className="w-3.5 h-3.5 shrink-0" /> {isUnderwriter || isSuperAdmin ? 'Run Credit Score in Desk →' : 'Evaluate Credit Score in Assessment Desk →'}
                       </Button>
                     </Link>
                   </div>
@@ -1413,7 +1421,7 @@ export default function ApplicationDetailPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {canReject && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
+                      {canReject && !isCreditAnalyst && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
                         <Button
                           size="sm"
                           variant="outline-danger"
@@ -1421,12 +1429,12 @@ export default function ApplicationDetailPage() {
                             setRejectReason('');
                             setRejectModalOpen(true);
                           }}
-                          className="gap-1.5 font-semibold text-xs border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                          className="gap-1.5 font-semibold text-xs border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40 whitespace-nowrap shrink-0"
                         >
-                          <XCircle className="w-3.5 h-3.5 text-rose-500" /> Reject Application
+                          <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" /> Reject Application
                         </Button>
                       )}
-                      {canForwardToUnderwriting && (
+                      {canForwardToUnderwriting && !isCreditAnalyst && (
                         <Button
                           size="sm"
                           onClick={() => {
@@ -1437,18 +1445,25 @@ export default function ApplicationDetailPage() {
                             );
                             setForwardModalOpen(true);
                           }}
-                          className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0"
+                          className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
                         >
                           {isForwardedToUnderwriting ? (
                             <>
-                              <RotateCcw className="w-3.5 h-3.5" /> Re-Forward to Underwriter
+                              <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Underwriter
                             </>
                           ) : (
                             <>
-                              <Send className="w-3.5 h-3.5" /> Forward to Underwriter
+                              <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Underwriter
                             </>
                           )}
                         </Button>
+                      )}
+                      {isCreditAnalyst && (
+                        <Link href={`/credit-assessment?applicationId=${data.id}`}>
+                          <Button size="sm" className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 whitespace-nowrap">
+                            <Calculator className="w-3.5 h-3.5 shrink-0" /> Assessment Workspace →
+                          </Button>
+                        </Link>
                       )}
                     </div>
                   </div>
@@ -1504,8 +1519,8 @@ export default function ApplicationDetailPage() {
                                 f.status === 'PASS'
                                   ? 'border-emerald-200 bg-emerald-50/50 text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300'
                                   : f.status === 'WARNING'
-                                  ? 'border-amber-200 bg-amber-50/50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'
-                                  : 'border-rose-200 bg-rose-50/50 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'
+                                    ? 'border-amber-200 bg-amber-50/50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'
+                                    : 'border-rose-200 bg-rose-50/50 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'
                               )}
                             >
                               {f.status === 'PASS' && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />}
@@ -1702,8 +1717,8 @@ export default function ApplicationDetailPage() {
                   {submitToCreditAnalystMutation.isPending
                     ? 'Submitting...'
                     : data.status === 'DRAFT'
-                    ? 'Confirm & Forward to Credit Analyst'
-                    : 'Confirm & Re-Forward to Credit Analyst'}
+                      ? 'Confirm & Forward to Credit Analyst'
+                      : 'Confirm & Re-Forward to Credit Analyst'}
                 </Button>
               </div>
             </div>

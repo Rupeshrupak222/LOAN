@@ -35,15 +35,15 @@ export function Button({
   };
 
   const sizes = {
-    sm: 'h-8 px-3 text-xs gap-1.5 rounded-lg',
-    md: 'h-9 px-3.5 text-sm gap-2 rounded-xl',
-    lg: 'h-11 px-5 text-base gap-2.5 rounded-xl',
+    sm: 'min-h-[2rem] px-3 py-1.5 text-xs gap-1.5 rounded-lg whitespace-nowrap shrink-0',
+    md: 'min-h-[2.25rem] px-3.5 py-1.5 text-sm gap-2 rounded-xl whitespace-nowrap shrink-0',
+    lg: 'min-h-[2.75rem] px-5 py-2 text-base gap-2.5 rounded-xl whitespace-nowrap shrink-0',
   };
 
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:pointer-events-none cursor-pointer select-none',
+        'inline-flex items-center justify-center text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:pointer-events-none cursor-pointer select-none max-w-full',
         variants[variant],
         sizes[size],
         className

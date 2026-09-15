@@ -284,15 +284,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {primaryRole === 'CUSTOMER'
                   ? `${branding.institutionName.split(' ')[0].toUpperCase()} PORTAL`
                   : primaryRole === 'AUDITOR'
-                  ? `${branding.institutionName.split(' ')[0].toUpperCase()} AUDIT`
-                  : (branding.portalTitle || branding.institutionName).toUpperCase()}
+                    ? `${branding.institutionName.split(' ')[0].toUpperCase()} AUDIT`
+                    : (branding.portalTitle || branding.institutionName).toUpperCase()}
               </p>
               <p className="text-[10px] font-medium text-slate-400 mt-0.5 truncate max-w-[170px]">
                 {primaryRole === 'CUSTOMER'
                   ? 'Borrower Self-Service'
                   : primaryRole === 'AUDITOR'
-                  ? 'Compliance & Audit'
-                  : branding.tagline || roleCfg.label}
+                    ? 'Compliance & Audit'
+                    : branding.tagline || roleCfg.label}
               </p>
             </div>
           </Link>
