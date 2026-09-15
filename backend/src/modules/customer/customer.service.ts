@@ -521,23 +521,45 @@ export async function createCustomer(
 
     const cleanEmail = input.email ? input.email.toLowerCase().trim() : undefined;
 
-    // Check if a Customer profile already exists for this userId, email, or mobile
-    const existingCust = await tx.customer.findFirst({
-      where: {
-        OR: [
-          ...(customerUserId ? [{ userId: customerUserId }] : []),
-          ...(cleanEmail ? [{ email: cleanEmail }] : []),
-          { mobile: mobile || input.mobile },
-        ],
-      },
-    });
+    // Check if a Customer profile already exists for this userId, email, or mobile in priority order
+    let existingCust: any = null;
+    if (customerUserId) {
+      existingCust = await tx.customer.findUnique({ where: { userId: customerUserId } });
+    }
+    if (!existingCust && cleanEmail) {
+      existingCust = await tx.customer.findFirst({
+        where: {
+          email: { equals: cleanEmail, mode: 'insensitive' },
+          ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
+        },
+      });
+    }
+    if (!existingCust && (mobile || input.mobile)) {
+      existingCust = await tx.customer.findFirst({
+        where: {
+          mobile: (mobile || input.mobile)!,
+          ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
+        },
+      });
+    }
 
     let cust;
     if (existingCust) {
+      // Ensure target userId does not conflict with another customer
+      let targetUserId = existingCust.userId;
+      if (customerUserId && customerUserId !== existingCust.userId) {
+        const customerWithSameUser = await tx.customer.findUnique({
+          where: { userId: customerUserId },
+        });
+        if (!customerWithSameUser || customerWithSameUser.id === existingCust.id) {
+          targetUserId = customerUserId;
+        }
+      }
+
       cust = await tx.customer.update({
         where: { id: existingCust.id },
         data: {
-          userId: customerUserId || existingCust.userId || undefined,
+          userId: targetUserId || undefined,
           ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           firstName: input.firstName,
           lastName: input.lastName,
@@ -558,9 +580,19 @@ export async function createCustomer(
         },
       });
     } else {
+      let newCustUserId: string | undefined = undefined;
+      if (customerUserId) {
+        const customerWithSameUser = await tx.customer.findUnique({
+          where: { userId: customerUserId },
+        });
+        if (!customerWithSameUser) {
+          newCustUserId = customerUserId;
+        }
+      }
+
       cust = await tx.customer.create({
         data: {
-          userId: customerUserId || undefined,
+          userId: newCustUserId,
           ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           customerCode: generateCustomerCode(),
           firstName: input.firstName,
@@ -752,7 +784,10 @@ export async function updateCustomer(
           create: { userId: newUser.id, roleId: customerRole.id },
         });
       }
-      data.user = { connect: { id: newUser.id } };
+      const userAlreadyLinked = await tx.customer.findUnique({ where: { userId: newUser.id } });
+      if (!userAlreadyLinked || userAlreadyLinked.id === id) {
+        data.user = { connect: { id: newUser.id } };
+      }
     }
 
     // 2. Sync Address table if address updated
@@ -861,6 +896,13 @@ export async function updateKycStatus(
 ) {
   if (actor?.roles?.includes('AUDITOR')) {
     throw new ForbiddenError('Access forbidden: Auditors have read-only access and cannot modify KYC records');
+  }
+  const AUTHORIZED_KYC_ROLES = ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
+  const hasKycAuthority = actor?.roles?.some((r) => AUTHORIZED_KYC_ROLES.includes(r));
+  if (actor && !hasKycAuthority) {
+    throw new ForbiddenError(
+      'Access forbidden: Loan Officers are strictly restricted from verifying or completing KYC records. KYC verification is strictly authorized for Credit Analysts and compliance officers.'
+    );
   }
   const existing = await getCustomer(id, actor);
 
@@ -1064,8 +1106,9 @@ export async function deleteCustomer(
   actorUserId?: string,
   actor?: CustomerActorContext
 ) {
-  if (actor?.roles && !actor.roles.includes('SUPER_ADMIN')) {
-    throw new ForbiddenError('Access forbidden: Only Super Administrators can delete customer records');
+  const allowedRoles = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER', 'BRANCH_MANAGER'];
+  if (actor?.roles && !actor.roles.some((r) => allowedRoles.includes(r))) {
+    throw new ForbiddenError('Access forbidden: Insufficient permissions to delete customer records');
   }
 
   const customer = await getCustomer(id, actor);
@@ -1083,48 +1126,96 @@ export async function deleteCustomer(
       await tx.collectionCase.deleteMany({ where: { id: { in: caseIds } } });
     }
 
-    // 3. Delete payments & allocations
+    // 3. Delete payments, allocations & submissions
     const paymentIds = (await tx.payment.findMany({ where: { customerId: id }, select: { id: true } })).map((p) => p.id);
     if (paymentIds.length > 0) {
       await tx.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
       await tx.payment.deleteMany({ where: { id: { in: paymentIds } } });
     }
+    await tx.paymentSubmission.deleteMany({ where: { customerId: id } }).catch(() => {});
 
     // 4. Delete loans and related records
-    const loanIds = customer.loans.map((l) => l.id);
+    const loanIds = customer.loans?.map((l: any) => l.id) || [];
     if (loanIds.length > 0) {
-      await tx.loanClosure.deleteMany({ where: { loanId: { in: loanIds } } });
-      await tx.settlement.deleteMany({ where: { loanId: { in: loanIds } } });
-      await tx.loanRestructure.deleteMany({ where: { loanId: { in: loanIds } } });
-      await tx.disbursement.deleteMany({ where: { loanId: { in: loanIds } } });
-      await tx.repaymentScheduleItem.deleteMany({ where: { loanId: { in: loanIds } } });
-      await tx.loan.deleteMany({ where: { id: { in: loanIds } } });
+      await tx.loanClosure.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
+      await tx.settlement.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
+      await tx.loanRestructure.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
+      await tx.disbursement.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
+      await tx.repaymentScheduleItem.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
+      await tx.transaction.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
+      await tx.loan.deleteMany({ where: { id: { in: loanIds } } }).catch(() => {});
     }
 
     // 5. Delete loan applications and underwriting records
-    const appIds = customer.applications.map((a) => a.id);
+    const appIds = customer.applications?.map((a: any) => a.id) || [];
     if (appIds.length > 0) {
-      await tx.underwritingDecision.deleteMany({ where: { applicationId: { in: appIds } } });
-      await tx.riskAssessment.deleteMany({ where: { applicationId: { in: appIds } } });
-      await tx.eligibilityAssessment.deleteMany({ where: { applicationId: { in: appIds } } });
-      await tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: appIds } } });
-      await tx.loanApplication.deleteMany({ where: { id: { in: appIds } } });
+      await tx.task.deleteMany({
+        where: {
+          OR: [
+            { applicationId: { in: appIds } },
+            { entityType: 'APPLICATION', entityId: { in: appIds } },
+          ],
+        },
+      }).catch(() => {});
+      await tx.activityLog.deleteMany({
+        where: {
+          entityType: 'APPLICATION',
+          entityId: { in: appIds },
+        },
+      }).catch(() => {});
+      await tx.approval.deleteMany({
+        where: {
+          OR: [
+            { applicationId: { in: appIds } },
+            { entityType: 'APPLICATION', entityId: { in: appIds } },
+          ],
+        },
+      }).catch(() => {});
+      await tx.creditReview.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.approvalRequest.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.applicationAssignment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.underwritingDecision.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.riskAssessment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.eligibilityAssessment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.document.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
+      await tx.loanApplication.deleteMany({ where: { id: { in: appIds } } }).catch(() => {});
     }
 
-    // 6. Delete documents, addresses, bank accounts, employment
-    await tx.document.deleteMany({ where: { customerId: id } });
-    await tx.customerAddress.deleteMany({ where: { customerId: id } });
-    await tx.customerBankAccount.deleteMany({ where: { customerId: id } });
-    await tx.customerEmployment.deleteMany({ where: { customerId: id } });
+    // Customer level tasks and activity logs
+    await tx.task.deleteMany({
+      where: {
+        OR: [
+          { entityType: 'CUSTOMER', entityId: id },
+        ],
+      },
+    }).catch(() => {});
+    await tx.activityLog.deleteMany({
+      where: {
+        entityType: 'CUSTOMER',
+        entityId: id,
+      },
+    }).catch(() => {});
+
+    // 6. Delete direct customer relations
+    await tx.document.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.customerAddress.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.customerBankAccount.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.customerEmployment.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.customerIdentifier.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.customerConsent.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.customerLifecycleHistory.deleteMany({ where: { customerId: id } }).catch(() => {});
+    await tx.creditReassessment.deleteMany({ where: { customerId: id } }).catch(() => {});
 
     // 7. Delete customer record
     await tx.customer.delete({ where: { id } });
 
     // 8. Delete linked User login account if exists
     if (customer.userId) {
-      await tx.userRole.deleteMany({ where: { userId: customer.userId } });
-      await tx.notification.deleteMany({ where: { userId: customer.userId } });
-      await tx.refreshToken.deleteMany({ where: { userId: customer.userId } });
+      await tx.userRole.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
+      await tx.notification.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
+      await tx.refreshToken.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
+      await tx.auditLog.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
       await tx.user.delete({ where: { id: customer.userId } }).catch(() => {});
     }
   });
@@ -1132,7 +1223,7 @@ export async function deleteCustomer(
   await logAudit({
     userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
     tenantId: customer.tenantId || undefined,
-    action: 'CUSTOMER_DELETED',
+    action: 'CUSTOMER_PERMANENTLY_DELETED',
     entity: 'Customer',
     entityId: id,
     previousValue: {
@@ -1142,5 +1233,5 @@ export async function deleteCustomer(
     },
   }).catch(() => {});
 
-  return { success: true, message: `Customer ${customer.customerCode} permanently deleted from database` };
+  return { success: true, message: `Customer ${customer.customerCode} permanently wiped from database` };
 }

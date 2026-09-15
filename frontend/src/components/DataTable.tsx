@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, EmptyState } from './ui';
 import { Skeleton } from './LoadingSkeletons';
 import { useTheme } from '@/lib/theme';
@@ -14,6 +15,14 @@ export interface Column<T> {
   align?: 'left' | 'center' | 'right';
 }
 
+export interface PaginationConfig {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages?: number;
+  onPageChange: (newPage: number) => void;
+}
+
 export function DataTable<T extends { id: string }>({
   columns,
   rows,
@@ -21,6 +30,7 @@ export function DataTable<T extends { id: string }>({
   emptyTitle = 'No records found',
   emptyDescription = 'There are currently no items matching your criteria.',
   emptyAction,
+  pagination,
 }: {
   columns: Column<T>[];
   rows: T[] | undefined;
@@ -28,6 +38,7 @@ export function DataTable<T extends { id: string }>({
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: ReactNode;
+  pagination?: PaginationConfig;
 }) {
   const { isDark } = useTheme();
 
@@ -144,6 +155,54 @@ export function DataTable<T extends { id: string }>({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {pagination && !loading && rows && rows.length > 0 && (
+        <div
+          className={cn(
+            "flex items-center justify-between px-6 py-3.5 border-t text-xs",
+            isDark
+              ? "border-[#2B3566] bg-[#16203D]/60 text-slate-400"
+              : "border-slate-200/80 bg-slate-50/50 text-slate-500"
+          )}
+        >
+          <div>
+            Showing <span className={cn("font-bold", isDark ? "text-slate-200" : "text-slate-700")}>{rows.length}</span> of{' '}
+            <span className={cn("font-bold", isDark ? "text-slate-200" : "text-slate-700")}>{pagination.total}</span> records
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => pagination.onPageChange(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+              className={cn(
+                "p-1.5 rounded-lg border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed",
+                isDark
+                  ? "border-[#2B3566] bg-[#1E2445] text-slate-200 hover:bg-[#2B3566]"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className={cn("font-semibold px-2", isDark ? "text-slate-300" : "text-slate-700")}>
+              Page {pagination.page} of {pagination.totalPages || Math.max(1, Math.ceil(pagination.total / pagination.pageSize))}
+            </span>
+            <button
+              type="button"
+              onClick={() => pagination.onPageChange(pagination.page + 1)}
+              disabled={pagination.page >= (pagination.totalPages || Math.max(1, Math.ceil(pagination.total / pagination.pageSize)))}
+              className={cn(
+                "p-1.5 rounded-lg border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed",
+                isDark
+                  ? "border-[#2B3566] bg-[#1E2445] text-slate-200 hover:bg-[#2B3566]"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
     </Card>

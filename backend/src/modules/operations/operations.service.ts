@@ -154,54 +154,67 @@ export class OperationsService {
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
-    if (tenantId) where.tenantId = tenantId;
+    const conditions: any[] = [];
+    if (tenantId && tenantId !== 'ALL') {
+      conditions.push({
+        OR: [
+          { tenantId: tenantId },
+          { tenantId: null },
+          { tenantId: 'tenant-adyapan-default' },
+        ],
+      });
+    }
 
     if (query.stage) {
-      where.stage = query.stage;
+      conditions.push({ stage: query.stage });
     }
 
     if (query.status) {
-      where.status = query.status;
+      conditions.push({ status: query.status });
     }
 
     if (query.priority) {
-      where.priority = query.priority;
+      conditions.push({ priority: query.priority });
     }
 
     if (query.assignedToUserId) {
-      where.assignedToUserId = query.assignedToUserId;
+      conditions.push({ assignedToUserId: query.assignedToUserId });
     }
 
     if (query.queueId) {
-      where.queueId = query.queueId;
+      conditions.push({ queueId: query.queueId });
     }
 
     if (query.productId) {
-      where.productId = query.productId;
+      conditions.push({ productId: query.productId });
     }
 
     if (query.branchId) {
-      where.branchId = query.branchId;
+      conditions.push({ branchId: query.branchId });
     }
 
     if (query.startDate || query.endDate) {
-      where.createdAt = {};
-      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
-      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+      const dateFilter: any = {};
+      if (query.startDate) dateFilter.gte = new Date(query.startDate);
+      if (query.endDate) dateFilter.lte = new Date(query.endDate);
+      conditions.push({ createdAt: dateFilter });
     }
 
     if (query.search && query.search.trim()) {
       const s = query.search.trim();
-      where.OR = [
-        { applicationNo: { contains: s, mode: 'insensitive' } },
-        { customer: { firstName: { contains: s, mode: 'insensitive' } } },
-        { customer: { lastName: { contains: s, mode: 'insensitive' } } },
-        { customer: { customerCode: { contains: s, mode: 'insensitive' } } },
-        { customer: { mobile: { contains: s, mode: 'insensitive' } } },
-        { loan: { loanNo: { contains: s, mode: 'insensitive' } } },
-      ];
+      conditions.push({
+        OR: [
+          { applicationNo: { contains: s, mode: 'insensitive' } },
+          { customer: { firstName: { contains: s, mode: 'insensitive' } } },
+          { customer: { lastName: { contains: s, mode: 'insensitive' } } },
+          { customer: { customerCode: { contains: s, mode: 'insensitive' } } },
+          { customer: { mobile: { contains: s, mode: 'insensitive' } } },
+          { loan: { loanNo: { contains: s, mode: 'insensitive' } } },
+        ],
+      });
     }
+
+    const where: any = conditions.length > 0 ? { AND: conditions } : {};
 
     const orderBy: any = {};
     const sortField = query.sortBy || 'createdAt';
@@ -246,7 +259,7 @@ export class OperationsService {
           _count: {
             select: {
               documents: true,
-              tasks: true,
+              Task: true,
             },
           },
         },
@@ -304,7 +317,7 @@ export class OperationsService {
       include: {
         customer: {
           include: {
-            identifiers: {
+            CustomerIdentifier: {
               select: {
                 id: true,
                 idType: true,
@@ -329,25 +342,20 @@ export class OperationsService {
         documents: {
           orderBy: { createdAt: 'desc' },
         },
-        tasks: {
+        Task: {
           orderBy: { createdAt: 'desc' },
         },
         statusHistory: {
           orderBy: { createdAt: 'desc' },
         },
-        creditReviews: {
+        CreditReview: {
           orderBy: { createdAt: 'desc' },
           take: 5,
         },
-        approvalRecords: {
+        Approval: {
           orderBy: { createdAt: 'desc' },
-          include: {
-            history: {
-              orderBy: { createdAt: 'desc' },
-            },
-          },
         },
-        assignments: {
+        ApplicationAssignment: {
           orderBy: { assignedAt: 'desc' },
           take: 10,
           include: {
@@ -803,7 +811,7 @@ export class OperationsService {
       where: { id: customerId },
       include: {
         branch: true,
-        identifiers: {
+        CustomerIdentifier: {
           select: {
             id: true,
             idType: true,
@@ -840,7 +848,7 @@ export class OperationsService {
     }
 
     // Get open tasks and activity logs for this customer
-    const appIds = customer.applications.map((a: any) => a.id);
+    const appIds = (customer as any).applications?.map((a: any) => a.id) || [];
     const [tasks, activities] = await Promise.all([
       prisma.task.findMany({
         where: {
@@ -866,21 +874,26 @@ export class OperationsService {
       }),
     ]);
 
-    const activeLoans = customer.loans.filter((l: any) => l.status === 'ACTIVE');
-    const totalSanctionedAmount = customer.loans.reduce((acc: number, l: any) => acc + Number(l.principal), 0);
-    const totalOutstandingAmount = activeLoans.reduce((acc: number, l: any) => acc + Number(l.outstandingPrincipal), 0);
-    const kycVerified = customer.identifiers.some((i: any) => i.verificationStatus === 'VERIFIED');
+    const loans = (customer as any).loans || [];
+    const applications = (customer as any).applications || [];
+    const documents = (customer as any).documents || [];
+    const identifiers = (customer as any).CustomerIdentifier || [];
+
+    const activeLoans = loans.filter((l: any) => l.status === 'ACTIVE');
+    const totalSanctionedAmount = loans.reduce((acc: number, l: any) => acc + Number(l.principal || 0), 0);
+    const totalOutstandingAmount = activeLoans.reduce((acc: number, l: any) => acc + Number(l.outstandingPrincipal || 0), 0);
+    const kycVerified = identifiers.some((i: any) => i.verificationStatus === 'VERIFIED');
 
     return {
       customer,
-      identifiers: customer.identifiers,
-      applications: customer.applications,
-      loans: customer.loans,
-      documents: customer.documents,
+      identifiers,
+      applications,
+      loans,
+      documents,
       tasks,
       activities,
       stats: {
-        totalApplications: customer.applications.length,
+        totalApplications: applications.length,
         activeLoansCount: activeLoans.length,
         totalSanctionedAmount,
         totalOutstandingAmount,

@@ -101,9 +101,9 @@ export const TicketDetailModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-5xl w-full h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-5xl w-full h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Top Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-100 dark:bg-slate-950/80">
           <div className="flex items-center gap-3">
             <div className="font-mono font-bold text-white text-base">
               {ticket.ticketNumber}
@@ -149,7 +149,7 @@ export const TicketDetailModal: React.FC<Props> = ({
         {/* Main Body: 2 Columns */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
           {/* Left Column: Conversation Thread + Reply Composer (2 cols) */}
-          <div className="md:col-span-2 flex flex-col border-r border-slate-800 bg-slate-950/40">
+          <div className="md:col-span-2 flex flex-col border-r border-slate-800 bg-slate-50 dark:bg-slate-950/40">
             {/* Conversation Messages */}
             <div className="flex-1 p-4 overflow-y-auto space-y-3">
               {messages.map((m) => {
@@ -168,7 +168,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                         isInternal
                           ? 'bg-amber-950/40 border border-amber-500/40 text-amber-200'
                           : isCustomer
-                          ? 'bg-slate-900 border border-slate-800 text-slate-200'
+                          ? 'bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
                           : 'bg-indigo-600/90 text-white'
                       }`}
                     >
@@ -196,7 +196,7 @@ export const TicketDetailModal: React.FC<Props> = ({
             </div>
 
             {/* Reply Composer */}
-            <form onSubmit={handleSendReply} className="p-3 bg-slate-900 border-t border-slate-800 space-y-2">
+            <form onSubmit={handleSendReply} className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
@@ -237,7 +237,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                       ? 'Add internal investigation notes, gateway reference logs...'
                       : 'Type response to customer...'
                   }
-                  className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500 font-sans resize-none"
+                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500 font-sans resize-none"
                 />
                 <button
                   type="submit"
@@ -255,9 +255,9 @@ export const TicketDetailModal: React.FC<Props> = ({
           </div>
 
           {/* Right Column: Ticket Meta & SLA Tracking Sidebar (1 col) */}
-          <div className="p-4 bg-slate-900/90 overflow-y-auto space-y-4">
+          <div className="p-4 bg-white dark:bg-white dark:bg-slate-900/90 overflow-y-auto space-y-4">
             {/* SLA Status Card */}
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+            <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-indigo-400" /> SLA Response & Resolution
               </h4>
@@ -292,7 +292,7 @@ export const TicketDetailModal: React.FC<Props> = ({
             </div>
 
             {/* Ticket Metadata */}
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+            <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2.5 text-xs">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">Ticket Info</h4>
 
               <div>
@@ -335,7 +335,7 @@ export const TicketDetailModal: React.FC<Props> = ({
         {/* Modal: Assign Agent */}
         {showAssign && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 max-w-sm w-full space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-5 max-w-sm w-full space-y-4">
               <h4 className="text-sm font-bold text-white">Assign Ticket</h4>
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Agent Name</label>
@@ -343,7 +343,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                   type="text"
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
               <div>
@@ -352,7 +352,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                   type="text"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -376,7 +376,7 @@ export const TicketDetailModal: React.FC<Props> = ({
         {/* Modal: Escalate */}
         {showEscalate && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 max-w-sm w-full space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-5 max-w-sm w-full space-y-4">
               <h4 className="text-sm font-bold text-white">Escalate Ticket</h4>
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Escalation Reason</label>
@@ -384,7 +384,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                   rows={3}
                   value={escalateReason}
                   onChange={(e) => setEscalateReason(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -408,7 +408,7 @@ export const TicketDetailModal: React.FC<Props> = ({
         {/* Modal: Resolve */}
         {showResolve && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 max-w-md w-full space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-5 max-w-md w-full space-y-4">
               <h4 className="text-sm font-bold text-white">Resolve Ticket & Customer Feedback</h4>
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Resolution Summary Note</label>
@@ -416,7 +416,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                   rows={3}
                   value={resolutionNote}
                   onChange={(e) => setResolutionNote(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
               <div>
@@ -424,7 +424,7 @@ export const TicketDetailModal: React.FC<Props> = ({
                 <select
                   value={csatScore}
                   onChange={(e) => setCsatScore(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg p-2"
                 >
                   <option value={5}>⭐⭐⭐⭐⭐ (5/5) Excellent</option>
                   <option value={4}>⭐⭐⭐⭐ (4/5) Good</option>

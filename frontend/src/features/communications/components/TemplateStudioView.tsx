@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type {
@@ -210,7 +210,7 @@ export const TemplateStudioView: React.FC<Props> = ({
   return (
     <div className="space-y-4">
       {/* Studio Header & Action Bar */}
-      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
           <div className="relative flex-1 max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -219,7 +219,7 @@ export const TemplateStudioView: React.FC<Props> = ({
               placeholder="Search templates, variables, DLT ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
             />
           </div>
 
@@ -227,7 +227,7 @@ export const TemplateStudioView: React.FC<Props> = ({
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Channels</option>
               <option value="SMS">SMS</option>
@@ -241,7 +241,7 @@ export const TemplateStudioView: React.FC<Props> = ({
             <select
               value={selectedLang}
               onChange={(e) => setSelectedLang(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Languages</option>
               <option value="en-IN">English (en-IN)</option>
@@ -262,14 +262,14 @@ export const TemplateStudioView: React.FC<Props> = ({
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTemplates.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-slate-500 bg-slate-900/40 rounded-xl border border-slate-800">
+          <div className="col-span-full py-12 text-center text-slate-500 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800">
             No templates match the selected criteria.
           </div>
         ) : (
           filteredTemplates.map((tmpl) => (
             <div
               key={tmpl.id}
-              className="bg-slate-900/70 border border-slate-800 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between transition group"
+              className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between transition group"
             >
               <div>
                 {/* Header */}
@@ -314,7 +314,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                 ) : null}
 
                 {/* Body Preview */}
-                <div className="p-2.5 bg-slate-950/80 rounded-lg border border-slate-800/80 text-xs text-slate-300 font-sans leading-relaxed line-clamp-3 mb-3">
+                <div className="p-2.5 bg-slate-100 dark:bg-slate-950/80 rounded-lg border border-slate-200 dark:border-slate-800/80 text-xs text-slate-300 font-sans leading-relaxed line-clamp-3 mb-3">
                   {tmpl.body}
                 </div>
 
@@ -325,7 +325,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                       {tmpl.variables.map((v) => (
                         <span
                           key={v}
-                          className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-indigo-300 border border-slate-700"
+                          className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-indigo-300 border border-slate-200 dark:border-slate-700"
                         >
                           {`{{${v}}}`}
                         </span>
@@ -366,10 +366,10 @@ export const TemplateStudioView: React.FC<Props> = ({
       {/* Live Test Runner Modal */}
       {testingTemplate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   Interactive Template Sandbox: {testingTemplate.name}
                 </h3>
@@ -403,7 +403,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                         type="text"
                         value={testVariables[v] || ''}
                         onChange={(e) => handleVariableChange(v, e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-sans"
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-sans"
                       />
                     </div>
                   ))
@@ -416,7 +416,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                   Simulated Customer View
                 </h4>
 
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col justify-between">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex-1 flex flex-col justify-between">
                   <div>
                     {previewResult?.subject ? (
                       <div className="text-xs font-bold text-white pb-2 mb-2 border-b border-slate-800">
@@ -444,7 +444,7 @@ export const TemplateStudioView: React.FC<Props> = ({
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-end">
               <button
                 onClick={() => setTestingTemplate(null)}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white rounded-lg transition"
@@ -461,10 +461,10 @@ export const TemplateStudioView: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={handleSubmitForm}
-            className="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <FileCode className="w-4 h-4 text-indigo-400" />
                 {editingTemplate ? `Edit Template (New Version v${editingTemplate.version + 1})` : 'Create New Template'}
               </h3>
@@ -492,7 +492,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="e.g. Loan Sanction WhatsApp Alert"
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   />
                 </div>
 
@@ -507,7 +507,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value)}
                     placeholder="e.g. WA_LOAN_SANCTION_V1"
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 disabled:opacity-50 font-mono"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 disabled:opacity-50 font-mono"
                   />
                 </div>
               </div>
@@ -521,7 +521,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                     disabled={!!editingTemplate}
                     value={formChannel}
                     onChange={(e) => setFormChannel(e.target.value as CommunicationChannel)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 disabled:opacity-50"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 disabled:opacity-50"
                   >
                     <option value="SMS">SMS</option>
                     <option value="WHATSAPP">WhatsApp</option>
@@ -539,7 +539,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                   <select
                     value={formLang}
                     onChange={(e) => setFormLang(e.target.value as LanguageCode)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   >
                     <option value="en-IN">English (en-IN)</option>
                     <option value="hi-IN">Hindi (hi-IN)</option>
@@ -553,7 +553,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value as MessageCategory)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   >
                     <option value="TRANSACTIONAL">TRANSACTIONAL</option>
                     <option value="COLLECTION">COLLECTION</option>
@@ -575,7 +575,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                     value={formSubject}
                     onChange={(e) => setFormSubject(e.target.value)}
                     placeholder="e.g. Loan Application #{{applicationId}} Approved"
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   />
                 </div>
               )}
@@ -590,7 +590,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                   value={formBody}
                   onChange={(e) => setFormBody(e.target.value)}
                   placeholder="Dear {{customerName}}, your loan of INR {{amount}} has been approved."
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-sans"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-sans"
                 />
               </div>
 
@@ -605,7 +605,7 @@ export const TemplateStudioView: React.FC<Props> = ({
                       value={formDltId}
                       onChange={(e) => setFormDltId(e.target.value)}
                       placeholder="e.g. DLT_1107161234567890"
-                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono"
                     />
                   </div>
 
@@ -618,14 +618,14 @@ export const TemplateStudioView: React.FC<Props> = ({
                       value={formSenderId}
                       onChange={(e) => setFormSenderId(e.target.value)}
                       placeholder="e.g. ADYAPN"
-                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono uppercase"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 font-mono uppercase"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => {

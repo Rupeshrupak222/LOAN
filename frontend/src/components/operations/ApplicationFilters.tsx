@@ -50,7 +50,7 @@ export function ApplicationFilters({ filters, onFilterChange, onReset }: Props) 
   ];
 
   const activeFilterCount = Object.entries(filters).filter(
-    ([k, v]) => k !== 'page' && k !== 'pageSize' && v !== undefined && v !== ''
+    ([k, v]) => !['page', 'pageSize', 'sortBy', 'sortDir'].includes(k) && v !== undefined && v !== ''
   ).length;
 
   return (

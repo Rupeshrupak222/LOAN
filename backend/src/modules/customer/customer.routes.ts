@@ -110,10 +110,13 @@ router.get(
         },
       });
       if (existingByEmail) {
-        await prisma.customer.update({
-          where: { id: existingByEmail.id },
-          data: { userId: req.user.id },
-        });
+        const customerWithSameUser = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+        if (!customerWithSameUser || customerWithSameUser.id === existingByEmail.id) {
+          await prisma.customer.update({
+            where: { id: existingByEmail.id },
+            data: { userId: req.user.id },
+          });
+        }
       } else {
         const dbUser = await prisma.user.findUnique({ where: { id: req.user.id } });
         const custCode = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -125,8 +128,8 @@ router.get(
             lastName: dbUser?.lastName || 'User',
             mobile: '9876543210',
             customerCode: custCode,
-            status: 'ACTIVE',
-            kycStatus: 'VERIFIED',
+            status: 'DRAFT',
+            kycStatus: 'NOT_STARTED',
             tenantId: req.user.tenantId || undefined,
           },
         });
@@ -247,6 +250,15 @@ router.delete(
   authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   asyncHandler(async (req, res) => {
     const result = await deleteCustomerBankAccount(req.params.id, req.params.bankAccountId, req.user?.id, req.user as any);
+    res.json(success(result));
+  })
+);
+
+router.delete(
+  '/:id',
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const result = await deleteCustomer(req.params.id, req.user?.id, req.user as any);
     res.json(success(result));
   })
 );

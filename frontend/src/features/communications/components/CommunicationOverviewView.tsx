@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type {
@@ -124,7 +124,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
       {/* Top Controls Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 backdrop-blur-md">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-indigo-400" />
             Communication & Customer Support Operations Control Hub
           </h2>
@@ -147,7 +147,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
       {/* Primary KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Overall Delivery Rate */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
               Overall Delivery Rate
@@ -174,7 +174,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
         </div>
 
         {/* 2. Active Outbox & Suppression */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
               Active Templates & Policies
@@ -195,7 +195,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
         </div>
 
         {/* 3. Support Tickets & SLA Breaches */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
               Support Desk Active Tickets
@@ -222,7 +222,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
         </div>
 
         {/* 4. Customer Satisfaction & Grievances */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
+        <div className="bg-white dark:bg-slate-900/70 border border-slate-800 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/40 transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
               CSAT & Regulatory Desk
@@ -246,7 +246,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
       {/* Channel Volume & Interactive Dispatch Sandbox */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Channel Health Grid (2 cols) */}
-        <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Send className="w-4 h-4 text-indigo-400" />
             Channel Delivery Performance Breakdown
@@ -265,11 +265,11 @@ export const CommunicationOverviewView: React.FC<Props> = ({
               const rate = stats.sent > 0 ? ((stats.delivered / stats.sent) * 100).toFixed(0) : '100';
 
               return (
-                <div key={c.channel} className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-lg">
+                <div key={c.channel} className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-800/80 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       {c.icon}
-                      <span className="text-xs font-medium text-slate-200">{c.label}</span>
+                      <span className="text-xs font-medium text-slate-800 dark:text-slate-200">{c.label}</span>
                     </div>
                     <span className="text-xs font-semibold text-emerald-400">{rate}%</span>
                   </div>
@@ -301,7 +301,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
               <select
                 value={selectedTestEvent}
                 onChange={(e) => setSelectedTestEvent(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
               >
                 <option value="APPLICATION_APPROVED">APPLICATION_APPROVED (SMS + WhatsApp)</option>
                 <option value="KYC_COMPLETED">KYC_COMPLETED (SMS + Push)</option>
@@ -327,7 +327,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
       </div>
 
       {/* Recent Dispatched Messages Stream */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-400" />
@@ -338,7 +338,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-100 dark:bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">Event / Category</th>
                 <th className="py-3 px-4">Channel</th>
@@ -348,7 +348,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
                 <th className="py-3 px-4">Timestamp</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
               {recentMessages.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
@@ -359,7 +359,7 @@ export const CommunicationOverviewView: React.FC<Props> = ({
                 recentMessages.map((msg) => (
                   <tr key={msg.id} className="hover:bg-slate-850/50 transition">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-200">{msg.eventCode}</div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">{msg.eventCode}</div>
                       <span className="text-[10px] text-indigo-400 font-mono">{msg.category}</span>
                     </td>
                     <td className="py-3 px-4">

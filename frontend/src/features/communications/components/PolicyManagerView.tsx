@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type {
@@ -91,7 +91,7 @@ export const PolicyManagerView: React.FC<Props> = ({
       <ShieldCheck className="w-3 h-3" />;
 
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
         {icon}
         {ch}
       </span>
@@ -101,9 +101,9 @@ export const PolicyManagerView: React.FC<Props> = ({
   return (
     <div className="space-y-4">
       {/* Header info banner */}
-      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Sliders className="w-4 h-4 text-indigo-400" />
             Central Event Routing & Fair Practice Quiet Hours Policies
           </h3>
@@ -114,7 +114,7 @@ export const PolicyManagerView: React.FC<Props> = ({
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition"
+          className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
@@ -122,10 +122,10 @@ export const PolicyManagerView: React.FC<Props> = ({
       </div>
 
       {/* Policy Table */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-100 dark:bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">Event Code</th>
                 <th className="py-3 px-4">Primary Channel</th>
@@ -136,14 +136,14 @@ export const PolicyManagerView: React.FC<Props> = ({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
               {policies.map((pol) => {
                 const canBypass = pol.priority === 'CRITICAL' || pol.category === 'SECURITY' || !pol.quietHoursEnabled;
 
                 return (
                   <tr key={pol.id} className="hover:bg-slate-850/50 transition">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-200">{pol.eventCode}</div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">{pol.eventCode}</div>
                       <span className="text-[10px] text-slate-500 font-mono">{pol.tenantId}</span>
                     </td>
                     <td className="py-3 px-4">
@@ -210,10 +210,10 @@ export const PolicyManagerView: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={handleSave}
-            className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-indigo-400" />
                 Configure Policy: {editingPolicy.eventCode}
               </h3>
@@ -234,7 +234,7 @@ export const PolicyManagerView: React.FC<Props> = ({
                 <select
                   value={primaryChannel}
                   onChange={(e) => setPrimaryChannel(e.target.value as CommunicationChannel)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                 >
                   <option value="SMS">SMS</option>
                   <option value="WHATSAPP">WhatsApp</option>
@@ -252,7 +252,7 @@ export const PolicyManagerView: React.FC<Props> = ({
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as CommunicationPriority)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                 >
                   <option value="LOW">LOW</option>
                   <option value="NORMAL">NORMAL</option>
@@ -261,9 +261,9 @@ export const PolicyManagerView: React.FC<Props> = ({
                 </select>
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-3">
+              <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-200 flex items-center gap-1.5">
+                  <label className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
                     Quiet Hours Regulation (TRAI / RBI)
                   </label>
@@ -283,7 +283,7 @@ export const PolicyManagerView: React.FC<Props> = ({
                         type="time"
                         value={quietHoursStart}
                         onChange={(e) => setQuietHoursStart(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1.5"
                       />
                     </div>
                     <div>
@@ -292,7 +292,7 @@ export const PolicyManagerView: React.FC<Props> = ({
                         type="time"
                         value={quietHoursEnd}
                         onChange={(e) => setQuietHoursEnd(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-700 text-slate-800 dark:text-slate-200 text-xs rounded-lg px-2.5 py-1.5"
                       />
                     </div>
                   </div>
@@ -310,7 +310,7 @@ export const PolicyManagerView: React.FC<Props> = ({
                     max={5}
                     value={retryLimit}
                     onChange={(e) => setRetryLimit(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   />
                 </div>
 
@@ -324,13 +324,13 @@ export const PolicyManagerView: React.FC<Props> = ({
                     max={1440}
                     value={dedupWindow}
                     onChange={(e) => setDedupWindow(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setEditingPolicy(null)}

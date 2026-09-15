@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -138,7 +138,11 @@ export default function NewApplicationPage() {
   const totalRepayment = (Number(emi) * tenureNum).toFixed(2);
   const totalInterest = (Number(totalRepayment) - principalNum).toFixed(2);
 
+  const isSubmittingRef = useRef(false);
+
   async function handleSubmit() {
+    if (isSubmittingRef.current || saving) return;
+    isSubmittingRef.current = true;
     setError(null);
     setSaving(true);
     try {
@@ -161,6 +165,7 @@ export default function NewApplicationPage() {
       setError(apiErrorMessage(err));
     } finally {
       setSaving(false);
+      isSubmittingRef.current = false;
     }
   }
 
@@ -257,16 +262,20 @@ export default function NewApplicationPage() {
                 <p className="text-slate-600">
                   Mobile: {selectedCustomer.mobile} · Customer ID: {selectedCustomer.customerCode}
                 </p>
-                <p className="text-slate-600">
-                  KYC Status: <span className="font-semibold text-brand-800">{selectedCustomer.kycStatus}</span> · Risk:{' '}
-                  <span className="font-semibold">{selectedCustomer.riskCategory || 'PENDING'}</span>
-                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                    Origination Intake Desk
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Document Verification: Pending Credit Analyst Handover
+                  </span>
+                </div>
               </div>
 
               {/* Onboarding Prerequisites Check */}
               {isCheckingEligibility && (
                 <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-500 animate-pulse">
-                  Checking borrower onboarding and KYC verification status...
+                  Checking borrower document uploads and onboarding status...
                 </div>
               )}
 
@@ -276,10 +285,10 @@ export default function NewApplicationPage() {
                     <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold text-amber-900 dark:text-amber-200">
-                        Borrower Onboarding Incomplete — Origination Blocked
+                        Borrower Onboarding Incomplete — Missing Mandatory Documents / Details
                       </p>
                       <p className="text-amber-800 dark:text-amber-300 mt-0.5">
-                        In accordance with policy, loan origination requires core profile, verified KYC/photo documents, employment income, and a registered bank account.
+                        Please upload all required applicant documents, confirm employment classification, and link a disbursement bank account before completing origination.
                       </p>
                     </div>
                   </div>
@@ -295,7 +304,7 @@ export default function NewApplicationPage() {
                   <div className="pt-1">
                     <Link href={`/customers/${customerId}`}>
                       <Button size="sm" variant="secondary" className="text-xs gap-1.5 font-semibold bg-white dark:bg-amber-900/40 border-amber-300">
-                        <ExternalLink className="w-3.5 h-3.5" /> Open Customer 360 to Complete Onboarding →
+                        <ExternalLink className="w-3.5 h-3.5" /> Open Customer 360 to Upload Documents →
                       </Button>
                     </Link>
                   </div>

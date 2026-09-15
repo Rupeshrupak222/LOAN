@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -138,7 +138,11 @@ export default function NewApplicationPage() {
   const totalRepayment = (Number(emi) * tenureNum).toFixed(2);
   const totalInterest = (Number(totalRepayment) - principalNum).toFixed(2);
 
+  const isSubmittingRef = useRef(false);
+
   async function handleSubmit() {
+    if (isSubmittingRef.current || saving) return;
+    isSubmittingRef.current = true;
     setError(null);
     setSaving(true);
     try {
@@ -161,6 +165,7 @@ export default function NewApplicationPage() {
       setError(apiErrorMessage(err));
     } finally {
       setSaving(false);
+      isSubmittingRef.current = false;
     }
   }
 
@@ -279,7 +284,7 @@ export default function NewApplicationPage() {
                         Borrower Onboarding Incomplete — Origination Blocked
                       </p>
                       <p className="text-amber-800 dark:text-amber-300 mt-0.5">
-                        In accordance with policy, loan origination requires core profile, verified KYC/photo documents, employment income, and a registered bank account.
+                        In accordance with policy, loan origination requires core profile, uploaded mandatory documents, employment income, and a registered bank account.
                       </p>
                     </div>
                   </div>

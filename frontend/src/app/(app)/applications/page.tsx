@@ -26,7 +26,7 @@ export default function ApplicationsPage() {
     refetch,
   } = useOperationsApplications({
     page: 1,
-    pageSize: 15,
+    pageSize: 10,
     search: '',
     stage: '',
     priority: '',
@@ -57,14 +57,15 @@ export default function ApplicationsPage() {
               Refresh
             </Button>
             {canCreate && (
-              <Button
-                size="sm"
-                onClick={() => setCreateModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 font-semibold"
-              >
-                <Plus className="w-4 h-4" />
-                Originate Application
-              </Button>
+              <Link href="/applications/new">
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 font-semibold shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  Originate Application
+                </Button>
+              </Link>
             )}
           </div>
         }
@@ -83,6 +84,7 @@ export default function ApplicationsPage() {
         meta={meta}
         loading={loading}
         onPageChange={changePage}
+        onRefetch={refetch}
       />
 
       {/* Originate Application Wizard Modal */}

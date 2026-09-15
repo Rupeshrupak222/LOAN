@@ -93,7 +93,7 @@ export function CollectionQueueTable({
       {/* Top Filter Bar */}
       <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
         {/* Queue Type Tabs */}
-        <div className="inline-flex rounded-lg border border-slate-700 bg-slate-900/60 p-1">
+        <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950/60 p-1">
           {[
             { id: 'ALL', label: 'All Queues' },
             { id: 'MY_QUEUE', label: 'My Queue' },
@@ -104,10 +104,10 @@ export function CollectionQueueTable({
               key={tab.id}
               onClick={() => onSelectQueueType(tab.id as any)}
               className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                'px-3 py-1.5 text-xs font-medium rounded-lg transition-all',
                 queueType === tab.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
               )}
             >
               {tab.label}
@@ -124,7 +124,7 @@ export function CollectionQueueTable({
               placeholder="Search customer, loan, phone..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-slate-900/80 border border-slate-700 rounded-md pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -134,10 +134,10 @@ export function CollectionQueueTable({
                 key={b.value}
                 onClick={() => onSelectBucket(b.value)}
                 className={cn(
-                  'px-2.5 py-1 text-xs font-medium rounded-md border transition-all whitespace-nowrap',
+                  'px-2.5 py-1 text-xs font-medium rounded-lg border transition-all whitespace-nowrap',
                   selectedBucket === b.value
-                    ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                    : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+                    ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-slate-200'
                 )}
               >
                 {b.label}
@@ -148,10 +148,10 @@ export function CollectionQueueTable({
       </div>
 
       {/* Main Queue Table */}
-      <Card className="overflow-hidden border-slate-800 bg-slate-900/80 backdrop-blur-sm shadow-xl">
+      <Card noPadding className="overflow-hidden shadow-sm dark:shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="border-b border-slate-800 bg-slate-950/60 text-slate-400 uppercase font-medium">
+          <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+            <thead className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 uppercase font-medium">
               <tr>
                 <th className="py-3 px-4">Case / Customer</th>
                 <th className="py-3 px-4">Loan Details</th>
@@ -161,7 +161,7 @@ export function CollectionQueueTable({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-400">
@@ -173,22 +173,22 @@ export function CollectionQueueTable({
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">
                     <CheckCircle2 className="h-8 w-8 text-emerald-500/60 mx-auto mb-2" />
-                    <p className="font-medium text-slate-300">No Delinquent Cases in Queue</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-300">No Delinquent Cases in Queue</p>
                     <p className="text-xs text-slate-500 mt-1">All accounts are currently in good standing or filter criteria returned zero results.</p>
                   </td>
                 </tr>
               ) : (
                 cases.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     {/* Case & Customer */}
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-100 flex items-center gap-1.5">
-                        <Link href={`/collections/${c.id}`} className="hover:text-blue-400 transition-colors">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Link href={`/collections/${c.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                           {c.caseNo}
                         </Link>
                         {getStatusBadge(c.status)}
                       </div>
-                      <div className="text-slate-300 font-medium mt-0.5">{c.customerName}</div>
+                      <div className="text-slate-800 dark:text-slate-300 font-medium mt-0.5">{c.customerName}</div>
                       <div className="text-slate-500 text-[11px] flex items-center gap-2">
                         <span>{c.mobile}</span>
                         {c.city && <span>• {c.city}</span>}
@@ -197,8 +197,8 @@ export function CollectionQueueTable({
 
                     {/* Loan Details */}
                     <td className="py-3 px-4">
-                      <div className="font-mono text-slate-200">{c.loanNo}</div>
-                      <div className="text-slate-400 text-[11px] mt-0.5">
+                      <div className="font-mono text-slate-800 dark:text-slate-200">{c.loanNo}</div>
+                      <div className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
                         EMI: ₹{Number(c.emiAmount).toLocaleString()}
                       </div>
                       <div className="text-slate-500 text-[11px]">
@@ -208,19 +208,19 @@ export function CollectionQueueTable({
 
                     {/* Overdue & DPD */}
                     <td className="py-3 px-4">
-                      <div className="font-bold text-rose-400 text-sm">
+                      <div className="font-bold text-rose-600 dark:text-rose-400 text-sm">
                         ₹{Number(c.overdueAmount).toLocaleString()}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className={cn(
                           'px-1.5 py-0.5 rounded text-[10px] font-bold',
-                          c.dpd > 90 ? 'bg-rose-950 text-rose-300 border border-rose-800' :
-                          c.dpd > 30 ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                          'bg-blue-950 text-blue-300 border border-blue-800'
+                          c.dpd > 90 ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800' :
+                          c.dpd > 30 ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800' :
+                          'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'
                         )}>
                           DPD {c.dpd}
                         </span>
-                        <span className="text-slate-400 text-[11px] font-mono">
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono">
                           Bucket {c.agingBucket}
                         </span>
                       </div>
@@ -229,7 +229,7 @@ export function CollectionQueueTable({
                     {/* Priority & Strategy */}
                     <td className="py-3 px-4">
                       <div>{getPriorityBadge(c.priority, c.priorityScore)}</div>
-                      <div className="text-[11px] text-slate-300 font-medium mt-1 truncate max-w-[180px]" title={c.recommendedAction}>
+                      <div className="text-[11px] text-slate-800 dark:text-slate-300 font-medium mt-1 truncate max-w-[180px]" title={c.recommendedAction}>
                         {c.recommendedAction}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
@@ -243,13 +243,13 @@ export function CollectionQueueTable({
                         <div>
                           <span className={cn(
                             'text-[10px] font-semibold px-1.5 py-0.5 rounded',
-                            c.latestPtpStatus === 'KEPT' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
-                            c.latestPtpStatus === 'BROKEN' ? 'bg-rose-950 text-rose-400 border border-rose-800' :
-                            'bg-amber-950 text-amber-400 border border-amber-800'
+                            c.latestPtpStatus === 'KEPT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800' :
+                            c.latestPtpStatus === 'BROKEN' ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-400 dark:border-rose-800' :
+                            'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800'
                           )}>
                             PTP ₹{Number(c.latestPtpAmount).toLocaleString()}
                           </span>
-                          <div className="text-slate-400 text-[11px] mt-0.5">
+                          <div className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
                             By {c.latestPtpDate ? formatDate(c.latestPtpDate) : 'N/A'}
                           </div>
                         </div>
@@ -257,8 +257,8 @@ export function CollectionQueueTable({
                         <div className="text-slate-500 text-[11px]">No active PTP</div>
                       )}
                       {c.nextFollowUpDate && (
-                        <div className="text-slate-400 text-[10px] mt-1 flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-blue-400" />
+                        <div className="text-slate-500 dark:text-slate-400 text-[10px] mt-1 flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                           Follow-up: {formatDate(c.nextFollowUpDate)}
                         </div>
                       )}
@@ -270,34 +270,34 @@ export function CollectionQueueTable({
                         <button
                           onClick={() => onOpenActivity(c)}
                           title="Log Contact Activity"
-                          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:hover:text-white transition-colors cursor-pointer"
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => onOpenPtp(c)}
                           title="Record Promise to Pay"
-                          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 transition-colors"
+                          className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-amber-300 dark:hover:text-amber-200 transition-colors cursor-pointer"
                         >
                           <Calendar className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => onOpenAssign(c)}
                           title="Assign Collector"
-                          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-blue-300 hover:text-blue-200 transition-colors"
+                          className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-blue-300 dark:hover:text-blue-200 transition-colors cursor-pointer"
                         >
                           <UserCheck className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => onOpenEscalate(c)}
                           title="Escalate Case"
-                          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-rose-300 hover:text-rose-200 transition-colors"
+                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-rose-300 dark:hover:text-rose-200 transition-colors cursor-pointer"
                         >
                           <ShieldAlert className="h-3.5 w-3.5" />
                         </button>
                         <Link
                           href={`/collections/${c.id}`}
-                          className="p-1.5 rounded-md bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-300 transition-colors"
+                          className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-600/20 dark:hover:bg-blue-600/40 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                           title="View Case Docket"
                         >
                           <ArrowUpRight className="h-3.5 w-3.5" />

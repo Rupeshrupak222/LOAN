@@ -15,11 +15,11 @@ export default function AuditorDashboardPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
+        <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-400">Total Audit Events</p>
-              <h3 className="text-2xl font-bold text-white mt-1">124,592</h3>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Audit Events</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">124,592</h3>
             </div>
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <ShieldCheck className="w-5 h-5 text-blue-400" />
@@ -27,11 +27,11 @@ export default function AuditorDashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
+        <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-400">Applications Inspected</p>
-              <h3 className="text-2xl font-bold text-white mt-1">8,941</h3>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Applications Inspected</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">8,941</h3>
             </div>
             <div className="p-2 bg-emerald-500/10 rounded-lg">
               <FileText className="w-5 h-5 text-emerald-400" />
@@ -39,10 +39,10 @@ export default function AuditorDashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
+        <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-400">Pending Findings</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Pending Findings</p>
               <h3 className="text-2xl font-bold text-amber-400 mt-1">14</h3>
             </div>
             <div className="p-2 bg-amber-500/10 rounded-lg">
@@ -51,10 +51,10 @@ export default function AuditorDashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
+        <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-400">Policy Violations</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Policy Violations</p>
               <h3 className="text-2xl font-bold text-red-400 mt-1">0</h3>
             </div>
             <div className="p-2 bg-red-500/10 rounded-lg">
@@ -65,16 +65,16 @@ export default function AuditorDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
-          <h3 className="text-lg font-medium text-white mb-4">Recent High-Risk Audit Events</h3>
-          <div className="text-sm text-slate-400 py-8 text-center border border-dashed border-slate-700/50 rounded-lg">
+        <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-4">Recent High-Risk Audit Events</h3>
+          <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
             No high-risk policy deviations detected recently.
           </div>
         </Card>
 
-        <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
-          <h3 className="text-lg font-medium text-white mb-4">Failed Financial Controls</h3>
-          <div className="text-sm text-slate-400 py-8 text-center border border-dashed border-slate-700/50 rounded-lg">
+        <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-4">Failed Financial Controls</h3>
+          <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
             All general ledger postings successfully reconciled.
           </div>
         </Card>

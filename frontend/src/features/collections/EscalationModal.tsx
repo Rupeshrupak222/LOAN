@@ -46,24 +46,24 @@ export function EscalationModal({ isOpen, onClose, caseItem }: EscalationModalPr
   if (!isOpen || !caseItem) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-6">
-        <h3 className="text-base font-bold text-rose-400 mb-1 flex items-center gap-1.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      <Card className="w-full max-w-md shadow-2xl p-6">
+        <h3 className="text-base font-bold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1.5">
           Escalate Delinquent Case
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Escalate case <span className="font-mono text-slate-200 font-semibold">{caseItem.caseNo}</span> ({caseItem.customerName}, DPD {caseItem.dpd}, Overdue ₹{Number(caseItem.overdueAmount).toLocaleString()}) to a supervisory tier.
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Escalate case <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">{caseItem.caseNo}</span> ({caseItem.customerName}, DPD {caseItem.dpd}, Overdue ₹{Number(caseItem.overdueAmount).toLocaleString()}) to a supervisory tier.
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Escalation Trigger Reason *
             </label>
             <select
               value={triggerReason}
               onChange={(e) => setTriggerReason(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="REPEATED_CONTACT_FAILURE">Repeated Contact Failure / Unreachable</option>
               <option value="CONSECUTIVE_BROKEN_PTPS">Consecutive Broken Promises (PTPs)</option>
@@ -75,13 +75,13 @@ export function EscalationModal({ isOpen, onClose, caseItem }: EscalationModalPr
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Escalation Target Tier *
             </label>
             <select
               value={toTier}
               onChange={(e) => setToTier(e.target.value as any)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="TIER_2_SUPERVISOR">Tier 2: Collection Supervisor / Team Lead</option>
               <option value="TIER_3_COLLECTION_MANAGER">Tier 3: Branch / Collection Manager</option>
@@ -90,7 +90,7 @@ export function EscalationModal({ isOpen, onClose, caseItem }: EscalationModalPr
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Escalation Justification & Background Notes *
             </label>
             <textarea
@@ -98,11 +98,11 @@ export function EscalationModal({ isOpen, onClose, caseItem }: EscalationModalPr
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Detail reasons for escalation, previous agent efforts, summary of calls/notices..."
               rows={3}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" size="sm" onClick={onClose} disabled={escalationMutation.isPending}>
               Cancel
             </Button>

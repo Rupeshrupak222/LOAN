@@ -19,9 +19,8 @@ export default function SubmitToCreditPage() {
   });
 
   const apps = Array.isArray(data) ? data : [];
-  // For Submit to Credit, show apps where KYC is verified and all mandatory gates passed
-  // (Assuming backend will authoritative block if something is missing, but frontend can filter optimistic)
-  const submitApps = apps.filter(a => a.status === 'DRAFT' && a.kycStatus === 'VERIFIED');
+  // For Submit to Credit, show all draft applications ready for final review and forward
+  const submitApps = apps.filter(a => a.status === 'DRAFT');
 
   return (
     <div className="space-y-6">

@@ -116,14 +116,14 @@ export default function SupportSlaPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-xl">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900/60 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 backdrop-blur-xl shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-500/20">
             <LifeBuoy className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Enterprise SLA & Support Center</h1>
-            <p className="text-sm text-slate-400">Severity-Based SLA Deadlines, Incident Postmortems & MTTA/MTTR Analytics</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Enterprise SLA & Support Center</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Severity-Based SLA Deadlines, Incident Postmortems & MTTA/MTTR Analytics</p>
           </div>
         </div>
 
@@ -133,57 +133,57 @@ export default function SupportSlaPage() {
               refetchTickets();
               refetchIncidents();
             }}
-            className="p-2 text-slate-400 hover:text-white bg-slate-800 border border-slate-700 rounded-xl"
+            className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xs cursor-pointer"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-            <span className="text-xs font-semibold text-emerald-400">{complianceRate}% Contractual SLA Compliance</span>
+          <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl">
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{complianceRate}% Contractual SLA Compliance</span>
           </div>
         </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
-          <span className="text-xs text-slate-400 font-medium">SLA Compliance Rate</span>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">{complianceRate}%</p>
-          <span className="text-[11px] text-slate-500">0 Critical Breaches</span>
+        <div className="p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">SLA Compliance Rate</span>
+          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{complianceRate}%</p>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">0 Critical Breaches</span>
         </div>
-        <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
-          <span className="text-xs text-slate-400 font-medium">Mean Time to Acknowledge (MTTA)</span>
-          <p className="text-2xl font-bold text-indigo-400 mt-1">{mtta} mins</p>
-          <span className="text-[11px] text-slate-500">Target: &lt; 15 mins (P1)</span>
+        <div className="p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mean Time to Acknowledge (MTTA)</span>
+          <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{mtta} mins</p>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">Target: &lt; 15 mins (P1)</span>
         </div>
-        <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
-          <span className="text-xs text-slate-400 font-medium">Mean Time to Resolve (MTTR)</span>
-          <p className="text-2xl font-bold text-cyan-400 mt-1">{mttr} mins</p>
-          <span className="text-[11px] text-slate-500">Target: &lt; 120 mins (P1)</span>
+        <div className="p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mean Time to Resolve (MTTR)</span>
+          <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400 mt-1">{mttr} mins</p>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">Target: &lt; 120 mins (P1)</span>
         </div>
-        <div className="p-5 bg-slate-900/40 rounded-2xl border border-slate-800">
-          <span className="text-xs text-slate-400 font-medium">Active Incidents</span>
-          <p className="text-2xl font-bold text-white mt-1">{activeIncidentsCount} Active</p>
-          <span className="text-[11px] text-emerald-400">
+        <div className="p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Active Incidents</span>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{activeIncidentsCount} Active</p>
+          <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
             {activeIncidentsCount === 0 ? 'All services operational' : `${activeIncidentsCount} under resolution`}
           </span>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
         <button
           onClick={() => setActiveTab('TICKETS')}
-          className={`px-4 py-2 text-sm font-medium rounded-xl transition-all ${
-            activeTab === 'TICKETS' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'
+          className={`px-4 py-2 text-sm font-medium rounded-xl transition-all cursor-pointer ${
+            activeTab === 'TICKETS' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           Support Tickets Queue ({tickets.length})
         </button>
         <button
           onClick={() => setActiveTab('INCIDENTS')}
-          className={`px-4 py-2 text-sm font-medium rounded-xl transition-all ${
-            activeTab === 'INCIDENTS' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'
+          className={`px-4 py-2 text-sm font-medium rounded-xl transition-all cursor-pointer ${
+            activeTab === 'INCIDENTS' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           Enterprise Incidents & Postmortems ({incidents.length})
@@ -198,10 +198,10 @@ export default function SupportSlaPage() {
               <button
                 key={sev}
                 onClick={() => setSeverityFilter(sev)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                   severityFilter === sev
-                    ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:border-indigo-500 dark:text-indigo-300'
+                    : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {sev.replace(/_/g, ' ')}
@@ -210,14 +210,14 @@ export default function SupportSlaPage() {
           </div>
 
           {/* Ticket Table */}
-          <div className="bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden">
+          <div className="bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             {filteredTickets.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">
+              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                 <p className="text-sm">No support tickets match the selected filter.</p>
               </div>
             ) : (
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-50 dark:bg-slate-950/60 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="p-4">Ticket ID & Title</th>
                     <th className="p-4">Severity</th>
@@ -227,26 +227,26 @@ export default function SupportSlaPage() {
                     <th className="p-4">SLA Resolution Target</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredTickets.map((tkt) => (
-                    <tr key={tkt.id} className="hover:bg-slate-800/30 transition-all">
+                    <tr key={tkt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all">
                       <td className="p-4">
-                        <span className="text-xs font-mono text-indigo-400 block">{tkt.id}</span>
-                        <span className="font-medium text-white text-sm">{tkt.title}</span>
+                        <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 block">{tkt.id}</span>
+                        <span className="font-medium text-slate-900 dark:text-white text-sm">{tkt.title}</span>
                       </td>
                       <td className="p-4">
                         <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${getSeverityBadge(tkt.severity)}`}>
                           {tkt.severity.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td className="p-4 text-xs text-slate-400">{tkt.category}</td>
+                      <td className="p-4 text-xs text-slate-500 dark:text-slate-400">{tkt.category}</td>
                       <td className="p-4">
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-slate-300">
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                           {tkt.status}
                         </span>
                       </td>
-                      <td className="p-4 text-xs text-slate-300 font-mono">{tkt.assignedTeam}</td>
-                      <td className="p-4 text-xs font-medium text-slate-300">
+                      <td className="p-4 text-xs text-slate-600 dark:text-slate-300 font-mono">{tkt.assignedTeam}</td>
+                      <td className="p-4 text-xs font-medium text-slate-600 dark:text-slate-300">
                         {tkt.resolutionDeadline ? new Date(tkt.resolutionDeadline).toLocaleString() : 'N/A'}
                       </td>
                     </tr>
@@ -261,38 +261,38 @@ export default function SupportSlaPage() {
       {activeTab === 'INCIDENTS' && (
         <div className="space-y-4">
           {incidents.length === 0 ? (
-            <div className="p-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-white">No Enterprise Incidents Recorded</p>
+            <div className="p-8 text-center bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 shadow-sm">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 dark:text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">No Enterprise Incidents Recorded</p>
               <p className="text-xs mt-1">All platform infrastructure and integrations operating normally.</p>
             </div>
           ) : (
             incidents.map((inc) => (
-              <div key={inc.id} className="p-6 bg-slate-900/40 rounded-2xl border border-slate-800 space-y-4">
+              <div key={inc.id} className="p-6 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-rose-400">{inc.id}</span>
+                      <span className="text-xs font-mono text-rose-600 dark:text-rose-400">{inc.id}</span>
                       <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${getSeverityBadge(inc.severity)}`}>
                         {inc.severity}
                       </span>
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                         STAGE: {inc.stage}
                       </span>
                     </div>
-                    <h3 className="text-lg font-bold text-white mt-1">{inc.title}</h3>
-                    <p className="text-xs text-slate-400 mt-1">{inc.impactSummary}</p>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1">{inc.title}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{inc.impactSummary}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <span className="text-xs font-bold text-amber-400 uppercase">Root Cause Analysis</span>
-                    <p className="text-xs text-slate-300 mt-1">{inc.rootCause || 'Under investigation'}</p>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">Root Cause Analysis</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{inc.rootCause || 'Under investigation'}</p>
                   </div>
-                  <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-                    <span className="text-xs font-bold text-emerald-400 uppercase">Mitigation & Circuit Breaker</span>
-                    <p className="text-xs text-slate-300 mt-1">{inc.mitigationSteps || 'Mitigation in progress'}</p>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase">Mitigation & Circuit Breaker</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{inc.mitigationSteps || 'Mitigation in progress'}</p>
                   </div>
                 </div>
               </div>

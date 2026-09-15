@@ -554,14 +554,14 @@ export function calculateApplicableDocuments(
       });
 
       if (empType === 'STUDENT') {
-        optional.push({
+        mandatory.push({
           code: 'STUDENT_ID_PROOF',
           category: 'EMPLOYMENT_PROOF',
           defaultDocumentType: 'STUDENT_ID',
-          acceptedDocumentTypes: ['STUDENT_ID', 'COLLEGE_ID', 'ADMISSION_LETTER'],
+          acceptedDocumentTypes: ['STUDENT_ID', 'COLLEGE_ID', 'ADMISSION_LETTER', 'ENROLLMENT_CERTIFICATE', 'STUDENT_PROOF', 'STUDENT_ID_CARD', 'STUDENT_ID_PROOF'],
           name: 'Student ID / University Admission Letter',
-          description: 'Valid college identification card or course admission letter',
-          status: 'OPTIONAL',
+          description: 'Valid college/institution identification card, enrollment proof, or admission letter',
+          status: 'MANDATORY',
           allowMultiple: false,
         });
       }
@@ -709,15 +709,250 @@ export function calculateApplicableDocuments(
   };
 }
 
+
+function normalizeClean(str?: string | null): string {
+  if (!str) return '';
+  return str.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function normalizeWords(str?: string | null): string {
+  if (!str) return '';
+  return str.toUpperCase().replace(/[^A-Z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
- * Checks which mandatory rules are satisfied by the current uploaded documents
+ * Robust document matcher: Determines if an uploaded document satisfies a rule definition.
+ */
+export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): boolean {
+  if (!doc) return false;
+
+  // 1. Explicit Rule Code Match
+  if (doc.ruleCode && (doc.ruleCode === rule.code || normalizeClean(doc.ruleCode) === normalizeClean(rule.code))) {
+    return true;
+  }
+
+  const rawCategory = (doc.category || '').toUpperCase().trim();
+  const rawType = (doc.documentType || '').toUpperCase().trim();
+  const rawName = (doc.documentName || '').toUpperCase().trim();
+  const rawFile = (doc.fileName || (doc.file && doc.file.name) || '').toUpperCase().trim();
+  const rawDesc = (doc.description || '').toUpperCase().trim();
+
+  const combinedWords = normalizeWords(`${rawCategory} ${rawType} ${rawName} ${rawFile} ${rawDesc}`);
+  const combinedClean = normalizeClean(`${rawCategory} ${rawType} ${rawName} ${rawFile} ${rawDesc}`);
+
+  const ruleCodeClean = normalizeClean(rule.code);
+  const ruleNameClean = normalizeClean(rule.name);
+
+  // 2. Direct Rule Code / Rule Name Clean Match
+  if (combinedClean.includes(ruleCodeClean) || combinedClean.includes(ruleNameClean)) {
+    return true;
+  }
+
+  // 3. Check Accepted Document Types
+  for (const accepted of rule.acceptedDocumentTypes) {
+    const accClean = normalizeClean(accepted);
+    const accWords = normalizeWords(accepted);
+    if (combinedClean.includes(accClean) || combinedWords.includes(accWords)) {
+      return true;
+    }
+  }
+
+  // 4. Semantic Keyword Matching per Rule Code
+  switch (rule.code) {
+    case 'STUDENT_ID_PROOF': {
+      if (
+        combinedWords.includes('STUDENT') ||
+        combinedWords.includes('COLLEGE') ||
+        combinedWords.includes('ADMISSION') ||
+        combinedWords.includes('ENROLLMENT') ||
+        combinedWords.includes('UNIVERSITY') ||
+        combinedWords.includes('BONAFIDE') ||
+        combinedClean.includes('IDCARD') ||
+        combinedClean.includes('STUDENTID') ||
+        rawCategory === 'EMPLOYMENT_PROOF'
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'IDENTITY_PROOF': {
+      if (
+        rawCategory === 'IDENTITY_PROOF' ||
+        combinedWords.includes('IDENTITY') ||
+        combinedWords.includes('POI') ||
+        combinedWords.includes('PAN') ||
+        combinedWords.includes('AADHAAR') ||
+        combinedWords.includes('ADHAAR') ||
+        combinedWords.includes('PASSPORT') ||
+        combinedWords.includes('VOTER') ||
+        combinedWords.includes('DRIVING LICENSE')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'ADDRESS_PROOF': {
+      if (
+        rawCategory === 'ADDRESS_PROOF' ||
+        combinedWords.includes('ADDRESS') ||
+        combinedWords.includes('POA') ||
+        combinedWords.includes('UTILITY') ||
+        combinedWords.includes('ELECTRICITY') ||
+        combinedWords.includes('RENT') ||
+        combinedWords.includes('WATER') ||
+        combinedWords.includes('GAS BILL')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'APPLICANT_PHOTO': {
+      if (
+        rawCategory === 'APPLICANT_PHOTO' ||
+        combinedWords.includes('PHOTO') ||
+        combinedWords.includes('SELFIE') ||
+        combinedWords.includes('PASSPORT PHOTO') ||
+        combinedClean.includes('APPLICANTPHOTO')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'SALARY_SLIPS': {
+      if (
+        combinedWords.includes('SALARY') ||
+        combinedWords.includes('PAYSLIP') ||
+        combinedWords.includes('PAY SLIP') ||
+        combinedWords.includes('WAGE')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'BANK_STATEMENTS':
+    case 'BUSINESS_BANK_STATEMENTS': {
+      if (
+        combinedWords.includes('BANK STATEMENT') ||
+        combinedWords.includes('PASSBOOK') ||
+        (combinedWords.includes('BANK') && combinedWords.includes('STATEMENT')) ||
+        rawCategory === 'BANK_STATEMENT'
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'BUSINESS_ITR':
+    case 'FORM_16': {
+      if (
+        combinedWords.includes('ITR') ||
+        combinedWords.includes('FORM 16') ||
+        combinedWords.includes('FORM16') ||
+        combinedWords.includes('INCOME TAX') ||
+        combinedWords.includes('TAX RETURN')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'PROFESSIONAL_DEGREE': {
+      if (
+        combinedWords.includes('DEGREE') ||
+        combinedWords.includes('CERTIFICATE') ||
+        combinedWords.includes('COUNCIL') ||
+        combinedWords.includes('PRACTICE') ||
+        combinedWords.includes('LICENSE')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'LAND_OWNERSHIP': {
+      if (
+        combinedWords.includes('LAND') ||
+        combinedWords.includes('KHASRA') ||
+        combinedWords.includes('KHATAUNI') ||
+        combinedWords.includes('7 12') ||
+        combinedClean.includes('712') ||
+        combinedWords.includes('JAMABANDI') ||
+        combinedWords.includes('PATTA')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'PENSION_PROOF': {
+      if (
+        combinedWords.includes('PENSION') ||
+        combinedWords.includes('PPO') ||
+        combinedWords.includes('RETIREMENT')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'CO_APPLICANT_KYC': {
+      if (
+        combinedWords.includes('CO APPLICANT') ||
+        combinedWords.includes('GUARANTOR') ||
+        combinedWords.includes('SPONSOR KYC')
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'CO_APPLICANT_INCOME': {
+      if (
+        combinedWords.includes('CO APPLICANT') ||
+        combinedWords.includes('SPONSOR INCOME') ||
+        combinedWords.includes('GUARANTOR INCOME')
+      ) {
+        return true;
+      }
+      break;
+    }
+  }
+
+  // 5. Direct Category Match if Category equals Rule Category
+  if (rawCategory && rawCategory === rule.category.toUpperCase()) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Evaluates whether an array of uploaded customer documents satisfies
+ * the dynamic mandatory checklist.
  */
 export function evaluateDocumentFulfillment(
-  uploadedDocuments: UploadedDocItem[],
+  uploadedDocuments: any[],
   employmentTypeRaw?: string | null,
   productTypeRaw?: string | null,
   context: { monthlyIncome?: number; requestedAmount?: number } = {}
-) {
+): {
+  isComplete: boolean;
+  mandatoryCount: number;
+  uploadedCount: number;
+  missingCodes: string[];
+  missingNames: string[];
+  checklistStatus: Array<{
+    rule: DocumentRuleDefinition;
+    isSatisfied: boolean;
+    matchingDocs: any[];
+  }>;
+  rules: DynamicDocumentChecklist;
+} {
   const rules = calculateApplicableDocuments(employmentTypeRaw, productTypeRaw, context);
   const docs = Array.isArray(uploadedDocuments) ? uploadedDocuments : [];
 
@@ -725,32 +960,7 @@ export function evaluateDocumentFulfillment(
   const missingNames: string[] = [];
 
   const checklistStatus = rules.mandatory.map((rule) => {
-    const matchingDocs = docs.filter((d) => {
-      const docCategory = (d.category || '').toUpperCase().trim();
-      const docType = (d.documentType || '').toUpperCase().trim();
-      const docName = (d.documentName || '').toUpperCase().trim();
-
-      if (d.ruleCode && d.ruleCode === rule.code) return true;
-
-      const matchesAcceptedType = rule.acceptedDocumentTypes.some((type) => {
-        const t = type.toUpperCase();
-        return docType === t || docType.includes(t) || docName.includes(t);
-      });
-
-      if (matchesAcceptedType) return true;
-
-      if (docType === rule.code || docName === rule.code || docType.includes(rule.code)) {
-        return true;
-      }
-
-      if (['APPLICANT_PHOTO', 'IDENTITY_PROOF', 'ADDRESS_PROOF', 'PROPERTY_PROOF', 'COLLATERAL_PROOF'].includes(rule.category)) {
-        if (docCategory === rule.category.toUpperCase() && !docType.includes('INCOME') && !docType.includes('BANK')) {
-          return true;
-        }
-      }
-
-      return false;
-    });
+    const matchingDocs = docs.filter((d) => isDocumentMatchingRule(d, rule));
 
     const isSatisfied = matchingDocs.length > 0;
     if (!isSatisfied) {

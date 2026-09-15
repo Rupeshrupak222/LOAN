@@ -68,7 +68,7 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white">RBI KFS & Pricing Simulator</h2>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">RBI KFS &amp; Pricing Simulator</h2>
                 <Badge variant="info" className="text-[10px]">
                   {product.name}
                 </Badge>
@@ -249,14 +249,14 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
                   className={cn(
                     'p-4 rounded-xl border flex items-start gap-3',
                     sim.eligibilityCheck.eligible
-                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                      : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300'
                   )}
                 >
                   {sim.eligibilityCheck.eligible ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
                   ) : (
-                    <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
                   )}
                   <div>
                     <h5 className="text-xs font-bold uppercase">
@@ -265,13 +265,13 @@ export function PricingSimulatorModal({ product, onClose }: Props) {
                         : 'Policy Variance Detected'}
                     </h5>
                     {sim.eligibilityCheck.computedFoirPct != null && (
-                      <p className="text-[11px] mt-0.5 text-slate-300">
+                      <p className="text-[11px] mt-0.5 text-slate-600 dark:text-slate-300">
                         Computed FOIR: <strong>{sim.eligibilityCheck.computedFoirPct}%</strong> (Max Cap:{' '}
                         {product.creditPolicy?.maxFoirPct}%)
                       </p>
                     )}
                     {sim.eligibilityCheck.reasons.length > 0 && (
-                      <ul className="text-[11px] list-disc list-inside mt-1 text-amber-200 space-y-0.5">
+                      <ul className="text-[11px] list-disc list-inside mt-1 text-amber-700 dark:text-amber-200 space-y-0.5">
                         {sim.eligibilityCheck.reasons.map((r, i) => (
                           <li key={i}>{r}</li>
                         ))}

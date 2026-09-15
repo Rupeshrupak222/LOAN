@@ -50,18 +50,18 @@ export function FollowUpModal({ isOpen, onClose, caseItem }: FollowUpModalProps)
   if (!isOpen || !caseItem) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-6">
-        <h3 className="text-base font-bold text-slate-100 mb-1">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      <Card className="w-full max-w-md shadow-2xl p-6">
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
           Schedule Follow-up Task
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Create operational task for <span className="font-semibold text-slate-200">{caseItem.customerName}</span> ({caseItem.caseNo}).
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Create operational task for <span className="font-semibold text-slate-800 dark:text-slate-200">{caseItem.customerName}</span> ({caseItem.caseNo}).
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Action Title / Task Goal *
             </label>
             <input
@@ -69,31 +69,31 @@ export function FollowUpModal({ isOpen, onClose, caseItem }: FollowUpModalProps)
               placeholder="e.g. Call borrower to confirm salary credit and execute UPI link"
               value={actionTitle}
               onChange={(e) => setActionTitle(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Due Date *
               </label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Task Priority
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="LOW">Low</option>
                 <option value="MEDIUM">Medium</option>
@@ -104,7 +104,7 @@ export function FollowUpModal({ isOpen, onClose, caseItem }: FollowUpModalProps)
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Task Notes & Special Instructions
             </label>
             <textarea
@@ -112,11 +112,11 @@ export function FollowUpModal({ isOpen, onClose, caseItem }: FollowUpModalProps)
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Provide checklist or previous interaction summary..."
               rows={2}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" size="sm" onClick={onClose} disabled={followUpMutation.isPending}>
               Cancel
             </Button>

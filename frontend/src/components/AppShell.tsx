@@ -73,6 +73,7 @@ const NAV_ICONS: Record<string, any> = {
   tasks: Clock,
   support: Headphones,
   customers: Users,
+  leads: Sparkles,
   'review-complete': CheckCircle2,
   'submit-to-credit': Send,
   'returned-applications': RotateCcw,
@@ -263,7 +264,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Instant Navigation Route Progress Bar */}
       <NavigationProgressBar />
 
-      {/* Sidebar - Sleek Enterprise Navy */}
+      {/* Sidebar - Theme Adaptive */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-30 flex h-full w-64 flex-col flex-none border-r border-[#1E2445]/80 bg-[#060F1B] transition-transform lg:static lg:translate-x-0',
@@ -280,14 +281,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Layers className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white tracking-tight leading-none truncate max-w-[170px]">
+              <p className="text-sm font-bold tracking-tight leading-none truncate max-w-[170px] text-white">
                 {primaryRole === 'CUSTOMER'
                   ? `${branding?.institutionName ? branding.institutionName.split(' ')[0] : 'Adyapan'} Portal`
                   : primaryRole === 'AUDITOR'
                     ? `${branding?.institutionName ? branding.institutionName.split(' ')[0] : 'Adyapan'} Audit`
                     : (branding?.portalTitle || branding?.institutionName || 'Adyapan Enterprise LMS')}
               </p>
-              <p className="text-xs font-medium text-slate-400 mt-0.5 truncate max-w-[170px]">
+              <p className="text-xs font-medium mt-0.5 truncate max-w-[170px] text-slate-400">
                 {primaryRole === 'CUSTOMER'
                   ? 'Borrower Self-Service'
                   : primaryRole === 'AUDITOR'
@@ -299,19 +300,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Workspace Switcher Pill (hidden for SUPER_ADMIN, CUSTOMER, and focused operational desks) */}
-        {authorizedWorkspaces.length > 1 && primaryRole !== 'SUPER_ADMIN' && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && (
+        {authorizedWorkspaces.length > 1 && primaryRole !== 'SUPER_ADMIN' && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && primaryRole !== 'LOAN_OFFICER' && (
           <div className="relative px-3 pt-3 flex-none">
             <button
               type="button"
               onClick={() => setWorkspaceDropdownOpen(!workspaceDropdownOpen)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#1E2445] bg-[#1E2445]/70 px-3 py-2 text-left text-xs transition-all hover:border-blue-500/50 hover:bg-[#1E2445]"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#1E2445] bg-[#1E2445]/70 hover:border-blue-500/50 hover:bg-[#1E2445] text-white px-3 py-2 text-left text-xs transition-all"
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="flex h-6 w-6 flex-none items-center justify-center rounded-lg bg-blue-600/20 text-blue-400">
                   <WorkspaceIcon className="h-3.5 w-3.5" />
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-white leading-tight">
+                  <p className="truncate text-xs font-bold leading-tight text-white">
                     {currentWorkspaceConfig.shortLabel}
                   </p>
                   <p className="truncate text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
@@ -415,7 +416,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 })}
               </div>
             </div>
-          ) : primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' ? (
+          ) : primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' || primaryRole === 'LOAN_OFFICER' ? (
             <div className="space-y-1">
               <div className="space-y-0.5 pt-1">
                 {roleCfg.nav.map((navKey) => {
@@ -504,10 +505,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-white leading-tight">
+                <p className="truncate text-xs font-bold leading-tight text-white">
                   {user.firstName} {user.lastName}
                 </p>
-                <p className="truncate text-[10px] font-medium text-slate-400 mt-0.5">{roleCfg.label}</p>
+                <p className="truncate text-[10px] font-medium mt-0.5 text-slate-400">{roleCfg.label}</p>
               </div>
             </div>
             <div className="h-2 w-2 rounded-full bg-[#10B981]" title="Online" />

@@ -123,7 +123,7 @@ export const PERMISSION_ALIAS_MAP: Record<string, string[]> = {
   'collection.writeoff.approve': ['collection.writeoff.approve', 'COLLECTIONS_WRITEOFF_APPROVE'],
 
   // Accounting & GL
-  'finance.gl.view': ['finance.gl.view', 'ACCOUNTING_VIEW'],
+  'finance.gl.view': ['finance.gl.view', 'ACCOUNTING_VIEW', 'accounting.view'],
   'finance.gl.post': ['finance.gl.post', 'JOURNAL_POST'],
   'accounting.view': ['accounting.view', 'ACCOUNTING_VIEW'],
   'accounting.dashboard.view': ['accounting.dashboard.view', 'ACCOUNTING_DASHBOARD_VIEW'],

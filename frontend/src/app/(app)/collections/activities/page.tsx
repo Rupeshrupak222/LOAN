@@ -11,9 +11,9 @@ export default function CollectionActivitiesPage() {
         title="Collection Activities"
         subtitle="Log of all collection calls, SMS, emails, and field visits."
       />
-      <Card className="p-6 border border-slate-800/80 bg-slate-900/50">
-        <div className="text-sm text-slate-400 py-8 text-center border border-dashed border-slate-700/50 rounded-lg">
-          [Collection Activities feed and reports will render here]
+      <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+        <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
+          [Collection Activities Table component goes here]
         </div>
       </Card>
     </div>

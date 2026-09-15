@@ -350,6 +350,8 @@ export default function CustomerDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['loan-officer-dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-origination-eligibility'] });
       setDocModalOpen(false);
       setSelectedFile(null);
       setFilePreview(null);
@@ -524,10 +526,10 @@ export default function CustomerDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
               <Link href={`/applications/new?customerId=${params.id}`}>
-                <Button size="sm" className="flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Originate Loan
+                <Button size="sm" className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs cursor-pointer">
+                  <Plus className="h-3.5 w-3.5" /> Originate Application
                 </Button>
               </Link>
             )}
@@ -1209,24 +1211,28 @@ export default function CustomerDetailPage() {
                                 }}
                                 className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
                               >
-                                <Send className="w-3 h-3" /> Forward
+                                <Send className="w-3 h-3" /> Forward to Credit
                               </Button>
-                            ) : ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
+                            ) : app.status === 'RETURNED' || app.underwriting?.decision === 'SEND_BACK' ? (
                               <Button
                                 size="sm"
                                 variant="secondary"
                                 disabled={forwardAppMutation.isPending}
                                 onClick={() => {
-                                  if (confirm(`Re-Forward Application #${app.applicationNo} to Credit Analyst queue?`)) {
+                                  if (confirm(`Resubmit corrected Application #${app.applicationNo} to Credit Analyst?`)) {
                                     forwardAppMutation.mutate(app.id);
                                   }
                                 }}
-                                className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-                                title="Re-forward this application to Credit Analyst queue"
+                                className="text-xs text-amber-600 border-amber-200 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
                               >
-                                <RotateCcw className="w-3 h-3" /> Re-Forward
+                                <RotateCcw className="w-3 h-3" /> Resubmit to Credit
                               </Button>
-                            ) : null
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>In Credit Review</span>
+                              </span>
+                            )
                           ) : isCreditAnalyst ? (
                             ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
                               <Link href={`/credit-assessment?applicationId=${app.id}`}>
