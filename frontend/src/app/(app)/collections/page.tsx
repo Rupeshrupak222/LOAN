@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -8,22 +8,60 @@ import {
   TrendingUp,
   CheckCircle2,
   RefreshCw,
+  PlusCircle,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { Button, KpiCard } from '@/components/ui';
+import { Button, KpiCard, Card } from '@/components/ui';
 import { useToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { collectionsApi } from '@/features/collections/api';
 import { CollectionAnalyticsView } from '@/features/collections/CollectionAnalyticsView';
+import { CollectionQueueTable } from '@/features/collections/CollectionQueueTable';
+import { ContactActivityModal } from '@/features/collections/ContactActivityModal';
+import { PtpModal } from '@/features/collections/PtpModal';
+import { AssignmentModal } from '@/features/collections/AssignmentModal';
+import { EscalationModal } from '@/features/collections/EscalationModal';
+import { StrategyConfigModal } from '@/features/collections/StrategyConfigModal';
+import type { CollectionCaseSummary } from '@/features/collections/types';
 
 export default function CollectionsDashboardPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
 
+  const [activeTab, setActiveTab] = useState<'QUEUE' | 'ANALYTICS' | 'STRATEGIES'>('QUEUE');
+  const [queueType, setQueueType] = useState<'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL'>('ALL');
+  const [selectedBucket, setSelectedBucket] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Selected case for action modals
+  const [selectedCase, setSelectedCase] = useState<CollectionCaseSummary | null>(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [ptpModalOpen, setPtpModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
+  const [strategyModalOpen, setStrategyModalOpen] = useState(false);
+
   // Dashboard Data
   const { data: dashboard, isLoading: dashboardLoading } = useQuery({
     queryKey: ['collection-dashboard'],
     queryFn: () => collectionsApi.getDashboard(),
+  });
+
+  // Cases List
+  const { data: casesData, isLoading: casesLoading } = useQuery({
+    queryKey: ['collection-cases', selectedBucket, queueType, searchQuery],
+    queryFn: () =>
+      collectionsApi.listCases({
+        bucket: selectedBucket || undefined,
+        queueType: queueType === 'ALL' ? undefined : queueType,
+        search: searchQuery || undefined,
+      }),
+  });
+
+  // Strategies List
+  const { data: strategies = [] } = useQuery({
+    queryKey: ['collection-strategies'],
+    queryFn: () => collectionsApi.listStrategies(),
   });
 
   // Auto Assign Mutation
@@ -157,7 +195,7 @@ export default function CollectionsDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {strategies?.map((strat) => (
+            {strategies?.map((strat: any) => (
               <Card key={strat.id} className="p-5 space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
@@ -177,15 +215,15 @@ export default function CollectionsDashboardPage() {
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3 text-xs text-slate-700 dark:text-slate-300 space-y-1">
                   <div className="font-semibold text-slate-900 dark:text-slate-200">Priority Factor Weights:</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    <div>DPD Weight: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.dpdWeight * 100}%</span></div>
-                    <div>Overdue Weight: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.overdueAmountWeight * 100}%</span></div>
-                    <div>Risk Grade: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.riskGradeWeight * 100}%</span></div>
-                    <div>Broken PTPs: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.brokenPtpWeight * 100}%</span></div>
+                    <div>DPD Weight: <span className="text-slate-800 dark:text-slate-200 font-medium">{(strat.priorityWeights?.dpdWeight ?? 0) * 100}%</span></div>
+                    <div>Overdue Weight: <span className="text-slate-800 dark:text-slate-200 font-medium">{(strat.priorityWeights?.overdueAmountWeight ?? 0) * 100}%</span></div>
+                    <div>Risk Grade: <span className="text-slate-800 dark:text-slate-200 font-medium">{(strat.priorityWeights?.riskGradeWeight ?? 0) * 100}%</span></div>
+                    <div>Broken PTPs: <span className="text-slate-800 dark:text-slate-200 font-medium">{(strat.priorityWeights?.brokenPtpWeight ?? 0) * 100}%</span></div>
                   </div>
                 </div>
 
                 <div className="text-slate-500 text-[11px] flex justify-between items-center pt-1">
-                  <span>Effective Date: {new Date(strat.effectiveDate).toLocaleDateString()}</span>
+                  <span>Effective Date: {strat.effectiveDate ? new Date(strat.effectiveDate).toLocaleDateString() : 'Immediate'}</span>
                   {strat.status === 'DRAFT' && (
                     <Button
                       size="sm"

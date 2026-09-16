@@ -1239,10 +1239,16 @@ export default function CustomerDetailPage() {
                                   <RotateCcw className="w-3 h-3" /> Resubmit to Credit
                                 </Button>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    toast.info(`Application #${app.applicationNo} is already forwarded to Credit Analyst (Current Stage: ${app.status?.replace(/_/g, ' ')}).`);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+                                >
                                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>In Credit Review</span>
-                                </span>
+                                  <span>Already Forwarded</span>
+                                </button>
                               )
                             ) : isCreditAnalyst ? (
                               ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
@@ -1563,9 +1569,22 @@ export default function CustomerDetailPage() {
 
               <div className="flex gap-2.5 pt-2">
                 <Button
-                  onClick={() => kycMutation.mutate()}
+                  onClick={() => {
+                    if (kycStatusInput === 'VERIFIED') {
+                      const unverified = (documents || []).filter((d: any) => !d.verified && d.status !== 'VERIFIED');
+                      if (unverified.length > 0) {
+                        const docNames = unverified.map((d: any) => d.fileName || d.documentType || 'Document').join(', ');
+                        toast.error(
+                          `Aapne abhi sabhi documents verify nahi kiye! Pending document(s): "${docNames}". Pehle sabhi documents verify karein tabhi customer status VERIFIED hoga.`,
+                          { title: 'Document Verification Incomplete' }
+                        );
+                        return;
+                      }
+                    }
+                    kycMutation.mutate();
+                  }}
                   disabled={kycMutation.isPending}
-                  className="flex-1 text-white"
+                  className="flex-1 text-white cursor-pointer"
                 >
                   {kycMutation.isPending ? 'Updating...' : 'Confirm Update'}
                 </Button>

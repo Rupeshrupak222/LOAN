@@ -250,68 +250,25 @@ export async function verifyDocument(
     },
   });
 
-  // Synchronize Customer KYC status and Application status across the platform
+  // Keep customer KYC status as UNDER_REVIEW if currently unreviewed, but NEVER auto-mark as VERIFIED.
+  // Full profile KYC verification is strictly authorized and executed via dedicated KYC verification action.
   const targetCustomerId = updated.customerId || (existing as any).customerId;
-  const targetAppId = updated.applicationId || (existing as any).applicationId;
 
   if (targetCustomerId) {
     try {
-      const allCustomerDocs = await prisma.document.findMany({
-        where: { customerId: targetCustomerId },
+      const currentCustomer = await prisma.customer.findUnique({
+        where: { id: targetCustomerId },
+        select: { kycStatus: true },
       });
 
-      const hasAnyRejected = allCustomerDocs.some((d) => d.status === 'REJECTED');
-      const hasVerifiedId = allCustomerDocs.some(
-        (d) =>
-          (d.status === 'VERIFIED' || d.verified) &&
-          (['IDENTITY_PROOF', 'PAN_CARD', 'AADHAAR'].includes(d.category || '') ||
-            ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID'].includes(d.documentType || ''))
-      );
-      const hasVerifiedAddress = allCustomerDocs.some(
-        (d) =>
-          (d.status === 'VERIFIED' || d.verified) &&
-          (['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category || '') ||
-            ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'AADHAAR'].includes(d.documentType || ''))
-      );
-      const hasVerifiedPhoto = allCustomerDocs.some(
-        (d) =>
-          (d.status === 'VERIFIED' || d.verified) &&
-          (['APPLICANT_PHOTO', 'PHOTO'].includes(d.category || '') ||
-            ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO'].includes(d.documentType || ''))
-      );
-
-      if (hasAnyRejected) {
-        await prisma.customer.update({
-          where: { id: targetCustomerId },
-          data: { kycStatus: 'REJECTED' },
-        });
-      } else if (hasVerifiedId && hasVerifiedAddress && hasVerifiedPhoto) {
-        await prisma.customer.update({
-          where: { id: targetCustomerId },
-          data: { kycStatus: 'VERIFIED', status: 'ACTIVE' },
-        });
-
-        // If in-flight application was KYC_PENDING, advance it to KYC_VERIFIED
-        if (targetAppId) {
-          const app = await prisma.loanApplication.findUnique({
-            where: { id: targetAppId },
-            select: { status: true },
-          });
-          if (app && app.status === 'KYC_PENDING') {
-            await prisma.loanApplication.update({
-              where: { id: targetAppId },
-              data: { status: 'KYC_VERIFIED' },
-            });
-          }
-        }
-      } else if (allCustomerDocs.some((d) => d.status === 'VERIFIED' || d.status === 'UNDER_REVIEW')) {
+      if (currentCustomer && (currentCustomer.kycStatus === 'NOT_STARTED' || currentCustomer.kycStatus === 'PENDING')) {
         await prisma.customer.update({
           where: { id: targetCustomerId },
           data: { kycStatus: 'UNDER_REVIEW' },
         });
       }
     } catch (syncErr) {
-      console.error('[DocumentService] Failed to synchronize customer KYC status:', syncErr);
+      console.error('[DocumentService] Failed to synchronize customer review status:', syncErr);
     }
   }
 

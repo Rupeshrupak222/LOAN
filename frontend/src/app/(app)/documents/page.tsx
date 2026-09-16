@@ -21,89 +21,29 @@ import {
   AlertTriangle,
   User,
   Phone,
-  FileCheck
+  FileCheck,
+  ShieldCheck,
+  X
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, Button } from '@/components/ui';
 import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatDate, formatMoney, cn } from '@/lib/utils';
-
-// Standard 5 Mandatory Underwriting Documents
-const MANDATORY_DOCUMENTS = [
-  {
-    key: 'IDENTITY_PROOF',
-    label: 'Identity Proof (PAN Card)',
-    description: 'Government issued PAN Card or official photo identity',
-    matches: (doc: any) => {
-      const c = (doc.category || '').toUpperCase();
-      const t = (doc.documentType || '').toUpperCase();
-      const n = (doc.fileName || '').toUpperCase();
-      return ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(c) ||
-        ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID'].includes(t) ||
-        n.includes('PAN') || n.includes('AADHAAR');
-    }
-  },
-  {
-    key: 'ADDRESS_PROOF',
-    label: 'Proof of Address',
-    description: 'Residential address proof (Aadhaar, Electricity Bill, Rent Agreement)',
-    matches: (doc: any) => {
-      const c = (doc.category || '').toUpperCase();
-      const t = (doc.documentType || '').toUpperCase();
-      const n = (doc.fileName || '').toUpperCase();
-      return ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(c) ||
-        ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'RENT_AGREEMENT', 'UTILITY_BILL', 'AADHAAR'].includes(t) ||
-        n.includes('ADDRESS') || n.includes('BILL') || n.includes('AADHAAR');
-    }
-  },
-  {
-    key: 'APPLICANT_PHOTO',
-    label: 'Applicant Photograph / Selfie',
-    description: 'Recent portrait photo or live customer selfie',
-    matches: (doc: any) => {
-      const c = (doc.category || '').toUpperCase();
-      const t = (doc.documentType || '').toUpperCase();
-      const n = (doc.fileName || '').toUpperCase();
-      return ['APPLICANT_PHOTO', 'PHOTO'].includes(c) ||
-        ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PASSPORT_PHOTO'].includes(t) ||
-        n.includes('PHOTO') || n.includes('SELFIE');
-    }
-  },
-  {
-    key: 'INCOME_PROOF',
-    label: 'Proof of Income / Salary Slip',
-    description: 'Recent 3 months salary slips, ITR, or Form 16',
-    matches: (doc: any) => {
-      const c = (doc.category || '').toUpperCase();
-      const t = (doc.documentType || '').toUpperCase();
-      const n = (doc.fileName || '').toUpperCase();
-      return ['INCOME_PROOF', 'FINANCIAL'].includes(c) ||
-        ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(t) ||
-        n.includes('SALARY') || n.includes('SLIP') || n.includes('INCOME') || n.includes('ITR');
-    }
-  },
-  {
-    key: 'BANK_STATEMENT',
-    label: 'Bank Statement (6 Months)',
-    description: 'Latest 6 months bank statement or Account Aggregator data',
-    matches: (doc: any) => {
-      const c = (doc.category || '').toUpperCase();
-      const t = (doc.documentType || '').toUpperCase();
-      const n = (doc.fileName || '').toUpperCase();
-      return ['BANK_STATEMENT'].includes(c) ||
-        ['BANK_STATEMENT', 'BANK_PASSBOOK', 'E_STATEMENT'].includes(t) ||
-        n.includes('BANK') || n.includes('STATEMENT') || n.includes('PASSBOOK');
-    }
-  }
-];
+import { evaluateDocumentFulfillment } from '@/lib/documentRules';
 
 export default function DocumentsWorkspacePage() {
+  const { user } = useAuth();
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  const isCreditAnalyst =
+    user?.roles?.includes('CREDIT_ANALYST') &&
+    !user?.roles?.some((r) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'LOAN_OFFICER'].includes(r));
 
   // Active Borrower Case Selection (null = list of all borrowers, string = view specific borrower's documents page)
   const initialAppId = searchParams.get('applicationId');
@@ -111,6 +51,9 @@ export default function DocumentsWorkspacePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMode, setFilterMode] = useState<'ALL' | 'MISSING' | 'PENDING' | 'COMPLETED'>('ALL');
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+  const [kycRemarksInput, setKycRemarksInput] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // 1. Fetch all documents from live database
   const { data: docs = [], isLoading: docsLoading, refetch: refetchDocs, isRefetching } = useQuery({
@@ -168,6 +111,28 @@ export default function DocumentsWorkspacePage() {
     },
   });
 
+  // Finalize Customer KYC Mutation
+  const finalizeKycMutation = useMutation({
+    mutationFn: async ({ customerId, remarks }: { customerId: string; remarks: string }) => {
+      const res = await api.patch(`/customers/${customerId}/kyc`, {
+        kycStatus: 'VERIFIED',
+        remarks: remarks || 'All mandatory borrower documents verified and approved',
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Borrower KYC compliance status has been officially updated to VERIFIED.');
+      queryClient.invalidateQueries({ queryKey: ['documents-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-360'] });
+    },
+    onError: (err: any) => {
+      toast.error('KYC Verification Failed', apiErrorMessage(err));
+    },
+  });
+
+  // Group all documents by Borrower Proposal Case
   // Group all documents by Borrower Proposal Case
   const borrowerCases = useMemo(() => {
     const caseMap = new Map<string, {
@@ -183,76 +148,155 @@ export default function DocumentsWorkspacePage() {
         matchingDoc?: any;
       }>;
       missingCount: number;
-      pendingCount: number;
-      verifiedCount: number;
+      missingNames: string[];
+      checklistPendingCount: number;
+      checklistVerifiedCount: number;
+      docsCount: number;
+      docsVerifiedCount: number;
+      docsPendingCount: number;
     }>();
 
-    // Initialize from applications
-    apps.forEach((app: any) => {
+    // 1. Initialize from applications (Filtered for Credit Analyst to only show forwarded/active proposals)
+    const targetApps = isCreditAnalyst
+      ? apps.filter((a: any) =>
+          [
+            'SUBMITTED',
+            'CREDIT_ASSESSMENT',
+            'UNDER_REVIEW',
+            'UNDERWRITING',
+            'APPROVED',
+            'DISBURSED',
+            'AGREEMENT_PENDING',
+            'READY_FOR_DISBURSEMENT',
+            'RETURNED',
+          ].includes(a.status)
+        )
+      : apps;
+
+    targetApps.forEach((app: any) => {
       const caseId = app.id;
+      const appCustomerId = app.customerId || app.customer?.id;
+
+      // Match all docs for this application or borrower profile in the database
+      const matchingDocs = docs.filter((d: any) => {
+        if (d.applicationId && d.applicationId === app.id) return true;
+        if (d.application?.id && d.application.id === app.id) return true;
+        if (appCustomerId && (d.customerId === appCustomerId || d.customer?.id === appCustomerId)) return true;
+        return false;
+      });
+
+      // Deduplicate docs by ID
+      const docMap = new Map<string, any>();
+      matchingDocs.forEach((d: any) => docMap.set(d.id, d));
+
       caseMap.set(caseId, {
         id: caseId,
         application: app,
         customer: app.customer || { firstName: 'Valued', lastName: 'Borrower', customerCode: 'KYC Vault' },
-        docs: [],
+        docs: Array.from(docMap.values()),
         checklist: [],
         missingCount: 0,
-        pendingCount: 0,
-        verifiedCount: 0,
+        missingNames: [],
+        checklistPendingCount: 0,
+        checklistVerifiedCount: 0,
+        docsCount: 0,
+        docsVerifiedCount: 0,
+        docsPendingCount: 0,
       });
     });
 
-    // Attach documents to their matching case
-    docs.forEach((doc: any) => {
-      const linkedApp = doc.application || customerAppMap.get(doc.customerId);
-      const caseId = linkedApp?.id || doc.customerId || doc.customer?.id || doc.id;
+    // 2. For non-Credit Analysts, also add standalone documents not tied to any target application
+    if (!isCreditAnalyst) {
+      docs.forEach((doc: any) => {
+        const customerId = doc.customerId || doc.customer?.id;
+        const caseId = doc.applicationId || doc.application?.id || customerId || doc.id;
+        if (!caseMap.has(caseId)) {
+          caseMap.set(caseId, {
+            id: caseId,
+            application: doc.application,
+            customer: doc.customer || { firstName: 'Valued', lastName: 'Borrower', customerCode: 'KYC Vault' },
+            docs: [doc],
+            checklist: [],
+            missingCount: 0,
+            missingNames: [],
+            checklistPendingCount: 0,
+            checklistVerifiedCount: 0,
+            docsCount: 0,
+            docsVerifiedCount: 0,
+            docsPendingCount: 0,
+          });
+        }
+      });
+    }
 
-      if (!caseMap.has(caseId)) {
-        caseMap.set(caseId, {
-          id: caseId,
-          application: linkedApp,
-          customer: doc.customer || { firstName: 'Valued', lastName: 'Borrower', customerCode: 'KYC Vault' },
-          docs: [],
-          checklist: [],
-          missingCount: 0,
-          pendingCount: 0,
-          verifiedCount: 0,
-        });
-      }
-
-      const c = caseMap.get(caseId)!;
-      c.docs.push(doc);
-    });
-
-    // Compute checklist and gap status for each borrower case
+    // 3. Compute dynamic checklist per borrower case using authoritative rules engine
     caseMap.forEach((c) => {
-      let missing = 0;
+      const empType =
+        c.customer?.employmentType ||
+        c.customer?.employmentDetails?.[0]?.employmentType ||
+        'SALARIED';
+      const prodType =
+        (c.application?.product as any)?.productType ||
+        c.application?.product?.name ||
+        'PERSONAL';
+      const reqAmt = Number(c.application?.requestedAmount || 0);
+      const mIncome = Number(c.customer?.monthlyIncome || 0);
+
+      const docEval = evaluateDocumentFulfillment(c.docs, empType, prodType, {
+        monthlyIncome: mIncome,
+        requestedAmount: reqAmt,
+      });
+
       let pending = 0;
       let verified = 0;
 
-      c.checklist = MANDATORY_DOCUMENTS.map((req) => {
-        const matchingDoc = c.docs.find((d) => req.matches(d));
-        if (!matchingDoc) {
-          missing++;
-          return { ...req, status: 'MISSING' as const };
+      c.checklist = docEval.checklistStatus.map((item) => {
+        const matchingDoc = item.matchingDocs?.[0];
+        if (!item.isSatisfied || !matchingDoc) {
+          return {
+            key: item.rule.code,
+            label: item.rule.name,
+            description: item.rule.description || 'Mandatory underwriting document',
+            status: 'MISSING' as const,
+          };
         }
         const isVer = matchingDoc.verified || matchingDoc.status === 'VERIFIED';
         if (isVer) {
           verified++;
-          return { ...req, status: 'VERIFIED' as const, matchingDoc };
+          return {
+            key: item.rule.code,
+            label: item.rule.name,
+            description: item.rule.description || 'Mandatory underwriting document',
+            status: 'VERIFIED' as const,
+            matchingDoc,
+          };
         } else {
           pending++;
-          return { ...req, status: 'PENDING' as const, matchingDoc };
+          return {
+            key: item.rule.code,
+            label: item.rule.name,
+            description: item.rule.description || 'Mandatory underwriting document',
+            status: 'PENDING' as const,
+            matchingDoc,
+          };
         }
       });
 
-      c.missingCount = missing;
-      c.pendingCount = pending;
-      c.verifiedCount = verified;
+      const totalDocs = c.docs.length;
+      const verifiedDocs = c.docs.filter((d: any) => d.verified === true || d.status === 'VERIFIED').length;
+      const pendingDocs = totalDocs - verifiedDocs;
+
+      c.docsCount = totalDocs;
+      c.docsVerifiedCount = verifiedDocs;
+      c.docsPendingCount = pendingDocs;
+      c.missingCount = docEval.missingCodes.length;
+      c.missingNames = docEval.missingNames;
+      c.checklistPendingCount = pending;
+      c.checklistVerifiedCount = verified;
     });
 
     return Array.from(caseMap.values());
-  }, [apps, docs, customerAppMap]);
+  }, [apps, docs, customerAppMap, isCreditAnalyst]);
 
   // Filtered borrower cases for the main list view
   const filteredCases = useMemo(() => {
@@ -268,12 +312,18 @@ export default function DocumentsWorkspacePage() {
       if (!matchesSearch) return false;
 
       if (filterMode === 'MISSING') return c.missingCount > 0;
-      if (filterMode === 'PENDING') return c.pendingCount > 0;
-      if (filterMode === 'COMPLETED') return c.missingCount === 0 && c.pendingCount === 0;
+      if (filterMode === 'PENDING') return c.docsPendingCount > 0;
+      if (filterMode === 'COMPLETED') return c.missingCount === 0 && c.docsPendingCount === 0;
 
       return true;
     });
   }, [borrowerCases, searchTerm, filterMode]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCases.length / pageSize));
+  const paginatedCases = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredCases.slice(start, start + pageSize);
+  }, [filteredCases, page, pageSize]);
 
   // Active case for dedicated single-page view
   const activeCase = useMemo(() => {
@@ -367,16 +417,16 @@ export default function DocumentsWorkspacePage() {
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs font-bold">
-              <span className="text-emerald-600 dark:text-emerald-400">{activeCase.verifiedCount} Verified</span>
+              <span className="text-emerald-600 dark:text-emerald-400">{activeCase.checklistVerifiedCount} Verified</span>
               <span>·</span>
-              <span className="text-amber-500">{activeCase.pendingCount} Pending</span>
+              <span className="text-amber-500">{activeCase.checklistPendingCount} Pending</span>
               <span>·</span>
               <span className="text-rose-600 dark:text-rose-400">{activeCase.missingCount} Missing</span>
             </div>
           </div>
 
-          {/* 5-Point Mandatory Items Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* Dynamic Profile-Aware Underwriting Checklist Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {activeCase.checklist.map((item) => {
               const isMissing = item.status === 'MISSING';
               const isVerified = item.status === 'VERIFIED';
@@ -445,11 +495,16 @@ export default function DocumentsWorkspacePage() {
 
         {/* SECTION 2: ALL UPLOADED DOCUMENTS TABLE */}
         <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-[#1E2445] bg-white dark:bg-[#0C152B] shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-500" />
-              <span>Uploaded Borrower Documents ({activeCase.docs.length})</span>
-            </h2>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-500" />
+                <span>Uploaded Borrower Documents ({activeCase.docsCount})</span>
+              </h2>
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                ({activeCase.docsVerifiedCount} Verified · {activeCase.docsPendingCount} Pending Verification)
+              </span>
+            </div>
             <span className="text-xs text-slate-400">
               Click &quot;Preview&quot; to review file artifacts in-page
             </span>
@@ -578,86 +633,326 @@ export default function DocumentsWorkspacePage() {
             </div>
           )}
 
-          {/* SECTION 3: IN-PAGE PREVIEW PANE (Opens Directly in Page, Zero Popups!) */}
-          {previewDoc && (
-            <div className="mt-5 p-5 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/20 dark:bg-[#1E2445]/30 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Document Preview: {previewDoc.fileName || previewDoc.documentType}
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Category: {previewDoc.category || 'GENERAL'} · Status: {previewDoc.verified ? 'VERIFIED' : previewDoc.status || 'PENDING'}
-                    </p>
+          {/* SECTION 3: BORROWER KYC VERIFICATION FINALIZATION & REMARKS */}
+          <div className="p-6 rounded-2xl border border-slate-200/80 dark:border-[#1E2445] bg-white dark:bg-[#0C152B] shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Borrower KYC Compliance &amp; Verification Finalization</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Verify all required borrower documents above, record audit remarks, and finalize customer KYC compliance
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500">Customer KYC Status:</span>
+                <span
+                  className={cn(
+                    'px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider',
+                    activeCase.customer?.kycStatus === 'VERIFIED'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                      : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                  )}
+                >
+                  {activeCase.customer?.kycStatus || 'NOT_STARTED'}
+                </span>
+              </div>
+            </div>
+
+            {/* Validation Feedback & Missing Alert Section */}
+            {(() => {
+              const unverifiedDocs = (activeCase.docs || []).filter((d: any) => !d.verified && d.status !== 'VERIFIED');
+              const missingItems = (activeCase.checklist || []).filter((item: any) => item.status === 'MISSING');
+              const isAllClear = unverifiedDocs.length === 0 && missingItems.length === 0 && (activeCase.docs || []).length > 0;
+
+              if (isAllClear) {
+                return (
+                  <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div className="text-xs text-emerald-800 dark:text-emerald-200 font-medium">
+                      <strong className="font-bold">Ready for Final KYC Verification!</strong> All {activeCase.docsCount} uploaded documents are verified and mandatory checklist criteria are fulfilled.
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/30 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Incomplete Document Verification ({unverifiedDocs.length} pending, {missingItems.length} missing)</span>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1.5 pl-6">
+                    {unverifiedDocs.length > 0 && (
+                      <p>
+                        <strong className="text-rose-600 dark:text-rose-400 font-bold">Unverified Documents:</strong>{' '}
+                        {unverifiedDocs.map((d: any) => d.fileName || d.documentType).join(', ')}
+                      </p>
+                    )}
+                    {missingItems.length > 0 && (
+                      <p>
+                        <strong className="text-rose-600 dark:text-rose-400 font-bold">Missing Required Artifacts:</strong>{' '}
+                        {missingItems.map((item: any) => item.label).join(', ')}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setPreviewDoc(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer text-xs font-bold"
+              );
+            })()}
+
+            {/* Remarks Box & Action Controls */}
+            <div className="space-y-3 pt-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                Verification Remarks / Compliance Notes *
+              </label>
+              <textarea
+                rows={2}
+                value={kycRemarksInput}
+                onChange={(e) => setKycRemarksInput(e.target.value)}
+                placeholder="e.g. All 6 mandatory borrower documents inspected, cross-verified with official credentials, and verified for credit assessment."
+                className="w-full rounded-xl border border-slate-300 dark:border-[#2B3566] bg-white dark:bg-[#0C152B] p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+
+              <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
+                <p className="text-[11px] text-slate-400">
+                  ⚠️ Validation checks ensure that all documents are strictly verified before customer KYC status is updated to <strong className="text-emerald-500 font-semibold">VERIFIED</strong>.
+                </p>
+                <Button
+                  onClick={() => {
+                    if (!activeCase?.customer?.id) return;
+                    const unverifiedDocs = (activeCase.docs || []).filter((d: any) => !d.verified && d.status !== 'VERIFIED');
+                    const missingItems = (activeCase.checklist || []).filter((item: any) => item.status === 'MISSING');
+
+                    if (unverifiedDocs.length > 0) {
+                      const docNames = unverifiedDocs.map((d: any) => d.fileName || d.documentType || 'Document').join(', ');
+                      toast.error(
+                        'Document Verification Incomplete!',
+                        `Aapne abhi sabhi documents verify nahi kiye! Pending document(s): "${docNames}". Pehle sabhi documents verify karein tabhi customer verify hoga.`
+                      );
+                      return;
+                    }
+
+                    if (missingItems.length > 0) {
+                      const missingNames = missingItems.map((item: any) => item.label).join(', ');
+                      toast.error(
+                        'Mandatory Documents Missing!',
+                        `Ye zaroori documents abhi missing hain: "${missingNames}". Sabhi zaroori documents ke bina customer verify nahi ho sakta.`
+                      );
+                      return;
+                    }
+
+                    finalizeKycMutation.mutate({
+                      customerId: activeCase.customer.id,
+                      remarks: kycRemarksInput.trim() || 'All borrower identity, income, and bank documents thoroughly verified and approved.',
+                    });
+                  }}
+                  disabled={finalizeKycMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs cursor-pointer flex items-center gap-2 shrink-0"
                 >
-                  ✕ Close Preview
-                </button>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{finalizeKycMutation.isPending ? 'Verifying Customer...' : 'Verify Customer &amp; Finalize KYC'}</span>
+                </Button>
               </div>
+            </div>
+          </div>
 
-              {/* Document Image/Artifact View */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0C152B] text-center space-y-3">
-                {previewDoc.fileUrl ? (
-                  previewDoc.fileUrl.match(/\.(jpeg|jpg|png|webp|gif)/i) ? (
-                    <div className="max-h-96 overflow-hidden rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5">
-                      <img
-                        src={previewDoc.fileUrl}
-                        alt="Document Artifact"
-                        className="max-h-96 object-contain"
-                      />
+          {/* SECTION 4: MODAL OVERLAY PREVIEW (Opens as a page/modal on top of the screen) */}
+          {previewDoc && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+              onClick={() => setPreviewDoc(null)}
+            >
+              <div
+                className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0C152B] shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#1E2445]/50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <FileText className="w-5 h-5" />
                     </div>
-                  ) : (
-                    <div className="py-8 space-y-2">
-                      <FileText className="w-12 h-12 mx-auto text-blue-500" />
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {previewDoc.fileName || 'PDF Document Artifact'}
-                      </p>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                        {previewDoc.fileName || previewDoc.documentType}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 uppercase">
+                          {previewDoc.category || 'GENERAL'}
+                        </span>
+                        <span className="text-[11px] text-slate-400">·</span>
+                        <span
+                          className={cn(
+                            'text-xs font-bold',
+                            previewDoc.verified || previewDoc.status === 'VERIFIED'
+                              ? 'text-emerald-500'
+                              : previewDoc.status === 'REJECTED'
+                              ? 'text-rose-500'
+                              : 'text-amber-500'
+                          )}
+                        >
+                          {previewDoc.verified || previewDoc.status === 'VERIFIED'
+                            ? 'Verified'
+                            : previewDoc.status === 'REJECTED'
+                            ? 'Rejected'
+                            : 'Pending Review'}
+                        </span>
+                      </div>
                     </div>
-                  )
-                ) : (
-                  <div className="py-8 text-slate-400 text-xs">
-                    Document URL not available in test sandbox mode.
                   </div>
-                )}
+                  <button
+                    onClick={() => setPreviewDoc(null)}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    aria-label="Close Preview"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
-                {previewDoc.fileUrl && (
-                  <a
-                    href={previewDoc.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-bold"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download / View Original File
-                  </a>
-                )}
-              </div>
+                {/* Modal Body / Document Preview */}
+                <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center bg-slate-100/50 dark:bg-black/30 min-h-[350px]">
+                  {(() => {
+                    const getDocUrl = (doc: any) => {
+                      if (!doc) return '';
+                      const raw = doc.storageKey || doc.fileUrl || doc.url || '';
+                      if (!raw) return '';
+                      if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+                        return raw;
+                      }
+                      if (raw.startsWith('/uploads')) {
+                        const backendBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
+                        return `${backendBase}${raw}`;
+                      }
+                      return raw;
+                    };
 
-              {/* Quick Actions Footer inside In-Page Preview */}
-              <div className="flex items-center justify-end gap-2 pt-2">
-                {!previewDoc.verified && previewDoc.status !== 'VERIFIED' && (
-                  <Button
-                    size="sm"
-                    onClick={() => verifyDocMutation.mutate({ docId: previewDoc.id, status: 'VERIFIED' })}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer text-xs font-semibold"
-                  >
-                    Approve &amp; Mark Verified
-                  </Button>
-                )}
-                {previewDoc.status !== 'REJECTED' && (
-                  <Button
-                    size="sm"
-                    onClick={() => verifyDocMutation.mutate({ docId: previewDoc.id, status: 'REJECTED', remarks: 'Deficient document' })}
-                    className="bg-rose-600 hover:bg-rose-700 text-white cursor-pointer text-xs font-semibold"
-                  >
-                    Reject Document
-                  </Button>
-                )}
+                    const fileUrl = getDocUrl(previewDoc);
+                    const isImage = Boolean(
+                      fileUrl.toLowerCase().match(/\.(jpeg|jpg|png|webp|gif|svg)/i) ||
+                      previewDoc.fileName?.toLowerCase().match(/\.(jpeg|jpg|png|webp|gif|svg)/i) ||
+                      fileUrl.includes('res.cloudinary.com') ||
+                      fileUrl.startsWith('data:image/')
+                    );
+                    const isPdf = Boolean(
+                      fileUrl.toLowerCase().endsWith('.pdf') ||
+                      previewDoc.fileName?.toLowerCase().endsWith('.pdf')
+                    );
+
+                    if (!fileUrl) {
+                      return (
+                        <div className="py-12 text-center text-slate-400 text-sm">
+                          Document binary preview is not available for this record.
+                        </div>
+                      );
+                    }
+
+                    if (isImage) {
+                      return (
+                        <div className="max-h-[60vh] max-w-full overflow-hidden rounded-xl flex items-center justify-center bg-black/5 dark:bg-black/40 p-2 shadow-inner">
+                          <img
+                            src={fileUrl}
+                            alt={previewDoc.fileName || 'Document Artifact'}
+                            className="max-h-[58vh] max-w-full object-contain rounded-lg shadow-md"
+                          />
+                        </div>
+                      );
+                    }
+
+                    if (isPdf) {
+                      return (
+                        <div className="w-full h-[60vh] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-md">
+                          <iframe
+                            src={fileUrl}
+                            title={previewDoc.fileName || 'PDF Document'}
+                            className="w-full h-full"
+                          />
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="py-12 text-center space-y-3">
+                        <FileText className="w-16 h-16 mx-auto text-blue-500" />
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                          {previewDoc.fileName || 'Document Artifact'}
+                        </p>
+                        <p className="text-xs text-slate-400 font-mono">
+                          {fileUrl}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#1E2445]/50">
+                  {(() => {
+                    const getDocUrl = (doc: any) => {
+                      if (!doc) return '';
+                      const raw = doc.storageKey || doc.fileUrl || doc.url || '';
+                      if (!raw) return '';
+                      if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+                        return raw;
+                      }
+                      if (raw.startsWith('/uploads')) {
+                        const backendBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
+                        return `${backendBase}${raw}`;
+                      }
+                      return raw;
+                    };
+                    const fileUrl = getDocUrl(previewDoc);
+                    return fileUrl ? (
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Open in New Tab / Download
+                      </a>
+                    ) : <div />;
+                  })()}
+
+                  <div className="flex items-center gap-2">
+                    {!previewDoc.verified && previewDoc.status !== 'VERIFIED' && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          verifyDocMutation.mutate({ docId: previewDoc.id, status: 'VERIFIED' });
+                          setPreviewDoc((prev: any) => prev ? { ...prev, status: 'VERIFIED', verified: true } : null);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer text-xs font-semibold px-4"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve &amp; Verify
+                      </Button>
+                    )}
+                    {previewDoc.status !== 'REJECTED' && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          verifyDocMutation.mutate({ docId: previewDoc.id, status: 'REJECTED', remarks: 'Deficient document' });
+                          setPreviewDoc((prev: any) => prev ? { ...prev, status: 'REJECTED', verified: false } : null);
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 text-white cursor-pointer text-xs font-semibold px-4"
+                      >
+                        <XCircle className="w-4 h-4 mr-1.5" /> Reject Document
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPreviewDoc(null)}
+                      className="cursor-pointer text-xs font-semibold px-4"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -731,7 +1026,7 @@ export default function DocumentsWorkspacePage() {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               )}
             >
-              Pending Verification ({borrowerCases.filter((c) => c.pendingCount > 0).length})
+              Pending Verification ({borrowerCases.filter((c) => c.docsPendingCount > 0).length})
             </button>
             <button
               onClick={() => setFilterMode('COMPLETED')}
@@ -742,7 +1037,7 @@ export default function DocumentsWorkspacePage() {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               )}
             >
-              Fully Complete ({borrowerCases.filter((c) => c.missingCount === 0 && c.pendingCount === 0).length})
+              Fully Complete ({borrowerCases.filter((c) => c.missingCount === 0 && c.docsPendingCount === 0).length})
             </button>
           </div>
 
@@ -786,7 +1081,7 @@ export default function DocumentsWorkspacePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#2B3566]">
-                {filteredCases.map((c) => {
+                {paginatedCases.map((c) => {
                   const customerName = `${c.customer?.firstName || 'Borrower'} ${c.customer?.lastName || ''}`.trim();
                   const appNo = c.application?.applicationNo;
                   const requestedAmount = c.application?.requestedAmount;
@@ -833,10 +1128,10 @@ export default function DocumentsWorkspacePage() {
                       {/* Uploaded Files Count */}
                       <td className="py-3.5 px-3">
                         <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {c.docs.length} Uploaded
+                          {c.docsCount} Uploaded
                         </span>
                         <p className="text-[10px] text-slate-400">
-                          {c.verifiedCount} Verified · {c.pendingCount} Pending
+                          {c.docsVerifiedCount} Verified · {c.docsPendingCount} Pending
                         </p>
                       </td>
 
@@ -847,15 +1142,15 @@ export default function DocumentsWorkspacePage() {
                             <AlertTriangle className="w-3 h-3" />
                             {c.missingCount} Missing Required
                           </span>
-                        ) : c.pendingCount > 0 ? (
+                        ) : c.docsPendingCount > 0 ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                             <Clock className="w-3 h-3" />
-                            {c.pendingCount} Pending Review
+                            {c.docsPendingCount} Pending Verification
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                             <CheckCircle2 className="w-3 h-3" />
-                            All Documents Complete
+                            All Documents Verified
                           </span>
                         )}
                       </td>
@@ -876,6 +1171,55 @@ export default function DocumentsWorkspacePage() {
                 })}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {filteredCases.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 pb-1 border-t border-slate-100 dark:border-[#2B3566] text-xs text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-2">
+                  <span>
+                    Showing {Math.min((page - 1) * pageSize + 1, filteredCases.length)} to{' '}
+                    {Math.min(page * pageSize, filteredCases.length)} of {filteredCases.length} dossiers
+                  </span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="ml-2 px-2 py-1 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-300 focus:outline-none"
+                  >
+                    <option value={5}>5 / page</option>
+                    <option value={10}>10 / page</option>
+                    <option value={20}>20 / page</option>
+                    <option value={50}>50 / page</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Previous Page"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Page {page} of {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Next Page"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>

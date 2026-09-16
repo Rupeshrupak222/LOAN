@@ -215,6 +215,10 @@ export function LoanOfficerDashboardView() {
 
   // Handler: Send to Credit Analyst
   const handleSendToCredit = async (app: any) => {
+    if (['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW', 'UNDERWRITING', 'APPROVED'].includes(app.status)) {
+      toast.info(`Application #${app.applicationNo || ''} is already forwarded to Credit Analyst (Current status: ${app.status?.replace(/_/g, ' ')}).`);
+      return;
+    }
     try {
       setSubmittingId(app.id);
       await api.post(`/applications/${app.id}/submit`, {

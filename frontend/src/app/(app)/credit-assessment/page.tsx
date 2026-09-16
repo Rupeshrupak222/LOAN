@@ -61,6 +61,7 @@ function CreditAssessmentQueueContent() {
       const res = await api.get('/credit/queue', { params: { tab: activeTab } });
       return res.data?.data;
     },
+    refetchInterval: 5000,
   });
 
   if (!isCreditAllowed) {
@@ -240,7 +241,7 @@ function CreditAssessmentQueueContent() {
                 Credit Assessment Queue
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200 dark:bg-[#1E2445] dark:text-blue-400 dark:border-[#2B3566]">
-                {filteredItems.length} {filteredItems.length === 1 ? 'proposal' : 'proposals'}
+                {filteredItems.length} shown · {metrics.applicationsAssigned} total
               </span>
             </div>
 

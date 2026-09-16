@@ -53,6 +53,7 @@ import { useTheme } from '@/lib/theme';
 import { useToast } from '@/lib/toast';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
+import { evaluateDocumentFulfillment } from '@/lib/documentRules';
 import { CreditIntelligenceCard } from '@/components/CreditIntelligenceCard';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 
@@ -213,13 +214,18 @@ export function CreditAssessmentWorkspace({
 
   const isAgeValid = ageError === null;
 
-  const missingMandatoryDocs: string[] = [];
-  if (!hasIdentity) missingMandatoryDocs.push('Identity Proof (PAN Card / Aadhaar)');
-  if (!hasPhoto) missingMandatoryDocs.push('Applicant Photo / Selfie');
-  if (!hasAddress) missingMandatoryDocs.push('Address Proof (Electricity Bill / Passport / Rental Agreement)');
-  if (!hasIncome) missingMandatoryDocs.push('Income Proof (Salary Slip / 3 Months Pay slips / ITR)');
-  if (!hasBank) missingMandatoryDocs.push('Bank Statement (Latest 6 Months)');
+  // Dynamic Rule-Based Document Evaluation based on borrower profile & product
+  const empType = customer?.employmentType || customer?.employmentDetails?.[0]?.employmentType || 'SALARIED';
+  const prodType = product?.productType || product?.name || 'PERSONAL';
+  const reqAmt = Number(app?.requestedAmount || 0);
+  const mIncome = Number(customer?.monthlyIncome || 0);
 
+  const docEval = evaluateDocumentFulfillment(documents, empType, prodType, {
+    monthlyIncome: mIncome,
+    requestedAmount: reqAmt,
+  });
+
+  const missingMandatoryDocs: string[] = docEval.missingNames;
   const unverifiedDocs = documents.filter((d) => !d.verified && d.status !== 'VERIFIED');
   const isKycPending = customer?.kycStatus !== 'VERIFIED';
   const isReturnedToLo = app?.status === 'RETURNED' || (app as any)?.underwriting?.decision === 'SEND_BACK';
@@ -228,8 +234,7 @@ export function CreditAssessmentWorkspace({
     missingMandatoryDocs.length > 0 ||
     unverifiedDocs.length > 0 ||
     isKycPending ||
-    !isAgeValid ||
-    documents.length < 5;
+    !isAgeValid;
 
   // Sync initial calculator values when data loads
 
@@ -277,7 +282,7 @@ export function CreditAssessmentWorkspace({
   // 3. ZERO deficiencies exist (!hasDeficiencies)
   // 4. KYC status is VERIFIED
   // 5. Borrower age matches product policy criteria (minAge - maxAge)
-  // 6. ALL 5 mandatory intake documents are uploaded (missingMandatoryDocs.length === 0, documents.length >= 5)
+  // 6. ALL mandatory intake documents required for borrower profile are uploaded (missingMandatoryDocs.length === 0)
   // 7. ALL uploaded documents are verified (unverifiedDocs.length === 0)
   const isStep2Complete = Boolean(
     isStep1Complete &&
@@ -285,7 +290,6 @@ export function CreditAssessmentWorkspace({
     !hasDeficiencies &&
     customer?.kycStatus === 'VERIFIED' &&
     isAgeValid &&
-    documents.length >= 5 &&
     missingMandatoryDocs.length === 0 &&
     unverifiedDocs.length === 0
   );
@@ -1546,24 +1550,36 @@ export function CreditAssessmentWorkspace({
                 Automated Policy Rules Breakdown:
               </span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                {(eligibility?.factors || [
-                  { factor: 'Age Requirement', status: 'PASS', detail: 'Applicant meets age criteria (21-60)' },
-                  { factor: 'Minimum Monthly Income', status: 'PASS', detail: `Income ₹${customer?.monthlyIncome || 0} meets min threshold` },
-                  { factor: 'Debt-To-Income (DTI) Ratio', status: 'PASS', detail: `DTI ratio is within limits` },
-                  { factor: 'KYC & Document Completeness', status: 'PASS', detail: 'Mandatory documentation verified' },
-                ]).map((f: any, idx: number) => (
-                  <div key={idx} className="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
-                    {f.status === 'PASS' ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                    )}
-                    <div>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{f.factor}</span>
-                      <p className="text-[11px] text-slate-500">{f.detail}</p>
+                {(() => {
+                  const factorsList = Array.isArray(eligibility?.factors)
+                    ? eligibility.factors
+                    : typeof eligibility?.factors === 'object' && eligibility.factors !== null
+                    ? Object.entries(eligibility.factors).map(([k, v]: [string, any]) => ({
+                        factor: typeof v === 'object' && v?.factor ? v.factor : k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toUpperCase(),
+                        status: typeof v === 'object' && v?.status ? v.status : (typeof v === 'boolean' ? (v ? 'PASS' : 'FAIL') : (v === 'PASS' || v === 'ELIGIBLE' ? 'PASS' : 'FAIL')),
+                        detail: typeof v === 'object' && v?.detail ? v.detail : (typeof v === 'string' ? v : `Policy parameter: ${k}`),
+                      }))
+                    : [
+                        { factor: 'Age Requirement', status: 'PASS', detail: 'Applicant meets age criteria (21-60)' },
+                        { factor: 'Minimum Monthly Income', status: 'PASS', detail: `Income ₹${customer?.monthlyIncome || 0} meets min threshold` },
+                        { factor: 'Debt-To-Income (DTI) Ratio', status: 'PASS', detail: `DTI ratio is within limits` },
+                        { factor: 'KYC & Document Completeness', status: 'PASS', detail: 'Mandatory documentation verified' },
+                      ];
+
+                  return factorsList.map((f: any, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                      {f.status === 'PASS' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{f.factor}</span>
+                        <p className="text-[11px] text-slate-500">{f.detail}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             </div>
           </Card>
@@ -1727,24 +1743,37 @@ export function CreditAssessmentWorkspace({
 
             {/* 4 Pillars Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-              {(risk?.factors || [
-                { name: 'Employment Vintage & Stability', score: 80, weight: 25, remarks: 'Verified experience' },
-                { name: 'Debt Service Capacity & Cash Flow', score: 95, weight: 30, remarks: 'Healthy FOIR' },
-                { name: 'KYC & Document Completeness', score: 85, weight: 20, remarks: 'Compliance satisfied' },
-                { name: 'Credit History & Default Risk', score: 90, weight: 25, remarks: 'Clean track record' },
-              ]).map((pillar: any, idx: number) => (
-                <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{pillar.name}</span>
-                    <span className="text-slate-400">{pillar.weight}% wt</span>
+              {(() => {
+                const riskFactorsList = Array.isArray(risk?.factors)
+                  ? risk.factors
+                  : typeof risk?.factors === 'object' && risk.factors !== null
+                  ? Object.entries(risk.factors).map(([k, v]: [string, any]) => ({
+                      name: typeof v === 'object' && v?.name ? v.name : k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toUpperCase(),
+                      score: typeof v === 'object' && v?.score !== undefined ? v.score : (typeof v === 'number' ? v : 80),
+                      weight: typeof v === 'object' && v?.weight !== undefined ? v.weight : 25,
+                      remarks: typeof v === 'object' && v?.remarks ? v.remarks : (typeof v === 'string' ? v : 'Verified'),
+                    }))
+                  : [
+                      { name: 'Employment Vintage & Stability', score: 80, weight: 25, remarks: 'Verified experience' },
+                      { name: 'Debt Service Capacity & Cash Flow', score: 95, weight: 30, remarks: 'Healthy FOIR' },
+                      { name: 'KYC & Document Completeness', score: 85, weight: 20, remarks: 'Compliance satisfied' },
+                      { name: 'Credit History & Default Risk', score: 90, weight: 25, remarks: 'Clean track record' },
+                    ];
+
+                return riskFactorsList.map((pillar: any, idx: number) => (
+                  <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="font-bold text-slate-700 dark:text-slate-200">{pillar.name}</span>
+                      <span className="text-slate-400">{pillar.weight}% wt</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-base font-bold text-[#2563EB]">{pillar.score}</span>
+                      <span className="text-[10px] text-slate-400">/ 100</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">{pillar.remarks}</p>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-base font-bold text-[#2563EB]">{pillar.score}</span>
-                    <span className="text-[10px] text-slate-400">/ 100</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">{pillar.remarks}</p>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
 
             <div className="flex justify-end pt-2">
@@ -2156,33 +2185,72 @@ export function CreditAssessmentWorkspace({
 
             {/* Preview Content Area */}
             <div className="flex-1 overflow-auto max-h-[58vh] bg-slate-100 dark:bg-slate-900/70 rounded-xl p-3 flex items-center justify-center min-h-[250px]">
-              {previewDoc.storageKey ? (
-                previewDoc.storageKey.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/) ||
-                previewDoc.storageKey.includes('/customer_photos/') ||
-                previewDoc.storageKey.includes('/kyc_documents/') ||
-                previewDoc.storageKey.startsWith('https://res.cloudinary.com') ? (
-                  <img
-                    src={previewDoc.storageKey}
-                    alt={previewDoc.fileName}
-                    className="max-h-[55vh] max-w-full object-contain rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                  />
-                ) : previewDoc.storageKey.toLowerCase().endsWith('.pdf') ? (
-                  <iframe
-                    src={previewDoc.storageKey}
-                    title={previewDoc.fileName}
-                    className="w-full h-[55vh] rounded-lg border border-slate-200 dark:border-slate-700"
-                  />
-                ) : (
+              {(() => {
+                const getDocUrl = (doc: any) => {
+                  if (!doc) return '';
+                  const raw = doc.storageKey || doc.fileUrl || doc.url || '';
+                  if (!raw) return '';
+                  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+                    return raw;
+                  }
+                  if (raw.startsWith('/uploads')) {
+                    const backendBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
+                    return `${backendBase}${raw}`;
+                  }
+                  return raw;
+                };
+
+                const fileUrl = getDocUrl(previewDoc);
+                const isImage = Boolean(
+                  fileUrl.toLowerCase().match(/\.(jpeg|jpg|png|webp|gif|svg)/i) ||
+                  previewDoc?.fileName?.toLowerCase().match(/\.(jpeg|jpg|png|webp|gif|svg)/i) ||
+                  fileUrl.includes('res.cloudinary.com') ||
+                  fileUrl.startsWith('data:image/')
+                );
+                const isPdf = Boolean(
+                  fileUrl.toLowerCase().endsWith('.pdf') ||
+                  previewDoc?.fileName?.toLowerCase().endsWith('.pdf')
+                );
+
+                if (!fileUrl) {
+                  return (
+                    <div className="p-8 text-center text-xs text-slate-400">
+                      No binary storage key available for this document record.
+                    </div>
+                  );
+                }
+
+                if (isImage) {
+                  return (
+                    <img
+                      src={fileUrl}
+                      alt={previewDoc.fileName || 'Document Artifact'}
+                      className="max-h-[55vh] max-w-full object-contain rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    />
+                  );
+                }
+
+                if (isPdf) {
+                  return (
+                    <iframe
+                      src={fileUrl}
+                      title={previewDoc.fileName || 'Document PDF'}
+                      className="w-full h-[55vh] rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                  );
+                }
+
+                return (
                   <div className="p-8 text-center space-y-2">
                     <FileText className="w-12 h-12 text-[#2563EB] mx-auto opacity-70" />
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {previewDoc.fileName}
                     </p>
                     <p className="text-[11px] text-slate-400 font-mono">
-                      Storage: {previewDoc.storageKey}
+                      {fileUrl}
                     </p>
                     <a
-                      href={previewDoc.storageKey}
+                      href={fileUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2563EB] hover:underline pt-2"
@@ -2190,12 +2258,8 @@ export function CreditAssessmentWorkspace({
                       <Download className="w-3.5 h-3.5" /> Download / Open Raw File
                     </a>
                   </div>
-                )
-              ) : (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  No binary storage key available for this document record.
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Verification & Remarks in Preview */}
