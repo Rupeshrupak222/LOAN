@@ -1,16 +1,106 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/PageHeader';
-import { Card } from '@/components/ui';
+import { collectionsApi } from '@/features/collections/api';
+import { CollectionQueueTable } from '@/features/collections/CollectionQueueTable';
+import { ContactActivityModal } from '@/features/collections/ContactActivityModal';
+import { PtpModal } from '@/features/collections/PtpModal';
+import { AssignmentModal } from '@/features/collections/AssignmentModal';
+import { EscalationModal } from '@/features/collections/EscalationModal';
+import type { CollectionCaseSummary } from '@/features/collections/types';
 
 export default function CollectionQueuePage() {
+  const queryClient = useQueryClient();
+  const [queueType, setQueueType] = useState<'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL'>('ALL');
+  const [selectedBucket, setSelectedBucket] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Selected case for action modals
+  const [selectedCase, setSelectedCase] = useState<CollectionCaseSummary | null>(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [ptpModalOpen, setPtpModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
+
+  // Cases List
+  const { data: casesData, isLoading: casesLoading } = useQuery({
+    queryKey: ['collection-cases', selectedBucket, queueType, searchQuery],
+    queryFn: () =>
+      collectionsApi.listCases({
+        bucket: selectedBucket || undefined,
+        queueType: queueType === 'ALL' ? undefined : queueType,
+        search: searchQuery || undefined,
+      }),
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       <PageHeader
-        breadcrumb="Collections / Collection Queue"
-        title="Delinquency Collection Queue"
-        subtitle="Manage assigned overdue accounts, prioritize by DPD, and track next actions."
+        title="Collection Queue"
+        subtitle="Manage delinquency tracking, DPD aging buckets, and collector queues."
+      />
+
+      <CollectionQueueTable
+        cases={casesData?.data || []}
+        isLoading={casesLoading}
+        selectedBucket={selectedBucket}
+        onSelectBucket={setSelectedBucket}
+        queueType={queueType}
+        onSelectQueueType={setQueueType}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onOpenActivity={(c) => {
+          setSelectedCase(c);
+          setActivityModalOpen(true);
+        }}
+        onOpenPtp={(c) => {
+          setSelectedCase(c);
+          setPtpModalOpen(true);
+        }}
+        onOpenAssign={(c) => {
+          setSelectedCase(c);
+          setAssignModalOpen(true);
+        }}
+        onOpenEscalate={(c) => {
+          setSelectedCase(c);
+          setEscalateModalOpen(true);
+        }}
+      />
+
+      {/* Action Modals */}
+      <ContactActivityModal
+        isOpen={activityModalOpen}
+        onClose={() => {
+          setActivityModalOpen(false);
+          setSelectedCase(null);
+        }}
+        caseItem={selectedCase}
+      />
+      <PtpModal
+        isOpen={ptpModalOpen}
+        onClose={() => {
+          setPtpModalOpen(false);
+          setSelectedCase(null);
+        }}
+        caseItem={selectedCase}
+      />
+      <AssignmentModal
+        isOpen={assignModalOpen}
+        onClose={() => {
+          setAssignModalOpen(false);
+          setSelectedCase(null);
+        }}
+        caseItem={selectedCase}
+      />
+      <EscalationModal
+        isOpen={escalateModalOpen}
+        onClose={() => {
+          setEscalateModalOpen(false);
+          setSelectedCase(null);
+        }}
+        caseItem={selectedCase}
       />
       <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
         <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">

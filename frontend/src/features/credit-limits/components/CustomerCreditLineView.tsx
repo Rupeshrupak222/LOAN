@@ -44,7 +44,7 @@ export function CustomerCreditLineView() {
           You do not have an active revolving credit facility yet. Apply for an instant credit line or term loan to get approved limit capacity.
         </p>
         <Link
-          href="/customer/apply"
+          href="/borrower/apply"
           className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md shadow-indigo-200"
         >
           Check Eligibility & Apply

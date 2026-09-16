@@ -190,14 +190,23 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
   ],
 
   COLLECTION_OFFICER: [
-    // Delinquency Buckets, Calls, Visits, PTP & Restructuring
+    'collection.view',
+    'collection.account.view',
+    'collection.queue.view',
+    'collection.activity.view',
+    'collection.activity.create',
+    'collection.promise.view',
+    'collection.promise.create',
+    'collection.promise.update',
+    'collection.payment.view',
     'customer.view',
-    'credit_limit.view', 'credit_facility.view',
-    'loan.view', 'loan.restructure', 'loan.settle',
-    'payment.view', 'payment.record',
-    'collection.view', 'collection.manage', 'collection.activity', 'collection.ptp',
-    'risk.view', 'risk.early_warnings',
-    'product.view',
+    'loan.view',
+    'task.view',
+    'task.update',
+    'report.view',
+    'report.export',
+    'support.view',
+    'support.create',
   ],
 
   AUDITOR: [
