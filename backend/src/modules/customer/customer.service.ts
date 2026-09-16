@@ -318,12 +318,16 @@ export function evaluateCustomerOnboardingStatus(
     requestedAmount: productContext?.requestedAmount,
   });
 
-  const kycDocsComplete = customer.kycStatus === 'VERIFIED' || docValidation.isComplete;
+  const normEmp = normalizeEmploymentType(empType);
+  const isNonEarningPersona = ['HOMEMAKER', 'STUDENT'].includes(normEmp);
 
-  if (!kycDocsComplete) {
+  // Mandatory documents must be fulfilled regardless of raw KYC flag
+  const kycDocsComplete = docValidation.isComplete && customer.kycStatus !== 'REJECTED';
+
+  if (!docValidation.isComplete) {
     docValidation.missingCodes.forEach((code) => missing.push(code));
     docValidation.missingNames.forEach((name) => {
-      reasons.push(`Required document missing for ${normalizeEmploymentType(empType)} applicant: ${name}`);
+      reasons.push(`Required document missing for ${normEmp} applicant: ${name}`);
     });
   }
 
@@ -336,10 +340,16 @@ export function evaluateCustomerOnboardingStatus(
     (customer.employerName && customer.employerName.trim().length > 0) ||
     (customer.employmentDetails &&
       customer.employmentDetails.some((e: any) => e.employerName && e.employerName.trim().length > 0)) ||
-    ['HOMEMAKER', 'STUDENT', 'RETIRED'].includes(normalizeEmploymentType(empType))
+    ['HOMEMAKER', 'STUDENT', 'RETIRED'].includes(normEmp)
   );
+
+  const hasCoApplicantDocs = docs.some((d: any) =>
+    ['CO_APPLICANT', 'GUARANTOR', 'SPONSOR'].includes(d.category) ||
+    ['CO_APPLICANT_PAN', 'CO_APPLICANT_AADHAAR', 'CO_APPLICANT_BANK_STATEMENT', 'CO_APPLICANT_SALARY_SLIP', 'CO_APPLICANT_ITR', 'GUARANTOR_KYC', 'SPONSOR_INCOME_PROOF'].includes(d.documentType || '')
+  );
+
   const hasMonthlyIncome =
-    monthlyIncomeVal > 0 || ['HOMEMAKER', 'STUDENT'].includes(normalizeEmploymentType(empType));
+    monthlyIncomeVal > 0 || (isNonEarningPersona && hasCoApplicantDocs);
 
   const employmentComplete = hasEmploymentType && hasEmployer && hasMonthlyIncome;
 
@@ -352,8 +362,13 @@ export function evaluateCustomerOnboardingStatus(
     reasons.push('Employer or business organization name is required.');
   }
   if (!hasMonthlyIncome) {
-    missing.push('MONTHLY_INCOME');
-    reasons.push('Valid positive monthly income is required.');
+    if (isNonEarningPersona) {
+      missing.push('CO_APPLICANT_SPONSOR');
+      reasons.push(`For ${normEmp} applicants with ₹0 declared income, an earning Co-Applicant / Parent Sponsor with KYC and income proof is required.`);
+    } else {
+      missing.push('MONTHLY_INCOME');
+      reasons.push('Valid positive monthly income is required.');
+    }
   }
 
   // Step 4: Bank Account Details

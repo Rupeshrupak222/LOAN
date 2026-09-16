@@ -144,9 +144,13 @@ function CreditAssessmentQueueContent() {
       return { label: 'Not Eligible / Declined', color: 'rose', step: 5, actionText: 'View Assessment' };
     }
 
-    // 4. Ready for Underwriting (Passed Financials and Risk Score)
+    // 4. In Underwriting (Already Forwarded)
+    if (app.status === 'UNDERWRITING') {
+      return { label: 'In Underwriting (Forwarded)', color: 'indigo', step: 6, actionText: 'Already Forwarded' };
+    }
+
+    // 5. Ready for Underwriting (Passed Financials and Risk Score)
     if (
-      app.status === 'UNDERWRITING' ||
       (app.eligibility?.result === 'ELIGIBLE' && app.riskAssessment?.score != null) ||
       (app.eligibility?.factors as any)?.decision === 'ELIGIBLE'
     ) {
@@ -427,7 +431,16 @@ function CreditAssessmentQueueContent() {
                       </td>
                       <td className="py-3.5 px-3 align-top">
                         {app.riskAssessment?.score != null ? (
-                          <span className="font-bold text-blue-600 dark:text-blue-400 text-xs">
+                          <span
+                            className={cn(
+                              'font-bold text-xs',
+                              app.riskAssessment.category === 'HIGH'
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : app.riskAssessment.category === 'MEDIUM'
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            )}
+                          >
                             {app.riskAssessment.score}/100 ({app.riskAssessment.category || 'LOW'})
                           </span>
                         ) : (

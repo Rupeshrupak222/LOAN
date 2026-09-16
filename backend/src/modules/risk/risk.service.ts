@@ -17,6 +17,7 @@ import {
 import { prisma } from '../../config/prisma';
 import { logAudit } from '../audit/audit.service';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../common/errors';
+import { calculateEmi } from '../finance/emi';
 
 // ---------------------------------------------------------------------------
 // 1. DETERMINISTIC RISK MODEL PROVIDER
@@ -40,9 +41,14 @@ export class DeterministicRiskProvider implements RiskModelProvider {
     const signals: RiskSignalItem[] = [];
     const keyRiskDrivers: string[] = [];
 
+    const isStudent = context.employmentType === 'STUDENT';
+    const isHomemaker = context.employmentType === 'HOMEMAKER';
+    const isRetired = context.employmentType === 'RETIRED';
+    const isSelfEmployed = ['SELF_EMPLOYED', 'BUSINESS_OWNER', 'BUSINESS'].includes(context.employmentType);
+
     // 1. Customer Pillar (0 to 100 risk score, lower is better)
     let custRisk = 20;
-    if (context.applicantAge < 21) {
+    if (context.applicantAge < 21 && !isStudent) {
       signals.push({
         id: 'sig-cust-age-young',
         code: 'RISK_CUST_AGE_UNDER_21',
@@ -58,7 +64,22 @@ export class DeterministicRiskProvider implements RiskModelProvider {
       });
       custRisk += 30;
       keyRiskDrivers.push('Applicant age under 21 years');
-    } else if (context.applicantAge > 58) {
+    } else if (context.applicantAge >= 18 && isStudent) {
+      signals.push({
+        id: 'sig-cust-student-profile',
+        code: 'RISK_CUST_STUDENT_AGE_ALIGNED',
+        name: 'Student Education Facility Age Alignment',
+        category: 'CUSTOMER',
+        actualValue: `${context.applicantAge} years`,
+        benchmarkValue: '18–35 years for Student Loan',
+        severity: 'LOW',
+        weight: 15,
+        scoreContribution: 5,
+        reason: 'Applicant is pursuing education under a co-applicant / sponsor guaranteed facility.',
+        recommendation: 'Verify college bonafide and sponsor KYC.',
+      });
+      custRisk = Math.max(0, custRisk - 10);
+    } else if (context.applicantAge > 58 && !isRetired && !isSelfEmployed) {
       signals.push({
         id: 'sig-cust-age-senior',
         code: 'RISK_CUST_AGE_SENIOR',
@@ -76,7 +97,7 @@ export class DeterministicRiskProvider implements RiskModelProvider {
       keyRiskDrivers.push('Applicant near superannuation age');
     }
 
-    if (context.workExperienceMonths < 12) {
+    if (context.workExperienceMonths < 12 && !isStudent && !isHomemaker) {
       signals.push({
         id: 'sig-cust-exp-low',
         code: 'RISK_CUST_EXPERIENCE_SHORT',
@@ -92,6 +113,21 @@ export class DeterministicRiskProvider implements RiskModelProvider {
       });
       custRisk += 25;
       keyRiskDrivers.push('Work experience vintage < 12 months');
+    } else if (isStudent || isHomemaker) {
+      signals.push({
+        id: 'sig-cust-sponsor-stability',
+        code: 'RISK_CUST_SPONSOR_STABLE',
+        name: 'Sponsor / Co-Applicant Guarantee Profile',
+        category: 'CUSTOMER',
+        actualValue: 'Sponsor Guaranteed',
+        benchmarkValue: 'Co-App Verified',
+        severity: 'LOW',
+        weight: 15,
+        scoreContribution: 5,
+        reason: `Applicant profile (${context.employmentType}) underwritten against verified family co-applicant.`,
+        recommendation: 'Verify sponsor relationship and income continuity.',
+      });
+      custRisk = Math.max(0, custRisk - 10);
     } else {
       signals.push({
         id: 'sig-cust-exp-stable',
@@ -104,22 +140,42 @@ export class DeterministicRiskProvider implements RiskModelProvider {
         weight: 15,
         scoreContribution: 5,
         reason: 'Applicant has demonstrated consistent employment or business operating history.',
-        recommendation: 'Standard validation of latest 3 salary slips.',
+        recommendation: 'Standard validation of latest 3 salary slips or ITR.',
       });
       custRisk = Math.max(0, custRisk - 15);
     }
 
     // 2. Financial Pillar
-    let finRisk = 20;
-    const foir = context.foirPct || (context.monthlyIncome > 0 ? (context.existingObligations / context.monthlyIncome) * 100 : 80);
-    if (foir > 65) {
+    let finRisk = 15;
+    if (context.monthlyIncome <= 0) {
+      signals.push({
+        id: 'sig-fin-zero-income',
+        code: 'RISK_FIN_ZERO_INCOME',
+        name: 'Zero Declared / Verified Income',
+        category: 'FINANCIAL',
+        actualValue: '₹0 / month',
+        benchmarkValue: '>= ₹20,000 / month',
+        severity: 'CRITICAL',
+        weight: 35,
+        scoreContribution: 60,
+        reason: 'Applicant has no verified income or sponsor financial backing to service proposed debt.',
+        recommendation: 'Mandatory earning co-applicant required or decline facility.',
+      });
+      finRisk += 65;
+      keyRiskDrivers.push('Zero earning capacity to service debt obligations');
+    }
+
+    const foir = context.foirPct || (context.monthlyIncome > 0 ? (context.existingObligations / context.monthlyIncome) * 100 : 100);
+    const maxFoirBenchmark = isSelfEmployed ? 65 : 50;
+
+    if (foir > maxFoirBenchmark + 15) {
       signals.push({
         id: 'sig-fin-foir-high',
         code: 'RISK_FIN_FOIR_BURDEN',
         name: 'Elevated Fixed Obligation to Income Ratio (FOIR)',
         category: 'FINANCIAL',
         actualValue: `${foir.toFixed(1)}%`,
-        benchmarkValue: '<= 50%',
+        benchmarkValue: `<= ${maxFoirBenchmark}%`,
         severity: 'CRITICAL',
         weight: 30,
         scoreContribution: 45,
@@ -128,14 +184,14 @@ export class DeterministicRiskProvider implements RiskModelProvider {
       });
       finRisk += 45;
       keyRiskDrivers.push(`High FOIR of ${foir.toFixed(0)}%`);
-    } else if (foir > 50) {
+    } else if (foir > maxFoirBenchmark) {
       signals.push({
         id: 'sig-fin-foir-moderate',
         code: 'RISK_FIN_FOIR_ELEVATED',
         name: 'Moderate Fixed Obligation Ratio',
         category: 'FINANCIAL',
         actualValue: `${foir.toFixed(1)}%`,
-        benchmarkValue: '<= 50%',
+        benchmarkValue: `<= ${maxFoirBenchmark}%`,
         severity: 'MEDIUM',
         weight: 20,
         scoreContribution: 20,
@@ -150,24 +206,24 @@ export class DeterministicRiskProvider implements RiskModelProvider {
         name: 'Comfortable Fixed Obligation Ratio (FOIR)',
         category: 'FINANCIAL',
         actualValue: `${foir.toFixed(1)}%`,
-        benchmarkValue: '<= 50%',
+        benchmarkValue: `<= ${maxFoirBenchmark}%`,
         severity: 'LOW',
         weight: 25,
         scoreContribution: 5,
-        reason: 'Fixed debt service obligations remain comfortably below the 50% capacity benchmark.',
+        reason: `Fixed debt service obligations remain comfortably below the ${maxFoirBenchmark}% capacity benchmark.`,
         recommendation: 'Standard debt service limits apply.',
       });
       finRisk = Math.max(0, finRisk - 10);
     }
 
-    if (context.monthlyIncome < 25000) {
+    if (context.monthlyIncome > 0 && context.monthlyIncome < 20000 && !isStudent && !isHomemaker) {
       signals.push({
         id: 'sig-fin-income-floor',
         code: 'RISK_FIN_INCOME_FLOOR',
         name: 'Net Income Near Floor Baseline',
         category: 'FINANCIAL',
         actualValue: `₹${context.monthlyIncome.toLocaleString('en-IN')}`,
-        benchmarkValue: '>= ₹25,000 / month',
+        benchmarkValue: '>= ₹20,000 / month',
         severity: 'HIGH',
         weight: 20,
         scoreContribution: 25,
@@ -723,11 +779,24 @@ export class RiskEngineService {
       applicantAge = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
     }
 
-    const monthlyIncome = employment?.monthlyIncome ? Number(employment.monthlyIncome) : customer.monthlyIncome ? Number(customer.monthlyIncome) : 45000;
-    const existingObligations = customer.existingObligations ? Number(customer.existingObligations) : 0;
-    const foirPct = monthlyIncome > 0 ? (existingObligations / monthlyIncome) * 100 : 50;
+    const rawEmpType = (customer.employmentType || employment?.employmentType || 'SALARIED').toUpperCase().replace(/[\s-]+/g, '_');
+    const isStudentOrHomemaker = ['STUDENT', 'HOMEMAKER'].includes(rawEmpType);
 
-    const overdueCount = customer.loans.filter((l) => l.status === 'OVERDUE').length;
+    const monthlyIncome = employment?.monthlyIncome ? Number(employment.monthlyIncome) : customer.monthlyIncome ? Number(customer.monthlyIncome) : 0;
+    const existingObligations = customer.existingObligations ? Number(customer.existingObligations) : 0;
+    
+    const requestedAmount = Number(app.requestedAmount || 0);
+    const tenureMonths = app.tenureMonths || 24;
+    const rate = Number(app.product?.interestRate || 12);
+    const emiCalc = calculateEmi(requestedAmount, rate, tenureMonths);
+    const proposedEmi = Number(emiCalc.emi || 0);
+    const totalObligations = existingObligations + proposedEmi;
+
+    const foirPct = monthlyIncome > 0 ? Math.round((totalObligations / monthlyIncome) * 10000) / 100 : 999;
+    const dtiPct = monthlyIncome > 0 ? Math.round((existingObligations / monthlyIncome) * 10000) / 100 : 999;
+
+    const overdueCount = customer.loans?.filter((l) => l.status === 'OVERDUE').length || 0;
+    const activeCreditExposure = customer.loans?.reduce((acc, l) => acc + Number(l.principal || 0), 0) || 0;
 
     return {
       applicationId: app.id,
@@ -739,44 +808,44 @@ export class RiskEngineService {
       channel: 'DIRECT_WEB',
 
       applicantAge,
-      customerTenureMonths: 12,
-      employmentType: (employment?.employmentType as any) || 'SALARIED',
-      employerName: employment?.employerName || 'Declared Employer',
-      workExperienceMonths: (employment?.workExperienceYears || 2) * 12,
+      customerTenureMonths: customer.loans?.length ? 12 : 1,
+      employmentType: (rawEmpType as any) || 'SALARIED',
+      employerName: employment?.employerName || (isStudentOrHomemaker ? 'Co-Applicant / Family Sponsor' : 'Declared Employer'),
+      workExperienceMonths: isStudentOrHomemaker ? 0 : ((employment?.workExperienceYears || 1) * 12),
       residenceStabilityMonths: 24,
       residenceType: 'RENTED',
-      existingCustomerRelationship: customer.loans.length > 0,
+      existingCustomerRelationship: (customer.loans?.length || 0) > 0,
       customerSegment: 'RETAIL',
 
       monthlyIncome,
       monthlyExpenses: Math.round(monthlyIncome * 0.4),
       existingObligations,
       foirPct,
-      dtiPct: foirPct,
-      disposableIncome: Math.max(0, monthlyIncome - existingObligations - Math.round(monthlyIncome * 0.4)),
-      incomeConsistencyScore: 85,
+      dtiPct,
+      disposableIncome: Math.max(0, monthlyIncome - totalObligations - Math.round(monthlyIncome * 0.3)),
+      incomeConsistencyScore: monthlyIncome > 0 ? 85 : 0,
 
-      bureauScore: 740,
+      bureauScore: (customer as any).creditScore || (customer.loans?.length > 0 ? (overdueCount > 0 ? 620 : 740) : 710),
       bureauEnquiriesLast6m: 1,
-      activeCreditLinesCount: customer.loans.length,
-      totalCreditExposure: customer.loans.reduce((acc, l) => acc + Number(l.principal), 0),
-      creditUtilizationPct: 25,
+      activeCreditLinesCount: customer.loans?.length || 0,
+      totalCreditExposure: activeCreditExposure,
+      creditUtilizationPct: (customer.loans?.length || 0) > 0 ? 35 : 0,
       maxDPDLast12m: overdueCount > 0 ? 45 : 0,
       hasOverdueAccounts: overdueCount > 0,
       overdueAmount: 0,
       hasWriteOffsOrSettlements: false,
-      creditHistoryDepthMonths: 36,
+      creditHistoryDepthMonths: (customer.loans?.length || 0) > 0 ? 36 : 6,
 
-      bankAccountAgeMonths: 24,
-      averageMonthlyBalance: customer.bankAccounts?.[0] ? 35000 : 15000,
-      salaryCreditConsistencyScore: 90,
+      bankAccountAgeMonths: customer.bankAccounts?.length ? 24 : 6,
+      averageMonthlyBalance: customer.bankAccounts?.[0] ? 35000 : (monthlyIncome > 0 ? Math.round(monthlyIncome * 0.25) : 0),
+      salaryCreditConsistencyScore: monthlyIncome > 0 ? 90 : 0,
       chequeBouncesLast90d: 0,
-      inwardOutwardRatio: 1.2,
+      inwardOutwardRatio: monthlyIncome > 0 ? 1.2 : 0.5,
       negativeBalanceDays90d: 0,
       existingEmiDebitCount: overdueCount,
 
-      requestedAmount: Number(app.requestedAmount),
-      requestedTenureMonths: app.tenureMonths || 24,
+      requestedAmount,
+      requestedTenureMonths: tenureMonths,
       productType: app.product?.productType || 'PERSONAL_LOAN',
       applicationVelocity24h: 1,
       applicationModificationCount: 0,

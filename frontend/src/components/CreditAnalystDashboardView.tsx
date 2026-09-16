@@ -411,38 +411,85 @@ export function CreditAnalystDashboardView() {
                       )}
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className={cn(
-                        'px-2 py-0.5 rounded-full text-[10px] font-bold tracking-tight',
-                        item.status === 'APPROVED' && 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300',
-                        item.status === 'UNDERWRITING' && 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300',
-                        item.status === 'CREDIT_ASSESSMENT' && 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300',
-                        item.status === 'SUBMITTED' && 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300',
-                        item.status === 'REJECTED' && 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300',
-                        !['APPROVED', 'UNDERWRITING', 'CREDIT_ASSESSMENT', 'SUBMITTED', 'REJECTED'].includes(item.status) && 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-                      )}>
-                        {item.status}
-                      </span>
+                      {(() => {
+                        let badgeLabel = item.status.replace(/_/g, ' ');
+                        let badgeClass = 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+
+                        if (item.status === 'REJECTED' || item.eligibilityCheck === 'NOT_ELIGIBLE') {
+                          badgeLabel = 'NOT ELIGIBLE';
+                          badgeClass = 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+                        } else if (item.underwriterStatus === 'SENT_BACK' || item.creditAnalysisStatus === 'SENT_BACK') {
+                          badgeLabel = 'SENT BACK';
+                          badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
+                        } else if (item.status === 'APPROVED') {
+                          badgeLabel = 'APPROVED';
+                          badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+                        } else if (item.status === 'UNDERWRITING') {
+                          badgeLabel = 'IN UNDERWRITING';
+                          badgeClass = 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800';
+                        } else if (item.isReadyForUnderwriter) {
+                          badgeLabel = 'READY FOR UW';
+                          badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+                        } else if (item.kycStatus !== 'VERIFIED' || (Number(item.documentsCount || 0) > 0 && Number(item.verifiedDocumentsCount || 0) < Number(item.documentsCount || 0))) {
+                          badgeLabel = 'KYC / DOCS PENDING';
+                          badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
+                        } else if (item.status === 'CREDIT_ASSESSMENT') {
+                          badgeLabel = 'IN ASSESSMENT';
+                          badgeClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800';
+                        }
+
+                        return (
+                          <span className={cn('px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-tight inline-block whitespace-nowrap', badgeClass)}>
+                            {badgeLabel}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[220px]">
-                      <Link
-                        href={`/credit-assessment?applicationId=${item.id}${item.isReadyForUnderwriter ? '&step=6' : ''}`}
-                        className="inline-flex items-center justify-center gap-2 w-[205px] h-9 px-3 rounded-xl text-xs font-bold bg-[#2563EB] hover:bg-blue-700 text-white shadow-xs transition cursor-pointer whitespace-nowrap shrink-0"
-                      >
-                        <span>
-                          {item.underwriterStatus === 'SENT_BACK' || item.creditAnalysisStatus === 'SENT_BACK'
-                            ? 'Review Corrections'
-                            : item.status === 'APPROVED'
-                            ? 'View Sanction'
-                            : item.isReadyForUnderwriter
-                            ? 'Forward to Underwriter'
-                            : item.status === 'UNDERWRITING'
-                            ? 'In Underwriting'
-                            : item.status === 'CREDIT_ASSESSMENT'
-                            ? 'Continue Assessment'
-                            : 'Start Assessment'}
-                        </span>
-                        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-                      </Link>
+                      {(() => {
+                        let actionLabel = 'Start Assessment';
+                        let actionHref = `/credit-assessment?applicationId=${item.id}`;
+                        let actionClass = 'bg-[#2563EB] hover:bg-blue-700 text-white';
+
+                        if (item.status === 'REJECTED' || item.eligibilityCheck === 'NOT_ELIGIBLE') {
+                          actionLabel = 'View Assessment';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=3`;
+                          actionClass = 'bg-slate-700 hover:bg-slate-800 text-white';
+                        } else if (item.underwriterStatus === 'SENT_BACK' || item.creditAnalysisStatus === 'SENT_BACK') {
+                          actionLabel = 'Review Corrections';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=2`;
+                          actionClass = 'bg-amber-600 hover:bg-amber-700 text-white';
+                        } else if (item.status === 'APPROVED') {
+                          actionLabel = 'View Sanction';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
+                          actionClass = 'bg-emerald-600 hover:bg-emerald-700 text-white';
+                        } else if (item.status === 'UNDERWRITING') {
+                          actionLabel = 'Already Forwarded';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
+                          actionClass = 'bg-purple-700 hover:bg-purple-800 text-white';
+                        } else if (item.isReadyForUnderwriter) {
+                          actionLabel = 'Forward to Underwriter';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
+                          actionClass = 'bg-[#2563EB] hover:bg-blue-700 text-white';
+                        } else if (item.status === 'CREDIT_ASSESSMENT') {
+                          actionLabel = 'Continue Assessment';
+                          actionHref = `/credit-assessment?applicationId=${item.id}`;
+                          actionClass = 'bg-[#2563EB] hover:bg-blue-700 text-white';
+                        }
+
+                        return (
+                          <Link
+                            href={actionHref}
+                            className={cn(
+                              'inline-flex items-center justify-center gap-2 w-[205px] h-9 px-3 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap shrink-0',
+                              actionClass
+                            )}
+                          >
+                            <span>{actionLabel}</span>
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                          </Link>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
