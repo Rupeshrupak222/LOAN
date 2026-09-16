@@ -235,7 +235,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
 
   const currentItem = accessibleNav.find(
-    (item) => item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+    (item) => item.href === pathname || (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
   );
   const isDashboard = pathname === '/dashboard';
   const isAccessibleRoute = isDashboard || canAccessRoute(user, pathname);
@@ -388,7 +388,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ].map((item) => {
                   const active =
                     pathname === item.href ||
-                    (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                    (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
                   const Icon = item.icon;
 
                   return (
@@ -423,7 +423,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   if (!navItem) return null;
                   const active =
                     pathname === navItem.href ||
-                    (navItem.href !== '/dashboard' && pathname.startsWith(navItem.href));
+                    (navItem.label !== 'Dashboard' && navItem.label !== 'Borrower Overview' && navItem.href !== '/dashboard' && pathname.startsWith(navItem.href + '/'));
                   const Icon = NAV_ICONS[navKey] || LayoutDashboard;
 
                   return (
@@ -464,7 +464,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {items.map((item) => {
                       const active =
                         pathname === item.href ||
-                        (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                        (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
                       const Icon = NAV_ICONS[item.key] || LayoutDashboard;
 
                       return (

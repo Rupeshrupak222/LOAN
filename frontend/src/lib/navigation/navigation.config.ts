@@ -179,16 +179,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     requiredPermission: 'offer.view',
     description: 'Loan offers, sanction terms, and Key Fact Statements',
   },
-  {
-    key: 'documents',
-    label: 'Documents',
-    href: '/documents',
-    iconName: 'FileCheck',
-    workspace: 'CREDIT',
-    group: 'OVERVIEW',
-    requiredPermission: 'application.view',
-    description: 'Document review, verification, and checklist fulfillment',
-  },
+
   {
     key: 'verifications',
     label: 'Verifications',
@@ -592,14 +583,6 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     label: 'Apply for Loan',
     href: '/borrower/apply',
     iconName: 'FileText',
-    workspace: 'BORROWER',
-    group: 'OVERVIEW',
-  },
-  {
-    key: 'customer-credit',
-    label: 'Credit Line & Limits',
-    href: '/borrower/loans',
-    iconName: 'CreditCard',
     workspace: 'BORROWER',
     group: 'OVERVIEW',
   },
