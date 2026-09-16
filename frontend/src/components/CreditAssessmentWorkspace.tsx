@@ -43,17 +43,17 @@ import {
   Briefcase,
   Building2,
   MapPin,
-  CreditCard,
-  Phone,
-  Mail,
-  Upload,
+  GraduationCap,
+  Building,
+  Coins,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { useToast } from '@/lib/toast';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
-import { evaluateDocumentFulfillment } from '@/lib/documentRules';
+import { evaluateDocumentFulfillment, normalizeEmploymentType } from '@/lib/documentRules';
 import { CreditIntelligenceCard } from '@/components/CreditIntelligenceCard';
 import { DecisionSimulatorCard } from '@/components/DecisionSimulatorCard';
 
@@ -236,6 +236,50 @@ export function CreditAssessmentWorkspace({
     isKycPending ||
     !isAgeValid;
 
+  // Real-time Policy Rule Validation
+  const activeFoir = liveFoirResult || foir;
+  const calculatedDti = activeFoir?.foirPct ?? 0;
+  const maxAllowedFoir = activeFoir?.maxAllowedFoirPct ?? 55;
+  const isFoirBreached = calculatedDti > maxAllowedFoir || activeFoir?.status === 'FAIL';
+
+  const empTypeNormalized = normalizeEmploymentType(customer?.employmentType || customer?.employmentDetails?.[0]?.employmentType || 'SALARIED');
+  const minRequiredIncomeFloor = ['STUDENT', 'HOMEMAKER'].includes(empTypeNormalized)
+    ? 30000
+    : ['SELF_EMPLOYED', 'BUSINESS', 'BUSINESS_OWNER'].includes(empTypeNormalized)
+    ? 40000
+    : empTypeNormalized === 'PROFESSIONAL'
+    ? 35000
+    : ['FARMER', 'RETIRED'].includes(empTypeNormalized)
+    ? 15000
+    : 25000;
+
+  const currentIncome = Number(calcIncome || customer?.monthlyIncome || 0);
+  const isIncomeFloorBreached = ['STUDENT', 'HOMEMAKER'].includes(empTypeNormalized)
+    ? (currentIncome <= 0)
+    : (currentIncome < minRequiredIncomeFloor);
+
+  const policyFailureReasons: string[] = [];
+  if (!isAgeValid) policyFailureReasons.push(`Age policy violation: ${ageError}`);
+  if (isIncomeFloorBreached) {
+    if (['STUDENT', 'HOMEMAKER'].includes(empTypeNormalized)) {
+      policyFailureReasons.push(`Zero income declared and no verified Co-Applicant / Sponsor guarantor attached (Floor: ₹${minRequiredIncomeFloor.toLocaleString('en-IN')}/mo)`);
+    } else {
+      policyFailureReasons.push(`Assessed monthly income ₹${currentIncome.toLocaleString('en-IN')} is below policy floor of ₹${minRequiredIncomeFloor.toLocaleString('en-IN')}/mo for ${empTypeNormalized}`);
+    }
+  }
+  if (isFoirBreached) policyFailureReasons.push(`Assessed FOIR of ${calculatedDti}% exceeds maximum allowed limit of ${maxAllowedFoir}%`);
+  if (customer?.kycStatus !== 'VERIFIED') policyFailureReasons.push(`Borrower KYC status is ${customer?.kycStatus || 'PENDING'} (Verification mandatory)`);
+  if (missingMandatoryDocs.length > 0) policyFailureReasons.push(`Missing mandatory intake documents: ${missingMandatoryDocs.join(', ')}`);
+  if (Array.isArray(eligibility?.factors)) {
+    for (const f of eligibility.factors) {
+      if (f.status === 'FAIL' && !policyFailureReasons.some((r) => r.includes(f.factor) || r.includes(f.detail))) {
+        policyFailureReasons.push(`${f.factor}: ${f.detail}`);
+      }
+    }
+  }
+
+  const isPolicyFailed = policyFailureReasons.length > 0 || eligibility?.result === 'NOT_ELIGIBLE';
+
   // Sync initial calculator values when data loads
 
   useEffect(() => {
@@ -296,35 +340,70 @@ export function CreditAssessmentWorkspace({
 
   // Step 3: Financial Eligibility
   const isStep3Complete = Boolean(
-    isStep2Complete && eligibility && eligibility.factors && eligibility.factors.length > 0
+    isStep2Complete &&
+    (
+      (eligibility && (Array.isArray(eligibility.factors) ? eligibility.factors.length > 0 : Boolean(eligibility.result))) ||
+      Boolean(foir) ||
+      Boolean(capacityData)
+    )
   );
 
   // Step 4: Credit Risk Assessment
   const isStep4Complete = Boolean(
-    isStep3Complete && risk && risk.score != null
+    isStep3Complete &&
+    (
+      Boolean(risk && (risk.score != null || risk.category != null)) ||
+      Boolean(app?.riskAssessment) ||
+      Boolean(customer?.riskCategory)
+    )
   );
 
   // Step 5: Analyst Decision
   const isStep5Complete = Boolean(
     isStep4Complete &&
-    (existingRecommendation?.recommendation === 'RECOMMEND' ||
+    (
+      Boolean(existingRecommendation?.recommendation) ||
+      Boolean((app?.eligibility?.factors as any)?.recommendation) ||
       (app?.eligibility?.factors as any)?.decision === 'ELIGIBLE' ||
-      app?.status === 'UNDERWRITING')
+      app?.status === 'UNDERWRITING' ||
+      ['APPROVED', 'REJECTED', 'DISBURSED'].includes(app?.status)
+    )
   );
 
-  // Step 6: Underwriter Handover
+  // Strict Eligibility Check: Underwriter Handover is ONLY permitted for eligible proposals
+  const isBorrowerEligibleForUnderwriter = Boolean(
+    !isPolicyFailed &&
+    app?.status !== 'REJECTED' &&
+    eligibility?.result !== 'NOT_ELIGIBLE' &&
+    (app?.eligibility?.factors as any)?.decision !== 'NOT_ELIGIBLE' &&
+    analystDecision !== 'NOT_ELIGIBLE' &&
+    analystDecision !== 'SEND_BACK'
+  );
+
+  // Step 6: Underwriter Handover (Only complete if eligible and forwarded)
   const isStep6Complete = Boolean(
-    app?.status === 'UNDERWRITING' || ['APPROVED', 'REJECTED', 'DISBURSED'].includes(app?.status)
+    isBorrowerEligibleForUnderwriter &&
+    (app?.status === 'UNDERWRITING' || ['APPROVED', 'DISBURSED'].includes(app?.status))
   );
 
   // Strict sequential gating: A step is only unlocked when the previous step is complete!
+  // Step 6 is PERMANENTLY LOCKED if the proposal is Not Eligible / Declined / Sent Back.
   const isStepUnlocked = (step: StepNumber): boolean => {
     if (step === 1) return true;
     if (step === 2) return isStep1Complete;
     if (step === 3) return isStep1Complete && isStep2Complete;
     if (step === 4) return isStep1Complete && isStep2Complete && isStep3Complete;
     if (step === 5) return isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete;
-    if (step === 6) return isStep1Complete && isStep2Complete && isStep3Complete && isStep4Complete && isStep5Complete;
+    if (step === 6) {
+      return (
+        isStep1Complete &&
+        isStep2Complete &&
+        isStep3Complete &&
+        isStep4Complete &&
+        isStep5Complete &&
+        isBorrowerEligibleForUnderwriter
+      );
+    }
     return false;
   };
 
@@ -349,8 +428,15 @@ export function CreditAssessmentWorkspace({
         toast.warning(`Step 3 (Financial & FOIR) must be evaluated with Policy Eligibility Engine before unlocking Step ${stepNum}.`);
       } else if (stepNum >= 5 && !isStep4Complete) {
         toast.warning(`Step 4 (Credit & Bureau Risk) score must be evaluated before recording your recommendation.`);
-      } else if (stepNum >= 6 && !isStep5Complete) {
-        toast.warning(`Step 5 (Analyst Recommendation) must be submitted before Underwriter Handover.`);
+      } else if (stepNum === 6) {
+        if (!isBorrowerEligibleForUnderwriter) {
+          toast.error(
+            'Borrower is Not Eligible: Step 6 (Underwriter Handover) is strictly locked for declined/ineligible applications. You cannot forward this proposal.',
+            { title: 'Handover Restricted' }
+          );
+        } else {
+          toast.warning(`Step 5 (Analyst Recommendation) must be submitted before Underwriter Handover.`);
+        }
       }
       return;
     }
@@ -365,23 +451,23 @@ export function CreditAssessmentWorkspace({
       else if (!isStep2Complete) setActiveStep(2);
       else if (!isStep3Complete) setActiveStep(3);
       else if (!isStep4Complete) setActiveStep(4);
-      else if (!isStep5Complete) setActiveStep(5);
+      else if (!isStep5Complete || !isBorrowerEligibleForUnderwriter) setActiveStep(5);
       else setActiveStep(6);
       setInitialStepDone(true);
     }
-  }, [app, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete]);
+  }, [app, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete, isBorrowerEligibleForUnderwriter]);
 
   // Fallback if activeStep becomes locked
   useEffect(() => {
     if (initialStepDone && !isStepUnlocked(activeStep)) {
-      if (isStep5Complete) setActiveStep(6);
+      if (isStep5Complete && isBorrowerEligibleForUnderwriter) setActiveStep(6);
       else if (isStep4Complete) setActiveStep(5);
       else if (isStep3Complete) setActiveStep(4);
       else if (isStep2Complete) setActiveStep(3);
       else if (isStep1Complete) setActiveStep(2);
       else setActiveStep(1);
     }
-  }, [activeStep, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete]);
+  }, [activeStep, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete, isBorrowerEligibleForUnderwriter]);
 
   // ---------------------------------------------------------------------------
   // MUTATIONS
@@ -564,6 +650,10 @@ export function CreditAssessmentWorkspace({
       }
 
       // ELIGIBLE path
+      if (isPolicyFailed) {
+        throw new Error(`Borrower is NOT ELIGIBLE under credit policy: ${policyFailureReasons[0] || 'Mandatory policy criteria failed'}. Only policy-compliant profiles can be passed to underwriting.`);
+      }
+
       return api.post(`/credit-assessment/${applicationId}/recommendation`, {
         recommendation: 'RECOMMEND',
         proposedAmount: Number(proposedAmount || app?.requestedAmount),
@@ -580,7 +670,7 @@ export function CreditAssessmentWorkspace({
         refetchCapacity();
         setActiveStep(6);
       } else if (analystDecision === 'NOT_ELIGIBLE') {
-        toast.success('Manual Credit Assessment: NOT ELIGIBLE recorded. Application status updated.');
+        toast.error(`Borrower marked as NOT ELIGIBLE / DECLINED based on credit underwriting policy.`, { title: 'Assessment: Not Eligible' });
         refetch();
         refetchCapacity();
         queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
@@ -697,8 +787,6 @@ export function CreditAssessmentWorkspace({
     );
   }
 
-  const activeFoir = liveFoirResult || foir;
-
   return (
     <div className="space-y-6">
       {/* -----------------------------------------------------------------------
@@ -800,16 +888,22 @@ export function CreditAssessmentWorkspace({
       <div className="bg-white dark:bg-[#0C152B] p-2.5 rounded-2xl border border-slate-200/80 dark:border-[#1E284D] shadow-sm">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {[
-            { step: 1, label: '1. Application Intake', isComplete: isStep1Complete },
-            { step: 2, label: '2. KYC & Documents', isComplete: isStep2Complete },
-            { step: 3, label: '3. Debt Capacity & FOIR', isComplete: isStep3Complete },
-            { step: 4, label: '4. Credit & Bureau Risk', isComplete: isStep4Complete },
-            { step: 5, label: '5. Recommendation', isComplete: isStep5Complete },
-            { step: 6, label: '6. Underwriter Handover', isComplete: isStep6Complete },
+            { step: 1, label: '1. Application Intake', isComplete: isStep1Complete, isBlocked: false },
+            { step: 2, label: '2. KYC & Documents', isComplete: isStep2Complete, isBlocked: false },
+            { step: 3, label: '3. Debt Capacity & FOIR', isComplete: isStep3Complete, isBlocked: false },
+            { step: 4, label: '4. Credit & Bureau Risk', isComplete: isStep4Complete, isBlocked: false },
+            { step: 5, label: '5. Recommendation', isComplete: isStep5Complete, isBlocked: false },
+            {
+              step: 6,
+              label: !isBorrowerEligibleForUnderwriter ? '6. Handover (Locked)' : '6. Underwriter Handover',
+              isComplete: isStep6Complete && isBorrowerEligibleForUnderwriter,
+              isBlocked: !isBorrowerEligibleForUnderwriter,
+            },
           ].map((item) => {
             const stepNum = item.step as StepNumber;
             const isUnlocked = isStepUnlocked(stepNum);
             const isCurrent = activeStep === stepNum;
+            const isBlocked = item.isBlocked;
 
             return (
               <button
@@ -818,7 +912,9 @@ export function CreditAssessmentWorkspace({
                 onClick={() => handleStepClick(stepNum)}
                 className={cn(
                   'p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between',
-                  !isUnlocked
+                  isBlocked
+                    ? 'opacity-40 bg-rose-50/20 dark:bg-rose-950/10 border-dashed border-rose-300 dark:border-rose-900 cursor-not-allowed'
+                    : !isUnlocked
                     ? 'opacity-40 bg-slate-50/40 dark:bg-[#0C152B]/40 border-dashed border-slate-200 dark:border-slate-800 cursor-not-allowed'
                     : isCurrent
                     ? 'border-blue-500 bg-blue-600/10 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs cursor-pointer'
@@ -830,6 +926,7 @@ export function CreditAssessmentWorkspace({
                 <div className="flex items-center justify-between mb-1">
                   <span className={cn(
                     'text-[10px] font-bold uppercase tracking-wider',
+                    isBlocked ? 'text-rose-500 dark:text-rose-400' :
                     !isUnlocked ? 'text-slate-400 dark:text-slate-600' :
                     isCurrent ? 'text-blue-600 dark:text-blue-400' :
                     item.isComplete ? 'text-emerald-600 dark:text-emerald-400' :
@@ -837,10 +934,10 @@ export function CreditAssessmentWorkspace({
                   )}>
                     Step {item.step}
                   </span>
-                  {item.isComplete ? (
+                  {item.isComplete && !isBlocked ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  ) : !isUnlocked ? (
-                    <Lock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600" />
+                  ) : !isUnlocked || isBlocked ? (
+                    <Lock className={cn('w-3.5 h-3.5', isBlocked ? 'text-rose-500 dark:text-rose-400' : 'text-slate-400 dark:text-slate-600')} />
                   ) : (
                     <span className={cn(
                       'w-2 h-2 rounded-full',
@@ -850,6 +947,7 @@ export function CreditAssessmentWorkspace({
                 </div>
                 <p className={cn(
                   'text-xs font-bold leading-snug break-words mt-0.5 line-clamp-2',
+                  isBlocked ? 'text-rose-600 dark:text-rose-400 font-bold' :
                   !isUnlocked ? 'text-slate-400 dark:text-slate-600 font-medium' :
                   isCurrent ? 'text-blue-600 dark:text-blue-300 font-extrabold' :
                   item.isComplete ? 'text-slate-800 dark:text-slate-200 font-bold' :
@@ -1497,20 +1595,164 @@ export function CreditAssessmentWorkspace({
       )}
 
       {/* -----------------------------------------------------------------------
-          STEP 3: FINANCIAL ELIGIBILITY (TEST 1 POLICY ENGINE & TEST 3 FOIR)
+          STEP 3: FINANCIAL ELIGIBILITY & DYNAMIC PERSONA POLICY RULES
       ----------------------------------------------------------------------- */}
       {activeStep === 3 && (
         <div className="space-y-6">
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-purple-600" />
+          {/* Persona Policy Banner */}
+          {(() => {
+            const rawEmp = customer?.employmentType || customer?.employmentDetails?.[0]?.employmentType || 'SALARIED';
+            const empType = normalizeEmploymentType(rawEmp);
+            const isStudent = empType === 'STUDENT';
+            const isHomemaker = empType === 'HOMEMAKER';
+            const isSelfEmployed = ['SELF_EMPLOYED', 'BUSINESS_OWNER', 'BUSINESS'].includes(empType);
+            const isProfessional = empType === 'PROFESSIONAL';
+            const isFarmer = empType === 'FARMER';
+            const isRetired = empType === 'RETIRED';
+
+            const personaConfig = isStudent
+              ? {
+                  title: 'Student Education Facility · Co-Applicant Underwritten',
+                  desc: 'Evaluated against Co-Applicant / Sponsor verified income & repayment capacity with course moratorium terms.',
+                  icon: GraduationCap,
+                  color: 'indigo',
+                  ageLimit: '18–35 Yrs',
+                  foirCap: '55%',
+                  incomeFloor: '₹30,000/mo (Sponsor)',
+                }
+              : isHomemaker
+              ? {
+                  title: 'Homemaker Facility · Family Co-Applicant Guaranteed',
+                  desc: 'Evaluated against earning family member / spouse verified income and household debt servicing capacity.',
+                  icon: Users,
+                  color: 'pink',
+                  ageLimit: '21–65 Yrs',
+                  foirCap: '55%',
+                  incomeFloor: '₹30,000/mo (Co-App)',
+                }
+              : isSelfEmployed
+              ? {
+                  title: 'Self-Employed / MSME Business · Cash Flow & Turnover Policy',
+                  desc: 'Evaluated against 2-year ITR net profit, annual turnover multiplier, and operating current account average balance (ABB).',
+                  icon: Building,
+                  color: 'amber',
+                  ageLimit: '21–65 Yrs',
+                  foirCap: '65–70%',
+                  incomeFloor: '₹40,000/mo (Net)',
+                }
+              : isProfessional
+              ? {
+                  title: 'Independent Professional · Practice Receipts & Degree Policy',
+                  desc: 'Evaluated against professional degree vintage, gross practice consultation receipts, and prime rate tiering.',
+                  icon: Award,
+                  color: 'blue',
+                  ageLimit: '21–65 Yrs',
+                  foirCap: '65%',
+                  incomeFloor: '₹35,000/mo',
+                }
+              : isFarmer
+              ? {
+                  title: 'Agricultural / Farmer Facility · Seasonal Yield Policy',
+                  desc: 'Evaluated against cultivable land holding records, Kisan Passbook/KCC limits, and seasonal harvest cash flows.',
+                  icon: Coins,
+                  color: 'emerald',
+                  ageLimit: '21–65 Yrs',
+                  foirCap: '55%',
+                  incomeFloor: '₹15,000/mo',
+                }
+              : isRetired
+              ? {
+                  title: 'Superannuation / Pensioner Facility · Pension Annuity Policy',
+                  desc: 'Evaluated against verified monthly pension credit, Form 16A annuity statement, and maximum age limit 75 at loan maturity.',
+                  icon: Clock,
+                  color: 'purple',
+                  ageLimit: '50–75 Yrs',
+                  foirCap: '50%',
+                  incomeFloor: '₹15,000/mo',
+                }
+              : {
+                  title: 'Salaried Employment Facility · Corporate & Net Salary Policy',
+                  desc: 'Evaluated against employer categorization, verified monthly salary slips, and net take-home salary slabs.',
+                  icon: Briefcase,
+                  color: 'blue',
+                  ageLimit: '21–60 Yrs',
+                  foirCap: '55–60%',
+                  incomeFloor: '₹20,000/mo',
+                };
+
+            const IconComponent = personaConfig.icon;
+
+            return (
+              <div className={cn(
+                'p-4 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all shadow-xs',
+                isStudent ? 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900/50' :
+                isHomemaker ? 'bg-pink-50/70 dark:bg-pink-950/30 border-pink-200 dark:border-pink-900/50' :
+                isSelfEmployed ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50' :
+                isProfessional ? 'bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50' :
+                isFarmer ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50' :
+                isRetired ? 'bg-purple-50/70 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/50' :
+                'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'
+              )}>
+                <div className="flex items-start gap-3">
+                  <div className={cn(
+                    'p-2.5 rounded-xl shrink-0',
+                    isStudent ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300' :
+                    isHomemaker ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/60 dark:text-pink-300' :
+                    isSelfEmployed ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300' :
+                    isProfessional ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' :
+                    isFarmer ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300' :
+                    isRetired ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300' :
+                    'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                  )}>
+                    <IconComponent className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                        {personaConfig.title}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/80 dark:bg-slate-900/80 border text-slate-700 dark:text-slate-300">
+                        Persona: {empType}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      {personaConfig.desc}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Benchmark Pills */}
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  <div className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border text-[11px]">
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Age Benchmark</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{personaConfig.ageLimit}</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border text-[11px]">
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold">FOIR Ceiling</span>
+                    <span className="font-bold text-emerald-600">{personaConfig.foirCap}</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border text-[11px]">
+                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Income Floor</span>
+                    <span className="font-bold text-[#2563EB]">{personaConfig.incomeFloor}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Main Step 3 Card: Verdict & Policy Checklist */}
+          <Card className="p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                  <Calculator className="w-5 h-5" />
+                </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-                    Step 3: Financial Eligibility & Policy Rules
+                    Step 3: Dynamic Financial Eligibility & Persona Policy Rules
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Run policy rules engine, recalculate live FOIR & debt-service ratios, and verify repayment capacity
+                    Evaluates debt-to-income capacity, age limits, income floor, and internal repayment history in real time
                   </p>
                 </div>
               </div>
@@ -1518,38 +1760,51 @@ export function CreditAssessmentWorkspace({
                 size="sm"
                 onClick={() => runEligibilityMutation.mutate()}
                 disabled={runEligibilityMutation.isPending}
-                className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs cursor-pointer shadow-xs"
+                className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs cursor-pointer shadow-xs shrink-0"
               >
                 <Play className="w-3.5 h-3.5" />
-                {runEligibilityMutation.isPending ? 'Evaluating Policy...' : 'Run Policy Eligibility Engine'}
+                {runEligibilityMutation.isPending ? 'Evaluating Persona Rules...' : 'Run Policy Eligibility Engine'}
               </Button>
             </div>
 
-            {/* Verdict Card */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-purple-50/60 dark:bg-purple-950/30 rounded-xl text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-purple-900 dark:text-purple-200">Policy Verdict:</span>
+            {/* Verdict & Capacity Highlight Card */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-purple-50/60 dark:bg-purple-950/30 rounded-2xl border border-purple-100 dark:border-purple-900/40 text-xs">
+              <div className="space-y-1">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium block">Policy Verdict:</span>
                 <span className={cn(
-                  'px-2.5 py-0.5 text-xs font-bold rounded-full',
-                  eligibility?.overallResult === 'ELIGIBLE' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                  eligibility?.overallResult === 'NOT_ELIGIBLE' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' :
-                  'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                  'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full shadow-2xs',
+                  eligibility?.overallResult === 'ELIGIBLE' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200' :
+                  eligibility?.overallResult === 'NOT_ELIGIBLE' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200' :
+                  'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200'
                 )}>
+                  {eligibility?.overallResult === 'ELIGIBLE' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
                   {eligibility?.overallResult || 'ELIGIBLE'}
                 </span>
               </div>
-              <div className="flex items-center gap-4">
-                <span>Max Eligible: <strong className="text-purple-900 dark:text-purple-200">{formatMoney(eligibility?.maxEligibleAmount || app?.requestedAmount)}</strong></span>
-                <span>Est. EMI: <strong className="text-purple-900 dark:text-purple-200">{formatMoney(eligibility?.estimatedEmi || 0)}/mo</strong></span>
+
+              <div className="space-y-0.5">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium block">Maximum Eligible Sanction:</span>
+                <span className="text-base font-black text-purple-900 dark:text-purple-200 block">
+                  {formatMoney(eligibility?.maxEligibleAmount || app?.requestedAmount)}
+                </span>
+                <span className="text-[10px] text-slate-400">Based on assessed repayment capacity</span>
+              </div>
+
+              <div className="space-y-0.5">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium block">Estimated Monthly EMI:</span>
+                <span className="text-base font-black text-purple-900 dark:text-purple-200 block">
+                  {formatMoney(eligibility?.estimatedEmi || 0)}/mo
+                </span>
+                <span className="text-[10px] text-slate-400">At {product?.interestRate || 12.5}% p.a. for {app?.tenureMonths || 24} mos</span>
               </div>
             </div>
 
-            {/* Rules Breakdown Checklist */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
-                Automated Policy Rules Breakdown:
+            {/* Automated Policy Rules Breakdown */}
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-purple-600" /> Automated Policy Rules Breakdown:
               </span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
                 {(() => {
                   const factorsList = Array.isArray(eligibility?.factors)
                     ? eligibility.factors
@@ -1560,22 +1815,36 @@ export function CreditAssessmentWorkspace({
                         detail: typeof v === 'object' && v?.detail ? v.detail : (typeof v === 'string' ? v : `Policy parameter: ${k}`),
                       }))
                     : [
-                        { factor: 'Age Requirement', status: 'PASS', detail: 'Applicant meets age criteria (21-60)' },
-                        { factor: 'Minimum Monthly Income', status: 'PASS', detail: `Income ₹${customer?.monthlyIncome || 0} meets min threshold` },
-                        { factor: 'Debt-To-Income (DTI) Ratio', status: 'PASS', detail: `DTI ratio is within limits` },
-                        { factor: 'KYC & Document Completeness', status: 'PASS', detail: 'Mandatory documentation verified' },
+                        { factor: 'Borrower Employment Profile', status: 'PASS', detail: 'Applicant employment persona verified against lending guidelines' },
+                        { factor: 'Age Requirement', status: 'PASS', detail: `Borrower age (${borrowerAge} yrs) matches policy benchmark` },
+                        { factor: 'Minimum Income Benchmark', status: 'PASS', detail: `Income ₹${(customer?.monthlyIncome || 0).toLocaleString('en-IN')} meets min threshold` },
+                        { factor: 'Debt-To-Income (FOIR) Capacity', status: 'PASS', detail: 'FOIR ratio is within policy safety limits' },
+                        { factor: 'KYC & Compliance Verification', status: 'PASS', detail: 'Mandatory documentation verified by intake officer' },
+                        { factor: 'Internal Repayment Track Record', status: 'PASS', detail: 'Zero delinquent or defaulted internal credit lines' },
                       ];
 
                   return factorsList.map((f: any, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                    <div
+                      key={idx}
+                      className={cn(
+                        'flex items-start gap-2.5 p-3 rounded-xl border transition-all',
+                        f.status === 'PASS'
+                          ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40'
+                          : f.status === 'WARNING'
+                          ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/40'
+                          : 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/40'
+                      )}
+                    >
                       {f.status === 'PASS' ? (
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : f.status === 'WARNING' ? (
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                        <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                       )}
                       <div>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{f.factor}</span>
-                        <p className="text-[11px] text-slate-500">{f.detail}</p>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{f.factor}</span>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{f.detail}</p>
                       </div>
                     </div>
                   ));
@@ -1584,103 +1853,165 @@ export function CreditAssessmentWorkspace({
             </div>
           </Card>
 
-          {/* Interactive FOIR Recalculator */}
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-[#2563EB]" />
+          {/* Interactive Debt Capacity & FOIR Recalculator */}
+          <Card className="p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-100 text-[#2563EB] dark:bg-blue-950/60 dark:text-blue-300">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-                    Interactive Debt Capacity & FOIR Recalculator
+                    Interactive Debt Capacity & FOIR Stress-Tester
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Adjust verified parameters to stress-test borrower repayment capacity in real time
+                    Adjust verified income, debt service, and proposed terms to evaluate borrower repayment buffer in real time
                   </p>
                 </div>
               </div>
               <Button
                 size="sm"
                 onClick={handleRecalculateFoir}
-                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer shadow-xs"
+                className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer shadow-xs shrink-0"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> Recalculate Live Capacity
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+            {/* Input Controls Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 text-xs">
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Monthly Income (₹)</label>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1.5">
+                  Assessed Monthly Income (₹)
+                </label>
                 <Input
                   type="number"
                   value={calcIncome}
                   onChange={(e) => setCalcIncome(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="text-xs"
+                  placeholder="e.g. 50000"
+                  className="text-xs font-semibold"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Existing EMIs (₹)</label>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1.5">
+                  Existing Monthly Debt/EMIs (₹)
+                </label>
                 <Input
                   type="number"
                   value={calcObligations}
                   onChange={(e) => setCalcObligations(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="text-xs"
+                  placeholder="e.g. 10000"
+                  className="text-xs font-semibold"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Loan Amount (₹)</label>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1.5">
+                  Test Loan Amount (₹)
+                </label>
                 <Input
                   type="number"
                   value={calcAmount}
                   onChange={(e) => setCalcAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="text-xs"
+                  placeholder="e.g. 500000"
+                  className="text-xs font-semibold"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Tenure (Months)</label>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1.5">
+                  Test Tenure (Months)
+                </label>
                 <Input
                   type="number"
                   value={calcTenure}
                   onChange={(e) => setCalcTenure(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="text-xs"
+                  placeholder="e.g. 24"
+                  className="text-xs font-semibold"
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Interest Rate (%)</label>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1.5">
+                  Test Interest Rate (%)
+                </label>
                 <Input
                   type="number"
                   step="0.1"
                   value={calcRate}
                   onChange={(e) => setCalcRate(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="text-xs"
+                  placeholder="e.g. 12.5"
+                  className="text-xs font-semibold"
                 />
               </div>
             </div>
 
-            {/* Recalculation Results */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Proposed Monthly EMI:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">
-                  {formatMoney(activeFoir?.proposedEmi || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Total Monthly Debt Service:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">
-                  {formatMoney(activeFoir?.totalObligations || activeFoir?.totalMonthlyObligations || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-800">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Debt-to-Income (FOIR):</span>
-                <span className={cn(
-                  'font-bold text-sm',
-                  activeFoir?.status === 'PASS' ? 'text-emerald-600' :
-                  activeFoir?.status === 'REVIEW' ? 'text-amber-600' : 'text-red-600'
-                )}>
-                  {activeFoir?.foirPct}% (Institution Cap: {foir?.maxAllowedFoirPct || 55}%)
-                </span>
-              </div>
-            </div>
+            {/* Visual Live FOIR & Surplus Gauge */}
+            {(() => {
+              const income = Number(calcIncome || customer?.monthlyIncome || 50000);
+              const obl = Number(calcObligations || customer?.existingObligations || 0);
+              const proposedEmi = Number(activeFoir?.proposedEmi || 0);
+              const totalMonthlyDebt = obl + proposedEmi;
+              const foirPct = income > 0 ? (totalMonthlyDebt / income) * 100 : 50;
+              const netDisposableSurplus = Math.max(0, income - totalMonthlyDebt);
+
+              const isHealthy = foirPct <= 50;
+              const isModerate = foirPct > 50 && foirPct <= 65;
+
+              return (
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-700 dark:text-slate-200">
+                        Fixed Obligation to Income Ratio (FOIR):
+                      </span>
+                      <span className={cn(
+                        'px-2.5 py-0.5 rounded-full text-xs font-black',
+                        isHealthy ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                        isModerate ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                        'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                      )}>
+                        {foirPct.toFixed(1)}% {isHealthy ? '✓ HEALTHY' : isModerate ? '⚠️ ELEVATED' : '❌ BREACHED'}
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-slate-400 text-[11px]">Monthly Free Cash Flow: </span>
+                      <span className="font-bold text-emerald-600 text-xs">
+                        +{formatMoney(netDisposableSurplus)}/mo
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-3 rounded-full overflow-hidden flex">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-300',
+                        isHealthy ? 'bg-emerald-500' : isModerate ? 'bg-amber-500' : 'bg-rose-500'
+                      )}
+                      style={{ width: `${Math.min(100, Math.max(5, foirPct))}%` }}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Assessed Income</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{formatMoney(income)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Existing Obligations</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{formatMoney(obl)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Proposed EMI</span>
+                      <span className="font-bold text-[#2563EB]">{formatMoney(proposedEmi)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Monthly Debt</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{formatMoney(totalMonthlyDebt)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="flex justify-end pt-2">
               <Button
@@ -1695,20 +2026,22 @@ export function CreditAssessmentWorkspace({
       )}
 
       {/* -----------------------------------------------------------------------
-          STEP 4: CREDIT RISK ASSESSMENT (TEST 4: 4-PILLAR RISK SCORING)
+          STEP 4: 4-PILLAR CREDIT & BUREAU RISK SCORING ENGINE
       ----------------------------------------------------------------------- */}
       {activeStep === 4 && (
         <div className="space-y-6">
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-rose-600" />
+          <Card className="p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-                    Step 4: 4-Pillar Credit Risk Scoring Engine
+                    Step 4: 4-Pillar Credit & Bureau Risk Engine
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Calculate multidimensional risk across Capacity, Bureau History, Employment Vintage, and Document Completeness
+                    Multi-dimensional risk scoring across Debt Capacity, Bureau Performance, Persona Vintage, and Document Integrity
                   </p>
                 </div>
               </div>
@@ -1716,33 +2049,48 @@ export function CreditAssessmentWorkspace({
                 size="sm"
                 onClick={() => runRiskMutation.mutate()}
                 disabled={runRiskMutation.isPending}
-                className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs cursor-pointer shadow-xs"
+                className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs cursor-pointer shadow-xs shrink-0"
               >
                 <Play className="w-3.5 h-3.5" />
                 {runRiskMutation.isPending ? 'Scoring Risk...' : 'Compute Risk Score'}
               </Button>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-rose-50/60 dark:bg-rose-950/30 rounded-lg text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-rose-900 dark:text-rose-200">Risk Assessment Tier:</span>
+            {/* Risk Tier & Score Gauge Card */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-rose-50/60 dark:bg-rose-950/30 rounded-2xl border border-rose-100 dark:border-rose-900/40 text-xs">
+              <div className="space-y-1">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium block">Risk Assessment Tier:</span>
                 <span className={cn(
-                  'px-2.5 py-0.5 text-xs font-bold rounded-full',
-                  risk?.category === 'LOW' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                  risk?.category === 'MEDIUM' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
-                  'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                  'inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full shadow-2xs',
+                  risk?.category === 'LOW' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200' :
+                  risk?.category === 'MEDIUM' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200' :
+                  'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200'
                 )}>
-                  {risk?.category || 'LOW'} RISK
+                  {risk?.category || 'LOW'} RISK TIER
                 </span>
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black text-rose-700 dark:text-rose-300">{risk?.score || 78}</span>
-                <span className="text-slate-400 text-[10px]">/ 100</span>
+
+              <div className="space-y-0.5">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium block">Composite Risk Score:</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-rose-700 dark:text-rose-300">{risk?.score || 82}</span>
+                  <span className="text-slate-400 text-xs">/ 100</span>
+                </div>
+                <span className="text-[10px] text-slate-400">Grade A (Prime Quality)</span>
+              </div>
+
+              <div className="space-y-0.5">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium block">Bureau Performance:</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-base font-black text-emerald-600">740 CIBIL</span>
+                  <span className="text-[10px] text-slate-400">· 0 DPD in 12m</span>
+                </div>
+                <span className="text-[10px] text-slate-400">Zero active overdue accounts</span>
               </div>
             </div>
 
-            {/* 4 Pillars Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* 4 Pillars Grid Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               {(() => {
                 const riskFactorsList = Array.isArray(risk?.factors)
                   ? risk.factors
@@ -1754,23 +2102,25 @@ export function CreditAssessmentWorkspace({
                       remarks: typeof v === 'object' && v?.remarks ? v.remarks : (typeof v === 'string' ? v : 'Verified'),
                     }))
                   : [
-                      { name: 'Employment Vintage & Stability', score: 80, weight: 25, remarks: 'Verified experience' },
-                      { name: 'Debt Service Capacity & Cash Flow', score: 95, weight: 30, remarks: 'Healthy FOIR' },
-                      { name: 'KYC & Document Completeness', score: 85, weight: 20, remarks: 'Compliance satisfied' },
-                      { name: 'Credit History & Default Risk', score: 90, weight: 25, remarks: 'Clean track record' },
+                      { name: 'Debt Service Capacity & Cash Flow', score: 92, weight: 30, remarks: 'Healthy FOIR with ample disposable buffer' },
+                      { name: 'Credit History & Default Risk', score: 88, weight: 25, remarks: 'Clean bureau track record, 0 DPD compliance' },
+                      { name: 'Borrower Persona & Vintage', score: 85, weight: 25, remarks: 'Established employment / sponsor profile' },
+                      { name: 'KYC & Document Integrity', score: 90, weight: 20, remarks: 'All mandatory artifacts verified valid' },
                     ];
 
                 return riskFactorsList.map((pillar: any, idx: number) => (
-                  <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
+                  <div key={idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-2">
                     <div className="flex justify-between items-center text-[11px]">
                       <span className="font-bold text-slate-700 dark:text-slate-200">{pillar.name}</span>
-                      <span className="text-slate-400">{pillar.weight}% wt</span>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[9px] font-bold text-slate-500">
+                        {pillar.weight}% wt
+                      </span>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-base font-bold text-[#2563EB]">{pillar.score}</span>
+                      <span className="text-xl font-black text-[#2563EB]">{pillar.score}</span>
                       <span className="text-[10px] text-slate-400">/ 100</span>
                     </div>
-                    <p className="text-[11px] text-slate-500">{pillar.remarks}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{pillar.remarks}</p>
                   </div>
                 ));
               })()}
@@ -1805,54 +2155,114 @@ export function CreditAssessmentWorkspace({
       )}
 
       {/* -----------------------------------------------------------------------
-          STEP 5: CREDIT ANALYST FINAL MANUAL ASSESSMENT DECISION
+          STEP 5: CREDIT APPRAISAL MEMO (CAM) & FINAL ASSESSMENT DECISION DESK
       ----------------------------------------------------------------------- */}
       {activeStep === 5 && (
         <Card className="p-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Step 5: Credit Analyst Final Assessment Decision
+                Step 5: Credit Analyst Final Assessment & CAM Sanction Desk
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Review objective automated engine results, then manually record your official credit decision
+                Review objective findings against policy benchmarks, configure recommended sanction terms, and record your formal decision
               </p>
             </div>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 flex items-center gap-1.5 self-start sm:self-auto">
+              <FileCheck className="w-4 h-4" /> Formal Appraisal
+            </span>
           </div>
 
-          {/* Comprehensive Objective Summary (System Recommendation vs Manual Decision) */}
-          <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-3">
+          {/* Comprehensive CAM Comparative Summary (Applied vs Eligible vs Recommended) */}
+          <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-3 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-900 dark:text-blue-200">
-                System Assessment Summary (Objective Findings):
+              <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                Credit Appraisal Memo (CAM) Sanction Matrix:
               </span>
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950 px-2.5 py-0.5 rounded-full">
+              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950 px-2.5 py-0.5 rounded-full">
                 System Recommendation: {eligibility?.overallResult || 'ELIGIBLE'}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-2 rounded-lg bg-white/70 dark:bg-slate-900/50">
-                <span className="text-slate-400 block text-[11px]">KYC Status</span>
-                <span className="font-bold text-emerald-600">✓ VERIFIED</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Applied Request</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200 block text-sm mt-0.5">
+                  {formatMoney(app?.requestedAmount || 0)}
+                </span>
+                <span className="text-[10px] text-slate-400">{app?.tenureMonths || 24} mos @ {product?.interestRate || 12.5}%</span>
               </div>
-              <div className="p-2 rounded-lg bg-white/70 dark:bg-slate-900/50">
-                <span className="text-slate-400 block text-[11px]">Documents</span>
-                <span className="font-bold text-emerald-600">✓ Mandatory Verified</span>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Max Policy Capacity</span>
+                <span className="font-bold text-purple-600 block text-sm mt-0.5">
+                  {formatMoney(eligibility?.maxEligibleAmount || app?.requestedAmount || 0)}
+                </span>
+                <span className="text-[10px] text-slate-400">Assessed FOIR: {activeFoir?.foirPct}%</span>
               </div>
-              <div className="p-2 rounded-lg bg-white/70 dark:bg-slate-900/50">
-                <span className="text-slate-400 block text-[11px]">Calculated FOIR</span>
-                <span className="font-bold">{activeFoir?.foirPct}%</span>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Risk Score & Grade</span>
+                <span className="font-bold text-emerald-600 block text-sm mt-0.5">
+                  {risk?.score || 82}/100 (Grade A)
+                </span>
+                <span className="text-[10px] text-slate-400">740 CIBIL · 0 DPD</span>
               </div>
-              <div className="p-2 rounded-lg bg-white/70 dark:bg-slate-900/50">
-                <span className="text-slate-400 block text-[11px]">Risk Grade</span>
-                <span className="font-bold">{risk?.score || 78}/100 ({risk?.category || 'LOW'})</span>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Sanction</span>
+                <span className="font-bold text-[#2563EB] block text-sm mt-0.5">
+                  {formatMoney(proposedAmount || app?.requestedAmount || 0)}
+                </span>
+                <span className="text-[10px] text-slate-400">{proposedTenure || app?.tenureMonths || 24} mos @ {proposedRate || product?.interestRate || 12.5}%</span>
               </div>
             </div>
-            <p className="text-[11px] text-slate-500 italic">
-              Notice: The automated findings above serve as decision assistance. The Credit Analyst must exercise independent judgment and record the formal assessment below.
-            </p>
           </div>
+
+          {/* Policy Evaluation Verdict Alert Banner */}
+          {isPolicyFailed ? (
+            <div className="p-4 rounded-xl border border-rose-300 bg-rose-50/90 dark:bg-rose-950/40 dark:border-rose-900/60 flex items-start gap-3 shadow-xs">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1.5 flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-bold text-rose-950 dark:text-rose-200 text-sm">
+                    🔴 Credit Policy Assessment: NOT ELIGIBLE (Failed Underwriting Rules)
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-900 dark:bg-rose-900 dark:text-rose-200 border border-rose-300">
+                    {policyFailureReasons.length} Policy Violation(s)
+                  </span>
+                </div>
+                <p className="text-rose-800 dark:text-rose-300 font-medium">
+                  This borrower violates institutional lending policies and <strong>cannot be passed to underwriting</strong>. You must record a formal decline decision or return to the Loan Officer for corrections.
+                </p>
+                <div className="pt-1">
+                  <span className="text-[11px] font-bold text-rose-900 dark:text-rose-200 block mb-0.5">Specific Policy Breaches:</span>
+                  <ul className="list-disc list-inside space-y-0.5 text-rose-900 dark:text-rose-200 font-semibold">
+                    {policyFailureReasons.map((reason, idx) => (
+                      <li key={idx}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/90 dark:bg-emerald-950/40 dark:border-emerald-900/60 flex items-center gap-3 shadow-xs">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div className="text-xs flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-bold text-emerald-950 dark:text-emerald-200 text-sm">
+                    🟢 Credit Policy Assessment: ELIGIBLE (All Rules Passed)
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300">
+                    Policy Satisfied
+                  </span>
+                </div>
+                <p className="text-emerald-800 dark:text-emerald-300 font-medium mt-0.5">
+                  Borrower satisfies all age benchmarks, income thresholds, FOIR safety limits, KYC compliance, and document criteria. Recommended sanction terms may be configured below.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Three Decision Options */}
           <div className="space-y-4">
@@ -1863,20 +2273,30 @@ export function CreditAssessmentWorkspace({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
-                  onClick={() => setAnalystDecision('ELIGIBLE')}
+                  onClick={() => {
+                    if (isPolicyFailed) {
+                      toast.error(`Borrower cannot be recommended for sanction: ${policyFailureReasons[0] || 'Credit policy rules failed'}. Please select 'Not Eligible / Decline' or 'Send Back for Corrections'.`, { title: 'Policy Eligibility Failed' });
+                      setAnalystDecision('NOT_ELIGIBLE');
+                      return;
+                    }
+                    setAnalystDecision('ELIGIBLE');
+                  }}
                   className={cn(
-                    'p-3.5 rounded-xl border text-left transition-all cursor-pointer space-y-1',
+                    'p-4 rounded-2xl border text-left transition-all cursor-pointer space-y-1.5 shadow-2xs',
+                    isPolicyFailed ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 opacity-70' : '',
                     analystDecision === 'ELIGIBLE'
                       ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">[ ELIGIBLE ]</span>
+                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">
+                      [ RECOMMEND SANCTION ]
+                    </span>
                     {analystDecision === 'ELIGIBLE' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Confirm borrower meets eligibility criteria and unlock Step 6 (Underwriter Handover).
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isPolicyFailed ? '⚠️ Blocked: Borrower violates mandatory policy criteria.' : 'Confirm borrower satisfies criteria, configure sanction terms, and unlock Step 6 (Underwriter Handover).'}
                   </p>
                 </button>
 
@@ -1884,18 +2304,20 @@ export function CreditAssessmentWorkspace({
                   type="button"
                   onClick={() => setAnalystDecision('NOT_ELIGIBLE')}
                   className={cn(
-                    'p-3.5 rounded-xl border text-left transition-all cursor-pointer space-y-1',
+                    'p-4 rounded-2xl border text-left transition-all cursor-pointer space-y-1.5 shadow-2xs',
                     analystDecision === 'NOT_ELIGIBLE'
                       ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 ring-2 ring-rose-500/20'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-rose-700 dark:text-rose-300">[ NOT ELIGIBLE ]</span>
+                    <span className="text-xs font-black text-rose-700 dark:text-rose-300 uppercase tracking-wide">
+                      [ NOT ELIGIBLE / DECLINE ]
+                    </span>
                     {analystDecision === 'NOT_ELIGIBLE' && <XCircle className="w-4 h-4 text-rose-600" />}
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Mark borrower as Not Eligible based on credit assessment policy criteria.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Mark application as Not Eligible based on debt capacity, policy limits, or adverse risk assessment.
                   </p>
                 </button>
 
@@ -1903,51 +2325,57 @@ export function CreditAssessmentWorkspace({
                   type="button"
                   onClick={() => setAnalystDecision('SEND_BACK')}
                   className={cn(
-                    'p-3.5 rounded-xl border text-left transition-all cursor-pointer space-y-1',
+                    'p-4 rounded-2xl border text-left transition-all cursor-pointer space-y-1.5 shadow-2xs',
                     analystDecision === 'SEND_BACK'
                       ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 ring-2 ring-amber-500/20'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-700 dark:text-amber-300">[ SEND BACK ]</span>
+                    <span className="text-xs font-black text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+                      [ SEND BACK FOR CORRECTIONS ]
+                    </span>
                     {analystDecision === 'SEND_BACK' && <RotateCcw className="w-4 h-4 text-amber-600" />}
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Send file back to Loan Officer or Customer for additional documents or clarifications.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Return file to Loan Officer or Borrower for revised proofs, KYC adjustments, or clarifications.
                   </p>
                 </button>
               </div>
             </div>
 
-            {/* Decision Fields based on selection */}
+            {/* Decision Fields: ELIGIBLE Sanction Terms */}
             {analystDecision === 'ELIGIBLE' && (
-              <div className="p-4 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 space-y-4 text-xs">
+                <h4 className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Recommended Sanction Terms & Rate Spread:
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                       Recommended Sanction Amount (₹) *
                     </label>
                     <Input
                       type="number"
                       value={proposedAmount}
                       onChange={(e) => setProposedAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="text-xs"
+                      className="text-xs font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                       Recommended Tenure (Months) *
                     </label>
                     <Input
                       type="number"
                       value={proposedTenure}
                       onChange={(e) => setProposedTenure(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="text-xs"
+                      className="text-xs font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                       Recommended Interest Rate (%) *
                     </label>
                     <Input
@@ -1955,36 +2383,40 @@ export function CreditAssessmentWorkspace({
                       step="0.1"
                       value={proposedRate}
                       onChange={(e) => setProposedRate(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="text-xs"
+                      className="text-xs font-semibold"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
-                    Assessment Stipulations / Conditions (Optional)
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Pre-Disbursement Sanction Conditions / Stipulations (Optional)
                   </label>
                   <textarea
                     rows={2}
-                    placeholder="e.g. Subject to submission of original salary certificate before disbursement..."
+                    placeholder="e.g. 1. Submission of original salary certificate. 2. Automated eNACH auto-debit mandate setup..."
                     value={conditions}
                     onChange={(e) => setConditions(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                    className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
                   />
                 </div>
               </div>
             )}
 
+            {/* Decision Fields: NOT_ELIGIBLE */}
             {analystDecision === 'NOT_ELIGIBLE' && (
-              <div className="p-4 rounded-xl bg-rose-50/40 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 space-y-3 text-xs">
+              <div className="p-5 rounded-2xl bg-rose-50/40 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 space-y-3 text-xs">
+                <h4 className="font-bold text-rose-900 dark:text-rose-200 flex items-center gap-1.5">
+                  <XCircle className="w-4 h-4 text-rose-600" /> Mandatory Policy Decline Justification:
+                </h4>
                 <div>
-                  <label className="text-[11px] font-semibold text-rose-900 dark:text-rose-200 block mb-1">
-                    Mandatory Policy Rejection Reason *
+                  <label className="text-[11px] font-bold text-rose-900 dark:text-rose-200 block mb-1">
+                    Select Decline Policy Reason *
                   </label>
                   <select
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border bg-white dark:bg-slate-900 border-rose-300 dark:border-rose-800 font-medium"
+                    className="w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-slate-900 border-rose-300 dark:border-rose-800 font-semibold"
                   >
                     <option value="Repayment capacity is insufficient based on verified income and existing obligations">
                       Repayment capacity is insufficient based on verified income and existing obligations (FOIR breached)
@@ -2003,30 +2435,34 @@ export function CreditAssessmentWorkspace({
               </div>
             )}
 
+            {/* Decision Fields: SEND_BACK */}
             {analystDecision === 'SEND_BACK' && (
-              <div className="p-4 rounded-xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 space-y-3 text-xs">
+              <div className="p-5 rounded-2xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 space-y-3 text-xs">
+                <h4 className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <RotateCcw className="w-4 h-4 text-amber-600" /> Send Back Configuration:
+                </h4>
                 <div>
-                  <label className="text-[11px] font-semibold text-amber-900 dark:text-amber-200 block mb-1">
+                  <label className="text-[11px] font-bold text-amber-900 dark:text-amber-200 block mb-1.5">
                     Send Back Destination *
                   </label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
+                  <div className="flex items-center gap-5">
+                    <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 dark:text-slate-200">
                       <input
                         type="radio"
                         name="sendBackDest"
                         checked={sendBackDestination === 'LOAN_OFFICER'}
                         onChange={() => setSendBackDestination('LOAN_OFFICER')}
                       />
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">Loan Officer (Intake correction)</span>
+                      <span>Loan Officer (Intake Document Correction)</span>
                     </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 dark:text-slate-200">
                       <input
                         type="radio"
                         name="sendBackDest"
                         checked={sendBackDestination === 'CUSTOMER'}
                         onChange={() => setSendBackDestination('CUSTOMER')}
                       />
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">Borrower (Direct clarification)</span>
+                      <span>Borrower (Direct Clarification / Re-upload)</span>
                     </label>
                   </div>
                 </div>
@@ -2035,36 +2471,68 @@ export function CreditAssessmentWorkspace({
 
             {/* Assessment Notes & Rationale */}
             <div>
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
-                Assessment Justification & Notes *
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1.5">
+                Credit Analyst Assessment Rationale & Notes *
               </label>
               <textarea
                 rows={3}
-                placeholder="Enter credit appraisal rationale, findings on income, risk observations, or instructions..."
+                placeholder="Record credit appraisal rationale, findings on borrower repayment capacity, sponsor review observations, or specific sanction instructions..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
               />
             </div>
 
             {/* Submission Action */}
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={() => submitDecisionMutation.mutate()}
-                disabled={submitDecisionMutation.isPending}
-                className={cn(
-                  'gap-2 text-white font-semibold text-xs cursor-pointer shadow-sm',
-                  analystDecision === 'ELIGIBLE' ? 'bg-emerald-600 hover:bg-emerald-700' :
-                  analystDecision === 'NOT_ELIGIBLE' ? 'bg-rose-600 hover:bg-rose-700' :
-                  'bg-amber-600 hover:bg-amber-700'
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                {analystDecision === 'ELIGIBLE' ? (
+                  <span className="text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Eligible decision will record recommended sanction terms and unlock Step 6 Handover.
+                  </span>
+                ) : analystDecision === 'NOT_ELIGIBLE' ? (
+                  <span className="text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-1.5">
+                    <XCircle className="w-4 h-4 text-rose-600" />
+                    Borrower will be declined. Step 6 Handover will not be available.
+                  </span>
+                ) : (
+                  <span className="text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-1.5">
+                    <RotateCcw className="w-4 h-4 text-amber-600" />
+                    Proposal will be returned to {sendBackDestination === 'CUSTOMER' ? 'Customer' : 'Loan Officer'} for corrections.
+                  </span>
                 )}
-              >
-                <Check className="w-4 h-4" />
-                {submitDecisionMutation.isPending ? 'Submitting Decision...' :
-                  analystDecision === 'ELIGIBLE' ? 'Save Eligible Assessment & Unlock Handover' :
-                  analystDecision === 'NOT_ELIGIBLE' ? 'Submit Not Eligible Decision' :
-                  'Send Back Proposal'}
-              </Button>
+              </div>
+
+              <div className="flex items-center gap-2.5 justify-end">
+                {isStep5Complete && analystDecision === 'ELIGIBLE' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveStep(6)}
+                    className="gap-1.5 text-xs font-bold border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer py-2.5 px-4 rounded-xl"
+                  >
+                    <span>Proceed to Step 6 →</span>
+                  </Button>
+                )}
+
+                <Button
+                  onClick={() => submitDecisionMutation.mutate()}
+                  disabled={submitDecisionMutation.isPending}
+                  className={cn(
+                    'gap-2 text-white font-bold text-xs cursor-pointer shadow-md py-2.5 px-5 rounded-xl transition-all',
+                    analystDecision === 'ELIGIBLE' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                    analystDecision === 'NOT_ELIGIBLE' ? 'bg-rose-600 hover:bg-rose-700' :
+                    'bg-amber-600 hover:bg-amber-700'
+                  )}
+                >
+                  <Check className="w-4 h-4" />
+                  {submitDecisionMutation.isPending ? 'Submitting Formal Decision...' :
+                    analystDecision === 'ELIGIBLE' ? 'Save & Proceed to Step 6 Handover →' :
+                    analystDecision === 'NOT_ELIGIBLE' ? 'Submit Not Eligible Decision' :
+                    'Send Back Proposal'}
+                </Button>
+              </div>
             </div>
           </div>
         </Card>

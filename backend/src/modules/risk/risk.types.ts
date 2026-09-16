@@ -117,7 +117,19 @@ export interface RiskInputContext {
   // Customer Pillar
   applicantAge: number;
   customerTenureMonths: number;
-  employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'BUSINESS' | 'PROFESSIONAL';
+  employmentType:
+    | 'SALARIED'
+    | 'SELF_EMPLOYED'
+    | 'BUSINESS_OWNER'
+    | 'BUSINESS'
+    | 'PROFESSIONAL'
+    | 'FREELANCER'
+    | 'FARMER'
+    | 'RETIRED'
+    | 'HOMEMAKER'
+    | 'STUDENT'
+    | 'OTHER'
+    | string;
   employerName?: string;
   workExperienceMonths: number;
   residenceStabilityMonths: number;

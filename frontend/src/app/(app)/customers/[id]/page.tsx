@@ -1681,7 +1681,8 @@ export default function CustomerDetailPage() {
                   <option value="ADDRESS_PROOF">ADDRESS PROOF (Utility Bill, Rental Agreement)</option>
                   <option value="INCOME_PROOF">INCOME PROOF (Salary Slips, Form 16, ITR 3Y)</option>
                   <option value="BANK_STATEMENT">BANK STATEMENT (3-6 Months Banking Record)</option>
-                  <option value="EMPLOYMENT_PROOF">EMPLOYMENT PROOF (Offer Letter, Corporate ID)</option>
+                  <option value="EMPLOYMENT_PROOF">EMPLOYMENT PROOF (Offer Letter, Corporate ID, Student ID)</option>
+                  <option value="CO_APPLICANT">CO-APPLICANT / GUARANTOR / SPONSOR (KYC & Income Proof)</option>
                   <option value="PROPERTY_DOCS">PROPERTY / COLLATERAL DOCUMENTS</option>
                   <option value="MANDATE_DOCS">NACH / E-MANDATE FORM</option>
                   <option value="OTHER">OTHER COMPLIANCE DOCUMENT</option>

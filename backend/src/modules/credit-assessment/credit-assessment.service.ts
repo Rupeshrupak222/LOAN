@@ -78,13 +78,14 @@ export async function getAssessmentDashboardMetrics(
     const isKycVerified = app.customer?.kycStatus === 'VERIFIED';
     const isSentBack = app.underwriting?.decision === 'SEND_BACK';
     const isAppApproved = app.status === 'APPROVED';
-    const isAssessmentComplete = isKycVerified && Boolean(app.eligibility) && Boolean(app.riskAssessment);
+    const isEligible = app.eligibility?.result === 'ELIGIBLE' || app.eligibility?.result === 'CONDITIONALLY_ELIGIBLE';
+    const isAssessmentComplete = isKycVerified && isEligible && Boolean(app.riskAssessment) && app.status !== 'REJECTED';
 
     if (isSentBack) {
       sentBack++;
     } else if (isAppApproved) {
       approved++;
-    } else if (isAssessmentComplete || app.status === 'UNDERWRITING') {
+    } else if (app.status === 'UNDERWRITING' || (isAssessmentComplete && app.status === 'CREDIT_ASSESSMENT')) {
       inUnderwriting++;
     } else if (app.status === 'CREDIT_ASSESSMENT') {
       inProgress++;
@@ -191,11 +192,11 @@ export async function getAssessmentQueue(
       kycStatus: { in: ['NOT_STARTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REJECTED'] },
     };
   } else if (tab === 'UNDERWRITING' || tab === 'FORWARDED_TO_UNDERWRITER' || tab === 'FORWARDED' || tab === 'READY_FOR_UNDERWRITER') {
-    // In Underwriting / Ready for Underwriter: KYC verified + assessment (eligibility + risk) completed
+    // In Underwriting / Ready for Underwriter: KYC verified + assessment (eligibility + risk) completed and ELIGIBLE
     where.customer = { ...where.customer, kycStatus: 'VERIFIED' };
-    where.eligibility = { isNot: null };
+    where.eligibility = { result: { in: ['ELIGIBLE', 'CONDITIONALLY_ELIGIBLE'] } };
     where.riskAssessment = { isNot: null };
-    where.status = { in: ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDERWRITING'] };
+    where.status = { in: ['CREDIT_ASSESSMENT', 'UNDERWRITING'] };
     where.OR = [
       { underwriting: null },
       { underwriting: { decision: { notIn: ['SEND_BACK', 'APPROVE', 'REJECT'] } } },
@@ -312,15 +313,18 @@ export async function getAssessmentQueue(
     const mobile = app.customer?.mobile || null;
     const kycStatus = app.customer?.kycStatus || 'NOT_STARTED';
 
+    const isEligible = app.eligibility?.result === 'ELIGIBLE' || app.eligibility?.result === 'CONDITIONALLY_ELIGIBLE';
     const isAssessmentComplete =
       app.customer?.kycStatus === 'VERIFIED' &&
+      isEligible &&
       Boolean(app.eligibility) &&
       Boolean(app.riskAssessment);
     const isReadyForUnderwriter =
       isAssessmentComplete &&
       app.status !== 'UNDERWRITING' &&
       app.underwriting?.decision !== 'SEND_BACK' &&
-      app.status !== 'APPROVED';
+      app.status !== 'APPROVED' &&
+      app.status !== 'REJECTED';
 
     return {
       id: app.id,
@@ -337,6 +341,7 @@ export async function getAssessmentQueue(
       kycStatus,
       status: app.status,
       creditAnalysisStatus,
+      eligibilityCheck: app.eligibility?.result || null,
       creditScore: null, // Bureau live data (no fake scores)
       creditScoreGrade: null,
       riskGrade,
@@ -534,10 +539,38 @@ export async function getAssessmentDetail(
   // 4. Policy Eligibility Analysis
   let eligibilityResult: any;
   if (app.eligibility) {
+    let rawFactors = app.eligibility.factors;
+    let factorList: any[] = [];
+    if (Array.isArray(rawFactors)) {
+      factorList = rawFactors;
+    } else if (rawFactors && typeof rawFactors === 'object') {
+      if (Array.isArray((rawFactors as any).list)) {
+        factorList = (rawFactors as any).list;
+      } else if (Array.isArray((rawFactors as any).items)) {
+        factorList = (rawFactors as any).items;
+      } else if (Array.isArray((rawFactors as any).factors)) {
+        factorList = (rawFactors as any).factors;
+      } else {
+        factorList = Object.entries(rawFactors)
+          .filter(([k]) => k !== 'recommendation')
+          .map(([k, v]: [string, any]) => ({
+            factor: typeof v === 'object' && v?.factor ? v.factor : k.replace(/([A-Z])/g, ' $1'),
+            status: typeof v === 'object' && v?.status ? v.status : 'PASS',
+            detail: typeof v === 'object' && v?.detail ? v.detail : String(v),
+          }));
+      }
+    }
+    if (factorList.length === 0) {
+      factorList = [
+        { factor: 'Age Requirement', status: isAgeValid ? 'PASS' : 'FAIL', detail: isAgeValid ? `Age verified (${borrowerAge} yrs)` : (ageError || 'Age criteria') },
+        { factor: 'Monthly Income Threshold', status: monthlyIncome >= 15000 ? 'PASS' : 'FAIL', detail: `Assessed Income ₹${monthlyIncome}` },
+        { factor: 'FOIR / DTI Threshold', status: foirStatus, detail: `Assessed FOIR is ${foirPct}% (Max: ${maxAllowedFoirPct}%)` },
+      ];
+    }
     eligibilityResult = {
       result: app.eligibility.result,
       score: (app.eligibility as any).score || 80,
-      factors: app.eligibility.factors || [],
+      factors: factorList,
       maxEligibleAmount: String(requestedAmount),
       estimatedEmi: String(proposedEmi),
     };
@@ -549,8 +582,8 @@ export async function getAssessmentDetail(
         result: foirStatus === 'FAIL' ? 'NOT_ELIGIBLE' : foirStatus === 'REVIEW' ? 'CONDITIONALLY_ELIGIBLE' : 'ELIGIBLE',
         score: 80,
         factors: [
-          { factor: 'Age Requirement', status: 'PASS', detail: 'Age verified within 21-60 years.' },
-          { factor: 'Monthly Income Threshold', status: monthlyIncome >= 25000 ? 'PASS' : 'FAIL', detail: `Income ₹${monthlyIncome}` },
+          { factor: 'Age Requirement', status: isAgeValid ? 'PASS' : 'FAIL', detail: `Age verified (${borrowerAge} yrs).` },
+          { factor: 'Monthly Income Threshold', status: monthlyIncome >= 15000 ? 'PASS' : 'FAIL', detail: `Income ₹${monthlyIncome}` },
           { factor: 'FOIR / DTI Threshold', status: foirStatus, detail: `FOIR is ${foirPct}% (Max: ${maxAllowedFoirPct}%)` },
         ],
         maxEligibleAmount: String(requestedAmount),
@@ -760,17 +793,30 @@ export async function submitCreditRecommendation(
       }).catch(() => null);
     }
 
-    // 2. Persist recommendation in EligibilityAssessment metadata
+    // 2. Persist recommendation in EligibilityAssessment metadata while PRESERVING factors list
+    const existingEligibility = await tx.eligibilityAssessment.findUnique({
+      where: { applicationId },
+    });
+    let preservedFactors: any = existingEligibility?.factors;
+    let newFactorsObj: any;
+    if (Array.isArray(preservedFactors)) {
+      newFactorsObj = { list: preservedFactors, items: preservedFactors, recommendation: recommendationPayload };
+    } else if (typeof preservedFactors === 'object' && preservedFactors !== null) {
+      newFactorsObj = { ...preservedFactors, recommendation: recommendationPayload };
+    } else {
+      newFactorsObj = { recommendation: recommendationPayload };
+    }
+
     await tx.eligibilityAssessment.upsert({
       where: { applicationId },
       update: {
         result: input.recommendation === 'RECOMMEND' ? 'ELIGIBLE' : input.recommendation === 'RECOMMEND_WITH_CONDITIONS' ? 'CONDITIONALLY_ELIGIBLE' : 'NOT_ELIGIBLE',
-        factors: { recommendation: recommendationPayload },
+        factors: newFactorsObj,
       },
       create: {
         applicationId,
         result: input.recommendation === 'RECOMMEND' ? 'ELIGIBLE' : input.recommendation === 'RECOMMEND_WITH_CONDITIONS' ? 'CONDITIONALLY_ELIGIBLE' : 'NOT_ELIGIBLE',
-        factors: { recommendation: recommendationPayload },
+        factors: newFactorsObj,
       },
     });
 
