@@ -354,9 +354,9 @@ export default function NewCustomerPage() {
     };
 
     if (!rule.allowMultiple) {
-      // Replace existing file for single-file slot (like photo)
+      // Replace existing file ONLY for this specific rule slot (do not discard other category docs)
       setUploadedDocs((prev) => [
-        ...prev.filter((d) => d.ruleCode !== rule.code && d.category !== rule.category),
+        ...prev.filter((d) => d.ruleCode !== rule.code),
         newDoc,
       ]);
     } else {
@@ -674,27 +674,7 @@ export default function NewCustomerPage() {
         }).catch((err) => console.warn('Bank account registration warning:', err));
       }
 
-      // 4. Automatically create initial Loan Application for customer
-      try {
-        setSavingProgress('Creating loan origination application...');
-        const prodName =
-          LOAN_PRODUCT_TYPES.find((p) => p.id === form.intendedProductType)?.label ||
-          form.intendedProductType ||
-          'Personal Loan';
-        const reqAmount = form.monthlyIncome ? Math.max(50000, Number(form.monthlyIncome) * 5) : 100000;
-
-        await api.post('/applications', {
-          customerId: newCustomerId,
-          productName: prodName,
-          requestedAmount: reqAmount,
-          tenureMonths: 24,
-          purpose: `Loan origination intake for ${prodName}`,
-        });
-      } catch (appErr) {
-        console.warn('Auto application origination note:', appErr);
-      }
-
-      // 5. Invalidate all relevant queries
+      // 4. Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['operations-applications'] });
       queryClient.invalidateQueries({ queryKey: ['loan-officer-dashboard-apps'] });
@@ -702,8 +682,8 @@ export default function NewCustomerPage() {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['customer', newCustomerId] });
 
-      // 6. Redirect to Customer 360 Profile
-      setSavingProgress('Customer and loan application created! Opening Customer 360...');
+      // 5. Redirect to Customer 360 Profile
+      setSavingProgress('Customer profile registered successfully! Opening Customer 360...');
       router.push(`/customers/${newCustomerId}`);
     } catch (err) {
       setGeneralError(apiErrorMessage(err));

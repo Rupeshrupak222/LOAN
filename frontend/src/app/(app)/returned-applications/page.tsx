@@ -24,6 +24,7 @@ import {
   X,
   FileUp,
   ShieldAlert,
+  ChevronLeft,
   ChevronRight,
   Filter,
 } from 'lucide-react';
@@ -87,6 +88,8 @@ export default function ReturnedApplicationsPage() {
 
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<StageFilter>('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Quick Document Upload Modal State
   const [uploadModalApp, setUploadModalApp] = useState<ReturnedAppRow | null>(null);
@@ -103,19 +106,27 @@ export default function ReturnedApplicationsPage() {
 
   // Fetch Returned Applications & Summary Metrics
   const { data: responseData, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['returned-applications', search, stageFilter],
+    queryKey: ['returned-applications', search, stageFilter, page, pageSize],
     queryFn: async () => {
       const res = await api.get('/applications/returned', {
         params: {
           search: search.trim() || undefined,
           stage: stageFilter !== 'ALL' ? stageFilter : undefined,
+          page,
+          pageSize,
         },
       });
-      return res.data?.data;
+      return res.data;
     },
   });
 
   const apps: ReturnedAppRow[] = Array.isArray(responseData?.data) ? responseData.data : [];
+  const pagination = responseData?.pagination || {
+    page,
+    pageSize,
+    total: apps.length,
+    totalPages: Math.max(1, Math.ceil(apps.length / pageSize)),
+  };
   const metrics = responseData?.metrics || {
     totalReturned: 0,
     returnedByUnderwriter: 0,
@@ -332,7 +343,10 @@ export default function ReturnedApplicationsPage() {
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setStageFilter(tab.key as StageFilter)}
+              onClick={() => {
+                setStageFilter(tab.key as StageFilter);
+                setPage(1);
+              }}
               className={cn(
                 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer',
                 stageFilter === tab.key
@@ -365,7 +379,10 @@ export default function ReturnedApplicationsPage() {
           <Input
             placeholder="Search borrower, app #, mobile..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="pl-9 text-xs"
           />
         </div>
@@ -611,6 +628,59 @@ export default function ReturnedApplicationsPage() {
               </div>
             );
           })}
+
+          {/* Pagination Controls */}
+          {apps.length > 0 && (
+            <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#171B36] text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-2">
+                <span>
+                  Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{apps.length}</span> of{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span> returned proposals
+                </span>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span>Per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="rounded-md border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#101326] px-1.5 py-0.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#101326] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1E2445] transition-colors cursor-pointer"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="font-medium text-slate-700 dark:text-slate-300 px-1">
+                  Page {page} of {pagination.totalPages || 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages || 1, p + 1))}
+                  disabled={page >= (pagination.totalPages || 1)}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-[#2B3566] bg-white dark:bg-[#101326] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1E2445] transition-colors cursor-pointer"
+                  title="Next Page"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
