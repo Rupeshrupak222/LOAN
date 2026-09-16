@@ -309,7 +309,8 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
   const age = birthDate ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 86400000)) : null;
 
   // Step 3: Document Checklist Construction
-  const allDocs = [...(customer.documents || []), ...(app.documents || [])];
+  // Only include documents uploaded specifically for this application (by Loan Officer)
+  const allDocs = [...(app.documents || [])];
   // Deduplicate documents by ID
   const uniqueDocs = Array.from(new Map(allDocs.map((d) => [d.id, d])).values());
 
@@ -319,8 +320,6 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
     description: string;
     mandatory: boolean;
   }[] = [
-    { category: 'IDENTITY', label: 'Identity Proof', description: 'PAN Card, Aadhaar Card, Passport, or Voter ID', mandatory: true },
-    { category: 'ADDRESS', label: 'Address Proof', description: 'Utility Bill, Rental Agreement, or Aadhaar card', mandatory: true },
     {
       category: 'INCOME',
       label: 'Income Proof',
