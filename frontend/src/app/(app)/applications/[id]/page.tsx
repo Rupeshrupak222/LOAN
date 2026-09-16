@@ -44,6 +44,7 @@ import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerific
 import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
 import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
 import { PendingWorkWarningModal, PendingWorkItem } from '@/components/PendingWorkWarningModal';
+import { evaluateDocumentFulfillment } from '@/lib/documentRules';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -304,35 +305,19 @@ export default function ApplicationDetailPage() {
     ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COMPANY_ADMIN'].includes(r)
   );
 
-  // Extract consolidated documents
+  // Extract consolidated documents safely with unique keys
   const customerDocs = Array.isArray(customer?.documents) ? customer.documents : [];
   const appDocs = Array.isArray(data?.documents) ? data.documents : [];
   const documentsMap = new Map<string, any>();
-  customerDocs.forEach((d: any) => documentsMap.set(d.id, d));
-  appDocs.forEach((d: any) => documentsMap.set(d.id, d));
+  customerDocs.forEach((d: any, idx: number) => {
+    const key = d.id || d._id || d.documentId || d.fileName || `cust-doc-${idx}`;
+    documentsMap.set(key, d);
+  });
+  appDocs.forEach((d: any, idx: number) => {
+    const key = d.id || d._id || d.documentId || d.fileName || `app-doc-${idx}`;
+    documentsMap.set(key, d);
+  });
   const documents = Array.from(documentsMap.values());
-
-  // 5 Mandatory Document Verification Checks
-  const hasIdentity = documents.some((d) =>
-    ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
-  );
-  const hasPhoto = documents.some((d) =>
-    ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
-  );
-  const hasAddress = documents.some((d) =>
-    ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
-    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
-  );
-  const hasIncome = documents.some((d) =>
-    ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
-    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
-  );
-  const hasBank = documents.some((d) =>
-    ['BANK_STATEMENT'].includes(d.category) ||
-    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
-  );
 
   // Calculate borrower age
   const calculateAge = (dobString?: string | null): number | null => {
@@ -362,70 +347,29 @@ export default function ApplicationDetailPage() {
   }
   const isAgeValid = ageError === null;
 
-  const mandatoryChecklist = [
-    {
-      id: 'IDENTITY_PROOF',
-      category: 'IDENTITY_PROOF',
-      defaultDocType: 'PAN_CARD',
-      title: 'Identity Proof',
-      desc: 'PAN Card / Aadhaar Card',
-      uploaded: hasIdentity,
-      doc: documents.find((d) =>
-        ['IDENTITY_PROOF', 'IDENTITY', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-        ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE'].includes(d.documentType || '')
-      ),
-    },
-    {
-      id: 'APPLICANT_PHOTO',
-      category: 'APPLICANT_PHOTO',
-      defaultDocType: 'CUSTOMER_SELFIE_PHOTO',
-      title: 'Applicant Photo',
-      desc: 'Applicant Photograph / Selfie with clear face',
-      uploaded: hasPhoto,
-      doc: documents.find((d) =>
-        ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-        ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO', 'PHOTO'].includes(d.documentType || '')
-      ),
-    },
-    {
-      id: 'ADDRESS_PROOF',
-      category: 'ADDRESS_PROOF',
-      defaultDocType: 'ELECTRICITY_BILL',
-      title: 'Address Proof',
-      desc: 'Utility / Electricity Bill / Passport / Rental Agreement',
-      uploaded: hasAddress,
-      doc: documents.find((d) =>
-        ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
-        ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
-      ),
-    },
-    {
-      id: 'INCOME_PROOF',
-      category: 'INCOME_PROOF',
-      defaultDocType: 'SALARY_SLIP',
-      title: 'Income Proof',
-      desc: 'Salary Slip / 3 Months Pay Slips / Form 16 / ITR',
-      uploaded: hasIncome,
-      doc: documents.find((d) =>
-        ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
-        ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
-      ),
-    },
-    {
-      id: 'BANK_STATEMENT',
-      category: 'BANK_STATEMENT',
-      defaultDocType: 'BANK_STATEMENT',
-      title: 'Bank Statement',
-      desc: 'Latest 6 Months Bank Statement / Passbook',
-      uploaded: hasBank,
-      doc: documents.find((d) =>
-        ['BANK_STATEMENT'].includes(d.category) ||
-        ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
-      ),
-    },
-  ];
+  // Dynamic Profile-Aware Rule-Based Document Evaluation
+  const empType = customer?.employmentType || customer?.employmentDetails?.[0]?.employmentType || 'SALARIED';
+  const prodType = (product as any)?.productType || product?.name || 'PERSONAL';
+  const reqAmt = Number(data?.requestedAmount || 0);
+  const mIncome = Number(customer?.monthlyIncome || 0);
 
-  const missingMandatoryDocs = mandatoryChecklist.filter((m) => !m.uploaded);
+  const docEval = evaluateDocumentFulfillment(documents, empType, prodType, {
+    monthlyIncome: mIncome,
+    requestedAmount: reqAmt,
+  });
+
+  const mandatoryChecklist = docEval.checklistStatus.map((item) => ({
+    id: item.rule.code,
+    category: item.rule.category,
+    defaultDocType: item.rule.defaultDocumentType,
+    title: item.rule.name,
+    desc: item.rule.description,
+    uploaded: item.isSatisfied,
+    status: item.rule.status,
+    doc: item.matchingDocs?.[0],
+  }));
+
+  const missingMandatoryDocs = docEval.missingNames;
   const isReturned = data.underwriting?.decision === 'SEND_BACK';
   const hasDeficiencies = isReturned ? (missingMandatoryDocs.length > 0 || !isAgeValid) : false;
 
@@ -479,7 +423,7 @@ export default function ApplicationDetailPage() {
       // ── Loan Officer to Credit Analyst Handoff ──────────────────────────
       // Loan Officer is responsible for uploading mandatory profile documents.
       // Loan Officer does NOT verify KYC (Credit Analyst/KYC engine does verification).
-      const missingDocs = mandatoryChecklist.filter((m) => !m.uploaded);
+      const missingDocs = mandatoryChecklist.filter((m) => m.status === 'MANDATORY' && !m.uploaded);
       const isDocsComplete = missingDocs.length === 0;
 
       if (!isDocsComplete) {
@@ -493,9 +437,10 @@ export default function ApplicationDetailPage() {
           });
         });
       } else {
+        const mandatoryTotal = mandatoryChecklist.filter((m) => m.status === 'MANDATORY').length;
         items.push({
           id: 'docs-complete',
-          title: `All Mandatory Documents Uploaded (${mandatoryChecklist.length}/${mandatoryChecklist.length})`,
+          title: `All Mandatory Documents Uploaded (${mandatoryTotal}/${mandatoryTotal})`,
           description: 'All mandatory profile documents are attached and ready for credit assessment.',
           category: 'DOCUMENTS',
           isDone: true,
@@ -711,7 +656,7 @@ export default function ApplicationDetailPage() {
                   disabled={hasDeficiencies}
                   onClick={() => {
                     if (hasDeficiencies) {
-                      toast.warning(`Cannot resend: Upload missing documents first (${missingMandatoryDocs.map((m) => m.title).join(', ')}).`);
+                      toast.warning(`Cannot resend: Upload missing documents first (${missingMandatoryDocs.join(', ')}).`);
                       return;
                     }
                     setSubmitReason('All missing mandatory documents uploaded and verified by Loan Officer. Resubmitted for credit assessment.');
@@ -1002,7 +947,7 @@ export default function ApplicationDetailPage() {
                 onClick={() => {
                   if (hasDeficiencies) {
                     toast.warning(
-                      `Cannot resend: Upload missing mandatory documents first (${missingMandatoryDocs.map((m) => m.title).join(', ')}).`
+                      `Cannot resend: Upload missing mandatory documents first (${missingMandatoryDocs.join(', ')}).`
                     );
                     return;
                   }
@@ -1030,7 +975,7 @@ export default function ApplicationDetailPage() {
                 )}
                 title={
                   hasDeficiencies
-                    ? `Locked: Upload missing mandatory documents first (${missingMandatoryDocs.map((m) => m.title).join(', ')})`
+                    ? `Locked: Upload missing mandatory documents first (${missingMandatoryDocs.join(', ')})`
                     : 'Resend proposal to Credit Analyst queue'
                 }
               >
@@ -1290,8 +1235,17 @@ export default function ApplicationDetailPage() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      setSubmitReason('Initial completed intake submitted for credit appraisal');
-                      setSubmitModalOpen(true);
+                      checkPendingWorkAndForward(
+                        'Loan Officer Intake',
+                        'Credit Assessment Desk',
+                        () => {
+                          setSubmitReason('Initial completed intake submitted for credit appraisal');
+                          setSubmitModalOpen(true);
+                        },
+                        async () => {
+                          await submitToCreditAnalystMutation.mutateAsync();
+                        }
+                      );
                     }}
                     className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shrink-0 cursor-pointer shadow-sm"
                   >
@@ -1307,7 +1261,7 @@ export default function ApplicationDetailPage() {
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Re-Submit Application Proposal?</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       {hasDeficiencies
-                        ? `Application was returned by Credit Analyst. Please upload missing mandatory documents (${missingMandatoryDocs.map((m) => m.title).join(', ')}) to unlock resubmission.`
+                        ? `Application was returned by Credit Analyst. Please upload missing mandatory documents (${missingMandatoryDocs.join(', ')}) to unlock resubmission.`
                         : 'Proposal was returned with remarks. All requirements corrected. You can resubmit it to the analyst desk.'}
                     </p>
                   </div>

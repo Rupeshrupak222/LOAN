@@ -827,7 +827,12 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
         combinedWords.includes('SALARY') ||
         combinedWords.includes('PAYSLIP') ||
         combinedWords.includes('PAY SLIP') ||
-        combinedWords.includes('WAGE')
+        combinedWords.includes('WAGE') ||
+        combinedWords.includes('EARNING') ||
+        combinedClean.includes('SALARYSLIP') ||
+        combinedClean.includes('PAYSLIP') ||
+        rawType.includes('SALARY') ||
+        rawType.includes('PAYSLIP')
       ) {
         return true;
       }
@@ -839,8 +844,24 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
       if (
         combinedWords.includes('BANK STATEMENT') ||
         combinedWords.includes('PASSBOOK') ||
-        (combinedWords.includes('BANK') && combinedWords.includes('STATEMENT')) ||
-        rawCategory === 'BANK_STATEMENT'
+        combinedWords.includes('BANK PASSBOOK') ||
+        combinedWords.includes('ACCOUNT STATEMENT') ||
+        combinedWords.includes('CURRENT ACCOUNT') ||
+        combinedWords.includes('SAVINGS ACCOUNT') ||
+        combinedWords.includes('BANK STMT') ||
+        combinedWords.includes('BANK') ||
+        combinedWords.includes('STATEMENT') ||
+        combinedClean.includes('BANKSTATEMENT') ||
+        combinedClean.includes('PASSBOOK') ||
+        combinedClean.includes('BANKSTMT') ||
+        combinedClean.includes('ACCOUNTSTATEMENT') ||
+        rawCategory === 'BANK_STATEMENT' ||
+        rawCategory === 'BANK' ||
+        rawCategory === 'BANKING' ||
+        rawType === 'BANK_STATEMENT' ||
+        rawType === 'BANK_PASSBOOK' ||
+        rawType === 'PASSBOOK' ||
+        rawType === 'STATEMENT'
       ) {
         return true;
       }
@@ -854,7 +875,12 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
         combinedWords.includes('FORM 16') ||
         combinedWords.includes('FORM16') ||
         combinedWords.includes('INCOME TAX') ||
-        combinedWords.includes('TAX RETURN')
+        combinedWords.includes('TAX RETURN') ||
+        combinedWords.includes('TAX') ||
+        combinedClean.includes('ITR') ||
+        combinedClean.includes('FORM16') ||
+        rawType.includes('ITR') ||
+        rawType.includes('FORM_16')
       ) {
         return true;
       }
