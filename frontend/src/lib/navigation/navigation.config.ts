@@ -180,16 +180,6 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     description: 'Loan offers, sanction terms, and Key Fact Statements',
   },
   {
-    key: 'documents',
-    label: 'Documents',
-    href: '/documents',
-    iconName: 'FileCheck',
-    workspace: 'CREDIT',
-    group: 'OVERVIEW',
-    requiredPermission: 'application.view',
-    description: 'Document review, verification, and checklist fulfillment',
-  },
-  {
     key: 'verifications',
     label: 'Verifications',
     href: '/verifications',

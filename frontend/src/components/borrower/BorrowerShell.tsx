@@ -49,7 +49,7 @@ export function BorrowerShell({ children }: BorrowerShellProps) {
             <nav className="hidden md:flex items-center gap-1">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href || (item.href !== '/borrower' && pathname.startsWith(item.href));
+                const isActive = pathname === item.href || (item.href !== '/borrower' && (pathname.startsWith(`${item.href}/`) || pathname.startsWith(`${item.href}?`)));
                 return (
                   <Link
                     key={item.href}
@@ -94,7 +94,7 @@ export function BorrowerShell({ children }: BorrowerShellProps) {
         <div className="grid grid-cols-6 gap-1">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== '/borrower' && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || (item.href !== '/borrower' && (pathname.startsWith(`${item.href}/`) || pathname.startsWith(`${item.href}?`)));
             return (
               <Link
                 key={item.href}

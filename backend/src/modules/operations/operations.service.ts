@@ -149,7 +149,7 @@ export class OperationsService {
   /**
    * Server-side paginated, searchable, multi-filtered applications directory
    */
-  async listApplications(query: ListApplicationsQuery, tenantId?: string) {
+  async listApplications(query: ListApplicationsQuery, tenantId?: string, roles?: string[]) {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
     const skip = (page - 1) * pageSize;
@@ -163,6 +163,21 @@ export class OperationsService {
           { tenantId: 'tenant-adyapan-default' },
         ],
       });
+    }
+
+    if (
+      roles?.includes('UNDERWRITER') &&
+      !roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'OPERATIONS_MANAGER'].includes(r))
+    ) {
+      if (!query.status && !query.stage) {
+        conditions.push({
+          OR: [
+            { status: { in: ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'REJECTED'] } },
+            { underwriting: { isNot: null } },
+            { stage: { contains: 'UNDERWRITING' } },
+          ],
+        });
+      }
     }
 
     if (query.stage) {
