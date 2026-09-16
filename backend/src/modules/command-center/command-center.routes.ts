@@ -86,7 +86,7 @@ router.post(
  */
 router.post(
   '/scan',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'AUDITOR'),
   asyncHandler(async (req, res) => {
     const results = await commandCenterService.runAutonomousScan({
       roles: req.user!.roles,

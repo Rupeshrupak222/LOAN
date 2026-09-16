@@ -290,7 +290,10 @@ router.post(
     'UNDERWRITER',
     'FINANCE_OFFICER',
     'COLLECTION_OFFICER',
-    'AUDITOR'
+    'AUDITOR',
+    'RISK_MANAGER',
+    'FRAUD_ANALYST',
+    'RISK_ANALYST'
   ),
   asyncHandler(async (req, res) => {
     const actor = await resolveActor(req);
