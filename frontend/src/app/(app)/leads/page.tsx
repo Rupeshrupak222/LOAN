@@ -18,6 +18,8 @@ import {
   Building,
   AlertCircle,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -54,6 +56,8 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Create Lead Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -89,22 +93,35 @@ export default function LeadsPage() {
     },
   });
 
-  // Fetch leads
-  const { data: leadsData, isLoading } = useQuery({
-    queryKey: ['leads', search, sourceFilter, statusFilter],
+  // Fetch leads with pagination
+  const { data: responseData, isLoading } = useQuery({
+    queryKey: ['leads', search, sourceFilter, statusFilter, page, pageSize],
     queryFn: async () => {
       const res = await api.get('/leads', {
         params: {
           search: search || undefined,
           source: sourceFilter || undefined,
           status: statusFilter || undefined,
+          page,
+          pageSize,
         },
       });
-      return (res.data?.data || []) as Lead[];
+      const rows = res.data?.data;
+      const pagination = res.data?.pagination || {
+        page,
+        pageSize,
+        total: Array.isArray(rows) ? rows.length : 0,
+        totalPages: Math.max(1, Math.ceil((Array.isArray(rows) ? rows.length : 0) / pageSize)),
+      };
+      return {
+        leads: (Array.isArray(rows) ? rows : []) as Lead[],
+        pagination,
+      };
     },
   });
 
-  const leads = leadsData || [];
+  const leads = responseData?.leads || [];
+  const pagination = responseData?.pagination || { page, pageSize, total: leads.length, totalPages: 1 };
   const products = productsData || [];
 
   // Create Lead Mutation
@@ -200,7 +217,10 @@ export default function LeadsPage() {
             <Input
               placeholder="Search by name, phone, email, lead code..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="pl-9 text-xs"
             />
           </div>
@@ -208,7 +228,10 @@ export default function LeadsPage() {
           <div>
             <select
               value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
+              onChange={(e) => {
+                setSourceFilter(e.target.value);
+                setPage(1);
+              }}
               className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-slate-700 dark:text-slate-200"
             >
               <option value="">All Sourcing Channels</option>
@@ -223,7 +246,10 @@ export default function LeadsPage() {
           <div>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
               className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-slate-700 dark:text-slate-200"
             >
               <option value="">All Statuses</option>
@@ -341,6 +367,59 @@ export default function LeadsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Footer */}
+        {leads.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <span>
+                Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{leads.length}</span> of{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-200">{pagination.total}</span> leads
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <div className="flex items-center gap-1.5">
+                <span>Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Previous Page"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <span className="font-medium text-slate-700 dark:text-slate-300 px-1">
+                Page {page} of {pagination.totalPages || 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pagination.totalPages || 1, p + 1))}
+                disabled={page >= (pagination.totalPages || 1)}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Next Page"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </Card>

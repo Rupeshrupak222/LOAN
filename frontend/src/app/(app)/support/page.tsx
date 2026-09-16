@@ -23,6 +23,7 @@ import {
   Users,
   Terminal,
   ArrowRight,
+  ChevronLeft,
   ChevronRight,
   RotateCcw,
   Check,
@@ -98,24 +99,25 @@ export interface EnterpriseIncident {
   impactedService: string;
   severity: SeverityLevel;
   stage: 'DETECTED' | 'INVESTIGATING' | 'MITIGATED' | 'RESOLVED' | 'POSTMORTEM';
-  ownerEmail: string;
-  impactSummary: string;
+  impactSummary?: string;
   rootCause?: string;
   mitigationSteps?: string;
   startedAt: string;
+  resolvedAt?: string;
+  updatedAt: string;
 }
 
-export interface SlaReport {
+export interface SLAReport {
   totalTickets: number;
-  resolvedTickets: number;
-  activeTickets: number;
-  responseCompliancePct: number;
+  openTickets: number;
+  breachedTickets: number;
+  p1Breached: number;
   resolutionCompliancePct: number;
-  avgMttaMinutes: number;
-  avgMttrMinutes: number;
+  avgResolutionTimeHours: number;
+  avgMttaMinutes?: number;
 }
 
-export default function SupportAndHelpdeskPage() {
+export default function SupportDeskPage() {
   const { user } = useAuth();
   const { isDark } = useTheme();
   const toast = useToast();
@@ -127,6 +129,8 @@ export default function SupportAndHelpdeskPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [ticketPage, setTicketPage] = useState(1);
+  const ticketPageSize = 10;
 
   // Modal States
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -177,11 +181,11 @@ export default function SupportAndHelpdeskPage() {
   });
 
   // 3. Fetch SLA Report
-  const { data: slaReport, refetch: refetchSlaReport } = useQuery<SlaReport>({
+  const { data: slaReport, refetch: refetchSlaReport } = useQuery<SLAReport>({
     queryKey: ['support-sla-report-v2'],
     queryFn: async () => {
       const res = await api.get('/support/sla-report');
-      return res.data?.data as SlaReport;
+      return res.data?.data as SLAReport;
     },
     refetchInterval: 20000,
   });
@@ -285,6 +289,11 @@ export default function SupportAndHelpdeskPage() {
       return true;
     });
   }, [tickets, statusFilter, severityFilter, categoryFilter, search]);
+
+  const totalTicketPages = Math.max(1, Math.ceil(filteredTickets.length / ticketPageSize));
+  const paginatedTickets = useMemo(() => {
+    return filteredTickets.slice((ticketPage - 1) * ticketPageSize, ticketPage * ticketPageSize);
+  }, [filteredTickets, ticketPage, ticketPageSize]);
 
   // Counts & Calculations
   const openCount = tickets.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
@@ -483,7 +492,10 @@ export default function SupportAndHelpdeskPage() {
                 <Input
                   placeholder="Search by ticket #, subject, text..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setTicketPage(1);
+                  }}
                   className="pl-8 text-xs h-8"
                 />
               </div>
@@ -492,7 +504,10 @@ export default function SupportAndHelpdeskPage() {
               <div>
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setTicketPage(1);
+                  }}
                   className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-slate-700 dark:text-slate-200 h-8"
                 >
                   <option value="ALL">All Statuses ({tickets.length})</option>
@@ -507,7 +522,10 @@ export default function SupportAndHelpdeskPage() {
               <div>
                 <select
                   value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value)}
+                  onChange={(e) => {
+                    setSeverityFilter(e.target.value);
+                    setTicketPage(1);
+                  }}
                   className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-slate-700 dark:text-slate-200 h-8"
                 >
                   <option value="ALL">All Severity Levels</option>
@@ -522,7 +540,10 @@ export default function SupportAndHelpdeskPage() {
               <div>
                 <select
                   value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  onChange={(e) => {
+                    setCategoryFilter(e.target.value);
+                    setTicketPage(1);
+                  }}
                   className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-slate-700 dark:text-slate-200 h-8"
                 >
                   <option value="ALL">All Inquiries</option>
@@ -564,7 +585,7 @@ export default function SupportAndHelpdeskPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-3">
-              {filteredTickets.map((ticket) => {
+              {paginatedTickets.map((ticket) => {
                 const isOverdue =
                   ticket.status !== 'RESOLVED' &&
                   ticket.status !== 'CLOSED' &&
@@ -657,6 +678,53 @@ export default function SupportAndHelpdeskPage() {
                   </div>
                 );
               })}
+
+              {/* Pagination Controls */}
+              {filteredTickets.length > 0 && (
+                <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{paginatedTickets.length}</span> of{' '}
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{filteredTickets.length}</span> tickets
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>Per page:</span>
+                      <select
+                        value={ticketPageSize}
+                        disabled
+                        className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none opacity-80"
+                      >
+                        <option value={10}>10</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setTicketPage((p) => Math.max(1, p - 1))}
+                      disabled={ticketPage <= 1}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-medium text-slate-700 dark:text-slate-300 px-1">
+                      Page {ticketPage} of {totalTicketPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setTicketPage((p) => Math.min(totalTicketPages, p + 1))}
+                      disabled={ticketPage >= totalTicketPages}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Next Page"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </Card>
+              )}
             </div>
           )}
         </div>

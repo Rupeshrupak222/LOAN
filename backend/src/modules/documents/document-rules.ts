@@ -744,8 +744,8 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
   if (!doc) return false;
 
   // 1. Explicit Rule Code Match
-  if (doc.ruleCode && (doc.ruleCode === rule.code || normalizeClean(doc.ruleCode) === normalizeClean(rule.code))) {
-    return true;
+  if (doc.ruleCode) {
+    return doc.ruleCode === rule.code || normalizeClean(doc.ruleCode) === normalizeClean(rule.code);
   }
 
   const rawCategory = (doc.category || '').toUpperCase().trim();

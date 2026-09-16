@@ -181,9 +181,9 @@ export class LeadService {
    * Lists leads respecting tenant and branch data isolation.
    */
   public async listLeads(
-    filters: { status?: LeadStatus; search?: string; source?: LeadSource },
+    filters: { status?: LeadStatus; search?: string; source?: LeadSource; page?: number; pageSize?: number },
     actor: LeadActorContext
-  ): Promise<{ data: LeadEntity[]; total: number }> {
+  ): Promise<{ data: LeadEntity[]; total: number; pagination?: { page: number; pageSize: number; total: number; totalPages: number } }> {
     const scope = ScopeResolver.resolveAuthorizedScope(actor as any);
     const allLeads = leadStore.getAll();
 
@@ -228,9 +228,26 @@ export class LeadService {
       return true;
     });
 
+    const sorted = filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const total = sorted.length;
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = filters.pageSize !== undefined ? Math.max(1, Number(filters.pageSize)) : undefined;
+
+    let paginatedData = sorted;
+    if (pageSize) {
+      const skip = (page - 1) * pageSize;
+      paginatedData = sorted.slice(skip, skip + pageSize);
+    }
+
     return {
-      data: filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-      total: filtered.length,
+      data: paginatedData,
+      total,
+      pagination: {
+        page,
+        pageSize: pageSize || total || 10,
+        total,
+        totalPages: pageSize ? Math.max(1, Math.ceil(total / pageSize)) : 1,
+      },
     };
   }
 

@@ -719,13 +719,24 @@ export async function transition(
 
   if (isResubmittingReturned || toStatus === 'SUBMITTED') {
     const allDocs = [...(app.customer?.documents || []), ...(app.documents || [])];
+    const customerEmploymentType =
+      app.customer?.employmentType ||
+      app.customer?.employmentDetails?.[0]?.employmentType ||
+      'SALARIED';
+    const customerMonthlyIncome =
+      app.customer?.monthlyIncome != null
+        ? Number(app.customer.monthlyIncome)
+        : app.customer?.employmentDetails?.[0]?.monthlyIncome
+        ? Number(app.customer.employmentDetails[0].monthlyIncome)
+        : 0;
+
     const fulfillment = validateCustomerDocumentFulfillment(
       allDocs,
-      app.customer?.employmentDetails?.[0]?.employmentType,
-      app.product?.productType,
+      customerEmploymentType,
+      (app.product as any)?.productType || app.product?.name,
       {
         requestedAmount: Number(app.requestedAmount),
-        monthlyIncome: app.customer?.employmentDetails?.[0]?.monthlyIncome ? Number(app.customer.employmentDetails[0].monthlyIncome) : undefined
+        monthlyIncome: customerMonthlyIncome,
       }
     );
 

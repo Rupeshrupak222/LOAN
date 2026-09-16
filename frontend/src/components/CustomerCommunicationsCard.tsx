@@ -20,6 +20,8 @@ import {
   Sparkles,
   ShieldCheck,
   Info,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Badge, Card, Button, Input } from '@/components/ui';
@@ -45,6 +47,8 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
   const [channelFilter, setChannelFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 10;
 
   // Send Notice Modal state
   const [sendModalOpen, setSendModalOpen] = useState(false);
@@ -192,6 +196,9 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
   const failedCount = logs.filter((l: any) => l.status === 'FAILED').length;
   const blockedCount = logs.filter((l: any) => ['BLOCKED_DND', 'BLOCKED_WINDOW'].includes(l.status)).length;
 
+  const totalLogPages = Math.max(1, Math.ceil(logs.length / logPageSize));
+  const paginatedLogs = logs.slice((logPage - 1) * logPageSize, logPage * logPageSize);
+
   return (
     <div className="space-y-4">
       {/* Top Banner & Fast Actions */}
@@ -279,7 +286,10 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
             {/* Channel filter */}
             <select
               value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value)}
+              onChange={(e) => {
+                setChannelFilter(e.target.value);
+                setLogPage(1);
+              }}
               className="text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1 text-slate-700 dark:text-slate-300"
             >
               <option value="ALL">All Channels</option>
@@ -292,7 +302,10 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
             {/* Status filter */}
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setLogPage(1);
+              }}
               className="text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1 text-slate-700 dark:text-slate-300"
             >
               <option value="ALL">All Statuses</option>
@@ -341,7 +354,7 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {logs.map((log: any) => (
+                {paginatedLogs.map((log: any) => (
                   <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-900/40 transition-colors">
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-1.5">
@@ -418,6 +431,39 @@ export function CustomerCommunicationsCard({ customer }: CustomerCommunicationsC
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination Footer */}
+            {logs.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-xs text-slate-500 dark:text-slate-400">
+                <div>
+                  Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{paginatedLogs.length}</span> of{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{logs.length}</span> logs
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                    disabled={logPage <= 1}
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft className="h-3 w-3" />
+                  </button>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    Page {logPage} of {totalLogPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
+                    disabled={logPage >= totalLogPages}
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Next Page"
+                  >
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>

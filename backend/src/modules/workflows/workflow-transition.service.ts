@@ -377,11 +377,17 @@ export class WorkflowTransitionService {
     }
 
     // ─── Prerequisite 2.5: Mandatory Profile-Specific Documents ───
-    const employmentType = customer.employmentDetails?.[0]?.employmentType || 'SALARIED';
-    const productType = app.product?.type || 'PERSONAL';
+    const employmentType = (customer as any).employmentType || customer.employmentDetails?.[0]?.employmentType || 'SALARIED';
+    const monthlyIncome =
+      (customer as any).monthlyIncome != null
+        ? Number((customer as any).monthlyIncome)
+        : customer.employmentDetails?.[0]?.monthlyIncome
+        ? Number(customer.employmentDetails[0].monthlyIncome)
+        : 0;
+    const productType = (app.product as any)?.productType || app.product?.type || app.product?.name || 'PERSONAL';
     const docFulfillment = validateCustomerDocumentFulfillment(docs, employmentType, productType, {
-      monthlyIncome: customer.employmentDetails?.[0]?.monthlyIncome,
-      requestedAmount: app.requestedAmount,
+      monthlyIncome,
+      requestedAmount: Number(app.requestedAmount || 0),
     });
     
     const docPrereq: PrerequisiteCheckResult = {

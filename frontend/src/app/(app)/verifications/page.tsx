@@ -13,6 +13,7 @@ import {
   FileCheck,
   CreditCard,
   UserCheck,
+  ChevronLeft,
   ChevronRight,
   RefreshCw,
   Sparkles
@@ -42,6 +43,8 @@ export default function VerificationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const { data: queueData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['verifications-queue'],
@@ -133,6 +136,9 @@ export default function VerificationsPage() {
     const matchesStatus = statusFilter === 'ALL' || v.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const getStatusBadge = (status: VerificationItem['status']) => {
     switch (status) {
@@ -279,7 +285,10 @@ export default function VerificationsPage() {
             type="text"
             placeholder="Search by ID, Applicant, or Ref..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-navy-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
@@ -288,7 +297,10 @@ export default function VerificationsPage() {
             <Filter className="w-4 h-4 text-gray-400" />
             <select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setPage(1);
+              }}
               className="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">All Verification Types</option>
@@ -300,7 +312,10 @@ export default function VerificationsPage() {
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-slate-200 bg-white dark:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="ALL">All Statuses</option>
@@ -347,7 +362,7 @@ export default function VerificationsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((item) => (
+                  paginatedItems.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-navy-800/40 transition">
                       <td className="py-3.5 px-4 font-mono text-xs font-semibold text-gray-700 dark:text-slate-300">
                         {item.id}
@@ -395,6 +410,62 @@ export default function VerificationsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Footer */}
+        {filtered.length > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/50 dark:bg-navy-900/50">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+              <span>Showing</span>
+              <span className="font-semibold text-gray-900 dark:text-slate-200">
+                {Math.min((page - 1) * pageSize + 1, filtered.length)} - {Math.min(page * pageSize, filtered.length)}
+              </span>
+              <span>of</span>
+              <span className="font-semibold text-gray-900 dark:text-slate-200">{filtered.length}</span>
+              <span>verification records</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                <span>Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="bg-white dark:bg-navy-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={page <= 1}
+                  className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-navy-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="px-2 text-xs font-medium text-gray-700 dark:text-slate-300">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={page >= totalPages}
+                  className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-navy-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  title="Next Page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

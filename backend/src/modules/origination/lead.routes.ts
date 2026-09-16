@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/asyncHandler';
-import { ok, created } from '../../common/response';
+import { ok, created, paginated } from '../../common/response';
 import { authenticate, authorize } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenant-context';
 import { leadService } from './lead.service';
@@ -31,9 +31,11 @@ router.get(
     const status = typeof req.query.status === 'string' ? (req.query.status as any) : undefined;
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const source = typeof req.query.source === 'string' ? (req.query.source as any) : undefined;
+    const page = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const pageSize = req.query.pageSize ? Math.max(1, Number(req.query.pageSize)) : undefined;
 
     const result = await leadService.listLeads(
-      { status, search, source },
+      { status, search, source, page, pageSize },
       {
         id: req.user?.id,
         email: req.user?.email,
@@ -43,6 +45,9 @@ router.get(
       }
     );
 
+    if (result.pagination) {
+      return paginated(res, result.data, result.pagination);
+    }
     return ok(res, result.data);
   })
 );

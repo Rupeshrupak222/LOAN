@@ -21,6 +21,8 @@ export default function LoansPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   // Quick Payout Execution State
   const [selectedDisbursementApp, setSelectedDisbursementApp] = useState<any | null>(null);
@@ -261,12 +263,18 @@ export default function LoansPage() {
           <Input
             placeholder="Search loan #, borrower, or phone..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
           className={cn(
             "h-9 rounded-xl border px-3 text-xs font-semibold shadow-sm focus:border-[#2563EB] focus:outline-none",
             isDark
@@ -287,8 +295,15 @@ export default function LoansPage() {
       {/* Combined Loans & Sanctioned Accounts Table */}
       <DataTable
         columns={columns}
-        rows={filteredRows}
+        rows={filteredRows.slice((page - 1) * pageSize, page * pageSize)}
         loading={isLoading}
+        pagination={{
+          page,
+          pageSize,
+          total: filteredRows.length,
+          totalPages: Math.max(1, Math.ceil(filteredRows.length / pageSize)),
+          onPageChange: (newPage) => setPage(newPage),
+        }}
         emptyTitle="No loan accounts or sanctioned proposals found"
         emptyDescription="Proposals approved in Underwriting will appear here with a 'Release Fund' button to disburse and activate loan schedules."
         emptyAction={

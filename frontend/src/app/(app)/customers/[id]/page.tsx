@@ -36,6 +36,8 @@ import {
   Send,
   MessageSquare,
   RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
@@ -78,6 +80,14 @@ export default function CustomerDetailPage() {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'communications' | 'bank_intelligence' | 'fraud'
   >('overview');
+
+  // Tab pagination states
+  const [appPage, setAppPage] = useState(1);
+  const appPageSize = 5;
+  const [loanPage, setLoanPage] = useState(1);
+  const loanPageSize = 4;
+  const [pmtPage, setPmtPage] = useState(1);
+  const pmtPageSize = 6;
 
   // Underwriter verification wizard state
   const [selectedAppForWizard, setSelectedAppForWizard] = useState<any>(null);
@@ -1172,91 +1182,123 @@ export default function CustomerDetailPage() {
           </div>
 
           {applications.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
-                  <tr>
-                    <th className="py-2.5 px-3">Application No</th>
-                    <th className="py-2.5 px-3">Product</th>
-                    <th className="py-2.5 px-3">Requested Amount</th>
-                    <th className="py-2.5 px-3">Tenure</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {applications.map((app: any) => (
-                    <tr key={app.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-brand-700 text-xs">{app.applicationNo}</td>
-                      <td className="py-3 px-3 text-slate-800 font-medium text-xs">{app.product?.name || 'Loan'}</td>
-                      <td className="py-3 px-3 font-bold text-slate-900 text-xs">{formatMoney(app.requestedAmount)}</td>
-                      <td className="py-3 px-3 text-slate-600 text-xs">{app.tenureMonths} Months</td>
-                      <td className="py-3 px-3"><Badge status={app.status} /></td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link href={`/applications/${app.id}`}>
-                            <Button size="sm" variant="secondary" className="text-xs">
-                              Review 360 →
-                            </Button>
-                          </Link>
-                          {isLoanOfficer ? (
-                            app.status === 'DRAFT' ? (
-                              <Button
-                                size="sm"
-                                disabled={forwardAppMutation.isPending}
-                                onClick={() => {
-                                  if (confirm(`Forward Application #${app.applicationNo} to Credit Analyst for appraisal?`)) {
-                                    forwardAppMutation.mutate(app.id);
-                                  }
-                                }}
-                                className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
-                              >
-                                <Send className="w-3 h-3" /> Forward to Credit
-                              </Button>
-                            ) : app.status === 'RETURNED' || app.underwriting?.decision === 'SEND_BACK' ? (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={forwardAppMutation.isPending}
-                                onClick={() => {
-                                  if (confirm(`Resubmit corrected Application #${app.applicationNo} to Credit Analyst?`)) {
-                                    forwardAppMutation.mutate(app.id);
-                                  }
-                                }}
-                                className="text-xs text-amber-600 border-amber-200 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
-                              >
-                                <RotateCcw className="w-3 h-3" /> Resubmit to Credit
-                              </Button>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
-                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>In Credit Review</span>
-                              </span>
-                            )
-                          ) : isCreditAnalyst ? (
-                            ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
-                              <Link href={`/credit-assessment?applicationId=${app.id}`}>
-                                <Button size="sm" className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0">
-                                  <span>Assess Credit</span>
-                                  <ArrowRight className="w-3 h-3" />
-                                </Button>
-                              </Link>
-                            ) : app.status === 'UNDERWRITING' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap">
-                                <Send className="w-3 h-3" /> In Underwriting
-                              </span>
-                            ) : ['APPROVED', 'DISBURSED', 'READY_FOR_DISBURSEMENT'].includes(app.status) ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
-                                <CheckCircle className="w-3 h-3" /> Sanctioned
-                              </span>
-                            ) : null
-                          ) : null}
-                        </div>
-                      </td>
+            <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Application No</th>
+                      <th className="py-2.5 px-3">Product</th>
+                      <th className="py-2.5 px-3">Requested Amount</th>
+                      <th className="py-2.5 px-3">Tenure</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {applications.slice((appPage - 1) * appPageSize, appPage * appPageSize).map((app: any) => (
+                      <tr key={app.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-3 font-semibold text-brand-700 text-xs">{app.applicationNo}</td>
+                        <td className="py-3 px-3 text-slate-800 font-medium text-xs">{app.product?.name || 'Loan'}</td>
+                        <td className="py-3 px-3 font-bold text-slate-900 text-xs">{formatMoney(app.requestedAmount)}</td>
+                        <td className="py-3 px-3 text-slate-600 text-xs">{app.tenureMonths} Months</td>
+                        <td className="py-3 px-3"><Badge status={app.status} /></td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link href={`/applications/${app.id}`}>
+                              <Button size="sm" variant="secondary" className="text-xs">
+                                Review 360 →
+                              </Button>
+                            </Link>
+                            {isLoanOfficer ? (
+                              app.status === 'DRAFT' ? (
+                                <Button
+                                  size="sm"
+                                  disabled={forwardAppMutation.isPending}
+                                  onClick={() => {
+                                    if (confirm(`Forward Application #${app.applicationNo} to Credit Analyst for appraisal?`)) {
+                                      forwardAppMutation.mutate(app.id);
+                                    }
+                                  }}
+                                  className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+                                >
+                                  <Send className="w-3 h-3" /> Forward to Credit
+                                </Button>
+                              ) : app.status === 'RETURNED' || app.underwriting?.decision === 'SEND_BACK' ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={forwardAppMutation.isPending}
+                                  onClick={() => {
+                                    if (confirm(`Resubmit corrected Application #${app.applicationNo} to Credit Analyst?`)) {
+                                      forwardAppMutation.mutate(app.id);
+                                    }
+                                  }}
+                                  className="text-xs text-amber-600 border-amber-200 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+                                >
+                                  <RotateCcw className="w-3 h-3" /> Resubmit to Credit
+                                </Button>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>In Credit Review</span>
+                                </span>
+                              )
+                            ) : isCreditAnalyst ? (
+                              ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(app.status) ? (
+                                <Link href={`/credit-assessment?applicationId=${app.id}`}>
+                                  <Button size="sm" className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0">
+                                    <span>Assess Credit</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </Button>
+                                </Link>
+                              ) : app.status === 'UNDERWRITING' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap">
+                                  <Send className="w-3 h-3" /> In Underwriting
+                                </span>
+                              ) : ['APPROVED', 'DISBURSED', 'READY_FOR_DISBURSEMENT'].includes(app.status) ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
+                                  <CheckCircle className="w-3 h-3" /> Sanctioned
+                                </span>
+                              ) : null
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Applications Pagination Footer */}
+              {applications.length > appPageSize && (
+                <div className="flex items-center justify-between pt-2 px-1 text-xs text-slate-500 border-t border-slate-100">
+                  <span>
+                    Showing {Math.min(applications.length, (appPage - 1) * appPageSize + 1)}–{Math.min(applications.length, appPage * appPageSize)} of {applications.length} applications
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setAppPage((p) => Math.max(1, p - 1))}
+                      disabled={appPage <= 1}
+                      className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-semibold px-1">
+                      Page {appPage} of {Math.ceil(applications.length / appPageSize)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAppPage((p) => Math.min(Math.ceil(applications.length / appPageSize), p + 1))}
+                      disabled={appPage >= Math.ceil(applications.length / appPageSize)}
+                      className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-xs text-slate-400 py-6 text-center">No loan applications on record.</p>
@@ -1271,43 +1313,75 @@ export default function CustomerDetailPage() {
             Loan Accounts & Servicing
           </h3>
           {loans.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {loans.map((loan: any) => (
-                <div key={loan.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow transition">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-slate-900 text-base">{loan.loanNo}</p>
-                      <p className="text-xs text-slate-500">{loan.product?.name || 'Loan'}</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {loans.slice((loanPage - 1) * loanPageSize, loanPage * loanPageSize).map((loan: any) => (
+                  <div key={loan.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow transition">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-slate-900 text-base">{loan.loanNo}</p>
+                        <p className="text-xs text-slate-500">{loan.product?.name || 'Loan'}</p>
+                      </div>
+                      <Badge status={loan.status} />
                     </div>
-                    <Badge status={loan.status} />
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-slate-400">Sanctioned Principal</p>
+                        <p className="font-semibold text-slate-800 text-sm">{formatMoney(loan.principal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400">Monthly EMI</p>
+                        <p className="font-semibold text-slate-800 text-sm">{formatMoney(loan.emiAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400">Outstanding Balance</p>
+                        <p className="font-bold text-brand-700 text-sm">{formatMoney(loan.outstandingPrincipal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400">Interest Rate</p>
+                        <p className="font-semibold text-slate-800 text-sm">{loan.interestRate}% p.a.</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                      <Link href={`/loans/${loan.id}`}>
+                        <Button size="sm" variant="secondary" className="text-xs">
+                          Amortization & Pay →
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <p className="text-slate-400">Sanctioned Principal</p>
-                      <p className="font-semibold text-slate-800 text-sm">{formatMoney(loan.principal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Monthly EMI</p>
-                      <p className="font-semibold text-slate-800 text-sm">{formatMoney(loan.emiAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Outstanding Balance</p>
-                      <p className="font-bold text-brand-700 text-sm">{formatMoney(loan.outstandingPrincipal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Interest Rate</p>
-                      <p className="font-semibold text-slate-800 text-sm">{loan.interestRate}% p.a.</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                    <Link href={`/loans/${loan.id}`}>
-                      <Button size="sm" variant="secondary" className="text-xs">
-                        Amortization & Pay →
-                      </Button>
-                    </Link>
+                ))}
+              </div>
+
+              {/* Loans Pagination Footer */}
+              {loans.length > loanPageSize && (
+                <div className="flex items-center justify-between pt-2 px-1 text-xs text-slate-500 border-t border-slate-100">
+                  <span>
+                    Showing {Math.min(loans.length, (loanPage - 1) * loanPageSize + 1)}–{Math.min(loans.length, loanPage * loanPageSize)} of {loans.length} loans
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLoanPage((p) => Math.max(1, p - 1))}
+                      disabled={loanPage <= 1}
+                      className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-semibold px-1">
+                      Page {loanPage} of {Math.ceil(loans.length / loanPageSize)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setLoanPage((p) => Math.min(Math.ceil(loans.length / loanPageSize), p + 1))}
+                      disabled={loanPage >= Math.ceil(loans.length / loanPageSize)}
+                      className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           ) : (
             <p className="text-xs text-slate-400 py-6 text-center">No active or closed loan accounts.</p>
@@ -1322,31 +1396,63 @@ export default function CustomerDetailPage() {
             Repayment Ledger & Transactions
           </h3>
           {payments.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
-                  <tr>
-                    <th className="py-2.5 px-3">Receipt No</th>
-                    <th className="py-2.5 px-3">Amount</th>
-                    <th className="py-2.5 px-3">Method</th>
-                    <th className="py-2.5 px-3">Reference / UTR</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3">Paid Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {payments.map((pmt: any) => (
-                    <tr key={pmt.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-brand-700 text-xs">{pmt.paymentNo}</td>
-                      <td className="py-3 px-3 font-bold text-slate-900 text-xs">{formatMoney(pmt.amount)}</td>
-                      <td className="py-3 px-3 text-slate-600 font-medium text-xs">{pmt.method}</td>
-                      <td className="py-3 px-3 font-mono text-xs text-slate-500">{pmt.reference || '-'}</td>
-                      <td className="py-3 px-3"><Badge status={pmt.status} /></td>
-                      <td className="py-3 px-3 text-xs text-slate-400">{pmt.paidAt ? formatDateTime(pmt.paidAt) : '-'}</td>
+            <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Receipt No</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Method</th>
+                      <th className="py-2.5 px-3">Reference / UTR</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Paid Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {payments.slice((pmtPage - 1) * pmtPageSize, pmtPage * pmtPageSize).map((pmt: any) => (
+                      <tr key={pmt.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-3 font-semibold text-brand-700 text-xs">{pmt.paymentNo}</td>
+                        <td className="py-3 px-3 font-bold text-slate-900 text-xs">{formatMoney(pmt.amount)}</td>
+                        <td className="py-3 px-3 text-slate-600 font-medium text-xs">{pmt.method}</td>
+                        <td className="py-3 px-3 font-mono text-xs text-slate-500">{pmt.reference || '-'}</td>
+                        <td className="py-3 px-3"><Badge status={pmt.status} /></td>
+                        <td className="py-3 px-3 text-xs text-slate-400">{pmt.paidAt ? formatDateTime(pmt.paidAt) : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Payments Pagination Footer */}
+              {payments.length > pmtPageSize && (
+                <div className="flex items-center justify-between pt-2 px-1 text-xs text-slate-500 border-t border-slate-100">
+                  <span>
+                    Showing {Math.min(payments.length, (pmtPage - 1) * pmtPageSize + 1)}–{Math.min(payments.length, pmtPage * pmtPageSize)} of {payments.length} transactions
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPmtPage((p) => Math.max(1, p - 1))}
+                      disabled={pmtPage <= 1}
+                      className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-semibold px-1">
+                      Page {pmtPage} of {Math.ceil(payments.length / pmtPageSize)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPmtPage((p) => Math.min(Math.ceil(payments.length / pmtPageSize), p + 1))}
+                      disabled={pmtPage >= Math.ceil(payments.length / pmtPageSize)}
+                      className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-xs text-slate-400 py-6 text-center">No payment transactions recorded.</p>
