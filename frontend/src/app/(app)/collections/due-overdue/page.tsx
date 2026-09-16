@@ -33,26 +33,11 @@ export default function CollectionDueOverduePage() {
         title="Due & Overdue Cases"
         subtitle="View and manage cases based on delinquency buckets (SMA-0, SMA-1, SMA-2)."
       />
-
-      <CollectionQueueTable
-        cases={casesData?.data || []}
-        isLoading={isLoading}
-        selectedBucket={selectedBucket}
-        onSelectBucket={setSelectedBucket}
-        queueType="ALL"
-        onSelectQueueType={() => {}}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onOpenActivity={(c) => { setSelectedCase(c); setActivityModalOpen(true); }}
-        onOpenPtp={(c) => { setSelectedCase(c); setPtpModalOpen(true); }}
-        onOpenAssign={(c) => { setSelectedCase(c); setAssignModalOpen(true); }}
-        onOpenEscalate={(c) => { setSelectedCase(c); setEscalateModalOpen(true); }}
-      />
-
-      <ContactActivityModal isOpen={activityModalOpen} onClose={() => { setActivityModalOpen(false); setSelectedCase(null); }} caseItem={selectedCase} />
-      <PtpModal isOpen={ptpModalOpen} onClose={() => { setPtpModalOpen(false); setSelectedCase(null); }} caseItem={selectedCase} />
-      <AssignmentModal isOpen={assignModalOpen} onClose={() => { setAssignModalOpen(false); setSelectedCase(null); }} caseItem={selectedCase} />
-      <EscalationModal isOpen={escalateModalOpen} onClose={() => { setEscalateModalOpen(false); setSelectedCase(null); }} caseItem={selectedCase} />
+      <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
+        <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
+          [Due and Overdue Accounts Table component goes here]
+        </div>
+      </Card>
     </div>
   );
 }

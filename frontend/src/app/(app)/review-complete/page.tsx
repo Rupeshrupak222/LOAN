@@ -19,8 +19,8 @@ export default function ReviewCompletePage() {
   });
 
   const apps = Array.isArray(data) ? data : [];
-  // For Review & Complete, show apps where KYC is verified
-  const reviewApps = apps.filter(a => a.status === 'DRAFT' && a.kycStatus === 'VERIFIED');
+  // For Review & Complete, show all draft applications pending review
+  const reviewApps = apps.filter(a => a.status === 'DRAFT');
 
   return (
     <div className="space-y-6">

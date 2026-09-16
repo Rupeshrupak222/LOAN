@@ -427,7 +427,7 @@ export default function AuditLogsPage() {
               {exportedData && (
                 <div className="space-y-2 pt-2">
                   <span className="font-semibold text-slate-700 dark:text-slate-300">Export Preview:</span>
-                  <div className="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-[10px] max-h-48 overflow-y-auto whitespace-pre">
+                  <div className="p-3 bg-slate-100 dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 rounded-xl font-mono text-[10px] max-h-48 overflow-y-auto whitespace-pre border border-slate-200 dark:border-slate-800">
                     {exportedData}
                   </div>
                 </div>

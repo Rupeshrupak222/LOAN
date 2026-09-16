@@ -18,7 +18,9 @@ import {
   AlertCircle,
   Briefcase,
   FileText,
-  XCircle
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useToast } from '@/lib/toast';
@@ -32,6 +34,8 @@ export function CreditAnalystCustomersView() {
   const [searchTerm, setSearchTerm] = useState('');
   // Filter Options: 'ALL' | 'ACTION_REQUIRED' | 'FORWARDED_TO_UNDERWRITER'
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'ACTION_REQUIRED' | 'FORWARDED_TO_UNDERWRITER'>('ALL');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   // 1. Fetch live queue from backend synced with database
   const { data: allData = [], isLoading, refetch, isRefetching } = useQuery({

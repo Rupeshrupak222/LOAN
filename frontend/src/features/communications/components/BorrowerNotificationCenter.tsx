@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type { BorrowerNotification } from '../types';
@@ -43,7 +43,7 @@ export const BorrowerNotificationCenter: React.FC<Props> = ({
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       {/* Top Banner & Customer Switcher */}
-      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400">
             <Bell className="w-5 h-5" />
@@ -67,7 +67,7 @@ export const BorrowerNotificationCenter: React.FC<Props> = ({
           <select
             value={selectedCustomerId}
             onChange={(e) => onChangeCustomer(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
           >
             <option value="CUST-DEMO-001">Customer: Aarav Sharma (CUST-DEMO-001)</option>
             <option value="CUST-DEMO-002">Customer: Meera Patel (CUST-DEMO-002)</option>
@@ -75,7 +75,7 @@ export const BorrowerNotificationCenter: React.FC<Props> = ({
           {unreadCount > 0 && (
             <button
               onClick={onMarkAllRead}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center gap-1.5 whitespace-nowrap"
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 whitespace-nowrap"
             >
               <CheckCheck className="w-3.5 h-3.5" /> Mark All Read
             </button>
@@ -92,7 +92,7 @@ export const BorrowerNotificationCenter: React.FC<Props> = ({
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
               filterRead === f
                 ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-200 dark:border-slate-800'
             }`}
           >
             {f === 'ALL' ? 'All Alerts' : f === 'UNREAD' ? `Unread (${unreadCount})` : 'Read'}
@@ -103,7 +103,7 @@ export const BorrowerNotificationCenter: React.FC<Props> = ({
       {/* Notifications Stream */}
       <div className="space-y-2.5">
         {filtered.length === 0 ? (
-          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-500">
+          <div className="bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center text-slate-500">
             No notifications in inbox for this customer.
           </div>
         ) : (

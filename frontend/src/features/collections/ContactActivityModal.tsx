@@ -50,25 +50,25 @@ export function ContactActivityModal({ isOpen, onClose, caseItem }: ContactActiv
   if (!isOpen || !caseItem) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-6">
-        <h3 className="text-base font-bold text-slate-100 mb-1">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      <Card className="w-full max-w-md shadow-2xl p-6">
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
           Log Customer Contact Activity
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Record interaction for <span className="font-semibold text-slate-200">{caseItem.customerName}</span> ({caseItem.mobile}, DPD {caseItem.dpd}).
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Record interaction for <span className="font-semibold text-slate-800 dark:text-slate-200">{caseItem.customerName}</span> ({caseItem.mobile}, DPD {caseItem.dpd}).
         </p>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Channel *
               </label>
               <select
                 value={activityType}
                 onChange={(e) => setActivityType(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="CALL">Phone Call</option>
                 <option value="SMS">SMS Message</option>
@@ -81,13 +81,13 @@ export function ContactActivityModal({ isOpen, onClose, caseItem }: ContactActiv
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Outcome *
               </label>
               <select
                 value={outcome}
                 onChange={(e) => setOutcome(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="CONTACTED">Customer Contacted</option>
                 <option value="PROMISE_TO_PAY">Promise To Pay Given</option>
@@ -102,19 +102,19 @@ export function ContactActivityModal({ isOpen, onClose, caseItem }: ContactActiv
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Next Follow-Up Date
             </label>
             <input
               type="date"
               value={nextFollowUpDate}
               onChange={(e) => setNextFollowUpDate(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Conversation Notes & Context *
             </label>
             <textarea
@@ -122,11 +122,11 @@ export function ContactActivityModal({ isOpen, onClose, caseItem }: ContactActiv
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Record borrower conversation, reasons for non-payment, financial difficulty, commitments..."
               rows={3}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" size="sm" onClick={onClose} disabled={activityMutation.isPending}>
               Cancel
             </Button>

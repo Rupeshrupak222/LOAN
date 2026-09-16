@@ -45,30 +45,30 @@ export function WriteOffRequestModal({ isOpen, onClose, caseItem }: WriteOffRequ
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-lg border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-6">
+      <Card className="w-full max-w-lg shadow-2xl p-6">
         <h3 className="text-base font-bold text-rose-500 mb-1 flex items-center gap-1.5">
           Propose Bad Debt Write-Off
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Propose full accounting charge-off for <span className="font-semibold text-slate-200">{caseItem.customerName}</span> ({caseItem.caseNo}, DPD {caseItem.dpd}). Requires Credit Committee approval.
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Propose full accounting charge-off for <span className="font-semibold text-slate-900 dark:text-slate-200">{caseItem.customerName}</span> ({caseItem.caseNo}, DPD {caseItem.dpd}). Requires Credit Committee approval.
         </p>
 
         <div className="space-y-4">
-          <div className="rounded-md border border-rose-900/60 bg-rose-950/30 p-3 text-xs text-rose-300">
+          <div className="rounded-md border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-3 text-xs text-rose-800 dark:text-rose-300">
             <p className="font-bold text-sm">Write-off Balance: ₹{Number(caseItem.overdueAmount).toLocaleString()}</p>
-            <p className="text-[11px] text-rose-400/80 mt-1">
+            <p className="text-[11px] text-rose-600 dark:text-rose-400/80 mt-1">
               Upon approval, this will generate a balanced Double-Entry GL Journal entry debiting account 5030 (Bad Debts Expense) and crediting 1020 (Principal Book).
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Primary Write-Off Classification Reason *
             </label>
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="UNTRACEABLE_BORROWER">Untraceable / Absconding Borrower (Skip Tracing Exhausted)</option>
               <option value="BORROWER_DECEASED_NO_ESTATE">Borrower Deceased with No Recoverable Estate</option>
@@ -79,7 +79,7 @@ export function WriteOffRequestModal({ isOpen, onClose, caseItem }: WriteOffRequ
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Recovery Exhaustion Summary & Evidence Docket *
             </label>
             <textarea
@@ -87,11 +87,11 @@ export function WriteOffRequestModal({ isOpen, onClose, caseItem }: WriteOffRequ
               onChange={(e) => setRecoveryExhaustionSummary(e.target.value)}
               placeholder="Detail all historical recovery attempts (field visits, demand notices, legal arbitration, skip tracing results) confirming exhaustion of standard remedies..."
               rows={4}
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-2 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" size="sm" onClick={onClose} disabled={writeOffMutation.isPending}>
               Cancel
             </Button>

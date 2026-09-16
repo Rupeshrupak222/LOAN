@@ -89,7 +89,148 @@ export default function CollectionsDashboardPage() {
         />
       </div>
 
-      <CollectionAnalyticsView />
+      {/* Main Navigation Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 space-x-4">
+        {[
+          { id: 'QUEUE', label: 'Operational Work Queue' },
+          { id: 'ANALYTICS', label: 'Delinquency & Migration Analytics' },
+          { id: 'STRATEGIES', label: 'Strategy Policies & Versioning' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={cn(
+              'py-2 px-1 border-b-2 text-xs font-semibold transition-all',
+              activeTab === tab.id
+                ? 'border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-300'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab 1: Queue Table */}
+      {activeTab === 'QUEUE' && (
+        <CollectionQueueTable
+          cases={casesData?.data || []}
+          isLoading={casesLoading}
+          selectedBucket={selectedBucket}
+          onSelectBucket={setSelectedBucket}
+          queueType={queueType}
+          onSelectQueueType={setQueueType}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onOpenActivity={(c) => {
+            setSelectedCase(c);
+            setActivityModalOpen(true);
+          }}
+          onOpenPtp={(c) => {
+            setSelectedCase(c);
+            setPtpModalOpen(true);
+          }}
+          onOpenAssign={(c) => {
+            setSelectedCase(c);
+            setAssignModalOpen(true);
+          }}
+          onOpenEscalate={(c) => {
+            setSelectedCase(c);
+            setEscalateModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Tab 2: Analytics & Migration */}
+      {activeTab === 'ANALYTICS' && (
+        <CollectionAnalyticsView />
+      )}
+
+      {/* Tab 3: Strategies */}
+      {activeTab === 'STRATEGIES' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Collection Strategies & Policy Versions</h3>
+            <Button size="sm" variant="primary" onClick={() => setStrategyModalOpen(true)}>
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Draft New Strategy
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {strategies?.map((strat) => (
+              <Card key={strat.id} className="p-5 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">{strat.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{strat.description}</div>
+                  </div>
+                  <span className={cn(
+                    'px-2 py-0.5 rounded text-[10px] font-bold',
+                    strat.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800' :
+                    strat.status === 'DRAFT' ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800' :
+                    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                  )}>
+                    {strat.status} (v{strat.version})
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+                  <div className="font-semibold text-slate-900 dark:text-slate-200">Priority Factor Weights:</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <div>DPD Weight: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.dpdWeight * 100}%</span></div>
+                    <div>Overdue Weight: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.overdueAmountWeight * 100}%</span></div>
+                    <div>Risk Grade: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.riskGradeWeight * 100}%</span></div>
+                    <div>Broken PTPs: <span className="text-slate-800 dark:text-slate-200 font-medium">{strat.priorityWeights?.brokenPtpWeight * 100}%</span></div>
+                  </div>
+                </div>
+
+                <div className="text-slate-500 text-[11px] flex justify-between items-center pt-1">
+                  <span>Effective Date: {new Date(strat.effectiveDate).toLocaleDateString()}</span>
+                  {strat.status === 'DRAFT' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={async () => {
+                        await collectionsApi.activateStrategy(strat.id);
+                        toast.success('Strategy activated.');
+                        queryClient.invalidateQueries({ queryKey: ['collection-strategies'] });
+                      }}
+                    >
+                      Activate
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Global Modals */}
+      <ContactActivityModal
+        isOpen={activityModalOpen}
+        onClose={() => setActivityModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <PtpModal
+        isOpen={ptpModalOpen}
+        onClose={() => setPtpModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <AssignmentModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <EscalationModal
+        isOpen={escalateModalOpen}
+        onClose={() => setEscalateModalOpen(false)}
+        caseItem={selectedCase}
+      />
+      <StrategyConfigModal
+        isOpen={strategyModalOpen}
+        onClose={() => setStrategyModalOpen(false)}
+      />
     </div>
   );
 }

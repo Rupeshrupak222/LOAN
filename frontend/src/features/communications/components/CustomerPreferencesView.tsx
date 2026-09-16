@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type {
@@ -83,7 +83,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Left List: Customer Directory */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col h-[650px]">
+      <div className="bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col h-[650px]">
         <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
           <Users className="w-4 h-4 text-indigo-400" />
           Customer Directory & Profiles
@@ -96,7 +96,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
             placeholder="Search customer ID..."
             value={searchCustomerId}
             onChange={(e) => setSearchCustomerId(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-200 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -133,7 +133,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
       </div>
 
       {/* Right: Preference Editor */}
-      <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+      <div className="lg:col-span-2 bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between">
         {selectedPref ? (
           <div className="space-y-6">
             {/* Header */}
@@ -152,7 +152,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
                 <select
                   value={preferredLang}
                   onChange={(e) => setPreferredLang(e.target.value as LanguageCode)}
-                  className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500"
+                  className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500"
                 >
                   <option value="en-IN">English (en-IN)</option>
                   <option value="hi-IN">Hindi (hi-IN)</option>
@@ -186,7 +186,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
                 ].map((ch) => (
                   <div
                     key={ch.key}
-                    className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between"
+                    className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2.5">
                       {ch.icon}
@@ -213,7 +213,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
               </h4>
 
               <div className="space-y-2">
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between">
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-medium text-slate-200">Marketing & Promotional Offers</div>
                     <div className="text-[11px] text-slate-400">Pre-approved limits, rate reductions, and cross-sell alerts</div>
@@ -226,7 +226,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
                   />
                 </div>
 
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between">
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-medium text-slate-200">EMI & Servicing Reminders</div>
                     <div className="text-[11px] text-slate-400">Upcoming repayment reminders 3 days and 1 day prior to due date</div>
@@ -239,7 +239,7 @@ export const CustomerPreferencesView: React.FC<Props> = ({
                   />
                 </div>
 
-                <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/60 flex items-center justify-between opacity-80">
+                <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-200 dark:border-slate-800/60 flex items-center justify-between opacity-80">
                   <div>
                     <div className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
                       <Lock className="w-3.5 h-3.5 text-slate-400" />

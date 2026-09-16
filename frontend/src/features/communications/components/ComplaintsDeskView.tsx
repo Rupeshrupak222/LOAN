@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import type { GrievanceComplaint } from '../types';
@@ -107,7 +107,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
       {/* Header and Regulatory Banner */}
       <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Scale className="w-4 h-4 text-indigo-400" />
             RBI Grievance Redressal Register & Ombudsman Desk
           </h3>
@@ -136,10 +136,10 @@ export const ComplaintsDeskView: React.FC<Props> = ({
       </div>
 
       {/* Complaints Table */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-100 dark:bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">Complaint #</th>
                 <th className="py-3 px-4">Complainant Details</th>
@@ -150,7 +150,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
               {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-850/50 transition">
                   <td className="py-3 px-4">
@@ -161,12 +161,12 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   </td>
 
                   <td className="py-3 px-4">
-                    <div className="font-semibold text-slate-200">{c.customerName}</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">{c.customerName}</div>
                     <div className="text-[11px] text-slate-400 font-mono">{c.customerId}</div>
                   </td>
 
                   <td className="py-3 px-4 max-w-xs">
-                    <div className="font-medium text-slate-200">{c.complaintType}</div>
+                    <div className="font-medium text-slate-800 dark:text-slate-200">{c.complaintType}</div>
                     <span className="text-[10px] text-indigo-400 font-mono">{c.rootCauseCategory}</span>
                   </td>
 
@@ -215,10 +215,10 @@ export const ComplaintsDeskView: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={handleRegister}
-            className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Scale className="w-4 h-4 text-indigo-400" />
                 Register Formal Grievance Complaint
               </h3>
@@ -240,7 +240,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                     required
                     value={formCustId}
                     onChange={(e) => setFormCustId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                   />
                 </div>
                 <div>
@@ -250,7 +250,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                     required
                     value={formCustName}
                     onChange={(e) => setFormCustName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                   />
                 </div>
               </div>
@@ -262,7 +262,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   required
                   value={formComplaintType}
                   onChange={(e) => setFormComplaintType(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
 
@@ -271,7 +271,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                 <select
                   value={formRootCause}
                   onChange={(e) => setFormRootCause(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                 >
                   <option value="PAYMENT_GATEWAY_DOUBLE_PULL">Payment Gateway Duplicate Pull</option>
                   <option value="DISBURSEMENT_GATEWAY_TIMEOUT">Disbursement Payout Latency</option>
@@ -288,12 +288,12 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   required
                   value={formDetails}
                   onChange={(e) => setFormDetails(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsRegistering(false)}
@@ -318,10 +318,10 @@ export const ComplaintsDeskView: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={handleResolve}
-            className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Award className="w-4 h-4 text-emerald-400" />
                 Resolve Grievance: {resolvingComplaint.complaintNumber}
               </h3>
@@ -341,7 +341,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   <select
                     value={resStatus}
                     onChange={(e) => setResStatus(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                   >
                     <option value="RESOLVED_SATISFIED">RESOLVED SATISFIED</option>
                     <option value="SETTLED_WITH_CONCESSION">SETTLED WITH CONCESSION</option>
@@ -354,7 +354,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   <select
                     value={resDecision}
                     onChange={(e) => setResDecision(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                   >
                     <option value="UPHELD">UPHELD (In favor of borrower)</option>
                     <option value="PARTIALLY_UPHELD">PARTIALLY UPHELD</option>
@@ -372,7 +372,7 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   type="number"
                   value={resCompensation}
                   onChange={(e) => setResCompensation(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
 
@@ -383,12 +383,12 @@ export const ComplaintsDeskView: React.FC<Props> = ({
                   required
                   value={resDetails}
                   onChange={(e) => setResDetails(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-800 dark:text-slate-200 text-xs rounded-lg p-2"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setResolvingComplaint(null)}

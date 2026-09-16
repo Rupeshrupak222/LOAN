@@ -416,6 +416,7 @@ model LoanApplication {
   priority         String?
   assignedToUserId String?
   queueId          String?
+  submittedAt      DateTime?
 
   statusHistory  ApplicationStatusHistory[]
   eligibility    EligibilityAssessment?

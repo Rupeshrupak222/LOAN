@@ -23,10 +23,10 @@ export default function EscalationsPage() {
         subtitle="Review high-risk collection cases escalated to supervisory tiers or legal recovery desks."
       />
 
-      <Card className="border-slate-800 bg-slate-900 p-5 shadow-xl">
+      <Card className="p-5 shadow-sm dark:shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-slate-300 text-left">
-            <thead className="border-b border-slate-800 bg-slate-950/60 text-slate-400 uppercase">
+          <table className="w-full text-xs text-slate-700 dark:text-slate-300 text-left">
+            <thead className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 uppercase">
               <tr>
                 <th className="py-3 px-4">Case / Customer</th>
                 <th className="py-3 px-4">Loan No</th>
@@ -36,26 +36,26 @@ export default function EscalationsPage() {
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-400">Loading escalated accounts...</td>
                 </tr>
               ) : escalatedCases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500">No active escalated cases requiring supervisory review.</td>
+                  <td colSpan={6} className="py-8 text-center text-slate-400">No active escalated cases requiring supervisory review.</td>
                 </tr>
               ) : (
                 escalatedCases.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-800/40">
+                  <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-100">{c.customerName}</div>
-                      <div className="text-slate-400 text-[11px] font-mono">{c.caseNo}</div>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{c.customerName}</div>
+                      <div className="text-slate-500 dark:text-slate-400 text-[11px] font-mono">{c.caseNo}</div>
                     </td>
-                    <td className="py-3 px-4 font-mono">{c.loanNo}</td>
-                    <td className="py-3 px-4 font-bold text-rose-400">₹{Number(c.overdueAmount).toLocaleString()}</td>
+                    <td className="py-3 px-4 font-mono text-slate-800 dark:text-slate-200">{c.loanNo}</td>
+                    <td className="py-3 px-4 font-bold text-rose-600 dark:text-rose-400">₹{Number(c.overdueAmount).toLocaleString()}</td>
                     <td className="py-3 px-4">
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800">
                         DPD {c.dpd} ({c.agingBucket})
                       </span>
                     </td>
@@ -63,7 +63,7 @@ export default function EscalationsPage() {
                       <Badge variant="danger">{c.priority}</Badge>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link href={`/collections/${c.id}`} className="text-blue-400 hover:underline">
+                      <Link href={`/collections/${c.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">
                         Review Case
                       </Link>
                     </td>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
 import {
   ArrowLeft,
@@ -46,6 +46,7 @@ import {
   UploadedDocItem,
   calculateApplicableDocuments,
   evaluateDocumentFulfillment,
+  isDocumentMatchingRule,
   normalizeEmploymentType,
   normalizeProductType,
 } from '@/lib/documentRules';
@@ -169,6 +170,7 @@ const LOAN_PRODUCT_TYPES: { id: ProductType; label: string; desc: string }[] = [
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
 
   const isBranchManagerOnly =
@@ -259,6 +261,7 @@ export default function NewCustomerPage() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingProgress, setSavingProgress] = useState<string>('');
+  const isSubmittingRef = useRef(false);
 
   // Refs for auto-focusing on invalid fields
   const fieldRefs = {
@@ -569,6 +572,7 @@ export default function NewCustomerPage() {
 
   // Final Submit & Open Customer 360
   async function handleSaveCustomer() {
+    if (isSubmittingRef.current || saving) return;
     setGeneralError(null);
 
     // Pre-flight validation across all steps
@@ -602,6 +606,7 @@ export default function NewCustomerPage() {
       return;
     }
 
+    isSubmittingRef.current = true;
     setSaving(true);
     setSavingProgress('Creating customer profile in LMS core...');
 
@@ -669,12 +674,42 @@ export default function NewCustomerPage() {
         }).catch((err) => console.warn('Bank account registration warning:', err));
       }
 
-      // 4. Redirect to Customer 360
-      setSavingProgress('Finalizing Customer 360 dossier...');
+      // 4. Automatically create initial Loan Application for customer
+      try {
+        setSavingProgress('Creating loan origination application...');
+        const prodName =
+          LOAN_PRODUCT_TYPES.find((p) => p.id === form.intendedProductType)?.label ||
+          form.intendedProductType ||
+          'Personal Loan';
+        const reqAmount = form.monthlyIncome ? Math.max(50000, Number(form.monthlyIncome) * 5) : 100000;
+
+        await api.post('/applications', {
+          customerId: newCustomerId,
+          productName: prodName,
+          requestedAmount: reqAmount,
+          tenureMonths: 24,
+          purpose: `Loan origination intake for ${prodName}`,
+        });
+      } catch (appErr) {
+        console.warn('Auto application origination note:', appErr);
+      }
+
+      // 5. Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['operations-applications'] });
+      queryClient.invalidateQueries({ queryKey: ['loan-officer-dashboard-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['loan-officer-returned-apps'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer', newCustomerId] });
+
+      // 6. Redirect to Customer 360 Profile
+      setSavingProgress('Customer and loan application created! Opening Customer 360...');
       router.push(`/customers/${newCustomerId}`);
     } catch (err) {
       setGeneralError(apiErrorMessage(err));
       setSaving(false);
+    } finally {
+      isSubmittingRef.current = false;
     }
   }
 
@@ -1371,10 +1406,8 @@ export default function NewCustomerPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {conditional.map((rule) => {
-                  const matchingDocs = uploadedDocs.filter(
-                    (d) => d.ruleCode === rule.code || rule.acceptedDocumentTypes.includes(d.documentType)
-                  );
+                {conditional.map((rule: DocumentRuleDefinition) => {
+                  const matchingDocs = uploadedDocs.filter((d) => isDocumentMatchingRule(d, rule));
                   const isAttached = matchingDocs.length > 0;
 
                   return (
@@ -1506,7 +1539,7 @@ export default function NewCustomerPage() {
 
               {showNotApplicableDocs && (
                 <div className="p-3 pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border-t border-slate-200 dark:border-slate-800">
-                  {notApplicable.map((rule) => (
+                  {notApplicable.map((rule: DocumentRuleDefinition) => (
                     <div
                       key={rule.code}
                       className="p-2 rounded-lg bg-white dark:bg-[#1E2445] border border-slate-200 dark:border-slate-800 text-[11px]"
