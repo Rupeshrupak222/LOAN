@@ -371,6 +371,7 @@ export async function getAssessmentDetail(
           employmentDetails: true,
         },
       },
+      documents: true,
       product: true,
       eligibility: true,
       riskAssessment: true,
@@ -431,40 +432,26 @@ export async function getAssessmentDetail(
     status: foirStatus,
   };
 
-  // 2. KYC & Document Checklist
-  const docs = customer.documents || [];
-  const missingRequiredDocs: string[] = [];
-
-  const hasIdentity = docs.some((d) =>
-    ['IDENTITY_PROOF', 'PAN_CARD', 'AADHAAR'].includes(d.category) ||
-    ['PAN_CARD', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'Aadhar_CARD'].includes(d.documentType || '')
+  // 2. Dynamic KYC & Document Checklist - Merge customer & application documents
+  const docMap = new Map<string, any>();
+  for (const d of customer.documents || []) {
+    docMap.set(d.id, d);
+  }
+  for (const d of (app as any).documents || []) {
+    docMap.set(d.id, d);
+  }
+  const docs = Array.from(docMap.values());
+  const docFulfillment = validateCustomerDocumentFulfillment(
+    docs,
+    customer.employmentType || 'SALARIED',
+    product.productType || 'PERSONAL',
+    {
+      monthlyIncome,
+      requestedAmount,
+    }
   );
-  if (!hasIdentity) missingRequiredDocs.push('Identity Proof (PAN Card / Aadhaar)');
 
-  const hasPhoto = docs.some((d) =>
-    ['APPLICANT_PHOTO', 'PHOTO'].includes(d.category) ||
-    ['CUSTOMER_SELFIE_PHOTO', 'APPLICANT_PHOTO'].includes(d.documentType || '')
-  );
-  if (!hasPhoto) missingRequiredDocs.push('Applicant Photo / Selfie');
-
-  const hasAddress = docs.some((d) =>
-    ['ADDRESS_PROOF', 'UTILITY_BILL'].includes(d.category) ||
-    ['ADDRESS_PROOF', 'ELECTRICITY_BILL', 'PASSPORT', 'VOTER_ID', 'RENTAL_AGREEMENT', 'Aadhar_CARD'].includes(d.documentType || '')
-  );
-  if (!hasAddress) missingRequiredDocs.push('Address Proof (Electricity Bill / Passport / Rental Agreement)');
-
-  const hasIncome = docs.some((d) =>
-    ['INCOME_PROOF', 'FINANCIAL'].includes(d.category) ||
-    ['SALARY_SLIP', 'ITR', 'FORM_16', 'PAYSLIP'].includes(d.documentType || '')
-  );
-  if (!hasIncome) missingRequiredDocs.push('Income Proof (Salary Slip / 3 Months Pay slips / ITR)');
-
-  const hasBank = docs.some((d) =>
-    ['BANK_STATEMENT'].includes(d.category) ||
-    ['BANK_STATEMENT', 'BANK_PASSBOOK'].includes(d.documentType || '')
-  );
-  if (!hasBank) missingRequiredDocs.push('Bank Statement (Latest 6 Months)');
-
+  const missingRequiredDocs: string[] = docFulfillment.missingNames;
   const unverifiedDocs = docs.filter((d) => !d.verified && d.status !== 'VERIFIED').map((d) => d.documentType || d.fileName);
   const verifiedDocs = docs.filter((d) => d.verified || d.status === 'VERIFIED');
 
@@ -501,12 +488,13 @@ export async function getAssessmentDetail(
     customer.kycStatus === 'VERIFIED' &&
     missingRequiredDocs.length === 0 &&
     unverifiedDocs.length === 0 &&
-    docs.length >= 5 &&
     isAgeValid;
+
+  const totalMandatoryCount = docFulfillment.mandatoryCount;
 
   const kycChecklist: KycDocumentChecklist = {
     isKycComplete,
-    totalRequired: 5,
+    totalRequired: totalMandatoryCount,
     totalUploaded: docs.length,
     totalVerified: verifiedDocs.length,
     missingRequiredDocs,

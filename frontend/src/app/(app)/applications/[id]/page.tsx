@@ -436,14 +436,15 @@ export default function ApplicationDetailPage() {
   );
 
   const isForwardedToUnderwriting = ['UNDERWRITING', 'APPROVED', 'REJECTED', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(data.status);
+  const isAlreadyForwardedToCredit = ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW', 'KYC_VERIFIED'].includes(data.status);
 
   const canLoanOfficerSubmit =
     isLoanOfficer &&
-    ['DRAFT'].includes(data.status);
+    ['DRAFT', 'KYC_PENDING'].includes(data.status);
 
   const canLoanOfficerReForward =
     (isLoanOfficer || isCreditAnalystOrHigher) &&
-    ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'].includes(data.status);
+    (isReturned || data.status === 'RETURNED' || data.underwriting?.decision === 'SEND_BACK');
 
   const canAssessCredit = !isOnlyLoanOfficer && user?.roles?.some((r: string) =>
     ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
@@ -1036,6 +1037,18 @@ export default function ApplicationDetailPage() {
                 {hasDeficiencies ? <Lock className="w-3.5 h-3.5 shrink-0" /> : <RotateCcw className="w-3.5 h-3.5 shrink-0" />}
                 Resend to Credit Analyst {hasDeficiencies && '(Locked)'}
               </Button>
+            ) : isAlreadyForwardedToCredit ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  toast.info(`Application #${data.applicationNo} has already been forwarded to Credit Analyst (Current status: ${data.status.replace(/_/g, ' ')}).`);
+                }}
+                className="gap-1.5 font-semibold text-xs text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 cursor-pointer hover:bg-emerald-100 whitespace-nowrap shrink-0"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Already Forwarded</span>
+              </Button>
             ) : null
           )}
 
@@ -1288,14 +1301,14 @@ export default function ApplicationDetailPage() {
                 </div>
               )}
 
-              {canLoanOfficerReForward && (
+              {canLoanOfficerReForward ? (
                 <div className="mt-4 rounded-xl bg-blue-50/60 dark:bg-[#1E2445] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-blue-100 dark:border-blue-900/30">
                   <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Re-Forward Application Proposal?</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Re-Submit Application Proposal?</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       {hasDeficiencies
                         ? `Application was returned by Credit Analyst. Please upload missing mandatory documents (${missingMandatoryDocs.map((m) => m.title).join(', ')}) to unlock resubmission.`
-                        : 'Proposal is in Credit Appraisal workflow. All documents verified. You can re-forward it to the analyst desk.'}
+                        : 'Proposal was returned with remarks. All requirements corrected. You can resubmit it to the analyst desk.'}
                     </p>
                   </div>
                   <Button
@@ -1326,7 +1339,29 @@ export default function ApplicationDetailPage() {
                     Resend to Credit Analyst {hasDeficiencies && '(Locked)'}
                   </Button>
                 </div>
-              )}
+              ) : isAlreadyForwardedToCredit ? (
+                <div className="mt-4 rounded-xl bg-emerald-50/60 dark:bg-[#1E2445] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-emerald-100 dark:border-emerald-900/30">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Application Already Forwarded to Credit Analyst
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      This borrower proposal is currently in credit appraisal (Status: {data.status?.replace(/_/g, ' ')}). You do not need to forward it again.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      toast.info(`Application #${data.applicationNo} is already in the Credit Analyst queue.`);
+                    }}
+                    className="gap-1.5 text-emerald-700 border-emerald-200 dark:border-emerald-800 bg-emerald-100/50 dark:bg-emerald-950/40 font-semibold text-xs shrink-0"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> In Credit Appraisal
+                  </Button>
+                </div>
+              ) : null}
             </Card>
 
             <Card className="space-y-3">

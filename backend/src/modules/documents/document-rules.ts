@@ -556,26 +556,26 @@ export function calculateApplicableDocuments(
         });
       }
 
-      conditional.push({
+      mandatory.push({
         code: 'CO_APPLICANT_KYC',
         category: 'CO_APPLICANT',
         defaultDocumentType: 'CO_APPLICANT_PAN',
-        acceptedDocumentTypes: ['CO_APPLICANT_PAN', 'CO_APPLICANT_AADHAAR', 'CO_APPLICANT_KYC'],
+        acceptedDocumentTypes: ['CO_APPLICANT_PAN', 'CO_APPLICANT_AADHAAR', 'CO_APPLICANT_KYC', 'GUARANTOR_KYC', 'SPONSOR_KYC', 'CO_APPLICANT'],
         name: 'Co-Applicant / Guarantor KYC Proof',
         description: 'Primary identity and address proof of earning spouse, parent, or sponsor',
-        status: 'CONDITIONAL',
+        status: 'MANDATORY',
         conditionReason: 'Required: Earning co-applicant or parent/sponsor required for student/homemaker facility',
         allowMultiple: true,
       });
 
-      conditional.push({
+      mandatory.push({
         code: 'CO_APPLICANT_INCOME',
         category: 'CO_APPLICANT',
         defaultDocumentType: 'CO_APPLICANT_BANK_STATEMENT',
-        acceptedDocumentTypes: ['CO_APPLICANT_BANK_STATEMENT', 'CO_APPLICANT_SALARY_SLIP', 'CO_APPLICANT_ITR'],
+        acceptedDocumentTypes: ['CO_APPLICANT_BANK_STATEMENT', 'CO_APPLICANT_SALARY_SLIP', 'CO_APPLICANT_ITR', 'SPONSOR_INCOME_PROOF', 'GUARANTOR_INCOME'],
         name: 'Co-Applicant / Sponsor Income Proof',
         description: 'Salary slips, bank statements, or ITR of the earning sponsor/guarantor',
-        status: 'CONDITIONAL',
+        status: 'MANDATORY',
         conditionReason: 'Required: Income proof of the sponsoring family member',
         allowMultiple: true,
       });
@@ -920,9 +920,12 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
 
     case 'CO_APPLICANT_KYC': {
       if (
-        combinedWords.includes('CO APPLICANT') ||
-        combinedWords.includes('GUARANTOR') ||
-        combinedWords.includes('SPONSOR KYC')
+        combinedWords.includes('KYC') ||
+        combinedWords.includes('GUARANTOR KYC') ||
+        combinedWords.includes('SPONSOR KYC') ||
+        combinedWords.includes('CO APPLICANT KYC') ||
+        combinedWords.includes('CO APPLICANT GUARANTOR') ||
+        (rawCategory === 'CO_APPLICANT' && !combinedWords.includes('INCOME') && !combinedWords.includes('SALARY') && !combinedWords.includes('BANK'))
       ) {
         return true;
       }
@@ -931,9 +934,29 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
 
     case 'CO_APPLICANT_INCOME': {
       if (
-        combinedWords.includes('CO APPLICANT') ||
+        combinedWords.includes('INCOME') ||
         combinedWords.includes('SPONSOR INCOME') ||
-        combinedWords.includes('GUARANTOR INCOME')
+        combinedWords.includes('GUARANTOR INCOME') ||
+        combinedWords.includes('CO APPLICANT INCOME') ||
+        combinedWords.includes('CO APPLICANT SALARY') ||
+        combinedWords.includes('CO APPLICANT BANK') ||
+        (rawCategory === 'CO_APPLICANT' && (combinedWords.includes('INCOME') || combinedWords.includes('SALARY') || combinedWords.includes('BANK') || combinedWords.includes('ITR') || combinedWords.includes('STATEMENT')))
+      ) {
+        return true;
+      }
+      break;
+    }
+
+    case 'STUDENT_ID_PROOF': {
+      if (
+        rawCategory === 'EMPLOYMENT_PROOF' ||
+        rawCategory === 'STUDENT_PROOF' ||
+        combinedWords.includes('STUDENT') ||
+        combinedWords.includes('COLLEGE') ||
+        combinedWords.includes('UNIVERSITY') ||
+        combinedWords.includes('ADMISSION') ||
+        combinedWords.includes('ENROLLMENT') ||
+        combinedWords.includes('BONAFIDE')
       ) {
         return true;
       }
@@ -941,9 +964,11 @@ export function isDocumentMatchingRule(doc: any, rule: DocumentRuleDefinition): 
     }
   }
 
-  // 5. Direct Category Match if Category equals Rule Category
+  // 5. Direct Category Match if Category equals Rule Category (unless broad multi-rule categories)
   if (rawCategory && rawCategory === rule.category.toUpperCase()) {
-    return true;
+    if (!['CO_APPLICANT', 'INCOME_PROOF', 'EMPLOYMENT_PROOF'].includes(rawCategory)) {
+      return true;
+    }
   }
 
   return false;
@@ -976,12 +1001,29 @@ export function validateCustomerDocumentFulfillment(
   const missingCodes: string[] = [];
   const missingNames: string[] = [];
 
-  const checklistStatus = rules.mandatory.map((rule) => {
-    // Check if any uploaded document matches this rule
+  // 1. Mandatory rules
+  const checklistRules: DocumentRuleDefinition[] = [...rules.mandatory];
+
+  // 2. Include conditional / optional rules IF documents are uploaded for them
+  const otherRules = [...rules.conditional, ...rules.optional];
+  otherRules.forEach((rule) => {
+    if (!checklistRules.some((r) => r.code === rule.code)) {
+      const hasMatchingDoc = docs.some((d) => isDocumentMatchingRule(d, rule));
+      if (hasMatchingDoc) {
+        checklistRules.push(rule);
+      }
+    }
+  });
+
+  const matchedDocIds = new Set<string>();
+  const checklistStatus = checklistRules.map((rule) => {
     const matchingDocs = docs.filter((d: any) => isDocumentMatchingRule(d, rule));
+    matchingDocs.forEach((d: any) => {
+      if (d.id) matchedDocIds.add(d.id);
+    });
 
     const isSatisfied = matchingDocs.length > 0;
-    if (!isSatisfied) {
+    if (!isSatisfied && rule.status === 'MANDATORY') {
       missingCodes.push(rule.code);
       missingNames.push(rule.name);
     }
@@ -991,6 +1033,26 @@ export function validateCustomerDocumentFulfillment(
       isSatisfied,
       matchingDocs,
     };
+  });
+
+  // 3. For any uploaded document not matched by standard rules, dynamically include it
+  docs.forEach((doc: any) => {
+    if (doc.id && !matchedDocIds.has(doc.id)) {
+      matchedDocIds.add(doc.id);
+      checklistStatus.push({
+        rule: {
+          code: doc.documentType || doc.category || 'OTHER_DOCUMENT',
+          category: doc.category || 'GENERAL',
+          defaultDocumentType: doc.documentType || 'DOCUMENT',
+          acceptedDocumentTypes: [doc.documentType || 'DOCUMENT'],
+          name: doc.fileName || doc.documentType || 'Uploaded Document',
+          description: `Uploaded artifact (${doc.category || 'GENERAL'})`,
+          status: 'CONDITIONAL',
+        },
+        isSatisfied: true,
+        matchingDocs: [doc],
+      });
+    }
   });
 
   const isComplete = missingCodes.length === 0;

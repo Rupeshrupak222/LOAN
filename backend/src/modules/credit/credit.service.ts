@@ -321,9 +321,24 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
   }[] = [
     { category: 'IDENTITY', label: 'Identity Proof', description: 'PAN Card, Aadhaar Card, Passport, or Voter ID', mandatory: true },
     { category: 'ADDRESS', label: 'Address Proof', description: 'Utility Bill, Rental Agreement, or Aadhaar card', mandatory: true },
-    { category: 'INCOME', label: 'Income Proof', description: 'Latest 3 Months Payslip, Form 16, or ITR Acknowledgement', mandatory: true },
-    { category: 'BANK_STATEMENT', label: 'Bank Statement', description: 'Latest 6 Months operative bank account statement', mandatory: true },
-    { category: 'EMPLOYMENT_BUSINESS', label: 'Employment / Business Proof', description: 'Offer Letter, Company Work ID, or GST Registration Certificate', mandatory: true },
+    {
+      category: 'INCOME',
+      label: 'Income Proof',
+      description: 'Latest 3 Months Payslip, Form 16, or ITR Acknowledgement',
+      mandatory: customer.employmentType !== 'STUDENT' && customer.employmentType !== 'HOMEMAKER',
+    },
+    {
+      category: 'BANK_STATEMENT',
+      label: 'Bank Statement',
+      description: 'Latest 6 Months operative bank account statement',
+      mandatory: customer.employmentType !== 'STUDENT' && customer.employmentType !== 'HOMEMAKER',
+    },
+    {
+      category: 'EMPLOYMENT_BUSINESS',
+      label: 'Employment / Student / Business Proof',
+      description: 'Company ID, Student ID, Admission Letter, or GST Certificate',
+      mandatory: true,
+    },
     { category: 'OTHER', label: 'Other Required Documents', description: 'Signatures, Photographs, or Guarantor Documents', mandatory: false },
   ];
 

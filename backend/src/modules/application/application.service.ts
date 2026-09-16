@@ -497,18 +497,17 @@ export async function createApplication(
     });
   }
 
-  // Prevent rapid double-click duplicate creation within 5 seconds for same customer & amount
-  const existingRecentDraft = await prisma.loanApplication.findFirst({
+  // Prevent duplicate in-flight applications for the same customer profile
+  const existingInFlight = await prisma.loanApplication.findFirst({
     where: {
       customerId: input.customerId,
-      status: 'DRAFT',
-      requestedAmount: Money.toDb(input.requestedAmount),
-      createdAt: { gte: new Date(Date.now() - 5000) },
+      status: { in: ['DRAFT', 'SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW', 'UNDERWRITING'] },
     },
     include: { customer: true, product: true },
+    orderBy: { createdAt: 'desc' },
   });
-  if (existingRecentDraft) {
-    return existingRecentDraft;
+  if (existingInFlight) {
+    return existingInFlight;
   }
 
   return prisma.loanApplication.create({
@@ -570,8 +569,11 @@ export async function transition(
   });
   if (!app) throw new NotFoundError('Application not found');
 
-  // Idempotency safeguard: if application is already in the target status, return it immediately without duplicate transition
+  // Idempotency safeguard: if application is already in the target status or already in active credit appraisal
   if (app.status === toStatus) {
+    return app;
+  }
+  if (toStatus === 'SUBMITTED' && ['SUBMITTED', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW', 'UNDERWRITING'].includes(app.status)) {
     return app;
   }
 

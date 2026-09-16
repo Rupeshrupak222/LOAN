@@ -21,31 +21,31 @@ import type { CollectionCaseSummary } from './types';
 interface CollectionQueueTableProps {
   cases: CollectionCaseSummary[];
   isLoading: boolean;
-  selectedBucket: string;
-  onSelectBucket: (bucket: string) => void;
-  queueType: 'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL';
-  onSelectQueueType: (type: 'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL') => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-  onOpenActivity: (caseItem: CollectionCaseSummary) => void;
-  onOpenPtp: (caseItem: CollectionCaseSummary) => void;
-  onOpenAssign: (caseItem: CollectionCaseSummary) => void;
-  onOpenEscalate: (caseItem: CollectionCaseSummary) => void;
+  selectedBucket?: string;
+  onSelectBucket?: (bucket: string) => void;
+  queueType?: 'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL';
+  onSelectQueueType?: (type: 'MY_QUEUE' | 'TEAM_QUEUE' | 'UNASSIGNED' | 'ALL') => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  onOpenActivity?: (caseItem: CollectionCaseSummary) => void;
+  onOpenPtp?: (caseItem: CollectionCaseSummary) => void;
+  onOpenAssign?: (caseItem: CollectionCaseSummary) => void;
+  onOpenEscalate?: (caseItem: CollectionCaseSummary) => void;
 }
 
 export function CollectionQueueTable({
   cases,
   isLoading,
-  selectedBucket,
-  onSelectBucket,
-  queueType,
-  onSelectQueueType,
-  searchQuery,
-  onSearchChange,
-  onOpenActivity,
-  onOpenPtp,
-  onOpenAssign,
-  onOpenEscalate,
+  selectedBucket = '',
+  onSelectBucket = () => {},
+  queueType = 'ALL',
+  onSelectQueueType = () => {},
+  searchQuery = '',
+  onSearchChange = () => {},
+  onOpenActivity = () => {},
+  onOpenPtp = () => {},
+  onOpenAssign = () => {},
+  onOpenEscalate = () => {},
 }: CollectionQueueTableProps) {
   const buckets = [
     { label: 'All Buckets', value: '' },
