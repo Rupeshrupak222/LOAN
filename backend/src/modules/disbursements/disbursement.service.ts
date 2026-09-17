@@ -16,6 +16,7 @@ export async function getReadyForDisbursementQueue(actor?: {
 }) {
   const where: any = {
     status: 'READY_FOR_DISBURSEMENT',
+    stage: 'FINANCE_VERIFIED',
   };
 
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {

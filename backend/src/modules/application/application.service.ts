@@ -78,6 +78,19 @@ export async function listApplications(
         ];
       }
     }
+    if (
+      actor.roles?.some((r) => ['FINANCE_OFFICER', 'FINANCE_CONTROLLER', 'DISBURSEMENT_OFFICER'].includes(r)) &&
+      !actor.roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'OPERATIONS_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r))
+    ) {
+      if (!status) {
+        where.AND = [
+          ...(where.AND || []),
+          {
+            status: { in: ['READY_FOR_DISBURSEMENT', 'DISBURSED'] },
+          },
+        ];
+      }
+    }
   }
 
   const [rows, total] = await Promise.all([

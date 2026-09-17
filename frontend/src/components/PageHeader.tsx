@@ -10,8 +10,8 @@ export function PageHeader({
   action,
   breadcrumb,
 }: {
-  title: string;
-  subtitle?: string;
+  title: ReactNode | string;
+  subtitle?: ReactNode | string;
   action?: ReactNode;
   breadcrumb?: string;
 }) {

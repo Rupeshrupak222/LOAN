@@ -382,8 +382,8 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Financial controls, pre-disbursement verification, electronic fund release, repayments, and reconciliation',
     nav: [
       'dashboard',
-      'finance-queue',
       'applications',
+      'finance-queue',
       'disbursements',
       'payments',
       'reconciliation',

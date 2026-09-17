@@ -61,6 +61,9 @@ export default function TasksPage() {
   const isLoanOfficer = roles.includes('LOAN_OFFICER');
   const isCreditAnalyst = roles.includes('CREDIT_ANALYST');
   const isUnderwriter = roles.includes('UNDERWRITER');
+  const isFinanceOfficer = roles.some((r) =>
+    ['FINANCE_OFFICER', 'FINANCE_CONTROLLER', 'DISBURSEMENT_OFFICER'].includes(r)
+  );
   const isManagerOrAdmin = roles.some((r) =>
     ['BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)
   );
@@ -240,6 +243,35 @@ export default function TasksPage() {
           createdAt: a.updatedAt || a.createdAt,
           actionLabel: 'Open Workspace',
           actionHref: `/underwriting?id=${a.id}`,
+        });
+      });
+  }
+
+  // ─── 4. FINANCE OFFICER TASKS ───
+  if (isFinanceOfficer || isManagerOrAdmin) {
+    apps
+      .filter((a) => a.status === 'READY_FOR_DISBURSEMENT')
+      .forEach((a) => {
+        const isPennyDropPending = !a.customer?.bankAccounts?.[0]?.isVerified;
+        tasks.push({
+          id: `task-fin-disburse-${a.id}`,
+          applicationId: a.id,
+          applicationNo: a.applicationNo,
+          customerId: a.customerId,
+          customerName: a.customerName || (a.customer ? `${a.customer.firstName} ${a.customer.lastName}` : 'Borrower'),
+          customerMobile: a.customerMobile || a.customer?.mobile || 'N/A',
+          taskType: isPennyDropPending ? 'KYC_VERIFICATION' : 'READY_TO_SUBMIT',
+          title: isPennyDropPending
+            ? 'Verify Bank Penny Drop & Authorize Pre-Disbursement Gates'
+            : 'Authorize Dual-Control Payout & Execute Fund Release',
+          reason: isPennyDropPending
+            ? 'Sanctioned loan requires penny drop account verification before fund release.'
+            : 'Loan sanctioned and forwarded to Finance Desk. 10-point gates ready for disbursement execution.',
+          stage: 'READY_FOR_DISBURSEMENT',
+          priority: 'HIGH',
+          createdAt: a.updatedAt || a.createdAt,
+          actionLabel: 'Open Finance Desk',
+          actionHref: `/finance-queue/${a.id}`,
         });
       });
   }

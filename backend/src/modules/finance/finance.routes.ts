@@ -37,6 +37,21 @@ const financeAuthorizedRoles = [
 // --- FINANCE QUEUE & DISBURSEMENT OPERATIONS (M2P + mPokket Hybrid) ---
 
 /**
+ * GET /api/v1/finance/queue/stats
+ * Get authoritative aggregate KPIs and tab counts across all finance stages
+ */
+router.get(
+  '/queue/stats',
+  authenticate,
+  authorize(...financeAuthorizedRoles),
+  asyncHandler(async (req: Request, res: Response) => {
+    const actor = getActor(req);
+    const stats = await financeService.getQueueStats(actor);
+    return ok(res, stats);
+  })
+);
+
+/**
  * GET /api/v1/finance/queue
  * List applications in Finance & Disbursement Queue by tab
  */
@@ -68,6 +83,24 @@ router.get(
 
     const workspace = await financeService.getFinanceWorkspace(applicationId, actor);
     return ok(res, workspace);
+  })
+);
+
+/**
+ * POST /api/v1/finance/applications/:applicationId/verify-clearance
+ * Finance Officer completes verification and forwards application to Disbursement Desk
+ */
+router.post(
+  '/applications/:applicationId/verify-clearance',
+  authenticate,
+  authorize(...financeAuthorizedRoles),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { applicationId } = req.params;
+    const { remarks } = req.body || {};
+    const actor = getActor(req);
+
+    const result = await financeService.verifyApplicationClearance(applicationId, { remarks }, actor);
+    return ok(res, result);
   })
 );
 
