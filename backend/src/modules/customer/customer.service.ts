@@ -53,6 +53,20 @@ export async function listCustomers(
     ) {
       where.branchId = actor.branchId;
     }
+
+    // Only show customers to Underwriters if they have an application forwarded to underwriting
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
+    ) {
+      where.applications = {
+        some: {
+          status: {
+            in: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'],
+          },
+        },
+      };
+    }
   }
 
   if (params.search) {
@@ -163,6 +177,18 @@ export async function getCustomer(id: string, actor?: CustomerActorContext) {
       customer.branchId !== actor.branchId
     ) {
       throw new ForbiddenError('Access forbidden: Customer belongs to a different branch');
+    }
+
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
+    ) {
+      const hasValidApp = customer.applications?.some((app) =>
+        ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)
+      );
+      if (!hasValidApp) {
+        throw new ForbiddenError('Access forbidden: Underwriters can only view customers with applications forwarded to underwriting');
+      }
     }
   }
 

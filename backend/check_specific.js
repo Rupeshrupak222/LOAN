@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const docs = await prisma.document.findMany({ where: { fileName: 'ChatGPT Image Aug 25, 2026, 12_04_27 PM.png' } }); console.log(JSON.stringify(docs, null, 2)); } main();

@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const docs = await prisma.document.findMany({ select: { id: true, fileName: true, status: true, createdAt: true } }); console.log(JSON.stringify(docs, null, 2)); } main();

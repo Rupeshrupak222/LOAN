@@ -466,9 +466,12 @@ export default function NewCustomerPage() {
         if (!firstInvalidField) firstInvalidField = 'dateOfBirth';
       } else {
         const birthDate = new Date(form.dateOfBirth);
-        const ageDifMs = Date.now() - birthDate.getTime();
-        const ageDate = new Date(ageDifMs);
-        const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
         if (age < 18) {
           stepErrors.dateOfBirth = 'Borrower must be at least 18 years of age';
           if (!firstInvalidField) firstInvalidField = 'dateOfBirth';
