@@ -240,6 +240,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!pathname || !href) return false;
     if (pathname === href) return true;
     if (href === '/dashboard' || href === '/' || href === '/borrower') return false;
+    if (href === '/underwriting-queue' && pathname.startsWith('/underwriting')) return true;
     return pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}?`);
   };
 

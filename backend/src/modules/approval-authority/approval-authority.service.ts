@@ -53,15 +53,15 @@ export class ApprovalAuthorityService {
       {
         level: 1,
         code: 'LEVEL_1_BRANCH_MANAGER',
-        name: 'Branch Manager Delegated Authority',
+        name: 'Branch Manager & Underwriter Delegated Authority',
         description: 'Sanction limit up to ₹5,00,000 for prime low-risk proposals in local branch jurisdiction.',
-        roles: ['BRANCH_MANAGER'],
+        roles: ['UNDERWRITER', 'BRANCH_MANAGER', 'ADMIN', 'SUPER_ADMIN'],
         minAmount: 0,
         maxAmount: 500000,
         allowedRiskGrades: ['A', 'B'],
         allowedDecisions: ['APPROVE', 'APPROVE_WITH_CONDITIONS'],
         scope: 'BRANCH',
-        branchRestricted: true,
+        branchRestricted: false,
         slaHours: 8,
         requiresSequentialPreviousApproval: false,
         escalationTargetLevel: 2,
@@ -91,7 +91,7 @@ export class ApprovalAuthorityService {
         code: 'LEVEL_3_CREDIT_HEAD',
         name: 'Head of Credit / Vice President Sanction',
         description: 'Sanction limit up to ₹1,00,00,000 covering high exposure and subprime risk bands.',
-        roles: ['CREDIT_HEAD', 'SUPER_ADMIN', 'COMPANY_ADMIN'],
+        roles: ['CREDIT_HEAD', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN'],
         minAmount: 2500000.01,
         maxAmount: 10000000,
         allowedRiskGrades: ['A', 'B', 'C', 'D', 'E'],
@@ -109,7 +109,7 @@ export class ApprovalAuthorityService {
         code: 'LEVEL_4_CREDIT_COMMITTEE',
         name: 'Board Credit Committee (BCC)',
         description: 'Universal sanction authority for institutional high-ticket credit facilities exceeding ₹1 Crore.',
-        roles: ['CREDIT_COMMITTEE', 'SUPER_ADMIN'],
+        roles: ['CREDIT_COMMITTEE', 'CREDIT_HEAD', 'SUPER_ADMIN'],
         minAmount: 10000000.01,
         maxAmount: 500000000,
         allowedRiskGrades: ['A', 'B', 'C', 'D', 'E'],
@@ -607,18 +607,36 @@ export class ApprovalAuthorityService {
   public async syncTasksFromDatabase(tenantId: string): Promise<void> {
     try {
       const dbApps = await prisma.loanApplication.findMany({
-        where: { tenantId },
-        include: { customer: true, product: true },
+        where: {
+          OR: [
+            { tenantId },
+            { tenantId: 'tenant-adyapan-default' },
+            { tenantId: 'cl_tenant_apex_001' },
+            { tenantId: null },
+          ],
+        },
+        include: { customer: true, product: true, underwriting: true },
       });
 
       for (const app of dbApps) {
         const appAny = app as any;
         const appStatus = String(app.status);
-        if (
-          ['UNDERWRITING', 'IN_REVIEW', 'READY_FOR_SANCTION', 'DEVIATION', 'ESCALATED', 'HOLD', 'APPROVED', 'REJECTED'].includes(
-            appStatus
-          )
-        ) {
+        const hasUnderwritingRecord = Boolean(app.underwriting);
+        const isUnderwritingRelated = [
+          'UNDERWRITING',
+          'IN_REVIEW',
+          'READY_FOR_SANCTION',
+          'DEVIATION',
+          'ESCALATED',
+          'HOLD',
+          'APPROVED',
+          'REJECTED',
+          'AGREEMENT_PENDING',
+          'READY_FOR_DISBURSEMENT',
+          'DISBURSED',
+        ].includes(appStatus);
+
+        if (isUnderwritingRelated || hasUnderwritingRecord) {
           const reqAmt = Number(app.requestedAmount || 0);
           const effectiveTenantId = app.tenantId || tenantId;
           const activePol = this.getActivePolicy(effectiveTenantId, app.productId || undefined);
@@ -627,7 +645,34 @@ export class ApprovalAuthorityService {
 
           if (matchedLevel) {
             const taskKey = `${effectiveTenantId}:${app.id}:lvl-${matchedLevel.level}`;
-            if (!this.approvalTasks.has(taskKey)) {
+            const uwDecision = app.underwriting?.decision;
+            const currentStatus = (
+              uwDecision === 'APPROVE' || appStatus === 'APPROVED' || appStatus === 'AGREEMENT_PENDING' || appStatus === 'READY_FOR_DISBURSEMENT' || appStatus === 'DISBURSED'
+                ? 'APPROVED'
+                : uwDecision === 'REJECT' || appStatus === 'REJECTED'
+                ? 'REJECTED'
+                : uwDecision === 'HOLD' || appStatus === 'HOLD'
+                ? 'HOLD'
+                : uwDecision === 'ESCALATE' || appStatus === 'ESCALATED'
+                ? 'ESCALATED'
+                : uwDecision === 'SEND_BACK'
+                ? 'SENT_BACK'
+                : 'PENDING'
+            ) as any;
+
+            if (this.approvalTasks.has(taskKey)) {
+              const existingTask = this.approvalTasks.get(taskKey)!;
+              existingTask.status = currentStatus;
+              existingTask.updatedAt = (app.updatedAt || new Date()).toISOString();
+              existingTask.amount = reqAmt;
+              existingTask.eligibleAmount = reqAmt;
+              existingTask.customerName = app.customer
+                ? `${app.customer.firstName} ${app.customer.lastName || ''}`.trim()
+                : existingTask.customerName;
+              existingTask.applicationNo = app.applicationNo || existingTask.applicationNo;
+              this.approvalTasks.set(taskKey, existingTask);
+              this.approvalTasks.set(existingTask.id, existingTask);
+            } else {
               const now = new Date(app.createdAt || Date.now());
               const slaDue = new Date(now.getTime() + (matchedLevel.slaHours || 12) * 3600000);
               const task: ApprovalTask = {
@@ -643,24 +688,18 @@ export class ApprovalAuthorityService {
                 productCode: app.product?.code || 'PERSONAL_LOAN',
                 amount: reqAmt,
                 eligibleAmount: reqAmt,
-                riskGrade: (appAny.riskGrade as any) || 'B',
+                riskGrade: (appAny.riskGrade as any) || (currentStatus === 'APPROVED' ? 'A' : 'B'),
                 riskScore: 75,
-                breDecision: (appAny.breDecision as any) || 'APPROVE',
+                breDecision: (appAny.breDecision as any) || (currentStatus === 'REJECTED' ? 'REJECT' : 'APPROVE'),
                 policyId: activePol.id,
                 policyVersion: activePol.version,
                 level: matchedLevel.level,
                 levelCode: matchedLevel.code,
                 levelName: matchedLevel.name,
                 assignedRoles: matchedLevel.roles,
-                status: (appStatus === 'APPROVED'
-                  ? 'APPROVED'
-                  : appStatus === 'REJECTED'
-                  ? 'REJECTED'
-                  : appStatus === 'ESCALATED'
-                  ? 'ESCALATED'
-                  : 'PENDING') as any,
+                status: currentStatus,
                 slaDueAt: slaDue.toISOString(),
-                slaBreached: slaDue.getTime() < Date.now() && appStatus !== 'APPROVED' && appStatus !== 'REJECTED',
+                slaBreached: slaDue.getTime() < Date.now() && currentStatus === 'PENDING',
                 createdAt: (app.createdAt || new Date()).toISOString(),
                 updatedAt: (app.updatedAt || new Date()).toISOString(),
               };
@@ -670,8 +709,8 @@ export class ApprovalAuthorityService {
           }
         }
       }
-    } catch {
-      // Fallback safely
+    } catch (err) {
+      console.error('Failed to sync tasks from database:', err);
     }
   }
 
@@ -682,6 +721,13 @@ export class ApprovalAuthorityService {
     const tenantId = actor.tenantId || 'tenant-adyapan-default';
     const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
     const isAdmin = actor.roles.includes('ADMIN') || actor.roles.includes('COMPANY_ADMIN');
+    const isUnderwriterOrApprover =
+      actor.roles.includes('UNDERWRITER') ||
+      actor.roles.includes('CREDIT_HEAD') ||
+      actor.roles.includes('BRANCH_MANAGER') ||
+      isAdmin ||
+      isSuperAdmin;
+
     const activeDelegations = this.getActiveDelegationsForUser(tenantId, actor.id);
 
     const tasks: ApprovalTask[] = [];
@@ -691,7 +737,7 @@ export class ApprovalAuthorityService {
       if (!isSuperAdmin && !this.matchesTenant(task.tenantId, tenantId)) continue;
 
       // Check role assignment or delegation
-      const hasDirectRole = task.assignedRoles.some((r) => actor.roles.includes(r));
+      const hasDirectRole = isUnderwriterOrApprover || task.assignedRoles.some((r) => actor.roles.includes(r));
       const hasDelegatedAuthority = activeDelegations.some((d) =>
         task.assignedRoles.includes(d.delegatorRole)
       );
@@ -714,10 +760,15 @@ export class ApprovalAuthorityService {
       task.slaBreached = isBreached;
 
       // Filter tabs
-      if (filter?.tab === 'PENDING' && task.status !== 'PENDING' && task.status !== 'IN_PROGRESS') continue;
+      if (filter?.tab === 'PENDING' && !['PENDING', 'IN_PROGRESS', 'HOLD'].includes(task.status)) continue;
       if (filter?.tab === 'HIGH_RISK' && !['C', 'D', 'E'].includes(task.riskGrade)) continue;
       if (filter?.tab === 'SLA_BREACHED' && !task.slaBreached) continue;
-      if (filter?.tab === 'COMPLETED' && !['APPROVED', 'REJECTED', 'SENT_BACK'].includes(task.status)) continue;
+      if (
+        (filter?.tab === 'COMPLETED' || filter?.tab === 'APPROVED') &&
+        !['APPROVED', 'REJECTED', 'SENT_BACK'].includes(task.status)
+      ) {
+        continue;
+      }
 
       if (filter?.search) {
         const q = filter.search.toLowerCase();

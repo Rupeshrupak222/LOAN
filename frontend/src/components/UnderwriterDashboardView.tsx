@@ -19,6 +19,9 @@ import {
   FileText,
   AlertCircle,
   Play,
+  XCircle,
+  Coins,
+  TrendingUp,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -71,35 +74,34 @@ export function UnderwriterDashboardView() {
     },
   });
 
-  // 6 Authoritative KPI Computations from live DB/workflow records
+  // 6 Authoritative Underwriter-Specific KPI Computations from live DB records
   const pendingReviewCount = cases.filter(
-    (c) => c.status === 'UNDERWRITING' || c.status === 'UNDER_REVIEW' || c.stage === 'UNDERWRITING_REVIEW'
+    (c) => c.status === 'UNDERWRITING' && (!c.underwriting?.decision || c.stage === 'IN_REVIEW' || c.stage === 'READY')
   ).length;
 
-  const decisionReadyCount = cases.filter(
-    (c) =>
-      (c.gates?.canApprove || c.stage === 'DECISION_READY' || c.status === 'UNDERWRITING') &&
-      (!c.deviations || c.deviations.length === 0 || c.deviations.every((d: any) => d.status === 'RESOLVED' || d.status === 'WAIVED'))
-  ).length;
-
-  const slaDueTodayCount = cases.filter((c) => {
-    if (!c.slaDeadline) return false;
-    const due = new Date(c.slaDeadline).getTime();
-    const todayEnd = new Date().setHours(23, 59, 59, 999);
-    return due <= todayEnd;
-  }).length;
-
-  const escalatedCount = cases.filter(
-    (c) => c.status === 'ESCALATED' || c.stage === 'ESCALATED' || Number(c.requestedAmount || 0) > 2500000
+  const sanctionedCount = cases.filter(
+    (c) => c.status === 'APPROVED' || c.underwriting?.decision === 'APPROVE' || c.underwriting?.decision === 'APPROVE_WITH_CONDITIONS'
   ).length;
 
   const onHoldCount = cases.filter(
-    (c) => c.status === 'HOLD' || c.stage === 'HOLD' || c.stage === 'AWAITING_INFORMATION'
+    (c) => c.status === 'HOLD' || c.stage === 'HOLD' || c.stage === 'AWAITING_INFORMATION' || c.underwriting?.decision === 'HOLD'
+  ).length;
+
+  const escalatedCount = cases.filter(
+    (c) => c.status === 'ESCALATED' || c.stage === 'ESCALATED' || c.underwriting?.decision === 'ESCALATE' || Number(c.requestedAmount || 0) > 2500000
   ).length;
 
   const sentBackCount = cases.filter(
     (c) => c.status === 'SENT_BACK' || c.stage === 'SENT_BACK' || c.underwriting?.decision === 'SEND_BACK'
   ).length;
+
+  const rejectedCount = cases.filter(
+    (c) => c.status === 'REJECTED' || c.underwriting?.decision === 'REJECT'
+  ).length;
+
+  const totalSanctionedExposure = cases
+    .filter((c) => c.status === 'APPROVED' || c.underwriting?.decision === 'APPROVE' || c.underwriting?.decision === 'APPROVE_WITH_CONDITIONS')
+    .reduce((sum, c) => sum + Number(c.eligibleAmount || c.requestedAmount || 0), 0);
 
   // Filtered Priority Cases
   const priorityCases = cases.filter((c) => {
@@ -148,42 +150,61 @@ export function UnderwriterDashboardView() {
         </div>
       </div>
 
-      {/* 2. Exactly 6 Canonical Underwriting KPI Cards (Live Database Driven) */}
+      {/* 2. Underwriting Authority & Summary Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className={cn('p-3.5 rounded-xl border flex items-center gap-3', cardBgClass)}>
+          <div className="w-9 h-9 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Delegated Limit</span>
+            <div className="text-sm font-black text-slate-900 dark:text-white">Level 2 (Up to ₹25,00,000)</div>
+          </div>
+        </div>
+
+        <div className={cn('p-3.5 rounded-xl border flex items-center gap-3', cardBgClass)}>
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            <Coins className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Sanctioned Portfolio</span>
+            <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+              ₹{totalSanctionedExposure.toLocaleString('en-IN')}
+            </div>
+          </div>
+        </div>
+
+        <div className={cn('p-3.5 rounded-xl border flex items-center gap-3', cardBgClass)}>
+          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Active Pipeline</span>
+            <div className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+              {cases.length} Applications
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Exactly 6 Canonical Underwriting Decision & Pipeline KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">Pending Review</span>
             <Clock className="w-4 h-4 text-blue-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white">{pendingReviewCount}</div>
+          <div className="text-2xl font-black text-blue-600 dark:text-blue-400">{pendingReviewCount}</div>
           <p className="text-[10px] text-slate-400 mt-1">Awaiting credit appraisal</p>
         </div>
 
         <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Decision Ready</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">Sanctioned</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{decisionReadyCount}</div>
-          <p className="text-[10px] text-slate-400 mt-1">All policies & gates pass</p>
-        </div>
-
-        <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">SLA Due Today</span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{slaDueTodayCount}</div>
-          <p className="text-[10px] text-slate-400 mt-1">Priority resolution required</p>
-        </div>
-
-        <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Escalated</span>
-            <Scale className="w-4 h-4 text-purple-500" />
-          </div>
-          <div className="text-2xl font-black text-purple-600 dark:text-purple-400">{escalatedCount}</div>
-          <p className="text-[10px] text-slate-400 mt-1">Referred to higher committee</p>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{sanctionedCount}</div>
+          <p className="text-[10px] text-slate-400 mt-1">Routed to Approval Queue</p>
         </div>
 
         <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
@@ -192,16 +213,34 @@ export function UnderwriterDashboardView() {
             <AlertCircle className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{onHoldCount}</div>
-          <p className="text-[10px] text-slate-400 mt-1">Info requested from applicant</p>
+          <p className="text-[10px] text-slate-400 mt-1">Info requested from borrower</p>
+        </div>
+
+        <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Escalated</span>
+            <Scale className="w-4 h-4 text-purple-500" />
+          </div>
+          <div className="text-2xl font-black text-purple-600 dark:text-purple-400">{escalatedCount}</div>
+          <p className="text-[10px] text-slate-400 mt-1">Referred to Level 3 / Head</p>
         </div>
 
         <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">Sent Back</span>
-            <History className="w-4 h-4 text-rose-500" />
+            <History className="w-4 h-4 text-orange-500" />
           </div>
-          <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{sentBackCount}</div>
+          <div className="text-2xl font-black text-orange-600 dark:text-orange-400">{sentBackCount}</div>
           <p className="text-[10px] text-slate-400 mt-1">Returned to Analyst / LO</p>
+        </div>
+
+        <div className={cn('rounded-2xl border p-4 transition-all', cardBgClass)}>
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Rejected</span>
+            <XCircle className="w-4 h-4 text-rose-500" />
+          </div>
+          <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{rejectedCount}</div>
+          <p className="text-[10px] text-slate-400 mt-1">Adverse action decided</p>
         </div>
       </div>
 

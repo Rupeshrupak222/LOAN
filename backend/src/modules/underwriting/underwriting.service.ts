@@ -4,6 +4,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/err
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
+import { approvalAuthorityService } from '../approval-authority/approval-authority.service';
 import type { UnderwritingDecisionInput, ResolveDeviationInput } from './underwriting.schema';
 
 export interface UnderwriterActorContext {
@@ -126,7 +127,7 @@ export async function getUnderwritingQueue(
   actor?: { id?: string; roles?: string[]; tenantId?: string; branchId?: string }
 ) {
   let where: any = {};
-  const normalizedTab = (tab || 'READY').toUpperCase();
+  const normalizedTab = (tab || 'ALL').toUpperCase();
 
   if (normalizedTab === 'READY' || normalizedTab === 'DECISION_REQUIRED') {
     // Only proposals explicitly forwarded by Credit Analyst into UNDERWRITING and awaiting underwriter sanction
@@ -140,24 +141,20 @@ export async function getUnderwritingQueue(
   } else if (normalizedTab === 'IN_REVIEW') {
     where = {
       status: 'UNDERWRITING',
+      stage: { contains: 'IN_REVIEW' },
     };
   } else if (normalizedTab === 'SENT_BACK') {
     where = {
-      OR: [
-        { underwriting: { decision: 'SEND_BACK' } },
-        {
-          statusHistory: {
-            some: {
-              reason: { contains: 'SEND_BACK' },
-            },
-          },
-        },
-      ],
+      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+      underwriting: { decision: 'SEND_BACK' },
     };
   } else if (normalizedTab === 'HOLD' || normalizedTab === 'AWAITING_INFO') {
     where = {
-      status: 'UNDERWRITING',
-      underwriting: { decision: 'HOLD' },
+      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+      OR: [
+        { underwriting: { decision: 'HOLD' } },
+        { stage: 'AWAITING_INFORMATION' },
+      ],
     };
   } else if (normalizedTab === 'APPROVED') {
     where = {
@@ -171,21 +168,33 @@ export async function getUnderwritingQueue(
     };
   } else if (normalizedTab === 'ESCALATED') {
     where = {
-      status: 'UNDERWRITING',
-      approvals: {
-        some: {
-          status: { in: ['ESCALATED', 'PENDING'] },
-          level: { gte: 3 },
+      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+      OR: [
+        { stage: 'ESCALATED_TO_CREDIT_HEAD' },
+        { underwriting: { decision: 'ESCALATE' } },
+        {
+          approvals: {
+            some: {
+              status: { in: ['ESCALATED', 'PENDING'] },
+              level: { gte: 3 },
+            },
+          },
         },
-      },
+      ],
     };
   } else {
-    // ALL proposals that have entered underwriting lifecycle (NEVER draft, submitted, or active credit assessment)
+    // ALL proposals that have officially been forwarded to Underwriting by Credit Analyst
     where = {
-      OR: [
-        { status: { in: ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] } },
-        { underwriting: { isNot: null } },
-      ],
+      status: {
+        in: [
+          'UNDERWRITING',
+          'APPROVED',
+          'REJECTED',
+          'AGREEMENT_PENDING',
+          'READY_FOR_DISBURSEMENT',
+          'DISBURSED',
+        ],
+      },
     };
   }
 
@@ -441,6 +450,31 @@ export async function getUnderwritingWorkspace(
     pricingTier: (app.riskAssessment as any)?.grade ? `PRIME_GRADE_${(app.riskAssessment as any).grade}` : 'STANDARD_TIER',
   };
 
+  // Pull real audit logs from database
+  const auditLogs = await prisma.auditLog.findMany({
+    where: {
+      OR: [
+        { entityId: applicationId },
+        { entityId: app.customerId },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  const customerMonthlyIncome = Number(app.customer?.monthlyIncome || 0);
+  const existingObligations = Number(
+    app.customer?.existingObligations ||
+    (app.customer?.employmentDetails as any)?.[0]?.monthlyObligations ||
+    (app.eligibility?.factors as any)?.existingObligations ||
+    0
+  );
+  const totalMonthlyOutflow = existingObligations + emi;
+  const foirPct = customerMonthlyIncome > 0 ? Math.round((totalMonthlyOutflow / customerMonthlyIncome) * 100) : 0;
+  const disposableIncome = Math.max(0, customerMonthlyIncome - totalMonthlyOutflow);
+  const bureauScore = (app.eligibility?.factors as any)?.bureauScore || (app.customer as any)?.creditScore || 720;
+  const activeLines = Number((app.eligibility?.factors as any)?.activeCreditLines ?? (bureauScore >= 700 ? 2 : 1));
+
   return {
     application: {
       id: app.id,
@@ -458,47 +492,48 @@ export async function getUnderwritingWorkspace(
       approvals: app.approvals,
     },
     customer: app.customer,
+    documents: [...(app.customer?.documents || [])],
     product: app.product,
     creditAssessment: {
       eligibility: app.eligibility,
       recommendation: (app.eligibility?.factors as any)?.recommendation || {
-        recommendation: 'APPROVE',
-        remarks: 'Borrower meets eligibility & repayment criteria. Recommended for sanction.',
+        recommendation: isForwardedToUnderwriting ? 'APPROVE' : 'UNDER_REVIEW',
+        remarks: (app.eligibility?.factors as any)?.remarks || 'Borrower meets debt-servicing criteria and is eligible for underwriting review.',
         assessedAt: app.updatedAt,
         assessedBy: 'Credit Analyst',
       },
       foirDti: {
-        foirPct: Math.round(((emi) / Math.max(1, Number(app.customer?.monthlyIncome || 50000))) * 100),
-        disposableIncome: Math.max(0, Number(app.customer?.monthlyIncome || 50000) - emi),
-        monthlyIncome: Number(app.customer?.monthlyIncome || 50000),
-        existingObligations: 0,
+        foirPct,
+        disposableIncome,
+        monthlyIncome: customerMonthlyIncome,
+        existingObligations,
       },
       bureau: {
-        score: (app.eligibility?.factors as any)?.bureauScore || 745,
-        summary: 'No SMA/DPD defaults recorded. Clean repayment track record over 36 months.',
-        activeLines: 2,
-        totalOutstanding: 45000,
+        score: bureauScore,
+        summary: bureauScore >= 700 ? 'Clean bureau repayment track record without defaults.' : 'Fair bureau score profile.',
+        activeLines,
+        totalOutstanding: existingObligations * 12,
       },
     },
     riskAndFraud: {
       riskAssessment: app.riskAssessment || {
-        score: 28,
-        grade: 'A',
-        riskCategory: 'LOW',
-        signals: { identityConfidence: 98, deviceReputation: 'CLEAN', incomeStability: 'STABLE' },
+        score: (app.eligibility?.factors as any)?.riskScore || (bureauScore >= 750 ? 18 : bureauScore >= 700 ? 25 : 45),
+        grade: (app.eligibility?.factors as any)?.riskGrade || (app.customer?.riskCategory === 'HIGH' ? 'C' : app.customer?.riskCategory === 'MEDIUM' ? 'B' : 'A'),
+        riskCategory: app.customer?.riskCategory || (bureauScore >= 700 ? 'LOW' : 'MEDIUM'),
+        signals: { identityConfidence: app.customer?.kycStatus === 'VERIFIED' ? 100 : 85, deviceReputation: 'CLEAN', incomeStability: 'STABLE' },
       },
       fraudSignals: {
-        overallRisk: 'LOW',
+        overallRisk: app.customer?.riskCategory === 'HIGH' ? 'HIGH' : 'LOW',
         isIdentitySynthesized: false,
         deviceFingerprintMatch: true,
         geoMismatch: false,
         pepCheck: 'CLEAR',
-        amlScreening: 'CLEAR',
+        amlScreening: app.customer?.kycStatus === 'VERIFIED' ? 'CLEAR' : 'PENDING',
       },
       breOutcome: {
-        verdict: 'ELIGIBLE_FOR_UNDERWRITING',
+        verdict: (app as any).breDecision || 'ELIGIBLE_FOR_UNDERWRITING',
         executedRulesCount: 14,
-        passedRulesCount: 14,
+        passedRulesCount: deviations.length === 0 ? 14 : Math.max(1, 14 - deviations.length),
         executionTimestamp: app.updatedAt,
       },
     },
@@ -507,6 +542,7 @@ export async function getUnderwritingWorkspace(
     underwritingDecision: app.underwriting,
     authorityCheck,
     gates,
+    auditLogs,
   };
 }
 
@@ -617,10 +653,19 @@ export async function submitUnderwritingDecision(
   }
 
   // Validate allowed application status for underwriting decision
-  const ALLOWED_UNDERWRITING_STATES = ['UNDERWRITING', 'CREDIT_ASSESSMENT', 'UNDER_REVIEW'];
+  const ALLOWED_UNDERWRITING_STATES = [
+    'UNDERWRITING',
+    'CREDIT_ASSESSMENT',
+    'UNDER_REVIEW',
+    'APPROVED',
+    'REJECTED',
+    'READY_FOR_SANCTION',
+    'HOLD',
+    'SUBMITTED',
+  ];
   if (!ALLOWED_UNDERWRITING_STATES.includes(app.status)) {
     throw new BadRequestError(
-      `Cannot commit underwriting decision for application in '${app.status}' status. Application must be in underwriting or under review.`
+      `Cannot commit underwriting decision for application in '${app.status}' status. Application cannot be modified once disbursed or cancelled.`
     );
   }
 
@@ -773,6 +818,13 @@ export async function submitUnderwritingDecision(
     ).catch(() => {});
   }
 
+  // Synchronize case with Approval Authority Queue immediately so it is present in /approval-queue
+  try {
+    await approvalAuthorityService.syncTasksFromDatabase(app.tenantId || 'tenant-adyapan-default');
+  } catch (syncErr) {
+    console.error('Failed to sync task with approvalAuthorityService:', syncErr);
+  }
+
   return result;
 }
 
@@ -862,15 +914,7 @@ export async function forwardToFinanceOfficer(
     throw new BadRequestError('Cannot forward to Finance: Application must have an approved underwriting decision.');
   }
 
-  if (app.status === 'READY_FOR_DISBURSEMENT' || app.status === 'DISBURSED') {
-    return {
-      success: true,
-      applicationId: app.id,
-      status: app.status,
-      message: 'Application has already been forwarded to Finance Officer.',
-    };
-  }
-
+  const isAlreadyForwarded = app.status === 'READY_FOR_DISBURSEMENT';
   const nextStatus = 'READY_FOR_DISBURSEMENT';
 
   await prisma.$transaction(async (tx) => {
@@ -878,6 +922,7 @@ export async function forwardToFinanceOfficer(
       where: { id: applicationId },
       data: {
         status: nextStatus,
+        stage: 'READY_FOR_DISBURSEMENT',
         updatedAt: new Date(),
       },
     });
@@ -888,7 +933,9 @@ export async function forwardToFinanceOfficer(
         fromStatus: app.status,
         toStatus: nextStatus,
         changedBy: actor.email,
-        reason: 'Underwriter approved sanction and forwarded to Finance Officer for disbursement execution',
+        reason: isAlreadyForwarded
+          ? 'Underwriter re-forwarded approved proposal to Finance Officer for expedited disbursement'
+          : 'Underwriter approved sanction and forwarded to Finance Officer for disbursement execution',
       },
     });
   });
@@ -897,19 +944,28 @@ export async function forwardToFinanceOfficer(
     tenantId: app.tenantId || undefined,
     userId: actor.id,
     role: actor.roles[0],
-    action: 'FORWARDED_TO_FINANCE',
+    action: isAlreadyForwarded ? 'REFORWARDED_TO_FINANCE' : 'FORWARDED_TO_FINANCE',
     entity: 'LoanApplication',
     entityId: applicationId,
     previousValue: { status: app.status },
-    newValue: { status: nextStatus, forwardedBy: actor.email },
+    newValue: { status: nextStatus, forwardedBy: actor.email, isReforward: isAlreadyForwarded },
   });
+
+  try {
+    await approvalAuthorityService.syncTasksFromDatabase(app.tenantId || 'tenant-adyapan-default');
+  } catch {
+    // Non-blocking
+  }
 
   return {
     success: true,
     applicationId: app.id,
     applicationNo: app.applicationNo,
     status: nextStatus,
-    message: 'Proposal successfully forwarded to Finance Officer queue for disbursement release.',
+    isReforward: isAlreadyForwarded,
+    message: isAlreadyForwarded
+      ? 'Proposal successfully re-forwarded to Finance Officer queue for expedited payout.'
+      : 'Proposal successfully forwarded to Finance Officer queue for disbursement release.',
   };
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -46,6 +46,7 @@ import {
   CheckSquare,
   History,
   FileSpreadsheet,
+  Pencil,
 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -83,6 +84,10 @@ function UnderwritingWorkspaceContent() {
   // Active Selected Application ID
   const [selectedAppId, setSelectedAppId] = useState<string | null>(urlAppId);
 
+  useEffect(() => {
+    if (urlAppId) setSelectedAppId(urlAppId);
+  }, [urlAppId]);
+
   // Active section tab in the workspace
   const [activeSection, setActiveSection] = useState<string>('ALL');
 
@@ -96,12 +101,12 @@ function UnderwritingWorkspaceContent() {
   // Timeline Modal State
   const [showTimelineModal, setShowTimelineModal] = useState(false);
 
-  // 1. Fetch Inbound Queue for Case Selection
+  // 1. Fetch Inbound Queue for Case Selection (ALL lifecycle cases including decided/approved/rejected)
   const { data: queueData, isLoading: queueLoading } = useQuery({
-    queryKey: ['underwriting-queue', 'READY', selectorSearch],
+    queryKey: ['underwriting-queue', 'ALL', selectorSearch],
     queryFn: async () => {
       const res = await api.get('/underwriting/queue', {
-        params: { tab: 'READY', search: selectorSearch.trim() || undefined },
+        params: { tab: 'ALL', search: selectorSearch.trim() || undefined },
       });
       const raw = res.data?.data;
       return (Array.isArray(raw) ? raw : raw?.items || []) as any[];
@@ -182,6 +187,8 @@ function UnderwritingWorkspaceContent() {
   const [sendBackTarget, setSendBackTarget] = useState<'CREDIT_ANALYST' | 'LOAN_OFFICER'>('CREDIT_ANALYST');
   const [holdInfoRequired, setHoldInfoRequired] = useState('');
 
+  const [isRevisingDecision, setIsRevisingDecision] = useState(false);
+
   // Resolve Deviation Mutation
   const resolveDeviationMutation = useMutation({
     mutationFn: async ({ devId, status, reason }: { devId: string; status: any; reason: string }) => {
@@ -231,14 +238,17 @@ function UnderwritingWorkspaceContent() {
       });
     },
     onSuccess: () => {
-      toast.success(`Underwriting decision '${decision}' committed successfully.`);
+      toast.success(`Underwriting decision '${decision}' committed successfully. Case routed to Approval Queue.`);
       refetchWorkspace();
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['approval-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-underwriting-cases'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['disbursements-queue'] });
       setDecisionReason('');
       setConditionText('');
       setHoldInfoRequired('');
+      setIsRevisingDecision(false);
     },
     onError: (err: any) => {
       toast.error(apiErrorMessage(err), { title: 'Underwriting Gate Enforcement' });
@@ -542,6 +552,7 @@ function UnderwritingWorkspaceContent() {
       </div>
 
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
       {/* STEP 1 — BORROWER (VIEW ONLY)                                             */}
       {/* ========================================================================= */}
       <Card id="sec-borrower" className="p-5 space-y-4">
@@ -553,7 +564,7 @@ function UnderwritingWorkspaceContent() {
             </h3>
           </div>
           <span className="text-xs text-slate-400">
-            Customer Code: <strong className="text-slate-700 dark:text-slate-200">{cust.customerCode || 'N/A'}</strong>
+            Customer Code: <strong className="text-slate-700 dark:text-slate-200">{cust.customerCode || cust.id?.slice(0, 8) || 'N/A'}</strong>
           </span>
         </div>
 
@@ -562,13 +573,13 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">Personal Information</span>
             <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-              {cust.firstName} {cust.lastName}
+              {cust.firstName || ''} {cust.lastName || ''}
             </div>
             <div className="text-slate-500">
               Gender: {cust.gender || 'Not specified'} · DOB: {cust.dateOfBirth ? formatDate(cust.dateOfBirth) : 'N/A'}
             </div>
             <div className="text-slate-500">
-              PAN: {cust.panNumber ? `••••${cust.panNumber.slice(-4)}` : 'Verified'}
+              PAN: {cust.panNumber ? `••••${cust.panNumber.slice(-4)}` : cust.panVerified ? 'Verified' : 'Not provided'}
             </div>
           </div>
 
@@ -576,11 +587,13 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">Employment & Income</span>
             <div className="font-bold text-slate-800 dark:text-slate-100">
-              {cust.employmentType || 'Salaried'}
+              {cust.employmentType || cust.employmentDetails?.[0]?.employmentType || 'Not specified'}
             </div>
-            <div className="text-slate-500">Employer: {cust.employerName || 'Private Enterprise'}</div>
+            <div className="text-slate-500">
+              Employer: {cust.employerName || cust.employmentDetails?.[0]?.employerName || (cust.employmentType === 'SELF_EMPLOYED' || cust.employmentType === 'FREELANCER' ? 'Self / Freelance' : 'N/A')}
+            </div>
             <div className="font-semibold text-emerald-600 dark:text-emerald-400">
-              Income: ₹{Number(cust.monthlyIncome || 0).toLocaleString('en-IN')}/month
+              Income: {cust.monthlyIncome ? `₹${Number(cust.monthlyIncome).toLocaleString('en-IN')}/month` : 'Not specified'}
             </div>
           </div>
 
@@ -594,7 +607,12 @@ function UnderwritingWorkspaceContent() {
               <Mail className="w-3 h-3 text-slate-400" /> {cust.email || 'No Email'}
             </div>
             <div className="text-slate-500 truncate flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-slate-400" /> {cust.city || 'City'}, {cust.state || 'State'} {cust.pincode}
+              <MapPin className="w-3 h-3 text-slate-400" />{' '}
+              {cust.addresses?.[0]?.addressLine
+                ? `${cust.addresses[0].addressLine}, ${cust.addresses[0].city || ''}, ${cust.addresses[0].state || ''} ${cust.addresses[0].pincode || ''}`.trim()
+                : cust.city || cust.state || cust.pincode
+                ? `${cust.city || ''}, ${cust.state || ''} ${cust.pincode || ''}`.trim()
+                : 'Address not provided'}
             </div>
           </div>
 
@@ -602,11 +620,12 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">Bank Account & Origination</span>
             <div className="font-semibold text-slate-800 dark:text-slate-100">
-              Bank: {cust.bankName || 'Verified Bank'} (IFSC: {cust.ifscCode || 'HDFC0001234'})
+              Bank: {cust.bankAccounts?.[0]?.bankName || cust.bankName || 'Not linked'}{' '}
+              (IFSC: {cust.bankAccounts?.[0]?.ifscCode || cust.bankIfsc || cust.ifscCode || 'N/A'})
             </div>
-            <div className="text-slate-500">Purpose: {app.purpose || 'Personal / General Use'}</div>
+            <div className="text-slate-500">Purpose: {app.purpose || 'General Financing'}</div>
             <div className="text-slate-500">
-              Source: {app.channel || 'Direct Web'} · Branch: {app.branch?.name || 'Main Branch'}
+              Source: {app.channel || 'Direct Web'} · Branch: {app.branch?.name || cust.branch?.name || 'Main Branch'}
             </div>
           </div>
         </div>
@@ -643,15 +662,15 @@ function UnderwritingWorkspaceContent() {
                     : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                 )}
               >
-                {ca.recommendation?.recommendation || 'RECOMMENDED FOR APPROVAL'}
+                {ca.recommendation?.recommendation || (app.status === 'UNDERWRITING' ? 'RECOMMENDED' : app.status)}
               </span>
             </div>
             <p className="text-slate-600 dark:text-slate-300 italic text-[11px]">
-              "{ca.recommendation?.remarks || 'Borrower meets debt-servicing benchmarks. FOIR is within acceptable range. Sanction recommended.'}"
+              "{ca.recommendation?.remarks || 'Borrower meets debt-servicing criteria and is eligible for underwriting review.'}"
             </p>
             <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-800 flex justify-between">
               <span>Assessed By: {ca.recommendation?.assessedBy || 'Credit Analyst'}</span>
-              <span>{ca.recommendation?.assessedAt ? formatDate(ca.recommendation.assessedAt) : 'Recently'}</span>
+              <span>{ca.recommendation?.assessedAt ? formatDate(ca.recommendation.assessedAt) : formatDate(app.updatedAt)}</span>
             </div>
           </div>
 
@@ -661,13 +680,13 @@ function UnderwritingWorkspaceContent() {
             <div className="flex justify-between items-center">
               <span className="text-slate-600 dark:text-slate-300">Monthly Income:</span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
-                ₹{Number(ca.foirDti?.monthlyIncome || cust.monthlyIncome || 50000).toLocaleString('en-IN')}
+                ₹{Number(ca.foirDti?.monthlyIncome ?? cust.monthlyIncome ?? 0).toLocaleString('en-IN')}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-600 dark:text-slate-300">Existing Obligations / EMI:</span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
-                ₹{Number(ca.foirDti?.existingObligations || 12000).toLocaleString('en-IN')}
+                ₹{Number(ca.foirDti?.existingObligations ?? 0).toLocaleString('en-IN')}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -675,16 +694,16 @@ function UnderwritingWorkspaceContent() {
               <span
                 className={cn(
                   'font-bold text-sm',
-                  (ca.foirDti?.foirPct || 38) <= 50 ? 'text-emerald-600' : 'text-amber-600'
+                  Number(ca.foirDti?.foirPct ?? 0) <= 50 ? 'text-emerald-600' : 'text-amber-600'
                 )}
               >
-                {ca.foirDti?.foirPct || 38}% (Cap: 50%)
+                {ca.foirDti?.foirPct ?? 0}% (Cap: 50%)
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-600 dark:text-slate-300">Net Disposable Income:</span>
               <span className="font-bold text-emerald-600">
-                ₹{Number(ca.foirDti?.disposableIncome || 32000).toLocaleString('en-IN')}/mo
+                ₹{Number(ca.foirDti?.disposableIncome ?? 0).toLocaleString('en-IN')}/mo
               </span>
             </div>
           </div>
@@ -697,20 +716,20 @@ function UnderwritingWorkspaceContent() {
               <span
                 className={cn(
                   'font-bold text-sm',
-                  (ca.bureau?.score || 745) >= 700 ? 'text-emerald-600' : 'text-amber-600'
+                  Number(ca.bureau?.score ?? cust.creditScore ?? 0) >= 700 ? 'text-emerald-600' : 'text-amber-600'
                 )}
               >
-                {ca.bureau?.score || 745} / 900
+                {ca.bureau?.score ?? cust.creditScore ?? 'N/A'}{ca.bureau?.score || cust.creditScore ? ' / 900' : ''}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-600 dark:text-slate-300">Active Credit Lines:</span>
               <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {ca.bureau?.activeLines || 2} accounts
+                {ca.bureau?.activeLines ?? 0} accounts
               </span>
             </div>
             <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-800">
-              {ca.bureau?.summary || 'No SMA/DPD defaults recorded. Clean repayment track record over 36 months.'}
+              {ca.bureau?.summary || (cust.creditScore ? `Bureau score recorded in credit bureau check.` : 'Bureau record available.')}
             </p>
           </div>
         </div>
@@ -734,24 +753,27 @@ function UnderwritingWorkspaceContent() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">PAN Verification</span>
-            <div className="font-bold text-emerald-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Matched
+            <div className={cn('font-bold flex items-center gap-1', cust.panNumber || cust.panVerified ? 'text-emerald-600' : 'text-amber-600')}>
+              {cust.panNumber || cust.panVerified ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+              {cust.panNumber || cust.panVerified ? 'Matched' : 'Pending'}
             </div>
-            <div className="text-[10px] text-slate-400">NSDL / Karza Verified</div>
+            <div className="text-[10px] text-slate-400">{cust.panNumber ? 'NSDL Verified' : 'Awaiting PAN'}</div>
           </div>
 
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">Aadhaar (OKYC)</span>
-            <div className="font-bold text-emerald-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+            <div className={cn('font-bold flex items-center gap-1', cust.aadhaarNumber || cust.aadhaarVerified ? 'text-emerald-600' : 'text-amber-600')}>
+              {cust.aadhaarNumber || cust.aadhaarVerified ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+              {cust.aadhaarNumber || cust.aadhaarVerified ? 'Verified' : 'Pending'}
             </div>
-            <div className="text-[10px] text-slate-400">UIDAI XML / OTP</div>
+            <div className="text-[10px] text-slate-400">{cust.aadhaarVerified ? 'UIDAI OKYC Verified' : 'Awaiting Aadhaar'}</div>
           </div>
 
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">Face Match / Liveness</span>
-            <div className="font-bold text-emerald-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 97.4% Match
+            <div className={cn('font-bold flex items-center gap-1', cust.faceMatchScore || cust.kycStatus === 'VERIFIED' ? 'text-emerald-600' : 'text-amber-600')}>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {cust.faceMatchScore ? `${cust.faceMatchScore}% Match` : cust.kycStatus === 'VERIFIED' ? 'Verified' : 'Pending'}
             </div>
             <div className="text-[10px] text-slate-400">Zero Spoof Detected</div>
           </div>
@@ -759,122 +781,95 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">AML Screening</span>
             <div className="font-bold text-emerald-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Clear (No Hits)
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {rf.fraudSignals?.amlScreening === 'CLEAR' || cust.kycStatus === 'VERIFIED' ? 'Clear (No Hits)' : 'In Review'}
             </div>
             <div className="text-[10px] text-slate-400">OFAC / RBI Watchlist</div>
           </div>
 
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">KYC Status</span>
-            <div className="font-bold text-emerald-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+            <div className={cn('font-bold flex items-center gap-1', cust.kycStatus === 'VERIFIED' ? 'text-emerald-600' : 'text-amber-600')}>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {cust.kycStatus || 'PENDING'}
             </div>
-            <div className="text-[10px] text-slate-400">Audited Stamp</div>
+            <div className="text-[10px] text-slate-400">Audited Status</div>
           </div>
         </div>
 
         {/* Documents Checklist & Previews */}
         <div className="overflow-x-auto text-xs pt-2">
-          <table className="w-full text-left">
-            <thead
-              className={cn(
-                'border-b font-bold uppercase text-[10px] tracking-wider',
-                isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500'
-              )}
-            >
-              <tr>
-                <th className="py-2 px-3">Document Type</th>
-                <th className="py-2 px-3">Status</th>
-                <th className="py-2 px-3">Verification Method</th>
-                <th className="py-2 px-3">Timestamp</th>
-                <th className="py-2 px-3 text-right">Inspection / Preview</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-              {cust.documents && cust.documents.length > 0 ? (
-                cust.documents.map((doc: any) => (
-                  <tr key={doc.id}>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-100">
-                      {doc.documentType || 'Identity Proof'}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span
-                        className={cn(
-                          'px-2 py-0.5 rounded text-[10px] font-bold',
-                          doc.verified || doc.status === 'VERIFIED'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                        )}
-                      >
-                        {doc.verified || doc.status === 'VERIFIED' ? 'VERIFIED' : 'PENDING'}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-500">Automated OCR + Database Verification</td>
-                    <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
-                      {doc.updatedAt ? formatDate(doc.updatedAt) : 'Recently'}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <button
-                        onClick={() => setPreviewDoc(doc)}
-                        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Preview Document
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <>
+          {(() => {
+            const allDocs = Array.from(
+              new Map(
+                [...(ws?.documents || []), ...(cust.documents || []), ...(app.documents || [])]
+                  .filter(Boolean)
+                  .map((d: any) => [d.id, d])
+              ).values()
+            );
+
+            return (
+              <table className="w-full text-left">
+                <thead
+                  className={cn(
+                    'border-b font-bold uppercase text-[10px] tracking-wider',
+                    isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500'
+                  )}
+                >
                   <tr>
-                    <td className="py-2 px-3 font-semibold">PAN Card Document</td>
-                    <td className="py-2 px-3">
-                      <span className="text-emerald-600 font-bold">VERIFIED</span>
-                    </td>
-                    <td className="py-2 px-3 text-slate-500">NSDL Direct Match</td>
-                    <td className="py-2 px-3 font-mono text-[10px] text-slate-400">Today</td>
-                    <td className="py-2 px-3 text-right">
-                      <button
-                        onClick={() =>
-                          setPreviewDoc({
-                            documentType: 'PAN_CARD',
-                            status: 'VERIFIED',
-                            verified: true,
-                            ocrStatus: 'MATCHED',
-                          })
-                        }
-                        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Preview
-                      </button>
-                    </td>
+                    <th className="py-2 px-3">Document Type</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3">Verification Method</th>
+                    <th className="py-2 px-3">Timestamp</th>
+                    <th className="py-2 px-3 text-right">Inspection / Preview</th>
                   </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-semibold">Salary Slips / Bank Statement</td>
-                    <td className="py-2 px-3">
-                      <span className="text-emerald-600 font-bold">VERIFIED</span>
-                    </td>
-                    <td className="py-2 px-3 text-slate-500">Account Aggregator & Perfios OCR</td>
-                    <td className="py-2 px-3 font-mono text-[10px] text-slate-400">Today</td>
-                    <td className="py-2 px-3 text-right">
-                      <button
-                        onClick={() =>
-                          setPreviewDoc({
-                            documentType: 'BANK_STATEMENT',
-                            status: 'VERIFIED',
-                            verified: true,
-                            ocrStatus: 'MATCHED',
-                          })
-                        }
-                        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Preview
-                      </button>
-                    </td>
-                  </tr>
-                </>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  {allDocs.length > 0 ? (
+                    allDocs.map((doc: any) => (
+                      <tr key={doc.id}>
+                        <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-100">
+                          {doc.documentType?.replace(/_/g, ' ') || doc.category || doc.fileName || 'Identity / Financial Proof'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={cn(
+                              'px-2 py-0.5 rounded text-[10px] font-bold',
+                              doc.verified || doc.status === 'VERIFIED'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            )}
+                          >
+                            {doc.verified || doc.status === 'VERIFIED' ? 'VERIFIED' : 'PENDING'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-500">
+                          {doc.verificationMethod || (doc.verified || doc.status === 'VERIFIED' ? 'Verified via OCR / Inspector' : 'Pending Inspection')}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
+                          {doc.updatedAt ? formatDate(doc.updatedAt) : doc.createdAt ? formatDate(doc.createdAt) : 'Recently'}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            onClick={() => setPreviewDoc(doc)}
+                            className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Preview Document
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                        No uploaded documents attached to this application.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
       </Card>
 
@@ -903,15 +898,15 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">Monthly Income</span>
             <div className="text-base font-bold text-slate-900 dark:text-white">
-              ₹{Number(ca.foirDti?.monthlyIncome || cust.monthlyIncome || 50000).toLocaleString('en-IN')}
+              ₹{Number(ca.foirDti?.monthlyIncome ?? cust.monthlyIncome ?? 0).toLocaleString('en-IN')}
             </div>
-            <div className="text-[10px] text-slate-400">Verified net salary</div>
+            <div className="text-[10px] text-slate-400">{cust.employmentType ? `Employment: ${cust.employmentType}` : 'Assessed Income'}</div>
           </div>
 
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">Existing EMI</span>
             <div className="text-base font-bold text-slate-900 dark:text-white">
-              ₹{Number(ca.foirDti?.existingObligations || 12000).toLocaleString('en-IN')}
+              ₹{Number(ca.foirDti?.existingObligations ?? 0).toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-slate-400">Bureau identified</div>
           </div>
@@ -927,7 +922,7 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">FOIR / DTI</span>
             <div className="text-base font-bold text-emerald-600">
-              {ca.foirDti?.foirPct || 38}%
+              {ca.foirDti?.foirPct ?? 0}%
             </div>
             <div className="text-[10px] text-slate-400">Policy cap: 50%</div>
           </div>
@@ -935,7 +930,7 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">Disposable Income</span>
             <div className="text-base font-bold text-slate-900 dark:text-white">
-              ₹{Number(ca.foirDti?.disposableIncome || 32000).toLocaleString('en-IN')}
+              ₹{Number(ca.foirDti?.disposableIncome ?? 0).toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-slate-400">Surplus post all dues</div>
           </div>
@@ -943,7 +938,7 @@ function UnderwritingWorkspaceContent() {
           <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400">Final Eligible Limit</span>
             <div className="text-base font-bold text-emerald-600">
-              ₹{Number(app.requestedAmount || 500000).toLocaleString('en-IN')}
+              ₹{Number(app.eligibleAmount || app.requestedAmount || 0).toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-slate-400">Authority approved</div>
           </div>
@@ -962,37 +957,60 @@ function UnderwritingWorkspaceContent() {
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            BRE Engine v2.4 · Decision Status: <strong className="text-emerald-600">{app.breDecision || 'PASS'}</strong>
+            BRE Engine v2.4 · Decision Status: <strong className="text-emerald-600">{app.breDecision || rf.breOutcome?.verdict || 'PASS'}</strong>
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1 overflow-hidden">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">Risk Score & Grade</span>
-            <div className="text-2xl font-black text-emerald-600">
-              Score: 22 <span className="text-xs font-normal text-slate-400">(Grade A / Low Risk)</span>
+            <div className="text-base font-bold text-emerald-600 truncate">
+              Score: {rf.riskAssessment?.score ?? 25}{' '}
+              <span className="text-xs font-normal text-slate-400">
+                (Grade {rf.riskAssessment?.grade || 'A'} / {rf.riskAssessment?.riskCategory || cust.riskCategory || 'LOW'} Risk)
+              </span>
             </div>
             <p className="text-[10px] text-slate-400">Multi-pillar weighted credit vector</p>
           </div>
 
-          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1 overflow-hidden">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">BRE Decision</span>
-            <div className="text-2xl font-black text-emerald-600">PASS</div>
-            <p className="text-[10px] text-slate-400">All automated policy gates cleared</p>
+            <div
+              className={cn(
+                'text-base font-bold truncate',
+                (app.breDecision || rf.breOutcome?.verdict || 'PASS').includes('FAIL') ||
+                (app.breDecision || rf.breOutcome?.verdict || 'PASS').includes('REJECT')
+                  ? 'text-rose-600'
+                  : (app.breDecision || rf.breOutcome?.verdict || 'PASS').includes('REFER')
+                  ? 'text-amber-600'
+                  : 'text-emerald-600'
+              )}
+              title={app.breDecision || rf.breOutcome?.verdict || 'PASS'}
+            >
+              {app.breDecision || rf.breOutcome?.verdict || 'PASS'}
+            </div>
+            <p className="text-[10px] text-slate-400">All automated policy gates evaluated</p>
           </div>
 
           <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">Hard Stops & Warnings</span>
             <div className="text-base font-bold text-slate-800 dark:text-slate-200">
-              0 Hard Stops · 0 Warnings
+              {deviations.filter((d: any) => d.severity === 'CRITICAL').length} Hard Stops ·{' '}
+              {deviations.filter((d: any) => d.severity !== 'CRITICAL').length} Warnings
             </div>
-            <p className="text-[10px] text-emerald-600 font-semibold">Clean underwriting gate profile</p>
+            <p className={cn('text-[10px] font-semibold', deviations.length === 0 ? 'text-emerald-600' : 'text-amber-600')}>
+              {deviations.length === 0 ? 'Clean underwriting gate profile' : 'Exceptions require mitigation / waiver'}
+            </p>
           </div>
 
           <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px]">Fraud & Syndicate Signals</span>
-            <div className="text-base font-bold text-emerald-600">Clean / Zero Anomaly</div>
-            <p className="text-[10px] text-slate-400">Device, IP & Geo-velocity matched</p>
+            <div className="text-base font-bold text-emerald-600">
+              {rf.fraudSignals?.overallRisk === 'HIGH' ? 'Review Required' : 'Clean / Zero Anomaly'}
+            </div>
+            <p className="text-[10px] text-slate-400">
+              {rf.fraudSignals?.deviceFingerprintMatch ? 'Device, IP & Identity verified' : 'Standard verification profile'}
+            </p>
           </div>
         </div>
       </Card>
@@ -1284,197 +1302,335 @@ function UnderwritingWorkspaceContent() {
       {/* ========================================================================= */}
       {/* STEP 8 — DECISION DESK                                                    */}
       {/* ========================================================================= */}
-      <Card id="sec-decision" className="p-5 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-blue-500" />
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              STEP 8 — FINAL UNDERWRITING DECISION
-            </h3>
-          </div>
-          <span className="text-xs text-slate-400">
-            Immutable Decision Desk · All Policy Gates Server-Enforced
-          </span>
-        </div>
+      {(() => {
+        const committedDecision = workspaceData?.underwritingDecision || workspaceData?.application?.underwriting;
+        const hasCommittedDecision = Boolean(committedDecision?.decision);
 
-        {/* Gating Notice if Blocked */}
-        {!canApprove && (
-          <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 space-y-1 text-xs">
-            <div className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4" /> Approval Policy Gate Notice
+        return (
+          <Card id="sec-decision" className="p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-blue-500" />
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  STEP 8 — FINAL UNDERWRITING DECISION
+                </h3>
+                {hasCommittedDecision && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Already Committed
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-slate-400">
+                Immutable Decision Desk · All Policy Gates Server-Enforced
+              </span>
             </div>
-            <ul className="list-disc list-inside text-rose-600 dark:text-rose-300 text-[11px] space-y-0.5">
-              {isExceedingLimit && (
-                <li>Requested amount exceeds Underwriter delegated limit. Action required: ESCALATE.</li>
-              )}
-              {gates.blockers?.map((b: string, idx: number) => (
-                <li key={idx}>{b}</li>
-              ))}
-            </ul>
-          </div>
-        )}
 
-        {/* Canonical 6 Action Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          {[
-            { key: 'APPROVE', label: 'APPROVE', disabled: !canApprove, color: 'bg-emerald-600 hover:bg-emerald-700' },
-            { key: 'APPROVE_WITH_CONDITIONS', label: 'APPROVE WITH CONDITIONS', disabled: !canApprove, color: 'bg-teal-600 hover:bg-teal-700' },
-            { key: 'SEND_BACK', label: 'SEND BACK', disabled: false, color: 'bg-amber-600 hover:bg-amber-700' },
-            { key: 'HOLD', label: 'HOLD / INFO REQUIRED', disabled: false, color: 'bg-yellow-600 hover:bg-yellow-700' },
-            { key: 'ESCALATE', label: 'ESCALATE', disabled: false, color: 'bg-purple-600 hover:bg-purple-700' },
-            { key: 'REJECT', label: 'REJECT', disabled: false, color: 'bg-rose-600 hover:bg-rose-700' },
-          ].map((btn) => (
-            <button
-              key={btn.key}
-              type="button"
-              disabled={btn.disabled}
-              onClick={() => setDecision(btn.key as any)}
-              className={cn(
-                'py-2 px-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer text-center',
-                decision === btn.key
-                  ? 'bg-[#2563EB] text-white border-blue-600 shadow-md ring-2 ring-blue-400/30'
-                  : btn.disabled
-                  ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-              )}
-            >
-              {btn.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Dynamic Fields for Decisions */}
-        <div className="space-y-3 pt-2 text-xs">
-          {decision === 'APPROVE_WITH_CONDITIONS' && (
-            <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900 bg-teal-50/40 dark:bg-teal-950/20 space-y-3">
-              <span className="font-bold text-teal-800 dark:text-teal-300">Sanction Conditions Formulation</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Condition Type</label>
-                  <select
-                    value={conditionType}
-                    onChange={(e) => setConditionType(e.target.value)}
-                    className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                  >
-                    <option value="PRE_DISBURSEMENT">Pre-Disbursement (Blocks Payout)</option>
-                    <option value="POST_DISBURSEMENT">Post-Disbursement</option>
-                  </select>
+            {/* Gating Notice if Blocked */}
+            {!canApprove && (
+              <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 space-y-1 text-xs">
+                <div className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" /> Approval Policy Gate Notice
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Responsible Party</label>
-                  <select
-                    value={conditionResponsible}
-                    onChange={(e) => setConditionResponsible(e.target.value)}
-                    className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                  >
-                    <option value="BORROWER">Borrower</option>
-                    <option value="LOAN_OFFICER">Loan Officer</option>
-                    <option value="CREDIT_ANALYST">Credit Analyst</option>
-                  </select>
+                <ul className="list-disc list-inside text-rose-600 dark:text-rose-300 text-[11px] space-y-0.5">
+                  {isExceedingLimit && (
+                    <li>Requested amount exceeds Underwriter delegated limit. Action required: ESCALATE.</li>
+                  )}
+                  {gates.blockers?.map((b: string, idx: number) => (
+                    <li key={idx}>{b}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Committed Decision Summary Banner */}
+            {hasCommittedDecision && (
+              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/70 to-indigo-50/40 dark:from-blue-950/40 dark:to-indigo-950/20 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-sm shrink-0',
+                      committedDecision.decision === 'APPROVE' && 'bg-emerald-600',
+                      committedDecision.decision === 'APPROVE_WITH_CONDITIONS' && 'bg-teal-600',
+                      committedDecision.decision === 'SEND_BACK' && 'bg-amber-600',
+                      committedDecision.decision === 'HOLD' && 'bg-yellow-600',
+                      committedDecision.decision === 'ESCALATE' && 'bg-purple-600',
+                      committedDecision.decision === 'REJECT' && 'bg-rose-600'
+                    )}>
+                      {committedDecision.decision === 'APPROVE' ? <CheckCircle2 className="w-5 h-5" /> :
+                       committedDecision.decision === 'REJECT' ? <XCircle className="w-5 h-5" /> :
+                       committedDecision.decision === 'APPROVE_WITH_CONDITIONS' ? <CheckCircle2 className="w-5 h-5" /> :
+                       <ShieldCheck className="w-5 h-5" />}
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                          Active Decision:
+                        </span>
+                        <span className={cn(
+                          'px-2.5 py-0.5 rounded text-[11px] font-extrabold uppercase shadow-xs',
+                          committedDecision.decision === 'APPROVE' && 'bg-emerald-500 text-white',
+                          committedDecision.decision === 'APPROVE_WITH_CONDITIONS' && 'bg-teal-500 text-white',
+                          committedDecision.decision === 'SEND_BACK' && 'bg-amber-500 text-white',
+                          committedDecision.decision === 'HOLD' && 'bg-yellow-500 text-white',
+                          committedDecision.decision === 'ESCALATE' && 'bg-purple-500 text-white',
+                          committedDecision.decision === 'REJECT' && 'bg-rose-500 text-white'
+                        )}>
+                          {committedDecision.decision.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                          ✓ Synced in Approval Queue
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Decided by <span className="font-semibold text-slate-700 dark:text-slate-300">{committedDecision.decidedBy || 'Underwriter'}</span>
+                        {committedDecision.createdAt && ` on ${formatDate(committedDecision.createdAt)}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    <Link href={`/approval-queue?search=${encodeURIComponent(app?.applicationNo || currentAppId)}`}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs font-bold border-blue-300 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-pointer gap-1.5"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" /> View in Approval Queue
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (!isRevisingDecision) {
+                          setDecision(committedDecision.decision);
+                          if (committedDecision.reason) setDecisionReason(committedDecision.reason);
+                        }
+                        setIsRevisingDecision(!isRevisingDecision);
+                      }}
+                      className={cn(
+                        'text-xs font-bold cursor-pointer gap-1.5 shadow-xs transition-colors',
+                        isRevisingDecision
+                          ? 'bg-slate-700 hover:bg-slate-800 text-white'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      )}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      {isRevisingDecision ? 'Hide Revision Form' : 'Revise / Change Decision'}
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Due Stage</label>
-                  <select
-                    value={conditionDueStage}
-                    onChange={(e) => setConditionDueStage(e.target.value)}
-                    className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                  >
-                    <option value="DISBURSEMENT">Disbursement Payout</option>
-                    <option value="FIRST_EMI">First EMI Due</option>
-                  </select>
+
+                {/* Decision commentary / notes */}
+                {committedDecision.reason && (
+                  <div className="pt-2 border-t border-blue-100 dark:border-blue-900/40 text-xs text-slate-700 dark:text-slate-300">
+                    <span className="font-semibold text-slate-900 dark:text-white">Underwriting Commentary: </span>
+                    <span className="italic">{committedDecision.reason}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Revision Mode Banner */}
+            {hasCommittedDecision && isRevisingDecision && (
+              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>
+                  <strong>Decision Revision Mode:</strong> You can select a new underwriting decision below. Submitting will revise the record and update the Approval Queue.
+                </span>
+              </div>
+            )}
+
+            {/* Canonical 6 Action Buttons and Decision Form */}
+            {(!hasCommittedDecision || isRevisingDecision) && (
+              <div className="space-y-4 pt-1">
+                {/* Action Selection Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  {[
+                    { key: 'APPROVE', label: 'APPROVE', disabled: !canApprove, color: 'bg-emerald-600 hover:bg-emerald-700' },
+                    { key: 'APPROVE_WITH_CONDITIONS', label: 'APPROVE WITH CONDITIONS', disabled: !canApprove, color: 'bg-teal-600 hover:bg-teal-700' },
+                    { key: 'SEND_BACK', label: 'SEND BACK', disabled: false, color: 'bg-amber-600 hover:bg-amber-700' },
+                    { key: 'HOLD', label: 'HOLD / INFO REQUIRED', disabled: false, color: 'bg-yellow-600 hover:bg-yellow-700' },
+                    { key: 'ESCALATE', label: 'ESCALATE', disabled: false, color: 'bg-purple-600 hover:bg-purple-700' },
+                    { key: 'REJECT', label: 'REJECT', disabled: false, color: 'bg-rose-600 hover:bg-rose-700' },
+                  ].map((btn) => (
+                    <button
+                      key={btn.key}
+                      type="button"
+                      disabled={btn.disabled}
+                      onClick={() => setDecision(btn.key as any)}
+                      className={cn(
+                        'py-2 px-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer text-center',
+                        decision === btn.key
+                          ? 'bg-[#2563EB] text-white border-blue-600 shadow-md ring-2 ring-blue-400/30'
+                          : btn.disabled
+                          ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Dynamic Fields for Decisions */}
+                <div className="space-y-3 pt-2 text-xs">
+                  {decision === 'APPROVE_WITH_CONDITIONS' && (
+                    <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-900 bg-teal-50/40 dark:bg-teal-950/20 space-y-3">
+                      <span className="font-bold text-teal-800 dark:text-teal-300">Sanction Conditions Formulation</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Condition Type</label>
+                          <select
+                            value={conditionType}
+                            onChange={(e) => setConditionType(e.target.value)}
+                            className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                          >
+                            <option value="PRE_DISBURSEMENT">Pre-Disbursement (Blocks Payout)</option>
+                            <option value="POST_DISBURSEMENT">Post-Disbursement</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Responsible Party</label>
+                          <select
+                            value={conditionResponsible}
+                            onChange={(e) => setConditionResponsible(e.target.value)}
+                            className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                          >
+                            <option value="BORROWER">Borrower</option>
+                            <option value="LOAN_OFFICER">Loan Officer</option>
+                            <option value="CREDIT_ANALYST">Credit Analyst</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Due Stage</label>
+                          <select
+                            value={conditionDueStage}
+                            onChange={(e) => setConditionDueStage(e.target.value)}
+                            className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                          >
+                            <option value="DISBURSEMENT">Disbursement Payout</option>
+                            <option value="FIRST_EMI">First EMI Due</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Condition Text *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Provide original salary certificate prior to fund release..."
+                          value={conditionText}
+                          onChange={(e) => setConditionText(e.target.value)}
+                          className={cn('w-full py-1.5 px-3 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {decision === 'SEND_BACK' && (
+                    <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
+                      <span className="font-bold text-amber-800 dark:text-amber-300">Routing & Correction Target</span>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Send Back Target</label>
+                        <select
+                          value={sendBackTarget}
+                          onChange={(e) => setSendBackTarget(e.target.value as any)}
+                          className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                        >
+                          <option value="CREDIT_ANALYST">Credit Analyst (For Financial / FOIR / Risk Re-Appraisal)</option>
+                          <option value="LOAN_OFFICER">Loan Officer (For Document Re-Collection / KYC)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {decision === 'HOLD' && (
+                    <div className="p-4 rounded-xl border border-yellow-200 dark:border-yellow-900 bg-yellow-50/40 dark:bg-yellow-950/20 space-y-3">
+                      <span className="font-bold text-yellow-800 dark:text-yellow-300">Information Required</span>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Information / Documents Needed *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Additional bank statement for Q2, employer confirmation letter..."
+                          value={holdInfoRequired}
+                          onChange={(e) => setHoldInfoRequired(e.target.value)}
+                          className={cn('w-full py-1.5 px-3 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {decision === 'ESCALATE' && (
+                    <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
+                      <span className="font-bold text-purple-800 dark:text-purple-300">Approval Authority Escalation</span>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Escalation Authority</label>
+                        <select
+                          value={escalationTarget}
+                          onChange={(e) => setEscalationTarget(e.target.value)}
+                          className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
+                        >
+                          <option value="LEVEL_3_CREDIT_HEAD">Level 3 — Head of Credit (Proposals &gt; ₹25L)</option>
+                          <option value="CREDIT_COMMITTEE">Level 4 — Executive Credit Committee (Proposals &gt; ₹50L)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Underwriter Rationale / Reason */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Underwriter Decision Rationale / Notes *
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Enter comprehensive underwriting commentary, risk evaluation, and rationale..."
+                      value={decisionReason}
+                      onChange={(e) => setDecisionReason(e.target.value)}
+                      className={cn(
+                        'w-full p-2.5 rounded-xl border text-xs outline-none focus:border-blue-500',
+                        isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                      )}
+                    />
+                  </div>
+
+                  {/* Submit Decision Button */}
+                  <div className="flex items-center gap-3">
+                    {hasCommittedDecision && isRevisingDecision && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setIsRevisingDecision(false)}
+                        className="py-2.5 text-xs font-bold cursor-pointer"
+                      >
+                        Cancel Revision
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={!decisionReason.trim() || decisionMutation.isPending}
+                      onClick={() => decisionMutation.mutate()}
+                      className={cn(
+                        'py-2.5 text-xs font-bold text-white shadow-md cursor-pointer flex-1',
+                        hasCommittedDecision
+                          ? 'bg-amber-600 hover:bg-amber-700'
+                          : 'bg-[#2563EB] hover:bg-blue-700'
+                      )}
+                    >
+                      {decisionMutation.isPending
+                        ? 'Committing Underwriting Decision...'
+                        : hasCommittedDecision
+                        ? `Update & Re-commit Decision: ${decision}`
+                        : `Commit Decision: ${decision}`}
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Condition Text *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Provide original salary certificate prior to fund release..."
-                  value={conditionText}
-                  onChange={(e) => setConditionText(e.target.value)}
-                  className={cn('w-full py-1.5 px-3 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                />
-              </div>
-            </div>
-          )}
-
-          {decision === 'SEND_BACK' && (
-            <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
-              <span className="font-bold text-amber-800 dark:text-amber-300">Routing & Correction Target</span>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Send Back Target</label>
-                <select
-                  value={sendBackTarget}
-                  onChange={(e) => setSendBackTarget(e.target.value as any)}
-                  className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                >
-                  <option value="CREDIT_ANALYST">Credit Analyst (For Financial / FOIR / Risk Re-Appraisal)</option>
-                  <option value="LOAN_OFFICER">Loan Officer (For Document Re-Collection / KYC)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {decision === 'HOLD' && (
-            <div className="p-4 rounded-xl border border-yellow-200 dark:border-yellow-900 bg-yellow-50/40 dark:bg-yellow-950/20 space-y-3">
-              <span className="font-bold text-yellow-800 dark:text-yellow-300">Information Required</span>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Information / Documents Needed *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Additional bank statement for Q2, employer confirmation letter..."
-                  value={holdInfoRequired}
-                  onChange={(e) => setHoldInfoRequired(e.target.value)}
-                  className={cn('w-full py-1.5 px-3 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                />
-              </div>
-            </div>
-          )}
-
-          {decision === 'ESCALATE' && (
-            <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
-              <span className="font-bold text-purple-800 dark:text-purple-300">Approval Authority Escalation</span>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Escalation Authority</label>
-                <select
-                  value={escalationTarget}
-                  onChange={(e) => setEscalationTarget(e.target.value)}
-                  className={cn('w-full py-1.5 px-2.5 rounded-lg border text-xs outline-none', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300')}
-                >
-                  <option value="LEVEL_3_CREDIT_HEAD">Level 3 — Head of Credit (Proposals &gt; ₹25L)</option>
-                  <option value="CREDIT_COMMITTEE">Level 4 — Executive Credit Committee (Proposals &gt; ₹50L)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Underwriter Rationale / Reason */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Underwriter Decision Rationale / Notes *
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Enter comprehensive underwriting commentary, risk evaluation, and rationale..."
-              value={decisionReason}
-              onChange={(e) => setDecisionReason(e.target.value)}
-              className={cn(
-                'w-full p-2.5 rounded-xl border text-xs outline-none focus:border-blue-500',
-                isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-              )}
-            />
-          </div>
-
-          {/* Submit Decision Button */}
-          <Button
-            size="sm"
-            disabled={!decisionReason.trim() || decisionMutation.isPending}
-            onClick={() => decisionMutation.mutate()}
-            className="w-full py-2.5 text-xs font-bold text-white bg-[#2563EB] hover:bg-blue-700 shadow-md cursor-pointer"
-          >
-            {decisionMutation.isPending ? 'Committing Underwriting Decision...' : `Commit Decision: ${decision}`}
-          </Button>
-        </div>
-      </Card>
+            )}
+          </Card>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* STEP 9 — AUDIT HISTORY (READ ONLY)                                        */}
@@ -1508,50 +1664,56 @@ function UnderwritingWorkspaceContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-              {ws?.auditLogs && ws.auditLogs.length > 0 ? (
-                ws.auditLogs.map((log: any) => (
+              {(() => {
+                const combinedLogs = [
+                  ...(ws?.auditLogs || []),
+                  ...(app.statusHistory || []).map((sh: any) => ({
+                    id: sh.id,
+                    createdAt: sh.createdAt,
+                    actorName: sh.changedBy || 'System / Operations',
+                    actorRole: 'OPERATIONS',
+                    action: 'STATUS_TRANSITION',
+                    oldStatus: sh.oldStatus,
+                    newStatus: sh.newStatus,
+                    reason: sh.reason || sh.comment || 'Status transition',
+                    correlationId: sh.id?.slice(0, 8),
+                  })),
+                ];
+
+                if (combinedLogs.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-slate-400 text-xs">
+                        No previous audit or status transitions recorded for this proposal.
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return combinedLogs.map((log: any) => (
                   <tr key={log.id}>
                     <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
                       {formatDate(log.createdAt || log.timestamp)}
                     </td>
                     <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-100">
                       {log.actorName || log.userName || 'System'}{' '}
-                      <span className="text-[10px] text-slate-400">({log.actorRole || log.role || 'UNDERWRITER'})</span>
+                      <span className="text-[10px] text-slate-400">({log.actorRole || log.role || 'USER'})</span>
                     </td>
                     <td className="py-2.5 px-3 font-bold text-blue-600 dark:text-blue-400">
                       {log.action}
                     </td>
                     <td className="py-2.5 px-3 text-[10px] font-mono">
-                      {log.oldStatus || 'DRAFT'} → {log.newStatus || app.status}
+                      {log.oldStatus ? `${log.oldStatus} → ${log.newStatus || app.status}` : log.newStatus || app.status}
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
-                      {log.reason || log.comment || 'Standard operational transition'}
+                      {log.reason || log.comment || 'Operational transition event logged'}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
-                      {log.correlationId || log.id?.slice(0, 8) || 'CORR-2026-01'}
+                      {log.correlationId || log.id?.slice(0, 8) || 'N/A'}
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">Today</td>
-                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-100">
-                    System / Automated BRE <span className="text-[10px] text-slate-400">(SYSTEM)</span>
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-blue-600 dark:text-blue-400">
-                    EVALUATE_APPLICATION
-                  </td>
-                  <td className="py-2.5 px-3 text-[10px] font-mono">
-                    CREDIT_ASSESSMENT → UNDERWRITING
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
-                    Automated appraisal passed and forwarded to Underwriting Desk
-                  </td>
-                  <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
-                    CORR-UW-{app.id?.slice(0, 6)}
-                  </td>
-                </tr>
-              )}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -1571,7 +1733,9 @@ function UnderwritingWorkspaceContent() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-500" />
-                <h4 className="font-bold text-sm">Document Inspection: {previewDoc.documentType}</h4>
+                <h4 className="font-bold text-sm">
+                  Document Inspection: {previewDoc.documentType?.replace(/_/g, ' ') || previewDoc.category || 'Document'}
+                </h4>
               </div>
               <button
                 onClick={() => setPreviewDoc(null)}
@@ -1585,10 +1749,10 @@ function UnderwritingWorkspaceContent() {
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
               <div className="font-bold text-sm">Verified Document Evidence</div>
               <p className="text-slate-500 max-w-xs mx-auto text-[11px]">
-                Cryptographically authenticated against government databases & OCR verified.
+                {previewDoc.fileName ? `File: ${previewDoc.fileName}` : 'Cryptographically authenticated against government databases & OCR verified.'}
               </p>
               <div className="pt-2 text-[10px] font-mono text-slate-400">
-                Type: {previewDoc.documentType} · Status: VERIFIED · Zero Tampering
+                Type: {previewDoc.documentType || 'DOCUMENT'} · Status: {previewDoc.status || 'VERIFIED'}
               </div>
             </div>
 
@@ -1630,13 +1794,13 @@ function UnderwritingWorkspaceContent() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Gross Assessed Monthly Income:</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200">
-                    ₹{Number(cust.monthlyIncome || 50000).toLocaleString('en-IN')}
+                    ₹{Number(ca.foirDti?.monthlyIncome ?? cust.monthlyIncome ?? 0).toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Existing Fixed Monthly Obligations (EMIs):</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200">
-                    - ₹{Number(ca.foirDti?.existingObligations || 12000).toLocaleString('en-IN')}
+                    - ₹{Number(ca.foirDti?.existingObligations ?? 0).toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1648,7 +1812,7 @@ function UnderwritingWorkspaceContent() {
                 <div className="border-t border-slate-200 dark:border-slate-800 pt-2 flex justify-between font-bold">
                   <span>Net Disposable Income (Surplus):</span>
                   <span className="text-emerald-600">
-                    ₹{Number(ca.foirDti?.disposableIncome || 32000).toLocaleString('en-IN')}/month
+                    ₹{Number(ca.foirDti?.disposableIncome ?? 0).toLocaleString('en-IN')}/month
                   </span>
                 </div>
               </div>
@@ -1656,7 +1820,7 @@ function UnderwritingWorkspaceContent() {
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800 space-y-1.5 text-[11px] text-slate-500">
                 <div className="flex justify-between">
                   <span>Fixed Obligations to Income Ratio (FOIR):</span>
-                  <strong className="text-slate-800 dark:text-slate-200">{ca.foirDti?.foirPct || 38}%</strong>
+                  <strong className="text-slate-800 dark:text-slate-200">{ca.foirDti?.foirPct ?? 0}%</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>Policy Standard Limit:</span>
@@ -1664,7 +1828,9 @@ function UnderwritingWorkspaceContent() {
                 </div>
                 <div className="flex justify-between">
                   <span>Debt-to-Income (DTI) Status:</span>
-                  <strong className="text-emerald-600">PASSED</strong>
+                  <strong className={Number(ca.foirDti?.foirPct ?? 0) <= 50 ? 'text-emerald-600' : 'text-amber-600'}>
+                    {Number(ca.foirDti?.foirPct ?? 0) <= 50 ? 'PASSED' : 'REQUIRES MITIGATION'}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -1703,45 +1869,44 @@ function UnderwritingWorkspaceContent() {
             </div>
 
             <div className="space-y-3 text-xs max-h-80 overflow-y-auto">
-              <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
-                  1
-                </div>
-                <div>
-                  <div className="font-bold text-slate-800 dark:text-slate-200">Loan Origination & Intake</div>
-                  <p className="text-[11px] text-slate-500">Applicant submitted details via Loan Officer channel.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
-                  2
-                </div>
-                <div>
-                  <div className="font-bold text-slate-800 dark:text-slate-200">KYC & Document Verification</div>
-                  <p className="text-[11px] text-slate-500">PAN, Aadhaar OKYC and Bank Account verified.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
-                  3
-                </div>
-                <div>
-                  <div className="font-bold text-slate-800 dark:text-slate-200">Credit Assessment Completed</div>
-                  <p className="text-[11px] text-slate-500">Credit Analyst validated FOIR and recommended approval.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
-                  4
-                </div>
-                <div>
-                  <div className="font-bold text-blue-600 dark:text-blue-400">Underwriting Workspace Review (Active)</div>
-                  <p className="text-[11px] text-slate-500">Currently in credit committee decision stage.</p>
-                </div>
-              </div>
+              {app.statusHistory && app.statusHistory.length > 0 ? (
+                app.statusHistory.map((item: any, idx: number) => (
+                  <div key={item.id || idx} className="flex gap-3 items-start">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                        {item.oldStatus ? `${item.oldStatus} → ${item.newStatus}` : item.newStatus || app.status}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        {item.reason || item.comment || 'Workflow transition'} · {formatDate(item.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="flex gap-3 items-start">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                      1
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">Loan Origination</div>
+                      <p className="text-[11px] text-slate-500">Proposal created on {formatDate(app.createdAt)}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 items-start">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                      2
+                    </div>
+                    <div>
+                      <div className="font-bold text-blue-600 dark:text-blue-400">Underwriting Review (Active)</div>
+                      <p className="text-[11px] text-slate-500">Current Stage: {app.status}</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end">

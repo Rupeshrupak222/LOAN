@@ -306,10 +306,10 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Credit committee decision queue, conditional sanction, and approval limits',
     nav: [
       'dashboard',
-      'underwriting-queue',
       'my-cases',
-      'approval-queue',
       'applications',
+      'underwriting-queue',
+      'approval-queue',
       'tasks',
       'support',
     ],

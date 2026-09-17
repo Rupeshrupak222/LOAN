@@ -13,7 +13,8 @@ export type ApprovalTaskStatus =
   | 'ESCALATED'
   | 'DELEGATED'
   | 'EXPIRED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'HOLD';
 
 export type ApprovalActionType =
   | 'APPROVE'

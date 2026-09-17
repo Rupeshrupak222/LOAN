@@ -87,31 +87,34 @@ export class FinanceService {
   ): Promise<FinanceQueueItem[]> {
     const normalizedTab = (tab || 'READY_FOR_DISBURSEMENT').toUpperCase();
 
+    // STRICT FORWARDING RESTRICTION:
+    // Applications MUST be explicitly forwarded to Finance Officer (status = READY_FOR_DISBURSEMENT or DISBURSED)
+    // Applications merely in APPROVED, UNDERWRITING, or AGREEMENT_PENDING will NOT appear until an officer clicks 'Forward to Finance Officer'.
     let where: any = {
-      status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] },
+      status: { in: ['READY_FOR_DISBURSEMENT', 'DISBURSED'] },
     };
 
     // Tab-specific lifecycle filtering
     if (normalizedTab === 'READY_FOR_DISBURSEMENT') {
-      where.status = { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] };
+      where.status = 'READY_FOR_DISBURSEMENT';
       where.customer = {
         kycStatus: 'VERIFIED',
         bankAccounts: { some: { isVerified: true } },
       };
     } else if (normalizedTab === 'PRE_CHECK_PENDING') {
-      where.status = { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'] };
+      where.status = 'READY_FOR_DISBURSEMENT';
       where.OR = [
         { customer: { kycStatus: { not: 'VERIFIED' } } },
         { customer: { bankAccounts: { none: { isVerified: true } } } },
       ];
     } else if (normalizedTab === 'PENDING_CHECKER') {
-      where.status = { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] };
+      where.status = 'READY_FOR_DISBURSEMENT';
     } else if (normalizedTab === 'STP_ELIGIBLE') {
-      where.status = { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] };
+      where.status = 'READY_FOR_DISBURSEMENT';
     } else if (normalizedTab === 'ON_HOLD') {
       where.status = 'UNDER_REVIEW';
     } else if (normalizedTab === 'FAILED') {
-      where.status = { in: ['APPROVED', 'READY_FOR_DISBURSEMENT'] };
+      where.status = 'READY_FOR_DISBURSEMENT';
     } else if (normalizedTab === 'EXECUTED') {
       where.status = 'DISBURSED';
     }
@@ -289,6 +292,13 @@ export class FinanceService {
 
     if (!app) {
       throw new NotFoundError(`Loan application ${applicationId} not found.`);
+    }
+
+    // Strict Forwarding Enforcement: Must be forwarded to Finance Desk
+    if (app.status !== 'READY_FOR_DISBURSEMENT' && app.status !== 'DISBURSED') {
+      throw new BadRequestError(
+        `Application #${app.applicationNo} is in '${app.status}' status and has not been forwarded to the Finance Desk. An authorized sanction officer must click 'Forward to Finance Officer' before disbursement processing.`
+      );
     }
 
     // Tenant & Branch Isolation
