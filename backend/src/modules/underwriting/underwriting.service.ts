@@ -128,41 +128,50 @@ export async function getUnderwritingQueue(
   let where: any = {};
   const normalizedTab = (tab || 'READY').toUpperCase();
 
-  if (normalizedTab === 'READY') {
+  if (normalizedTab === 'READY' || normalizedTab === 'DECISION_REQUIRED') {
+    // Only proposals explicitly forwarded by Credit Analyst into UNDERWRITING and awaiting underwriter sanction
     where = {
+      status: 'UNDERWRITING',
       OR: [
-        { status: 'UNDERWRITING' },
-        { status: 'CREDIT_ASSESSMENT', eligibility: { isNot: null } },
-        { status: 'UNDER_REVIEW' },
+        { underwriting: null },
+        { underwriting: { decision: { notIn: ['APPROVE', 'REJECT', 'SEND_BACK'] } } },
       ],
-      underwriting: { is: null }, // Not yet decided
     };
   } else if (normalizedTab === 'IN_REVIEW') {
     where = {
-      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+      status: 'UNDERWRITING',
     };
   } else if (normalizedTab === 'SENT_BACK') {
     where = {
-      status: 'SUBMITTED',
-      statusHistory: {
-        some: {
-          reason: { contains: 'SEND_BACK' },
+      OR: [
+        { underwriting: { decision: 'SEND_BACK' } },
+        {
+          statusHistory: {
+            some: {
+              reason: { contains: 'SEND_BACK' },
+            },
+          },
         },
-      },
+      ],
     };
   } else if (normalizedTab === 'HOLD' || normalizedTab === 'AWAITING_INFO') {
-    where = { status: 'UNDER_REVIEW' };
-  } else if (normalizedTab === 'DECISION_REQUIRED') {
     where = {
-      status: { in: ['UNDERWRITING', 'CREDIT_ASSESSMENT'] },
-      underwriting: { is: null },
+      status: 'UNDERWRITING',
+      underwriting: { decision: 'HOLD' },
     };
   } else if (normalizedTab === 'APPROVED') {
-    where = { status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] } };
+    where = {
+      status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] },
+      underwriting: { isNot: null },
+    };
   } else if (normalizedTab === 'REJECTED') {
-    where = { status: 'REJECTED' };
+    where = {
+      status: 'REJECTED',
+      underwriting: { isNot: null },
+    };
   } else if (normalizedTab === 'ESCALATED') {
     where = {
+      status: 'UNDERWRITING',
       approvals: {
         some: {
           status: { in: ['ESCALATED', 'PENDING'] },
@@ -171,9 +180,12 @@ export async function getUnderwritingQueue(
       },
     };
   } else {
-    // ALL non-draft applications
+    // ALL proposals that have entered underwriting lifecycle (NEVER draft, submitted, or active credit assessment)
     where = {
-      status: { notIn: ['DRAFT', 'CANCELLED'] },
+      OR: [
+        { status: { in: ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] } },
+        { underwriting: { isNot: null } },
+      ],
     };
   }
 
@@ -354,11 +366,15 @@ export async function getUnderwritingWorkspace(
   const unverifiedDocs = docs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
   const hasKycRejected = app.customer?.kycStatus === 'REJECTED';
   const hasAnalystRecommendation = !!(app.eligibility?.factors as any)?.recommendation;
+  const isForwardedToUnderwriting = ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status);
   const unresolvedCriticalDeviations = deviations.filter(
     (d) => (d.severity === 'CRITICAL' || d.severity === 'HIGH') && d.status === 'PENDING'
   );
 
   const blockers: string[] = [];
+  if (!isForwardedToUnderwriting) {
+    blockers.push(`Proposal is currently in ${app.status} stage and has NOT been forwarded to Underwriting by the Credit Analyst.`);
+  }
   if (hasKycRejected) {
     blockers.push('Borrower KYC is marked as REJECTED');
   }
@@ -376,10 +392,10 @@ export async function getUnderwritingWorkspace(
 
   const gates = {
     intakeComplete: true,
-    creditAssessmentReviewed: true,
+    creditAssessmentReviewed: isForwardedToUnderwriting,
     kycVerified: !hasKycRejected,
     documentsVerified: unverifiedDocs.length === 0,
-    financialAssessmentComplete: true,
+    financialAssessmentComplete: isForwardedToUnderwriting,
     riskPolicyChecked: true,
     deviationsResolved: unresolvedCriticalDeviations.length === 0,
     canApprove: blockers.length === 0,
@@ -759,3 +775,141 @@ export async function submitUnderwritingDecision(
 
   return result;
 }
+
+export async function startUnderwritingCase(
+  applicationId: string,
+  actor: UnderwriterActorContext
+) {
+  const ALLOWED_ROLES = ['UNDERWRITER', 'COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'];
+  if (!actor.roles?.some((r) => ALLOWED_ROLES.includes(r))) {
+    throw new ForbiddenError('Access forbidden: Only Underwriters can start underwriting case review.');
+  }
+
+  const app = await prisma.loanApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      customer: true,
+      product: true,
+      statusHistory: true,
+    },
+  });
+  if (!app) throw new NotFoundError('Loan application not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+  }
+
+  await prisma.applicationStatusHistory.create({
+    data: {
+      applicationId: app.id,
+      fromStatus: app.status,
+      toStatus: app.status,
+      changedBy: actor.email,
+      reason: 'Underwriter started in-depth case appraisal',
+    },
+  });
+
+  await logAudit({
+    tenantId: app.tenantId || undefined,
+    userId: actor.id,
+    role: actor.roles[0],
+    action: 'UNDERWRITING_STARTED',
+    entity: 'LoanApplication',
+    entityId: applicationId,
+    previousValue: { status: app.status },
+    newValue: { status: app.status, startedBy: actor.email, stage: 'IN_REVIEW' },
+  });
+
+  return {
+    success: true,
+    applicationId: app.id,
+    applicationNo: app.applicationNo,
+    status: app.status,
+    stage: 'IN_REVIEW',
+    startedBy: actor.email,
+  };
+}
+
+export async function forwardToFinanceOfficer(
+  applicationId: string,
+  actor: UnderwriterActorContext
+) {
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'COMPANY_ADMIN', 'ADMIN', 'SUPER_ADMIN'];
+  if (!actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r))) {
+    throw new ForbiddenError('Access forbidden: Only Underwriters can forward approved proposals to Finance.');
+  }
+
+  const app = await prisma.loanApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      underwriting: true,
+      product: true,
+      customer: true,
+    },
+  });
+  if (!app) throw new NotFoundError('Loan application not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
+    }
+  }
+
+  const decision = app.underwriting?.decision;
+  if (!decision || !['APPROVE', 'APPROVE_WITH_CONDITIONS'].includes(decision)) {
+    throw new BadRequestError('Cannot forward to Finance: Application must have an approved underwriting decision.');
+  }
+
+  if (app.status === 'READY_FOR_DISBURSEMENT' || app.status === 'DISBURSED') {
+    return {
+      success: true,
+      applicationId: app.id,
+      status: app.status,
+      message: 'Application has already been forwarded to Finance Officer.',
+    };
+  }
+
+  const nextStatus = 'READY_FOR_DISBURSEMENT';
+
+  await prisma.$transaction(async (tx) => {
+    await tx.loanApplication.update({
+      where: { id: applicationId },
+      data: {
+        status: nextStatus,
+        updatedAt: new Date(),
+      },
+    });
+
+    await tx.applicationStatusHistory.create({
+      data: {
+        applicationId: app.id,
+        fromStatus: app.status,
+        toStatus: nextStatus,
+        changedBy: actor.email,
+        reason: 'Underwriter approved sanction and forwarded to Finance Officer for disbursement execution',
+      },
+    });
+  });
+
+  await logAudit({
+    tenantId: app.tenantId || undefined,
+    userId: actor.id,
+    role: actor.roles[0],
+    action: 'FORWARDED_TO_FINANCE',
+    entity: 'LoanApplication',
+    entityId: applicationId,
+    previousValue: { status: app.status },
+    newValue: { status: nextStatus, forwardedBy: actor.email },
+  });
+
+  return {
+    success: true,
+    applicationId: app.id,
+    applicationNo: app.applicationNo,
+    status: nextStatus,
+    message: 'Proposal successfully forwarded to Finance Officer queue for disbursement release.',
+  };
+}
+

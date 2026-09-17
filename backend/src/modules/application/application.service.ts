@@ -61,6 +61,23 @@ export async function listApplications(
         { customer: { branchId: null } },
       ];
     }
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'OPERATIONS_MANAGER'].includes(r))
+    ) {
+      if (!status) {
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              { status: { in: ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'REJECTED'] } },
+              { underwriting: { isNot: null } },
+              { stage: { contains: 'UNDERWRITING' } },
+            ],
+          },
+        ];
+      }
+    }
   }
 
   const [rows, total] = await Promise.all([

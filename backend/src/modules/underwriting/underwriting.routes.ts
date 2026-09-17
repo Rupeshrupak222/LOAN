@@ -9,6 +9,8 @@ import {
   getUnderwritingWorkspace,
   resolveApplicationDeviation,
   submitUnderwritingDecision,
+  startUnderwritingCase,
+  forwardToFinanceOfficer,
 } from './underwriting.service';
 
 const router = Router();
@@ -32,7 +34,7 @@ router.get(
   })
 );
 
-// 2. Consolidated Underwriting Workspace (11-section model)
+// 2. Consolidated Underwriting Workspace (9-step model)
 router.get(
   '/:applicationId/workspace',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD', 'BRANCH_MANAGER'),
@@ -48,7 +50,39 @@ router.get(
   })
 );
 
-// 3. Deviations Resolution
+// 3. Start Underwriting Case (transition to In Review)
+router.post(
+  '/:applicationId/start',
+  authorize('COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),
+  asyncHandler(async (req, res) => {
+    const result = await startUnderwritingCase(req.params.applicationId, {
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+      tenantId: req.tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
+    res.json(success(result));
+  })
+);
+
+// 4. Forward to Finance Officer (for approved/conditional sanction)
+router.post(
+  '/:applicationId/forward-to-finance',
+  authorize('COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),
+  asyncHandler(async (req, res) => {
+    const result = await forwardToFinanceOfficer(req.params.applicationId, {
+      id: req.user!.id,
+      email: req.user!.email,
+      roles: req.user!.roles,
+      tenantId: req.tenantId || req.user?.tenantId,
+      branchId: req.user?.branchId,
+    });
+    res.json(success(result));
+  })
+);
+
+// 5. Deviations Resolution
 router.post(
   '/:applicationId/deviations/:deviationId/resolve',
   authorize('COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD'),
@@ -70,7 +104,7 @@ router.post(
   })
 );
 
-// 4. Underwriting Decision Commit
+// 6. Underwriting Decision Commit
 router.post(
   '/:applicationId/decision',
   authorize('COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER'),

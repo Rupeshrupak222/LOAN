@@ -16,11 +16,12 @@ import {
   UserCheck,
   Tag,
   RefreshCw,
+  Scale,
 } from 'lucide-react';
-import { useApprovalQueue } from '../hooks/useApprovalMatrix';
+import { useApprovalQueue, useApprovalPolicies } from '../hooks/useApprovalMatrix';
 import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import { ApprovalTask } from '../types';
-import { Spinner } from '@/components/ui';
+import { Spinner, Badge, Button } from '@/components/ui';
 
 export const ApprovalQueueView: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<string>('PENDING');
@@ -31,8 +32,13 @@ export const ApprovalQueueView: React.FC = () => {
     search: searchTerm,
   });
 
+  const { data: policies = [] } = useApprovalPolicies();
+  const activePolicy = policies.find((p) => p.status === 'ACTIVE') || policies[0];
+  const userLevel = activePolicy?.levels?.find((l) => l.roles?.includes('UNDERWRITER')) || activePolicy?.levels?.[0];
+  const userAuthorityMaxLimit = userLevel?.maxAmount ?? Infinity;
+
   const pendingCount = tasks.filter((t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS').length;
-  const highRiskCount = tasks.filter((t) => ['C', 'D', 'E'].includes(t.riskGrade)).length;
+  const highRiskCount = tasks.filter((t) => ['C', 'D', 'E'].includes(t.riskGrade as any)).length;
   const breachedCount = tasks.filter((t) => t.slaBreached).length;
 
   return (
@@ -83,26 +89,18 @@ export const ApprovalQueueView: React.FC = () => {
       <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-2xl space-y-4">
         {/* Filter and Search Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
-            {[
-              { id: 'PENDING', label: 'Pending Action' },
-              { id: 'HIGH_RISK', label: 'High Risk' },
-              { id: 'SLA_BREACHED', label: 'SLA Breached' },
-              { id: 'COMPLETED', label: 'Sanction History' },
-              { id: 'ALL', label: 'All Tasks' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setSelectedTab(tab.id)}
-                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all ${
-                  selectedTab === tab.id
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedTab}
+              onChange={(e) => setSelectedTab(e.target.value)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+            >
+              <option value="PENDING">Pending Authority Action</option>
+              <option value="HIGH_RISK">High Risk Proposals</option>
+              <option value="SLA_BREACHED">SLA Breached</option>
+              <option value="COMPLETED">Sanction History</option>
+              <option value="ALL">All Authority Tasks</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-2">
@@ -113,13 +111,13 @@ export const ApprovalQueueView: React.FC = () => {
                 placeholder="Search applicant or loan #..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-56 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-56 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <button
               onClick={() => refetch()}
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               title="Refresh queue"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -143,83 +141,133 @@ export const ApprovalQueueView: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {tasks.map((task) => (
-              <div
-                key={task.id}
-                className={`p-4 rounded-xl border transition-all ${
-                  task.slaBreached
-                    ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/40'
-                    : 'bg-slate-50/50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-900/60'
-                }`}
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  {/* Left: Applicant & Amount Info */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-300">
-                        {task.applicationNo}
-                      </span>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">
-                        {task.customerName}
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                        {task.productCode}
-                      </span>
-                    </div>
+            {tasks.map((task) => {
+              const sanctionAmt = Number(task.eligibleAmount || task.amount || 0);
+              const matchedLevel = activePolicy?.levels?.find((l) => l.level === task.level) || userLevel;
+              const authorityLimit = matchedLevel?.maxAmount ?? userAuthorityMaxLimit;
+              const isWithinAuthority = authorityLimit === Infinity || sanctionAmt <= authorityLimit;
+              const isEscalated = task.status === 'ESCALATED' || (!isWithinAuthority && task.status !== 'APPROVED');
 
-                    <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-mono">
-                      <span>
-                        Requested: <strong className="text-slate-900 dark:text-white">{formatMoney(task.amount)}</strong>
-                      </span>
-                      <span>
-                        Eligible: <strong className="text-emerald-600 dark:text-emerald-300">{formatMoney(task.eligibleAmount)}</strong>
-                      </span>
-                      <span>
-                        BRE Verdict:{' '}
-                        <strong
-                          className={
-                            task.breDecision === 'APPROVE'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : task.breDecision === 'REFER'
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-rose-600 dark:text-rose-400'
-                          }
+              return (
+                <div
+                  key={task.id}
+                  className={`p-4 rounded-xl border transition-all ${
+                    task.slaBreached
+                      ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/40'
+                      : 'bg-slate-50/50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-900/60'
+                  }`}
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    {/* Left: Application, Requested Amount, Proposed Sanction, Risk Grade */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                          #{task.applicationNo || task.id.slice(0, 8)}
+                        </span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          {task.customerName}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {task.productCode || 'PERSONAL_LOAN'}
+                        </span>
+                        <span
+                          className={cn(
+                            'text-[10px] font-bold px-2 py-0.5 rounded border',
+                            (task.riskGrade as string) === 'A' || (task.riskGrade as string) === 'LOW'
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                              : (task.riskGrade as string) === 'B' || (task.riskGrade as string) === 'MEDIUM'
+                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                              : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                          )}
                         >
-                          {task.breDecision}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Right: Level, SLA & Action Link */}
-                  <div className="flex items-center gap-4 self-end md:self-center">
-                    <div className="text-right text-xs">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">Authority:</span>
-                        <span className="px-2 py-0.5 rounded font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                          L{task.level} • {task.levelName}
+                          Risk Grade: {task.riskGrade || 'MEDIUM'}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-1 justify-end">
-                        <Clock className="w-3 h-3" />
-                        <span className={task.slaBreached ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
-                          {task.slaBreached ? 'SLA Breached' : `Due: ${new Date(task.slaDueAt).toLocaleTimeString()}`}
+                      <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-mono flex-wrap">
+                        <span>
+                          Requested:{' '}
+                          <strong className="text-slate-900 dark:text-white">{formatMoney(task.amount)}</strong>
+                        </span>
+                        <span>
+                          Proposed Sanction:{' '}
+                          <strong className="text-emerald-600 dark:text-emerald-300">
+                            {formatMoney(task.eligibleAmount || task.amount)}
+                          </strong>
+                        </span>
+                        <span>
+                          Decision Status:{' '}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {task.status || 'PENDING'}
+                          </strong>
+                        </span>
+                        <span>
+                          Escalation Status:{' '}
+                          <strong
+                            className={
+                              isEscalated
+                                ? 'text-purple-600 dark:text-purple-400 font-bold'
+                                : 'text-slate-500 dark:text-slate-400'
+                            }
+                          >
+                            {isEscalated ? 'ESCALATED (Higher Level Required)' : 'None'}
+                          </strong>
                         </span>
                       </div>
                     </div>
 
-                    <Link
-                      href={`/approval-tasks/${task.id}`}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
-                    >
-                      Review Proposal
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
+                    {/* Right: Underwriter Authority & Action Button (REVIEW vs ESCALATE) */}
+                    <div className="flex items-center gap-4 self-end md:self-center">
+                      <div className="text-right text-xs">
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">
+                            Authority:
+                          </span>
+                          <span
+                            className={cn(
+                              'px-2 py-0.5 rounded font-bold border',
+                              isWithinAuthority
+                                ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                : 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                            )}
+                          >
+                            {isWithinAuthority
+                              ? `Within Authority (${authorityLimit !== Infinity ? `≤ ${formatMoney(authorityLimit)}` : 'Full Scope'})`
+                              : `Exceeds Authority (> ${formatMoney(authorityLimit)})`}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          <span className={task.slaBreached ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
+                            {task.slaBreached ? 'SLA Breached' : `Due: ${new Date(task.slaDueAt || Date.now()).toLocaleTimeString()}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Primary Action Button based on Authority Matrix */}
+                      {isWithinAuthority ? (
+                        <Link
+                          href={`/underwriting?id=${task.applicationId || task.id}`}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#2563EB] hover:bg-blue-700 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+                        >
+                          REVIEW
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/underwriting?id=${task.applicationId || task.id}`}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/30 transition-all cursor-pointer"
+                        >
+                          <Scale className="w-3.5 h-3.5" />
+                          ESCALATE
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -147,66 +147,6 @@ export class ApprovalAuthorityService {
 
     this.policies.set(`${tenantId}:${standardPolicy.id}`, standardPolicy);
     this.historicalPolicySnapshots.set(`${tenantId}:${standardPolicy.id}:v1`, { ...standardPolicy });
-
-    // Seed Demo Approval Tasks
-    const demoTask1: ApprovalTask = {
-      id: 'task-appr-demo-001',
-      applicationId: 'app-demo-001',
-      applicationNo: 'APP-2026-001',
-      tenantId,
-      branchId: 'PUN01',
-      customerName: 'Rohit Sharma',
-      customerId: 'cust-demo-001',
-      productCode: 'PERSONAL_PRIME_SALARIED',
-      amount: 250000,
-      eligibleAmount: 250000,
-      riskGrade: 'A',
-      riskScore: 82,
-      breDecision: 'APPROVE',
-      policyId: standardPolicy.id,
-      policyVersion: 1,
-      level: 1,
-      levelCode: 'LEVEL_1_BRANCH_MANAGER',
-      levelName: 'Branch Manager Delegated Authority',
-      assignedRoles: ['BRANCH_MANAGER'],
-      status: 'PENDING',
-      slaDueAt: new Date(Date.now() + 8 * 3600000).toISOString(),
-      slaBreached: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const demoTask2: ApprovalTask = {
-      id: 'task-appr-demo-002',
-      applicationId: 'app-demo-002',
-      applicationNo: 'APP-2026-002',
-      tenantId,
-      branchId: 'PUN01',
-      customerName: 'Pooja Hegde',
-      customerId: 'cust-demo-002',
-      productCode: 'PERSONAL_PRIME_SALARIED',
-      amount: 1200000,
-      eligibleAmount: 1200000,
-      riskGrade: 'B',
-      riskScore: 74,
-      breDecision: 'APPROVE',
-      policyId: standardPolicy.id,
-      policyVersion: 1,
-      level: 2,
-      levelCode: 'LEVEL_2_UNDERWRITER',
-      levelName: 'Senior Credit Underwriter Authority',
-      assignedRoles: ['UNDERWRITER', 'ADMIN'],
-      status: 'PENDING',
-      slaDueAt: new Date(Date.now() + 12 * 3600000).toISOString(),
-      slaBreached: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.approvalTasks.set(`${tenantId}:app-demo-001:lvl-1`, demoTask1);
-    this.approvalTasks.set('task-appr-demo-001', demoTask1);
-    this.approvalTasks.set(`${tenantId}:app-demo-002:lvl-2`, demoTask2);
-    this.approvalTasks.set('task-appr-demo-002', demoTask2);
   }
 
   // ---------------------------------------------------------------------------
@@ -662,6 +602,77 @@ export class ApprovalAuthorityService {
     }
 
     return task;
+  }
+
+  public async syncTasksFromDatabase(tenantId: string): Promise<void> {
+    try {
+      const dbApps = await prisma.loanApplication.findMany({
+        where: { tenantId },
+        include: { customer: true, product: true },
+      });
+
+      for (const app of dbApps) {
+        const appAny = app as any;
+        const appStatus = String(app.status);
+        if (
+          ['UNDERWRITING', 'IN_REVIEW', 'READY_FOR_SANCTION', 'DEVIATION', 'ESCALATED', 'HOLD', 'APPROVED', 'REJECTED'].includes(
+            appStatus
+          )
+        ) {
+          const reqAmt = Number(app.requestedAmount || 0);
+          const effectiveTenantId = app.tenantId || tenantId;
+          const activePol = this.getActivePolicy(effectiveTenantId, app.productId || undefined);
+          const matchedLevel =
+            activePol.levels.find((l) => reqAmt >= l.minAmount && reqAmt <= l.maxAmount) || activePol.levels[0];
+
+          if (matchedLevel) {
+            const taskKey = `${effectiveTenantId}:${app.id}:lvl-${matchedLevel.level}`;
+            if (!this.approvalTasks.has(taskKey)) {
+              const now = new Date(app.createdAt || Date.now());
+              const slaDue = new Date(now.getTime() + (matchedLevel.slaHours || 12) * 3600000);
+              const task: ApprovalTask = {
+                id: `task-appr-${app.id.slice(0, 8)}`,
+                applicationId: app.id,
+                applicationNo: app.applicationNo || `APP-${app.id.slice(-6).toUpperCase()}`,
+                tenantId: effectiveTenantId,
+                branchId: app.branchId || app.customer?.branchId || undefined,
+                customerName: app.customer
+                  ? `${app.customer.firstName} ${app.customer.lastName || ''}`.trim()
+                  : 'Applicant',
+                customerId: app.customerId || app.customer?.id || 'cust-unknown',
+                productCode: app.product?.code || 'PERSONAL_LOAN',
+                amount: reqAmt,
+                eligibleAmount: reqAmt,
+                riskGrade: (appAny.riskGrade as any) || 'B',
+                riskScore: 75,
+                breDecision: (appAny.breDecision as any) || 'APPROVE',
+                policyId: activePol.id,
+                policyVersion: activePol.version,
+                level: matchedLevel.level,
+                levelCode: matchedLevel.code,
+                levelName: matchedLevel.name,
+                assignedRoles: matchedLevel.roles,
+                status: (appStatus === 'APPROVED'
+                  ? 'APPROVED'
+                  : appStatus === 'REJECTED'
+                  ? 'REJECTED'
+                  : appStatus === 'ESCALATED'
+                  ? 'ESCALATED'
+                  : 'PENDING') as any,
+                slaDueAt: slaDue.toISOString(),
+                slaBreached: slaDue.getTime() < Date.now() && appStatus !== 'APPROVED' && appStatus !== 'REJECTED',
+                createdAt: (app.createdAt || new Date()).toISOString(),
+                updatedAt: (app.updatedAt || new Date()).toISOString(),
+              };
+              this.approvalTasks.set(taskKey, task);
+              this.approvalTasks.set(task.id, task);
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback safely
+    }
   }
 
   public getApprovalQueue(

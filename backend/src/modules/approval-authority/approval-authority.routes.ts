@@ -22,6 +22,8 @@ const getApprovalQueueHandler = asyncHandler(async (req: Request, res: Response)
   const actor = req.user as any;
   const tab = req.query.tab as string | undefined;
   const search = req.query.search as string | undefined;
+  const tenantId = actor?.tenantId || req.tenantId || 'tenant-adyapan-default';
+  await approvalAuthorityService.syncTasksFromDatabase(tenantId);
   const tasks = approvalAuthorityService.getApprovalQueue(actor, { tab, search });
   return ok(res, tasks);
 });

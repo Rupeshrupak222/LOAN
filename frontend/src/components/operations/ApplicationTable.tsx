@@ -1,11 +1,10 @@
-'use client';
-
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { User, ChevronLeft, ChevronRight, Eye, Send, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { User, ChevronLeft, ChevronRight, Eye, Send, ShieldCheck, CheckCircle2, Sliders } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useToast } from '@/lib/toast';
+import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui';
 
 interface Props {
@@ -17,8 +16,10 @@ interface Props {
 }
 
 export function ApplicationTable({ applications, meta, loading, onPageChange, onRefetch }: Props) {
+  const { user } = useAuth();
   const toast = useToast();
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const isUnderwriter = user?.roles?.includes('UNDERWRITER');
 
   async function handleSendToCredit(app: any) {
     if (sendingId) return;
@@ -125,9 +126,19 @@ export function ApplicationTable({ applications, meta, loading, onPageChange, on
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">
-                        {app.customerName || `${app.customer?.firstName || ''} ${app.customer?.lastName || ''}`.trim() || 'Borrower'}
-                      </div>
+                      {Boolean(app.customerId || app.customer?.id) ? (
+                        <Link
+                          href={`/customers/${app.customerId || app.customer?.id}`}
+                          className="font-semibold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline cursor-pointer block"
+                          title="Open Customer 360"
+                        >
+                          {app.customerName || `${app.customer?.firstName || ''} ${app.customer?.lastName || ''}`.trim() || 'Borrower'}
+                        </Link>
+                      ) : (
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">
+                          {app.customerName || `${app.customer?.firstName || ''} ${app.customer?.lastName || ''}`.trim() || 'Borrower'}
+                        </div>
+                      )}
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                         {app.customer?.customerCode || '—'} • {app.customer?.mobile || app.customerMobile || '—'}
                       </div>
@@ -179,16 +190,34 @@ export function ApplicationTable({ applications, meta, loading, onPageChange, on
                         {Boolean(app.customerId || app.customer?.id) && (
                           <Link
                             href={`/customers/${app.customerId || app.customer?.id}`}
-                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs hover:border-slate-300 transition-all shrink-0"
-                            title="View Customer 360 Profile"
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs hover:border-slate-300 transition-all shrink-0 cursor-pointer"
+                            title="Open Customer 360 Profile"
                           >
                             <User className="h-3.5 w-3.5 text-blue-500" />
                             <span>View Profile</span>
                           </Link>
                         )}
 
-                        {/* 2. Send to Credit Analyst / Status */}
-                        {isDraftOrPending ? (
+                        {/* 2. Underwriter / Operational Action */}
+                        {isUnderwriter && (app.status === 'UNDERWRITING' || app.stage === 'UNDERWRITING') ? (
+                          <Link
+                            href={`/underwriting?id=${app.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition-all shrink-0 cursor-pointer"
+                            title="Open Underwriting Workspace"
+                          >
+                            <Sliders className="h-3.5 w-3.5" />
+                            <span>Underwrite</span>
+                          </Link>
+                        ) : isUnderwriter && app.status === 'APPROVED' ? (
+                          <Link
+                            href={`/underwriting?id=${app.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all shrink-0 cursor-pointer"
+                            title="View Sanction Offer"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            <span>View Sanction</span>
+                          </Link>
+                        ) : isDraftOrPending ? (
                           <button
                             type="button"
                             onClick={() => handleSendToCredit(app)}
@@ -209,7 +238,7 @@ export function ApplicationTable({ applications, meta, loading, onPageChange, on
                         <Link
                           href={`/applications/${app.id}`}
                           className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-blue-600 hover:border-slate-300 dark:hover:bg-blue-950/40 transition-colors shrink-0"
-                          title="Open Application Workspace"
+                          title="Open Application Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>

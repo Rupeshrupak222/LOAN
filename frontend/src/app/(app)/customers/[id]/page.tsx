@@ -53,7 +53,7 @@ import { BankStatementIntelligenceCard } from '@/components/BankStatementIntelli
 import { CustomerCommunicationsCard } from '@/components/CustomerCommunicationsCard';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
 import { UnderwritingVerificationWizard } from '@/components/UnderwritingVerificationWizard';
-import { calculateApplicableDocuments, normalizeEmploymentType } from '@/lib/documentRules';
+import { calculateApplicableDocuments, normalizeEmploymentType, evaluateDocumentFulfillment } from '@/lib/documentRules';
 
 function getDocumentDisplayUrl(url?: string | null): string {
   if (!url) return '';
@@ -881,28 +881,173 @@ export default function CustomerDetailPage() {
       )}
 
       {/* Tab 2: KYC & Documents */}
-      {activeTab === 'kyc_docs' && (
-        <Card noPadding className="p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                KYC Compliance & Document Vault
-              </h3>
-              <p className="text-xs text-slate-500">Identity proofs, income documents, bank statements, and signed mandates</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {(isLoanOfficer || isAdmin) && !isBranchManager && (
-                <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
-                  + Upload Document
-                </Button>
-              )}
-              {isAdmin && (
-                <Button size="sm" onClick={() => setKycModalOpen(true)}>
-                  Update KYC Status
-                </Button>
-              )}
-            </div>
-          </div>
+      {activeTab === 'kyc_docs' && (() => {
+        const docFulfillment = evaluateDocumentFulfillment(
+          documents,
+          data.employmentType,
+          undefined,
+          { monthlyIncome: Number(data.monthlyIncome) || undefined }
+        );
+
+        const openQuickUpload = (category: string, defaultType: string) => {
+          setDocCategory(category);
+          setDocType(defaultType);
+          setSelectedFile(null);
+          setFilePreview(null);
+          setDocModalOpen(true);
+        };
+
+        return (
+          <div className="space-y-6">
+            {/* Dynamic Persona Document Requirements Grid Banner */}
+            <Card className="p-5 space-y-4 border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 via-white to-sky-50/30 dark:from-[#151932] dark:to-[#1E2445]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-slate-200 dark:border-slate-800">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      {docFulfillment.rules?.employmentType || data.employmentType} Borrower Requirements
+                    </span>
+                    {docFulfillment.isComplete ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-0.5 rounded-full">
+                        <CheckCircle className="h-3 w-3" /> All Mandatory Documents Fulfilled
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-100 dark:bg-rose-950 dark:text-rose-300 px-2.5 py-0.5 rounded-full">
+                        <AlertCircle className="h-3 w-3" /> {docFulfillment.missingNames.length} Mandatory Document(s) Missing
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Dynamic KYC & Underwriting Document Checklist
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    To originate loan applications and pass Credit Assessment steps without rejection, all mandatory borrower documents must be uploaded.
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Fulfillment: <span className={cn(docFulfillment.isComplete ? 'text-emerald-600' : 'text-amber-600')}>{docFulfillment.uploadedCount} / {docFulfillment.mandatoryCount}</span> Mandatory
+                  </div>
+                  <div className="w-36 h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-1.5 overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-300',
+                        docFulfillment.isComplete ? 'bg-emerald-500' : 'bg-amber-500'
+                      )}
+                      style={{
+                        width: `${Math.min(100, Math.round((docFulfillment.uploadedCount / Math.max(1, docFulfillment.mandatoryCount)) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid of persona requirement cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {docFulfillment.checklistStatus.map((item) => {
+                  const rule = item.rule;
+                  const isSatisfied = item.isSatisfied;
+                  const isVerified = item.matchingDocs.some((d: any) => d.status === 'VERIFIED' || d.verified);
+                  const isMandatory = rule.status === 'MANDATORY';
+
+                  return (
+                    <div
+                      key={rule.code}
+                      className={cn(
+                        'rounded-xl border p-3.5 space-y-2.5 transition-all text-xs flex flex-col justify-between',
+                        isVerified
+                          ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/30'
+                          : isSatisfied
+                          ? 'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/30'
+                          : isMandatory
+                          ? 'border-rose-200 bg-rose-50/40 dark:border-rose-900/50 dark:bg-rose-950/30'
+                          : 'border-slate-200 bg-slate-50/40 dark:border-slate-800 dark:bg-slate-900/40'
+                      )}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
+                            {rule.name}
+                          </span>
+                          <span
+                            className={cn(
+                              'text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-wider uppercase shrink-0',
+                              isMandatory
+                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            )}
+                          >
+                            {isMandatory ? 'Mandatory' : 'Optional'}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                          {rule.description}
+                        </p>
+
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
+                          Accepted: {rule.acceptedDocumentTypes.slice(0, 3).join(', ')}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-2">
+                        {isVerified ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400 text-[11px]">
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Verified ✓</span>
+                          </span>
+                        ) : isSatisfied ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 text-[11px]">
+                            <Clock className="h-3.5 w-3.5 text-amber-600" />
+                            <span>Uploaded (Pending)</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400 text-[11px]">
+                            <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                            <span>Missing</span>
+                          </span>
+                        )}
+
+                        {(isLoanOfficer || isAdmin) && !isBranchManager && (
+                          <Button
+                            size="sm"
+                            variant={isSatisfied ? 'secondary' : 'primary'}
+                            className="text-[11px] h-6 px-2 shrink-0 cursor-pointer"
+                            onClick={() => openQuickUpload(rule.category, rule.acceptedDocumentTypes[0] || 'DOCUMENT')}
+                          >
+                            {isSatisfied ? 'Re-upload' : '+ Upload'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* Document Vault Table Card */}
+            <Card noPadding className="p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Uploaded Document Vault ({documents.length})
+                  </h3>
+                  <p className="text-xs text-slate-500">All identity proofs, income proofs, bank records, and collateral documents</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(isLoanOfficer || isAdmin) && !isBranchManager && (
+                    <Button size="sm" variant="secondary" onClick={() => setDocModalOpen(true)}>
+                      + Upload Custom Doc
+                    </Button>
+                  )}
+                  {isAdmin && (
+                    <Button size="sm" onClick={() => setKycModalOpen(true)}>
+                      Update KYC Status
+                    </Button>
+                  )}
+                </div>
+              </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -1033,7 +1178,9 @@ export default function CustomerDetailPage() {
             </table>
           </div>
         </Card>
-      )}
+      </div>
+    );
+  })()}
 
       {/* Tab 3: Banking & Employment */}
       {activeTab === 'banking' && (

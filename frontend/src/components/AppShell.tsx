@@ -81,8 +81,9 @@ const NAV_ICONS: Record<string, any> = {
   'loan-products': Building2,
   'branch-review': FileCheck,
   'underwriting-queue': ClipboardCheck,
-  underwriting: FileCheck,
+  'my-cases': UserCheck,
   'approval-queue': FileCheck,
+  underwriting: FileCheck,
   'approval-tasks': FileCheck,
   loans: DollarSign,
   disbursements: Wallet,
@@ -235,9 +236,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const roleCfg = ROLE_CONFIG[primaryRole] || ROLE_CONFIG.CUSTOMER;
   const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
 
-  const currentItem = accessibleNav.find(
-    (item) => item.href === pathname || (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
-  );
+  const isItemActive = (href: string) => {
+    if (!pathname || !href) return false;
+    if (pathname === href) return true;
+    if (href === '/dashboard' || href === '/' || href === '/borrower') return false;
+    return pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}?`);
+  };
+
+  const currentItem = accessibleNav.find((item) => isItemActive(item.href));
   const isDashboard = pathname === '/dashboard';
   const isAccessibleRoute = isDashboard || canAccessRoute(user, pathname);
   const currentLabel = currentItem?.label || 'Dashboard';
@@ -387,9 +393,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   { label: 'Platform Operations', href: '/operations', icon: Activity },
                   { label: 'Governance & Audit', href: '/audit-logs', icon: ScrollText },
                 ].map((item) => {
-                  const active =
-                    pathname === item.href ||
-                    (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
+                  const active = isItemActive(item.href);
                   const Icon = item.icon;
 
                   return (
@@ -422,9 +426,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {roleCfg.nav.map((navKey) => {
                   const navItem = NAV_ITEMS[navKey];
                   if (!navItem) return null;
-                  const active =
-                    pathname === navItem.href ||
-                    (navItem.label !== 'Dashboard' && navItem.label !== 'Borrower Overview' && navItem.href !== '/dashboard' && pathname.startsWith(navItem.href + '/'));
+                  const active = isItemActive(navItem.href);
                   const Icon = NAV_ICONS[navKey] || LayoutDashboard;
 
                   return (
@@ -463,9 +465,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </p>
                   <div className="space-y-0.5 pt-1">
                     {items.map((item) => {
-                      const active =
-                        pathname === item.href ||
-                        (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
+                      const active = isItemActive(item.href);
                       const Icon = NAV_ICONS[item.key] || LayoutDashboard;
 
                       return (

@@ -151,7 +151,7 @@ export function AppSidebar({ open, onClose, collapsed = false }: AppSidebarProps
                   const ItemIcon = ICON_MAP[item.icon] || FileText;
                   const isActive =
                     pathname === item.route ||
-                    (item.label !== 'Dashboard' && item.label !== 'Borrower Overview' && item.route !== '/dashboard' && pathname.startsWith(item.route + '/'));
+                    (item.route !== '/dashboard' && item.route !== '/borrower' && (pathname.startsWith(`${item.route}/`) || pathname.startsWith(`${item.route}?`)));
 
                   return (
                     <Link
