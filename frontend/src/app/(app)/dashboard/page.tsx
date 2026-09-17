@@ -73,6 +73,7 @@ import { LoanOfficerDashboardView } from '@/features/origination';
 import { CreditAnalystDashboardView } from '@/components/CreditAnalystDashboardView';
 import { SuperAdminDashboardView } from '@/components/SuperAdminDashboardView';
 import { UnderwriterDashboardView } from '@/components/UnderwriterDashboardView';
+import { FinanceDashboardView } from '@/components/FinanceDashboardView';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -381,6 +382,10 @@ export default function DashboardPage() {
 
   if (primaryRole === 'UNDERWRITER') {
     return <UnderwriterDashboardView />;
+  }
+
+  if (primaryRole === 'FINANCE_OFFICER') {
+    return <FinanceDashboardView />;
   }
 
   const cardBgClass = isDark

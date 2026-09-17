@@ -180,6 +180,17 @@ export class OperationsService {
       }
     }
 
+    if (
+      roles?.some((r) => ['FINANCE_OFFICER', 'FINANCE_CONTROLLER', 'DISBURSEMENT_OFFICER'].includes(r)) &&
+      !roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'OPERATIONS_MANAGER', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r))
+    ) {
+      if (!query.status && !query.stage) {
+        conditions.push({
+          status: { in: ['READY_FOR_DISBURSEMENT', 'DISBURSED'] },
+        });
+      }
+    }
+
     if (query.stage) {
       conditions.push({ stage: query.stage });
     }

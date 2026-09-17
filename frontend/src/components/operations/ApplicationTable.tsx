@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { User, ChevronLeft, ChevronRight, Eye, Send, ShieldCheck, CheckCircle2, Sliders } from 'lucide-react';
+import { User, ChevronLeft, ChevronRight, Eye, Send, ShieldCheck, CheckCircle2, Sliders, Coins, Wallet } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils';
 import { api, apiErrorMessage } from '@/lib/api';
 import { useToast } from '@/lib/toast';
@@ -20,6 +20,9 @@ export function ApplicationTable({ applications, meta, loading, onPageChange, on
   const toast = useToast();
   const [sendingId, setSendingId] = useState<string | null>(null);
   const isUnderwriter = user?.roles?.includes('UNDERWRITER');
+  const isFinanceOfficer = user?.roles?.some((r: string) =>
+    ['FINANCE_OFFICER', 'FINANCE_CONTROLLER', 'DISBURSEMENT_OFFICER'].includes(r)
+  );
 
   async function handleSendToCredit(app: any) {
     if (sendingId) return;
@@ -198,8 +201,26 @@ export function ApplicationTable({ applications, meta, loading, onPageChange, on
                           </Link>
                         )}
 
-                        {/* 2. Underwriter / Operational Action */}
-                        {isUnderwriter && (app.status === 'UNDERWRITING' || app.stage === 'UNDERWRITING') ? (
+                        {/* 2. Underwriter / Operational / Finance Action */}
+                        {isFinanceOfficer && app.status === 'READY_FOR_DISBURSEMENT' ? (
+                          <Link
+                            href={`/finance-queue/${app.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all shrink-0 cursor-pointer"
+                            title="Open Finance & Disbursement Desk"
+                          >
+                            <Coins className="h-3.5 w-3.5" />
+                            <span>Finance Desk</span>
+                          </Link>
+                        ) : isFinanceOfficer && app.status === 'DISBURSED' ? (
+                          <Link
+                            href={`/disbursements`}
+                            className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all shrink-0 cursor-pointer"
+                            title="View Disbursement History"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>Disbursed</span>
+                          </Link>
+                        ) : isUnderwriter && (app.status === 'UNDERWRITING' || app.stage === 'UNDERWRITING') ? (
                           <Link
                             href={`/underwriting?id=${app.id}`}
                             className="inline-flex items-center justify-center gap-1.5 w-[130px] h-[34px] px-2.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition-all shrink-0 cursor-pointer"

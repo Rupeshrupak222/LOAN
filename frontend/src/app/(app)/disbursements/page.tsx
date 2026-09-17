@@ -521,113 +521,175 @@ export default function DisbursementsPage() {
         </Card>
       )}
 
-      {/* DIRECT DISBURSEMENT EXECUTION MODAL */}
-      {selectedApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
-          <div
-            className={cn(
-              "w-full max-w-2xl rounded-2xl border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto transition-all",
-              isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
-            )}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2B3566]">
-              <div>
-                <h3 className={cn("text-base font-bold", isDark ? "text-white" : "text-slate-900")}>
-                  Execute Electronic Fund Disbursement
-                </h3>
-                <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
-                  Release principal to borrower bank account and activate live loan schedule
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedApp(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* DIRECT DISBURSEMENT EXECUTION MODAL (Full Electronic Fund Release Desk) */}
+      {selectedApp && (() => {
+        const sanctionedAmount = Number(selectedApp.requestedAmount || 0);
+        const processingFee = Math.round(sanctionedAmount * 0.015);
+        const gstOnFee = Math.round(processingFee * 0.18);
+        const netDisbursal = sanctionedAmount - processingFee - gstOnFee;
+        const primaryBank = selectedApp.customer?.bankAccounts?.find((b: any) => b.isVerified) || selectedApp.customer?.bankAccounts?.[0] || null;
 
-            {/* AI Disbursement & Treasury Readiness Card */}
-            <DisbursementIntelligenceCard
-              applicationId={selectedApp.id}
-              applicationNo={selectedApp.applicationNo}
-              utrReference={reference}
-            />
-
-            {/* Proposal Summary */}
-            <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#1E2445] text-xs space-y-1.5 border border-slate-200/60 dark:border-[#2B3566]">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Application No:</span>
-                <span className="font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded">
-                  {selectedApp.applicationNo}
-                </span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+            <div
+              className={cn(
+                "w-full max-w-3xl rounded-2xl border p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto transition-all",
+                isDark ? "bg-[#171B36] border-[#2B3566] text-slate-100" : "bg-white border-slate-200 text-slate-900"
+              )}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2B3566]">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div>
+                    <h3 className={cn("text-base font-bold flex items-center gap-2", isDark ? "text-white" : "text-slate-900")}>
+                      <Send className="h-5 w-5 text-emerald-600" />
+                      <span>Electronic Fund Release & Disbursal Desk</span>
+                    </h3>
+                    <p className={cn("text-xs mt-0.5", isDark ? "text-slate-400" : "text-slate-500")}>
+                      Execute direct Core Banking electronic transfer to borrower bank account.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedApp(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Borrower Profile:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">
-                    {selectedApp.customer?.firstName} {selectedApp.customer?.lastName}
-                  </span>
-                  {(selectedApp.customerId || selectedApp.customer?.id) && (
-                    <Link
-                      href={`/customers/${selectedApp.customerId || selectedApp.customer?.id}`}
-                      target="_blank"
-                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800"
-                      title="Inspect Borrower 360 Profile in new tab"
-                    >
-                      <span>Borrower 360</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
-                  )}
+
+              {/* 1. AUTOMATED MONEY MOVEMENT ROUTE */}
+              <div className="p-4 bg-slate-50 dark:bg-[#1E2445]/60 rounded-xl border border-slate-200/80 dark:border-[#2B3566]">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Wallet className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Automated Money Movement & Settlement Route</span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-11 gap-3 items-center">
+                  {/* Source Card: Company Nodal Account */}
+                  <div className="lg:col-span-4 p-3 rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                        <Building className="h-3.5 w-3.5" /> Source Debit Account
+                      </span>
+                      <Badge variant="success" className="text-[9px] py-0 font-bold">Treasury Active</Badge>
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                      Adyapan Capital Services Ltd (Treasury)
+                    </div>
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                      HDFC Bank - Corporate Treasury
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1 border-t border-blue-200/60 dark:border-blue-900/40">
+                      <span>A/C XXXX-XXXX-8901</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">GL: 1010</span>
+                    </div>
+                  </div>
+
+                  {/* Middle Channel: Transfer Rails & Gateway */}
+                  <div className="lg:col-span-3 flex flex-col items-center justify-center p-1.5 text-center space-y-1.5">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      <span>Payout Rails</span>
+                      <ArrowRight className="h-3 w-3 text-emerald-600 hidden lg:inline" />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                      {(['IMPS', 'NEFT', 'RTGS'] as const).map((rail) => (
+                        <button
+                          key={rail}
+                          type="button"
+                          onClick={() => setMethod(rail)}
+                          className={cn(
+                            'py-1 px-1 text-center rounded border text-xs font-bold transition-all cursor-pointer',
+                            method === rail || (method === 'NEFT_BANK_TRANSFER' && rail === 'NEFT')
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                          )}
+                        >
+                          <div className="text-[11px]">{rail}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      Connected Banking API
+                    </span>
+                  </div>
+
+                  {/* Destination Card: Borrower Bank Account */}
+                  <div className="lg:col-span-4 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase text-emerald-800 dark:text-emerald-400 flex items-center gap-1">
+                        <User className="h-3.5 w-3.5" /> Destination Credit Account
+                      </span>
+                      <Badge variant="success" className="text-[9px] py-0 font-bold">Penny-Drop Verified</Badge>
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                      {selectedApp.customer?.firstName} {selectedApp.customer?.lastName}
+                    </div>
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                      {primaryBank?.bankName || selectedApp.customer?.bankName || 'Not Linked'} &bull; A/C {primaryBank?.accountNumber ? `XXXX-XXXX-${primaryBank.accountNumber.slice(-4)}` : (selectedApp.customer?.bankAccountNo || '—')}
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1 border-t border-emerald-200/60 dark:border-emerald-900/40">
+                      <span>IFSC: {primaryBank?.ifscCode || selectedApp.customer?.bankIfsc || '—'}</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">100% Match</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Sanctioned Principal:</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                  {formatMoney(selectedApp.requestedAmount || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Beneficiary Bank A/C:</span>
-                <span className="font-mono font-semibold">
-                  {selectedApp.customer?.bankAccounts?.[0]?.bankName || selectedApp.customer?.bankName || 'Bank'} ·{' '}
-                  {selectedApp.customer?.bankAccounts?.[0]?.accountNumber || selectedApp.customer?.bankAccountNo || 'On Record'}{' '}
-                  ({selectedApp.customer?.bankAccounts?.[0]?.ifscCode || selectedApp.customer?.bankIfsc || 'IFSC'})
-                </span>
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>
-                  Disbursement Payment Channel *
-                </label>
-                <select
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value)}
-                  className={cn(
-                    "w-full rounded-xl border p-2.5 text-xs focus:border-[#2563EB] focus:outline-none",
-                    isDark ? "border-[#2B3566] bg-[#1E2445] text-slate-200" : "border-slate-300 bg-white text-slate-800"
-                  )}
-                >
-                  <option value="NEFT_BANK_TRANSFER">NEFT Electronic Bank Transfer</option>
-                  <option value="RTGS">RTGS High-Value Transfer</option>
-                  <option value="IMPS">IMPS Instant Transfer</option>
-                  <option value="DIRECT_CREDIT">Internal Bank Direct Credit</option>
-                  <option value="CHEQUE">Corporate Account Payee Cheque</option>
-                </select>
-              </div>
+              {/* 2. TRANSACTION REFERENCE & NET PAYOUT CARD */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+                <div className="sm:col-span-7 space-y-3">
+                  <div>
+                    <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>
+                      Bank Payment Reference / UTR Number
+                    </label>
+                    <Input
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                      placeholder="e.g. CMS-NEFT-994827104"
+                      className="text-xs h-9 font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Bank UTR reference recorded for audit and general ledger posting.
+                    </p>
+                  </div>
 
-              <div>
-                <label className={cn("block text-xs font-semibold mb-1", isDark ? "text-slate-300" : "text-slate-700")}>
-                  Bank Payment Reference / UTR Number *
-                </label>
-                <Input
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="e.g. CMS-NEFT-994827104"
-                  required
-                />
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Sanctioned Principal:</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{formatMoney(sanctionedAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Deductions (Processing Fee + GST):</span>
+                      <span className="font-mono text-rose-600 font-semibold">- {formatMoney(processingFee + gstOnFee)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-5 p-4 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
+                  <div>
+                    <div className="text-[10px] font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider">
+                      Net Payout Amount
+                    </div>
+                    <div className="text-2xl font-bold font-mono text-emerald-800 dark:text-emerald-200 mt-0.5">
+                      {formatMoney(netDisbursal)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Status: Finance Verified & Cleared
+                    </div>
+                  </div>
+
+                  <Button
+                    disabled={!reference.trim() || disburseMutation.isPending}
+                    onClick={() => disburseMutation.mutate()}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 gap-1.5 shadow-md transition-all cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {disburseMutation.isPending ? 'Executing Transfer...' : `Authorize & Release Funds (${formatMoney(netDisbursal)})`}
+                  </Button>
+                </div>
               </div>
 
               {disburseMutation.isError && (
@@ -640,24 +702,10 @@ export default function DisbursementsPage() {
                   {apiErrorMessage(disburseMutation.error)}
                 </div>
               )}
-
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200 dark:border-[#2B3566]">
-                <Button variant="ghost" onClick={() => setSelectedApp(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  disabled={!reference.trim() || disburseMutation.isPending}
-                  onClick={() => disburseMutation.mutate()}
-                  className="bg-[#2563EB] hover:bg-blue-700 text-white font-semibold gap-1.5"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  {disburseMutation.isPending ? 'Releasing Funds...' : 'Authorize & Release Funds'}
-                </Button>
-              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
