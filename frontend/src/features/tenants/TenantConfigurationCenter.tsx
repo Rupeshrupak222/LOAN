@@ -118,13 +118,13 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
 
   const tabs = [
     { key: 'profile', label: 'Organization Profile', icon: <Building2 className="w-4 h-4" /> },
-    { key: 'readiness', label: 'Readiness & Health', icon: <Activity className="w-4 h-4" />, badge: `${readiness.readinessScorePct}%` },
-    { key: 'branches', label: 'Branches', icon: <Building2 className="w-4 h-4" />, count: branches.length },
-    { key: 'users', label: 'Staff Users', icon: <Users className="w-4 h-4" />, count: users.length },
-    { key: 'products', label: 'Loan Products', icon: <Layers className="w-4 h-4" />, count: productsSummary.total },
-    { key: 'workflows', label: 'Workflows', icon: <GitBranch className="w-4 h-4" />, count: workflowsSummary.total },
-    { key: 'bre', label: 'Decision Engine (BRE)', icon: <Sliders className="w-4 h-4" />, count: decisionPoliciesSummary.activePolicies },
-    { key: 'approval', label: 'Approval Matrix', icon: <ShieldCheck className="w-4 h-4" />, count: approvalMatrixSummary.levelsCount },
+    { key: 'readiness', label: 'Readiness & Health', icon: <Activity className="w-4 h-4" />, badge: `${readiness?.readinessScorePct || 0}%` },
+    { key: 'branches', label: 'Branches', icon: <Building2 className="w-4 h-4" />, count: branches?.length || 0 },
+    { key: 'users', label: 'Staff Users', icon: <Users className="w-4 h-4" />, count: users?.length || 0 },
+    { key: 'products', label: 'Loan Products', icon: <Layers className="w-4 h-4" />, count: productsSummary?.total || 0 },
+    { key: 'workflows', label: 'Workflows', icon: <GitBranch className="w-4 h-4" />, count: workflowsSummary?.total || 0 },
+    { key: 'bre', label: 'Decision Engine (BRE)', icon: <Sliders className="w-4 h-4" />, count: decisionPoliciesSummary?.activePolicies || 0 },
+    { key: 'approval', label: 'Approval Matrix', icon: <ShieldCheck className="w-4 h-4" />, count: approvalMatrixSummary?.levelsCount || 0 },
     { key: 'credit-limits', label: 'Credit Limits', icon: <CreditCard className="w-4 h-4" /> },
     { key: 'branding', label: 'White-Label Branding', icon: <Palette className="w-4 h-4" /> },
   ];
@@ -137,7 +137,7 @@ export const TenantConfigurationCenter: React.FC<TenantConfigurationCenterProps>
           <div className="flex items-center gap-4">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg"
-              style={{ backgroundColor: branding.primaryColor || '#2563EB' }}
+              style={{ backgroundColor: branding?.primaryColor || '#2563EB' }}
             >
               {tenant.code.slice(0, 2)}
             </div>

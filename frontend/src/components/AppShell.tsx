@@ -239,7 +239,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isItemActive = (href: string) => {
     if (!pathname || !href) return false;
     if (pathname === href) return true;
-    if (href === '/dashboard' || href === '/') return false;
+    if (href === '/dashboard' || href === '/' || href === '/borrower') return false;
     return pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}?`);
   };
 

@@ -510,7 +510,7 @@ export function CreditAssessmentWorkspace({
     },
   });
 
-  // Step 2: Verify Single Document Mutation
+  // Step 2: Verify Single Document Mutation (Fixed with Instant UI Update)
   const verifyDocMutation = useMutation({
     mutationFn: async (docId: string) => {
       const remarks = docRemarksMap[docId] || 'Document inspected and verified valid by Credit Analyst';
@@ -520,15 +520,38 @@ export function CreditAssessmentWorkspace({
         remarks,
       });
     },
+    onMutate: async (docId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['credit-assessment', applicationId] });
+      const previousData = queryClient.getQueryData(['credit-assessment', applicationId]);
+      queryClient.setQueryData(['credit-assessment', applicationId], (old: any) => {
+        if (!old || !old.kycChecklist) return old;
+        return {
+          ...old,
+          kycChecklist: {
+            ...old.kycChecklist,
+            documents: old.kycChecklist.documents.map((d: any) => 
+              d.id === docId ? { ...d, status: 'VERIFIED', verified: true } : d
+            )
+          }
+        };
+      });
+      return { previousData };
+    },
     onSuccess: () => {
       toast.success('Document marked as verified.');
+    },
+    onError: (err: any, docId, context: any) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['credit-assessment', applicationId], context.previousData);
+      }
+      toast.error(apiErrorMessage(err), { title: 'Document Verification Error' });
+    },
+    onSettled: () => {
       refetch();
       refetchCapacity();
       queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
-    },
-    onError: (err: any) => {
-      toast.error(apiErrorMessage(err), { title: 'Document Verification Error' });
-    },
+      queryClient.invalidateQueries({ queryKey: ['credit-assessment', applicationId] });
+    }
   });
 
   // Step 2: Batch Verify All Uploaded Documents
@@ -1497,7 +1520,7 @@ export function CreditAssessmentWorkspace({
                               <Button
                                 size="sm"
                                 onClick={() => verifyDocMutation.mutate(doc.id)}
-                                disabled={verifyDocMutation.isPending}
+                                disabled={verifyDocMutation.isPending && verifyDocMutation.variables === doc.id}
                                 className="gap-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto shadow-xs whitespace-nowrap shrink-0"
                               >
                                 <Check className="w-3 h-3" /> Verify Document
@@ -2661,11 +2684,15 @@ export function CreditAssessmentWorkspace({
                   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
                     return raw;
                   }
+                  const backendBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
                   if (raw.startsWith('/uploads')) {
-                    const backendBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
                     return `${backendBase}${raw}`;
                   }
-                  return raw;
+                  if (raw.startsWith('/')) {
+                    return raw;
+                  }
+                  // If it's a raw filename, assume it's in the backend uploads directory
+                  return `${backendBase}/uploads/${raw}`;
                 };
 
                 const fileUrl = getDocUrl(previewDoc);
@@ -2750,7 +2777,7 @@ export function CreditAssessmentWorkspace({
                       verifyDocMutation.mutate(previewDoc.id);
                       setPreviewDoc({ ...previewDoc, verified: true, status: 'VERIFIED' });
                     }}
-                    disabled={verifyDocMutation.isPending}
+                    disabled={verifyDocMutation.isPending && verifyDocMutation.variables === previewDoc.id}
                     className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer shadow-xs"
                   >
                     <Check className="w-3.5 h-3.5" />

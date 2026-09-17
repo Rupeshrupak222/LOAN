@@ -489,6 +489,9 @@ export async function generateDecisionIntelligence(
       'DISBURSEMENT_OFFICER',
       'COLLECTION_OFFICER',
       'AUDITOR',
+      'RISK_MANAGER',
+      'FRAUD_ANALYST',
+      'RISK_ANALYST'
     ].includes(r)
   );
   if (!isStaff) {
