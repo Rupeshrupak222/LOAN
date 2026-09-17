@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const validKey = '/uploads/documents/CUST-260916174360200001439_1789555800216.png'; const result = await prisma.document.updateMany({ data: { storageKey: validKey } }); console.log('Updated ' + result.count + ' documents to valid image!'); } main();

@@ -68,9 +68,12 @@ export const BorrowerPersonalStep: React.FC<Props> = ({
       errs.dateOfBirth = 'Date of birth is required';
     } else {
       const birthDate = new Date(formData.dateOfBirth);
-      const ageDifMs = Date.now() - birthDate.getTime();
-      const ageDate = new Date(ageDifMs);
-      const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
       if (age < 18) {
         errs.dateOfBirth = 'Applicant must be at least 18 years old';
       }

@@ -61,6 +61,19 @@ export async function listApplications(
         { customer: { branchId: null } },
       ];
     }
+
+    // Restrict underwriters to applications forwarded to underwriting
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
+    ) {
+      const allowedStatuses = ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'];
+      if (status && !allowedStatuses.includes(status)) {
+        where.status = 'UNDERWRITING'; // Unmatchable if they queried a status they don't have access to
+      } else if (!status) {
+        where.status = { in: allowedStatuses };
+      }
+    }
   }
 
   const [rows, total] = await Promise.all([
@@ -440,6 +453,15 @@ export async function getApplication(id: string, actor?: ApplicationActorContext
       app.customer.branchId !== actor.branchId
     ) {
       throw new ForbiddenError('Access forbidden: Application belongs to another branch');
+    }
+
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
+    ) {
+      if (!['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)) {
+        throw new ForbiddenError('Access forbidden: Underwriters can only view applications forwarded to underwriting');
+      }
     }
   }
 
