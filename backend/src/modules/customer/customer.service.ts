@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import argon2 from 'argon2';
 import { prisma } from '../../config/prisma';
-import { NotFoundError, ForbiddenError } from '../../common/errors';
+import { NotFoundError, ForbiddenError, ConflictError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { generateCustomerCode } from '../shared/codes';
 import { Money } from '../finance/money';
@@ -529,6 +529,12 @@ export async function createCustomer(
     // If email is provided, create linked User account with CUSTOMER role and hashed password
     if (input.email && passwordHash) {
       const cleanEmail = input.email.toLowerCase().trim();
+
+      const existingUser = await tx.user.findUnique({ where: { email: cleanEmail } });
+      if (existingUser) {
+        throw new ConflictError('Email already exists, use different email');
+      }
+
       const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
 
       const user = await tx.user.upsert({
