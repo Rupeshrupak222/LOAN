@@ -208,8 +208,13 @@ export default function TasksPage() {
   // ─── 3. UNDERWRITER TASKS ───
   if (isUnderwriter || isManagerOrAdmin) {
     apps
-      .filter((a) => a.status === 'UNDERWRITING')
+      .filter((a) =>
+        ['UNDERWRITING', 'IN_REVIEW', 'READY_FOR_SANCTION', 'DEVIATION', 'ESCALATED', 'AWAITING_INFO'].includes(a.status)
+      )
       .forEach((a) => {
+        const isDev = a.status === 'DEVIATION' || a.status === 'ESCALATED';
+        const isAwaiting = a.status === 'AWAITING_INFO';
+        const isReady = a.status === 'READY_FOR_SANCTION';
         tasks.push({
           id: `task-uw-sanction-${a.id}`,
           applicationId: a.id,
@@ -218,13 +223,23 @@ export default function TasksPage() {
           customerName: a.customerName,
           customerMobile: a.customer?.mobile || 'N/A',
           taskType: 'UNDERWRITING_DECISION',
-          title: 'Underwriting Appraisal & Sanction Decision',
-          reason: 'Credit Assessment complete. Proposal pending final sanction, return, or rejection.',
-          stage: 'UNDERWRITING',
-          priority: 'HIGH',
+          title: isDev
+            ? 'Deviation & Escalation Authority Review'
+            : isAwaiting
+            ? 'Additional Information & Stipulations Review'
+            : isReady
+            ? 'Sanction Approval & Decision Finalization'
+            : 'Underwriting Appraisal & Sanction Decision',
+          reason: isDev
+            ? 'Policy deviation or threshold breach requires authority review.'
+            : isAwaiting
+            ? 'Clarification pending underwriter review.'
+            : 'Credit Assessment complete. Proposal pending final sanction, return, or rejection.',
+          stage: a.status || 'UNDERWRITING',
+          priority: isDev ? 'HIGH' : a.priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
           createdAt: a.updatedAt || a.createdAt,
-          actionLabel: 'Review for Sanction',
-          actionHref: `/underwriting?applicationId=${a.id}`,
+          actionLabel: 'Open Workspace',
+          actionHref: `/underwriting?id=${a.id}`,
         });
       });
   }

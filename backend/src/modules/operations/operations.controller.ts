@@ -17,7 +17,8 @@ export class OperationsController {
 
   async listApplications(req: Request, res: Response) {
     const tenantId = (req as any).user?.tenantId;
-    const result = await operationsService.listApplications(req.query as any, tenantId);
+    const roles = (req as any).user?.roles;
+    const result = await operationsService.listApplications(req.query as any, tenantId, roles);
     return res.json({ success: true, data: result.data, meta: result.meta });
   }
 

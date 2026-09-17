@@ -15,7 +15,7 @@ export async function getReadyForDisbursementQueue(actor?: {
   branchId?: string;
 }) {
   const where: any = {
-    status: { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'] },
+    status: 'READY_FOR_DISBURSEMENT',
   };
 
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {

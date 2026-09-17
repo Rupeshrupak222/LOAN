@@ -409,11 +409,32 @@ export async function getAssessmentDetail(
   const monthlyIncome = Number(customer.monthlyIncome || 0);
   const existingObligations = Number(customer.existingObligations || 0);
 
-  // 1. Authoritative FOIR / DTI Calculation
+  // Normalize employment persona for strict policy rule enforcement
+  const rawEmp = (customer.employmentType || '').toUpperCase().trim();
+  const isStudent = rawEmp === 'STUDENT';
+  const isHomemaker = rawEmp === 'HOMEMAKER';
+  const isSelfEmployed = ['SELF_EMPLOYED', 'BUSINESS', 'BUSINESS_OWNER'].includes(rawEmp);
+  const isProfessional = rawEmp === 'PROFESSIONAL';
+  const isFarmer = rawEmp === 'FARMER';
+  const isRetired = rawEmp === 'RETIRED';
+
+  // 1. Authoritative FOIR / DTI Calculation with Persona Specific Limits
   const tenantId = app.tenantId || 'tenant-adyapan-default';
   const foirConfig = configurationService.getTenantConfig<any>(tenantId, 'FOIR_DTI');
-  const maxAllowedFoirPct = Number(foirConfig?.maxDtiRatio ? foirConfig.maxDtiRatio * 100 : 55);
-  const warningFoirPct = Number(foirConfig?.warningDtiRatio ? foirConfig.warningDtiRatio * 100 : 45);
+  
+  let maxAllowedFoirPct = Number(foirConfig?.maxDtiRatio ? foirConfig.maxDtiRatio * 100 : 55);
+  let warningFoirPct = Number(foirConfig?.warningDtiRatio ? foirConfig.warningDtiRatio * 100 : 45);
+
+  if (isSelfEmployed || isProfessional) {
+    maxAllowedFoirPct = 65; // Business & Professional allowed up to 65% DTI
+    warningFoirPct = 55;
+  } else if (isRetired) {
+    maxAllowedFoirPct = 50; // Pensioner strict limit 50% DTI
+    warningFoirPct = 40;
+  } else {
+    maxAllowedFoirPct = 55; // Salaried, Farmer, Student, Homemaker, Freelancer standard 55%
+    warningFoirPct = 45;
+  }
 
   const emiCalc = calculateEmi(requestedAmount, interestRate, tenureMonths);
   const proposedEmi = Number(emiCalc.emi || 0);
@@ -460,7 +481,7 @@ export async function getAssessmentDetail(
   const unverifiedDocs = docs.filter((d) => !d.verified && d.status !== 'VERIFIED').map((d) => d.documentType || d.fileName);
   const verifiedDocs = docs.filter((d) => d.verified || d.status === 'VERIFIED');
 
-  // Age calculation and policy verification
+  // Age calculation and policy verification per Persona Rules
   const calculateAge = (dobString?: Date | string | null): number | null => {
     if (!dobString) return null;
     const dob = new Date(dobString);
@@ -476,16 +497,31 @@ export async function getAssessmentDetail(
 
   const borrowerAge = calculateAge(customer.dateOfBirth);
   const tenantEligibilityConfig = configurationService.getTenantConfig<any>(tenantId, 'ELIGIBILITY');
-  const minAge = Number(tenantEligibilityConfig?.minAge ?? 21);
-  const maxAge = Number(tenantEligibilityConfig?.maxAge ?? 60);
+  
+  let minAge = Number(tenantEligibilityConfig?.minAge ?? 21);
+  let maxAge = Number(tenantEligibilityConfig?.maxAge ?? 60);
+
+  if (isStudent) {
+    minAge = 18;
+    maxAge = 35; // Student Age Range: 18 - 35
+  } else if (isRetired) {
+    minAge = 50;
+    maxAge = 75; // Retired / Pensioner Age Range: 50 - 75
+  } else if (isSelfEmployed || isProfessional || isFarmer || isHomemaker) {
+    minAge = 21;
+    maxAge = 65; // Business, Professional, Farmer, Homemaker Age Range: 21 - 65
+  } else {
+    minAge = 21;
+    maxAge = 60; // Salaried, Freelancer, Other Age Range: 21 - 60
+  }
 
   let ageError: string | null = null;
   if (borrowerAge === null) {
     ageError = 'Date of birth is missing or unverified on borrower profile';
   } else if (borrowerAge < minAge) {
-    ageError = `Borrower age (${borrowerAge} yrs) is below minimum policy requirement (${minAge} yrs)`;
+    ageError = `Borrower age (${borrowerAge} yrs) is below minimum policy requirement (${minAge} yrs for ${rawEmp || 'profile'})`;
   } else if (borrowerAge > maxAge) {
-    ageError = `Borrower age (${borrowerAge} yrs) exceeds maximum allowable age (${maxAge} yrs)`;
+    ageError = `Borrower age (${borrowerAge} yrs) exceeds maximum allowable age (${maxAge} yrs for ${rawEmp || 'profile'})`;
   }
   const isAgeValid = ageError === null;
 

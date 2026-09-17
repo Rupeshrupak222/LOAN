@@ -89,4 +89,10 @@ export const approvalAuthorityApi = {
     const res = await api.post(`/delegations/delegations/${delegationId}/revoke`);
     return res.data?.data || res.data;
   },
+
+  // Finance Routing
+  forwardToFinance: async (applicationId: string): Promise<any> => {
+    const res = await api.post(`/underwriting/${applicationId}/forward-to-finance`);
+    return res.data?.data || res.data;
+  },
 };

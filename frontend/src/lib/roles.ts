@@ -38,6 +38,8 @@ export type NavKey =
   | 'documents'
   | 'branch-review'
   | 'underwriting-queue'
+  | 'my-cases'
+  | 'approval-queue'
   | 'underwriting'
   | 'offers'
   | 'loans'
@@ -118,6 +120,8 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   'loan-products': { key: 'loan-products', href: '/loan-products', label: 'Loan Products', group: 'LENDING' },
   'branch-review': { key: 'branch-review', href: '/branch-review', label: 'Branch Applications Desk', group: 'LENDING' },
   'underwriting-queue': { key: 'underwriting-queue', href: '/underwriting-queue', label: 'Underwriting Queue', group: 'OVERVIEW' },
+  'my-cases': { key: 'my-cases', href: '/my-cases', label: 'My Cases', group: 'OVERVIEW' },
+  'approval-queue': { key: 'approval-queue', href: '/approval-queue', label: 'Approval Queue', group: 'OVERVIEW' },
   underwriting: { key: 'underwriting', href: '/underwriting', label: 'Underwriting', group: 'OVERVIEW' },
   offers: { key: 'offers', href: '/offers', label: 'Offers & Decisions', group: 'OVERVIEW' },
   loans: { key: 'loans', href: '/loans', label: 'Loan Accounts', group: 'LENDING' },
@@ -302,10 +306,10 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     description: 'Credit committee decision queue, conditional sanction, and approval limits',
     nav: [
       'dashboard',
-      'underwriting-queue',
+      'my-cases',
       'applications',
-      'underwriting',
-      'offers',
+      'underwriting-queue',
+      'approval-queue',
       'tasks',
       'support',
     ],

@@ -1699,8 +1699,8 @@ export function CreditAssessmentWorkspace({
                   icon: Briefcase,
                   color: 'blue',
                   ageLimit: '21–60 Yrs',
-                  foirCap: '55–60%',
-                  incomeFloor: '₹20,000/mo',
+                  foirCap: '55%',
+                  incomeFloor: '₹25,000/mo',
                 };
 
             const IconComponent = personaConfig.icon;

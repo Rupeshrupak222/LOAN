@@ -72,6 +72,7 @@ import { BorrowerDashboardView } from '@/features/borrower';
 import { LoanOfficerDashboardView } from '@/features/origination';
 import { CreditAnalystDashboardView } from '@/components/CreditAnalystDashboardView';
 import { SuperAdminDashboardView } from '@/components/SuperAdminDashboardView';
+import { UnderwriterDashboardView } from '@/components/UnderwriterDashboardView';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -376,6 +377,10 @@ export default function DashboardPage() {
 
   if (primaryRole === 'CREDIT_ANALYST') {
     return <CreditAnalystDashboardView />;
+  }
+
+  if (primaryRole === 'UNDERWRITER') {
+    return <UnderwriterDashboardView />;
   }
 
   const cardBgClass = isDark
@@ -915,7 +920,7 @@ export default function DashboardPage() {
 
 
       {/* D. UNDERWRITER WORKSPACE */}
-      {primaryRole === 'UNDERWRITER' && (
+      {(primaryRole as any) === 'UNDERWRITER' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <KpiItem
