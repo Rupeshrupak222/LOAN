@@ -1472,6 +1472,7 @@ export default function ApplicationDetailPage() {
                             ? 'Proposal has been forwarded. You can re-forward if updated or decline if invalid.'
                             : 'All credit scores and recommendations are recorded. Forward proposal to Underwriting committee or reject.'}
                         </p>
+                      </div>
                       <div className="flex items-center gap-2">
                         {canReject && !isCreditAnalyst && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
                           <Button
