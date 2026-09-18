@@ -72,16 +72,16 @@ export default function BorrowerSupportHubPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/borrower"
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-xs transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-amber-400" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-amber-500 dark:text-amber-400" />
               Borrower Support & Grievance Redressal
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Assistance, FAQs, and statutory grievance escalation under RBI Ombudsman Scheme
             </p>
           </div>
@@ -92,19 +92,19 @@ export default function BorrowerSupportHubPage() {
         {/* Support Ticket Form & FAQs */}
         <div className="md:col-span-2 space-y-6">
           {/* Create Ticket Card */}
-          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-blue-400" />
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               Submit Customer Assistance Request
             </h3>
 
             {submittedTicket ? (
-              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-2">
-                <div className="flex items-center gap-2 text-emerald-400 font-bold">
+              <div className="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-xs space-y-2">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold">
                   <CheckCircle2 className="w-4 h-4" />
                   Ticket #{submittedTicket.ticketNumber} Registered
                 </div>
-                <p className="text-slate-300">
+                <p className="text-slate-700 dark:text-slate-300">
                   {submittedTicket.message}
                 </p>
                 <Button
@@ -114,7 +114,7 @@ export default function BorrowerSupportHubPage() {
                     setSubmittedTicket(null);
                     setTicketData({ subject: '', category: 'REPAYMENT_MANDATE', description: '' });
                   }}
-                  className="rounded-xl border-slate-700 text-xs text-slate-300 mt-2"
+                  className="rounded-xl border-slate-300 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 mt-2"
                 >
                   Create Another Request
                 </Button>
@@ -128,11 +128,11 @@ export default function BorrowerSupportHubPage() {
                 className="space-y-4 text-xs"
               >
                 <div className="space-y-1.5">
-                  <label className="font-medium text-slate-300">Category</label>
+                  <label className="font-medium text-slate-700 dark:text-slate-300">Category</label>
                   <select
                     value={ticketData.category}
                     onChange={(e) => setTicketData({ ...ticketData, category: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 outline-none"
                   >
                     <option value="REPAYMENT_MANDATE">Repayment & Auto-Debit Mandate</option>
                     <option value="NOC_CLOSURE">No-Objection Certificate (NOC) & Closure</option>
@@ -143,26 +143,26 @@ export default function BorrowerSupportHubPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-medium text-slate-300">Subject / Summary</label>
+                  <label className="font-medium text-slate-700 dark:text-slate-300">Subject / Summary</label>
                   <input
                     type="text"
                     required
                     placeholder="Brief description of the issue"
                     value={ticketData.subject}
                     onChange={(e) => setTicketData({ ...ticketData, subject: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 outline-none"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-medium text-slate-300">Details</label>
+                  <label className="font-medium text-slate-700 dark:text-slate-300">Details</label>
                   <textarea
                     required
                     rows={4}
                     placeholder="Provide details to help our team resolve your query swiftly..."
                     value={ticketData.description}
                     onChange={(e) => setTicketData({ ...ticketData, description: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 outline-none"
                   />
                 </div>
 
@@ -179,22 +179,22 @@ export default function BorrowerSupportHubPage() {
           </div>
 
           {/* Frequently Asked Questions */}
-          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-white">Frequently Asked Questions</h3>
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Frequently Asked Questions</h3>
             <div className="space-y-2">
               {FAQS.map((faq, idx) => {
                 const isOpen = openFaq === idx;
                 return (
                   <div
                     key={idx}
-                    className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs cursor-pointer transition-all"
+                    className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 text-xs cursor-pointer transition-all"
                     onClick={() => setOpenFaq(isOpen ? null : idx)}
                   >
-                    <div className="flex justify-between items-center font-semibold text-white">
+                    <div className="flex justify-between items-center font-semibold text-slate-900 dark:text-white">
                       <span>{faq.q}</span>
-                      {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                      {isOpen ? <ChevronUp className="w-4 h-4 text-slate-500 dark:text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
                     </div>
-                    {isOpen && <p className="text-slate-400 mt-2.5 leading-relaxed">{faq.a}</p>}
+                    {isOpen && <p className="text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed">{faq.a}</p>}
                   </div>
                 );
               })}
@@ -204,34 +204,34 @@ export default function BorrowerSupportHubPage() {
 
         {/* RBI Grievance Redressal Card */}
         <div className="space-y-4">
-          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-xl">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
             <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-400" />
-              <h3 className="text-sm font-bold text-white">Principal Grievance Officer</h3>
+              <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Principal Grievance Officer</h3>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               If your query is not resolved within 24 hours, you may escalate directly to our Nodal Grievance Redressal Officer.
             </p>
 
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-2">
-              <div className="font-bold text-white">Ms. Sunita Sharma</div>
-              <div className="text-slate-400 text-[11px]">Principal Nodal Officer (RBI Registered NBFC)</div>
-              <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-slate-300">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs space-y-2">
+              <div className="font-bold text-slate-900 dark:text-white">Ms. Sunita Sharma</div>
+              <div className="text-slate-500 dark:text-slate-400 text-[11px]">Principal Nodal Officer (RBI Registered NBFC)</div>
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-1.5 text-slate-700 dark:text-slate-300">
                 <div className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-blue-400" />
-                  <a href="mailto:grievance.officer@adyapanlms.com" className="text-blue-400 underline">
+                  <Mail className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <a href="mailto:grievance.officer@adyapanlms.com" className="text-blue-600 dark:text-blue-400 underline">
                     grievance.officer@adyapanlms.com
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5 text-blue-400" />
+                  <Phone className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   <span>+91 1800 200 8899</span>
                 </div>
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-500 leading-relaxed border-t border-slate-800/80 pt-3">
+            <div className="text-[11px] text-slate-500 dark:text-slate-500 leading-relaxed border-t border-slate-100 dark:border-slate-800/80 pt-3">
               Compliant with the Reserve Bank - Integrated Ombudsman Scheme, 2021.
             </div>
           </div>

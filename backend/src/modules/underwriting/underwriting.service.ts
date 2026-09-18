@@ -182,19 +182,28 @@ export async function getUnderwritingQueue(
         },
       ],
     };
-  } else {
-    // ALL proposals that have officially been forwarded to Underwriting by Credit Analyst
+  } else if (normalizedTab === 'BRANCH_REVIEW') {
     where = {
-      status: {
-        in: [
-          'UNDERWRITING',
-          'APPROVED',
-          'REJECTED',
-          'AGREEMENT_PENDING',
-          'READY_FOR_DISBURSEMENT',
-          'DISBURSED',
-        ],
-      },
+      stage: 'BRANCH_MANAGER_REVIEW',
+    };
+  } else {
+    // ALL proposals that have officially been forwarded from Credit Analyst to Branch Manager or to Underwriting
+    where = {
+      OR: [
+        {
+          status: {
+            in: [
+              'UNDERWRITING',
+              'APPROVED',
+              'REJECTED',
+              'AGREEMENT_PENDING',
+              'READY_FOR_DISBURSEMENT',
+              'DISBURSED',
+            ],
+          },
+        },
+        { stage: 'BRANCH_MANAGER_REVIEW' },
+      ],
     };
   }
 

@@ -307,7 +307,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Workspace Switcher Pill (hidden for SUPER_ADMIN, CUSTOMER, and focused operational desks) */}
-        {authorizedWorkspaces.length > 1 && primaryRole !== 'SUPER_ADMIN' && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && primaryRole !== 'LOAN_OFFICER' && (
+        {authorizedWorkspaces.length > 1 &&
+          primaryRole !== 'SUPER_ADMIN' &&
+          primaryRole !== 'CUSTOMER' &&
+          primaryRole !== 'CREDIT_ANALYST' &&
+          primaryRole !== 'UNDERWRITER' &&
+          primaryRole !== 'FINANCE_OFFICER' &&
+          primaryRole !== 'LOAN_OFFICER' &&
+          primaryRole !== 'BRANCH_MANAGER' &&
+          primaryRole !== 'COLLECTION_OFFICER' &&
+          primaryRole !== 'RISK_ANALYST' &&
+          primaryRole !== 'FRAUD_ANALYST' &&
+          primaryRole !== 'RISK_MANAGER' && (
           <div className="relative px-3 pt-3 flex-none">
             <button
               type="button"
@@ -376,26 +387,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        {/* Nav List */}
-        <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-[#1E2445]">
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 min-h-0">
           {primaryRole === 'SUPER_ADMIN' ? (
             <div className="space-y-1">
-              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Platform Control-Plane
-              </p>
               <div className="space-y-0.5 pt-1">
-                {[
-                  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-                  { label: 'Tenants', href: '/tenants', icon: Building2 },
-                  { label: 'Users & Access', href: '/users', icon: KeyRound },
-                  { label: 'Products & Policies', href: '/products', icon: Sliders },
-                  { label: 'Workflows & Approvals', href: '/workflows', icon: Workflow },
-                  { label: 'Integrations', href: '/integrations', icon: Cpu },
-                  { label: 'Platform Operations', href: '/operations', icon: Activity },
-                  { label: 'Governance & Audit', href: '/audit-logs', icon: ScrollText },
-                ].map((item) => {
+                {accessibleNav.map((item) => {
                   const active = isItemActive(item.href);
-                  const Icon = item.icon;
+                  const Icon = NAV_ICONS[item.key] || LayoutDashboard;
 
                   return (
                     <Link
@@ -405,7 +404,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       className={cn(
                         'group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors',
                         active
-                          ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-600/30'
+                          ? 'bg-[#2563EB] text-white font-bold shadow-sm shadow-[#2563EB]/30'
                           : 'text-slate-300 font-medium hover:bg-white/6 hover:text-white'
                       )}
                     >
@@ -421,7 +420,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 })}
               </div>
             </div>
-          ) : primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' || primaryRole === 'LOAN_OFFICER' ? (
+          ) : primaryRole === 'CREDIT_ANALYST' ||
+            primaryRole === 'UNDERWRITER' ||
+            primaryRole === 'FINANCE_OFFICER' ||
+            primaryRole === 'LOAN_OFFICER' ||
+            primaryRole === 'BRANCH_MANAGER' ||
+            primaryRole === 'COLLECTION_OFFICER' ||
+            primaryRole === 'RISK_ANALYST' ||
+            primaryRole === 'FRAUD_ANALYST' ||
+            primaryRole === 'RISK_MANAGER' ? (
             <div className="space-y-1">
               <div className="space-y-0.5 pt-1">
                 {roleCfg.nav.map((navKey) => {
@@ -496,7 +503,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               );
             })
           )}
-        </nav>
+        </div>
 
         {/* User Card at bottom of sidebar */}
         <div className="m-3 flex-none rounded-xl border border-[#1E2445] bg-[#1E2445]/60 p-3 shadow-2xs">

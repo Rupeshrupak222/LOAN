@@ -14,7 +14,7 @@ const router = Router();
 router.use(authenticate);
 router.use(tenantContext);
 
-const INTAKE_ROLES = ['CUSTOMER', 'LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
+const INTAKE_ROLES = ['CUSTOMER', 'LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'];
 
 router.get(
   '/',

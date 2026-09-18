@@ -197,7 +197,7 @@ router.get(
 
 router.post(
   '/',
-  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(createCustomerSchema),
   asyncHandler(async (req, res) => {
     const customer = await createCustomer(req.body, req.user?.id, req.user?.tenantId);
@@ -217,7 +217,7 @@ router.patch(
 
 router.patch(
   '/:id/kyc',
-  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(updateKycStatusSchema),
   asyncHandler(async (req, res) => {
     const customer = await updateKycStatus(req.params.id, req.body, req.user?.id, req.user as any);

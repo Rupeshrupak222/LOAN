@@ -76,7 +76,7 @@ export default function CustomerDetailPage() {
   const isAdmin = Boolean(user?.roles?.some((r: string) => ['SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const canManageAddresses = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const canManageBankAccounts = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
-  const canOriginateApplication = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
+  const canOriginateApplication = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
   const [activeTab, setActiveTab] = useState<
     'overview' | 'kyc_docs' | 'banking' | 'applications' | 'loans' | 'payments' | 'collections' | 'communications' | 'bank_intelligence' | 'fraud'
   >('overview');
@@ -468,7 +468,18 @@ export default function CustomerDetailPage() {
   }
 
   const addresses = Array.isArray(data.addresses) ? data.addresses : [];
-  const documents = Array.isArray(data.documents) ? data.documents : [];
+  
+  // Deduplicate documents in UI as an ironclad safeguard: keep only single latest document per requirement
+  const rawDocuments = Array.isArray(data.documents) ? data.documents : [];
+  const seenDocKeys = new Set<string>();
+  const documents: any[] = [];
+  for (const doc of rawDocuments) {
+    const key = `${(doc.category || '').toUpperCase().trim()}__${(doc.documentType || '').toUpperCase().trim()}`;
+    if (!seenDocKeys.has(key)) {
+      seenDocKeys.add(key);
+      documents.push(doc);
+    }
+  }
   
   // Deduplicate bank accounts in UI as a safeguard
   const rawBankAccounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
@@ -521,7 +532,7 @@ export default function CustomerDetailPage() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Customer 360 AI
             </Button>
-            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['CREDIT_ANALYST', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && !isBranchManager && (
               <Button size="sm" variant="secondary" onClick={() => setKycModalOpen(true)}>
                 Update KYC Status
               </Button>
@@ -536,7 +547,7 @@ export default function CustomerDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
-            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && (
+            {user?.roles?.some((r: string) => ['LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)) && !isBranchManager && (
               <Link href={`/applications/new?customerId=${params.id}`}>
                 <Button size="sm" className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs cursor-pointer">
                   <Plus className="h-3.5 w-3.5" /> Originate Application

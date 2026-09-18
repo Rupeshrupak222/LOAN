@@ -145,34 +145,72 @@ export async function uploadAndRegisterDocument(
     ? `OTHER: ${metadata.documentName}`
     : metadata.documentType || metadata.category;
 
-  const isAutoVerifiable = metadata.category === 'BANK_STATEMENT' || metadata.category === 'BUSINESS_PROOF';
-
-  // 4. Save to Database
-  const doc = await prisma.document.create({
-    data: {
+  // 4. Save or Update in Database - Prevent duplicates for the same customer requirement
+  // Check if a document already exists with this exact customerId & (documentType or category+name)
+  const existingDoc = await prisma.document.findFirst({
+    where: {
       customerId: metadata.customerId,
-      applicationId: metadata.applicationId || null,
-      category: metadata.category,
-      documentType: effectiveDocType,
-      fileName: file.originalname,
-      storageKey: fileStorageUrl,
-      contentType: file.mimetype,
-      sizeBytes: file.size || file.buffer.length,
-      expiryDate: metadata.expiryDate ? new Date(metadata.expiryDate) : null,
-      status: isAutoVerifiable ? 'VERIFIED' : 'PENDING',
-      verified: isAutoVerifiable,
-      verifiedBy: isAutoVerifiable ? 'SYSTEM_AI_VERIFICATION' : undefined,
-      verifiedAt: isAutoVerifiable ? new Date() : undefined,
+      OR: [
+        { documentType: effectiveDocType },
+        { category: metadata.category, documentType: effectiveDocType },
+        ...(metadata.documentType ? [{ documentType: metadata.documentType }] : []),
+      ],
     },
-    include: {
-      customer: { select: { firstName: true, lastName: true, customerCode: true } },
-    },
+    orderBy: { createdAt: 'desc' },
   });
+
+  let doc: any;
+  if (existingDoc) {
+    // Update existing document record with the latest file version and reset status to PENDING for officer re-verification
+    doc = await prisma.document.update({
+      where: { id: existingDoc.id },
+      data: {
+        applicationId: metadata.applicationId || existingDoc.applicationId || null,
+        category: metadata.category,
+        documentType: effectiveDocType,
+        fileName: file.originalname,
+        storageKey: fileStorageUrl,
+        contentType: file.mimetype,
+        sizeBytes: file.size || file.buffer.length,
+        expiryDate: metadata.expiryDate ? new Date(metadata.expiryDate) : null,
+        status: 'PENDING',
+        verified: false,
+        verifiedBy: null,
+        verifiedAt: null,
+        rejectionReason: null,
+      },
+      include: {
+        customer: { select: { firstName: true, lastName: true, customerCode: true } },
+      },
+    });
+  } else {
+    // Create new document record with strict PENDING verification status
+    doc = await prisma.document.create({
+      data: {
+        customerId: metadata.customerId,
+        applicationId: metadata.applicationId || null,
+        category: metadata.category,
+        documentType: effectiveDocType,
+        fileName: file.originalname,
+        storageKey: fileStorageUrl,
+        contentType: file.mimetype,
+        sizeBytes: file.size || file.buffer.length,
+        expiryDate: metadata.expiryDate ? new Date(metadata.expiryDate) : null,
+        status: 'PENDING',
+        verified: false,
+        verifiedBy: null,
+        verifiedAt: null,
+      },
+      include: {
+        customer: { select: { firstName: true, lastName: true, customerCode: true } },
+      },
+    });
+  }
 
   // 5. Audit Log
   await logAudit({
     userId: actorUserId,
-    action: 'DOCUMENT_UPLOADED',
+    action: existingDoc ? 'DOCUMENT_UPDATED' : 'DOCUMENT_UPLOADED',
     entity: 'Document',
     entityId: doc.id,
     newValue: {

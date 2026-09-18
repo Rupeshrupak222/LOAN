@@ -370,8 +370,8 @@ export function CreditAssessmentWorkspace({
     )
   );
 
-  // Strict Eligibility Check: Underwriter Handover is ONLY permitted for eligible proposals
-  const isBorrowerEligibleForUnderwriter = Boolean(
+  // Strict Eligibility Check: Branch Manager Handover is ONLY permitted for eligible proposals
+  const isBorrowerEligibleForBranchManager = Boolean(
     !isPolicyFailed &&
     app?.status !== 'REJECTED' &&
     eligibility?.result !== 'NOT_ELIGIBLE' &&
@@ -380,10 +380,12 @@ export function CreditAssessmentWorkspace({
     analystDecision !== 'SEND_BACK'
   );
 
-  // Step 6: Underwriter Handover (Only complete if eligible and forwarded)
+  // Step 6: Branch Manager Handover (Only complete if eligible and forwarded)
   const isStep6Complete = Boolean(
-    isBorrowerEligibleForUnderwriter &&
-    (app?.status === 'UNDERWRITING' || ['APPROVED', 'DISBURSED'].includes(app?.status))
+    isBorrowerEligibleForBranchManager &&
+    (app?.stage === 'BRANCH_MANAGER_REVIEW' ||
+      app?.status === 'UNDERWRITING' ||
+      ['APPROVED', 'DISBURSED'].includes(app?.status))
   );
 
   // Strict sequential gating: A step is only unlocked when the previous step is complete!
@@ -401,7 +403,7 @@ export function CreditAssessmentWorkspace({
         isStep3Complete &&
         isStep4Complete &&
         isStep5Complete &&
-        isBorrowerEligibleForUnderwriter
+        isBorrowerEligibleForBranchManager
       );
     }
     return false;
@@ -429,13 +431,13 @@ export function CreditAssessmentWorkspace({
       } else if (stepNum >= 5 && !isStep4Complete) {
         toast.warning(`Step 4 (Credit & Bureau Risk) score must be evaluated before recording your recommendation.`);
       } else if (stepNum === 6) {
-        if (!isBorrowerEligibleForUnderwriter) {
+        if (!isBorrowerEligibleForBranchManager) {
           toast.error(
-            'Borrower is Not Eligible: Step 6 (Underwriter Handover) is strictly locked for declined/ineligible applications. You cannot forward this proposal.',
+            'Borrower is Not Eligible: Step 6 (Branch Manager Handover) is strictly locked for declined/ineligible applications. You cannot forward this proposal.',
             { title: 'Handover Restricted' }
           );
         } else {
-          toast.warning(`Step 5 (Analyst Recommendation) must be submitted before Underwriter Handover.`);
+          toast.warning(`Step 5 (Analyst Recommendation) must be submitted before Branch Manager Handover.`);
         }
       }
       return;
@@ -451,23 +453,23 @@ export function CreditAssessmentWorkspace({
       else if (!isStep2Complete) setActiveStep(2);
       else if (!isStep3Complete) setActiveStep(3);
       else if (!isStep4Complete) setActiveStep(4);
-      else if (!isStep5Complete || !isBorrowerEligibleForUnderwriter) setActiveStep(5);
+      else if (!isStep5Complete || !isBorrowerEligibleForBranchManager) setActiveStep(5);
       else setActiveStep(6);
       setInitialStepDone(true);
     }
-  }, [app, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete, isBorrowerEligibleForUnderwriter]);
+  }, [app, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete, isBorrowerEligibleForBranchManager]);
 
   // Fallback if activeStep becomes locked
   useEffect(() => {
     if (initialStepDone && !isStepUnlocked(activeStep)) {
-      if (isStep5Complete && isBorrowerEligibleForUnderwriter) setActiveStep(6);
+      if (isStep5Complete && isBorrowerEligibleForBranchManager) setActiveStep(6);
       else if (isStep4Complete) setActiveStep(5);
       else if (isStep3Complete) setActiveStep(4);
       else if (isStep2Complete) setActiveStep(3);
       else if (isStep1Complete) setActiveStep(2);
       else setActiveStep(1);
     }
-  }, [activeStep, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete, isBorrowerEligibleForUnderwriter]);
+  }, [activeStep, initialStepDone, isStep1Complete, isStep2Complete, isStep3Complete, isStep4Complete, isStep5Complete, isBorrowerEligibleForBranchManager]);
 
   // ---------------------------------------------------------------------------
   // MUTATIONS
@@ -688,7 +690,7 @@ export function CreditAssessmentWorkspace({
     },
     onSuccess: () => {
       if (analystDecision === 'ELIGIBLE') {
-        toast.success('Manual Credit Assessment: ELIGIBLE recorded. Unlocked Step 6: Underwriter Handover.');
+        toast.success('Manual Credit Assessment: ELIGIBLE recorded. Unlocked Step 6: Branch Manager Handover.');
         refetch();
         refetchCapacity();
         setActiveStep(6);
@@ -710,25 +712,26 @@ export function CreditAssessmentWorkspace({
     },
   });
 
-  // Step 6: Forward to Underwriter Mutation
-  const forwardToUnderwritingMutation = useMutation({
+  // Step 6: Forward to Branch Manager Mutation
+  const forwardToBranchManagerMutation = useMutation({
     mutationFn: async () => {
       return api.post(`/credit-assessment/${applicationId}/forward-underwriting`, {
         recommendationId: existingRecommendation?.id,
-        forwardingNotes: notes || existingRecommendation?.notes || 'Credit assessment completed & verified. Handover to Underwriter for sanction.',
+        forwardingNotes: notes || existingRecommendation?.notes || 'Credit assessment completed & verified. Handover to Branch Manager for review.',
       });
     },
     onSuccess: () => {
-      toast.success('Proposal successfully handed over to Underwriting Queue.');
+      toast.success('Proposal successfully handed over to Branch Manager review desk.');
       queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['branch-manager'] });
       queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
       if (onForwardSuccess) {
         onForwardSuccess();
       }
     },
     onError: (err: any) => {
-      toast.error(apiErrorMessage(err), { title: 'Underwriter Handover Error' });
+      toast.error(apiErrorMessage(err), { title: 'Branch Manager Handover Error' });
     },
   });
 
@@ -918,9 +921,9 @@ export function CreditAssessmentWorkspace({
             { step: 5, label: '5. Recommendation', isComplete: isStep5Complete, isBlocked: false },
             {
               step: 6,
-              label: !isBorrowerEligibleForUnderwriter ? '6. Handover (Locked)' : '6. Underwriter Handover',
-              isComplete: isStep6Complete && isBorrowerEligibleForUnderwriter,
-              isBlocked: !isBorrowerEligibleForUnderwriter,
+              label: !isBorrowerEligibleForBranchManager ? '6. Handover (Locked)' : '6. Branch Review Handover',
+              isComplete: isStep6Complete && isBorrowerEligibleForBranchManager,
+              isBlocked: !isBorrowerEligibleForBranchManager,
             },
           ].map((item) => {
             const stepNum = item.step as StepNumber;
@@ -2319,7 +2322,7 @@ export function CreditAssessmentWorkspace({
                     {analystDecision === 'ELIGIBLE' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isPolicyFailed ? '⚠️ Blocked: Borrower violates mandatory policy criteria.' : 'Confirm borrower satisfies criteria, configure sanction terms, and unlock Step 6 (Underwriter Handover).'}
+                    {isPolicyFailed ? '⚠️ Blocked: Borrower violates mandatory policy criteria.' : 'Confirm borrower satisfies criteria, configure sanction terms, and unlock Step 6 (Branch Manager Handover).'}
                   </p>
                 </button>
 
@@ -2562,21 +2565,21 @@ export function CreditAssessmentWorkspace({
       )}
 
       {/* -----------------------------------------------------------------------
-          STEP 6: UNDERWRITER HANDOVER (ONLY UNLOCKED IF ELIGIBLE)
+          STEP 6: BRANCH MANAGER HANDOVER (ONLY UNLOCKED IF ELIGIBLE)
       ----------------------------------------------------------------------- */}
       {activeStep === 6 && (
         <Card className="p-6 space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Step 6: Underwriter Handover & Sanction Queue Forwarding
+                Step 6: Branch Manager Handover & Review Queue Forwarding
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Review complete assessment packet and forward proposal to the Underwriter for sanction decision
+                Review complete assessment packet and forward proposal to the Branch Manager for review
               </p>
             </div>
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4" /> Ready for Underwriter
+              <ShieldCheck className="w-4 h-4" /> Ready for Branch Manager
             </span>
           </div>
 
@@ -2622,25 +2625,25 @@ export function CreditAssessmentWorkspace({
           <div className="p-5 rounded-xl border border-blue-200 bg-blue-50/60 dark:bg-blue-950/20 dark:border-blue-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <p className="text-sm font-bold text-blue-950 dark:text-blue-200">
-                Handover to Underwriting Authority
+                Handover to Branch Manager
               </p>
               <p className="text-xs text-blue-800 dark:text-blue-300">
-                Forwarding transitions proposal status to <span className="font-semibold">UNDERWRITING</span> and assigns the dossier to the Sanction Committee for final sanction.
+                Forwarding transitions proposal stage to <span className="font-semibold">BRANCH_MANAGER_REVIEW</span> and assigns the dossier to the Branch Manager for review and approval/escalation.
               </p>
             </div>
-            {app?.status === 'UNDERWRITING' || app?.status === 'APPROVED' || app?.status === 'SANCTIONED' || app?.status === 'DISBURSED' || app?.status === 'REJECTED' ? (
+            {app?.stage === 'BRANCH_MANAGER_REVIEW' || app?.status === 'UNDERWRITING' || app?.status === 'APPROVED' || app?.status === 'SANCTIONED' || app?.status === 'DISBURSED' || app?.status === 'REJECTED' ? (
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs border border-emerald-300/60 dark:border-emerald-800/40 shrink-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Handed Over to Underwriting ({app?.status})</span>
+                <span>Handed Over to Branch Manager ({app?.stage === 'BRANCH_MANAGER_REVIEW' ? 'Under BM Review' : app?.status})</span>
               </div>
             ) : (
               <Button
-                onClick={() => forwardToUnderwritingMutation.mutate()}
-                disabled={forwardToUnderwritingMutation.isPending}
+                onClick={() => forwardToBranchManagerMutation.mutate()}
+                disabled={forwardToBranchManagerMutation.isPending}
                 className="gap-2 bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm"
               >
                 <Send className="w-4 h-4" />
-                {forwardToUnderwritingMutation.isPending ? 'Forwarding Dossier...' : 'Forward to Underwriter →'}
+                {forwardToBranchManagerMutation.isPending ? 'Forwarding Dossier...' : 'Forward to Branch Manager →'}
               </Button>
             )}
           </div>

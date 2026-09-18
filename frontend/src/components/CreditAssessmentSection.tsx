@@ -371,7 +371,7 @@ export function CreditAssessmentSection({
     { num: 4, title: 'Financial Eligibility', subtitle: 'FOIR, DTI & Policy', isComplete: workflow.step4Complete },
     { num: 5, title: 'Credit Risk', subtitle: '4-Pillar Model', isComplete: workflow.step5Complete },
     { num: 6, title: 'Analyst Decision', subtitle: 'Recommendation', isComplete: workflow.step6Complete },
-    { num: 7, title: 'Underwriter Handover', subtitle: 'Sanction Queue', isComplete: workflow.step7Complete },
+    { num: 7, title: 'Branch Review Handover', subtitle: 'Branch Desk', isComplete: workflow.step7Complete },
   ];
 
   return (
@@ -1403,9 +1403,9 @@ export function CreditAssessmentSection({
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold">1. ELIGIBLE — FORWARD TO UNDERWRITER</p>
+                  <p className="text-xs font-bold">1. ELIGIBLE — FORWARD TO BRANCH MANAGER</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Adequate debt-service capacity. Recommend formal sanction to Underwriting committee.
+                    Adequate debt-service capacity. Recommend proposal to Branch Manager for review and approval.
                   </p>
                 </div>
               </button>
@@ -1437,7 +1437,7 @@ export function CreditAssessmentSection({
                 <div>
                   <p className="text-xs font-bold">2. NOT ELIGIBLE</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    FOIR exceeds policy limit or criteria failed. Application does NOT forward to Underwriter.
+                    FOIR exceeds policy limit or criteria failed. Application does NOT forward to Branch Manager.
                   </p>
                 </div>
               </button>
@@ -1569,9 +1569,9 @@ export function CreditAssessmentSection({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
             <p className="text-[11px] text-slate-400">
               {decision === 'ELIGIBLE'
-                ? 'On submission, application will transition to UNDERWRITING and appear in Underwriter queue.'
+                ? 'On submission, application stage will transition to BRANCH_MANAGER_REVIEW and appear on Branch Manager desk.'
                 : decision === 'NOT_ELIGIBLE'
-                ? 'On submission, application will be marked NOT ELIGIBLE without forwarding to Underwriting.'
+                ? 'On submission, application will be marked NOT ELIGIBLE without forwarding to Branch Manager.'
                 : 'Application will be sent back to Loan Officer for required document resubmission.'}
             </p>
 
@@ -1600,7 +1600,7 @@ export function CreditAssessmentSection({
                   <span>
                     Submit [
                     {decision === 'ELIGIBLE'
-                      ? 'ELIGIBLE — FORWARD TO UNDERWRITER'
+                      ? 'ELIGIBLE — FORWARD TO BRANCH MANAGER'
                       : decision === 'NOT_ELIGIBLE'
                       ? 'NOT ELIGIBLE'
                       : 'FURTHER REVIEW'}
@@ -1614,7 +1614,7 @@ export function CreditAssessmentSection({
       )}
 
       {/* ========================================================================= */}
-      {/* STEP 7: FORWARD TO UNDERWRITER (COMPLETED STATE & AUDIT LEDGER)            */}
+      {/* STEP 7: FORWARD TO BRANCH MANAGER (COMPLETED STATE & AUDIT LEDGER)         */}
       {/* ========================================================================= */}
       {activeStep === 7 && (
         <Card className="space-y-4 animate-in fade-in border-2 border-emerald-500/30 dark:border-emerald-500/40">
@@ -1624,13 +1624,13 @@ export function CreditAssessmentSection({
             </div>
             <div>
               <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Step 7 Complete: Forwarded to Underwriting & Credit Audit Recorded
+                Step 7 Complete: Forwarded to Branch Manager & Credit Audit Recorded
               </h4>
               <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
                 The credit assessment workflow for proposal #{applicationNo} has been completed successfully.
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Application status has moved to <strong>UNDERWRITING</strong>. It has been transferred from your pending queue into the Underwriter and Branch Manager sanction queue.
+                Application stage has moved to <strong>BRANCH_MANAGER_REVIEW</strong>. It has been transferred into the Branch Manager review desk.
               </p>
             </div>
           </div>

@@ -37,11 +37,11 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-48 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+        <div className="h-48 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="h-64 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
-          <div className="h-64 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
-          <div className="h-64 bg-slate-900/60 border border-slate-800 rounded-2xl animate-pulse" />
+          <div className="h-64 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl animate-pulse" />
+          <div className="h-64 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl animate-pulse" />
+          <div className="h-64 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl animate-pulse" />
         </div>
       </div>
     );
@@ -54,17 +54,17 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
   return (
     <div className="space-y-6">
       {/* Discovery Hero Banner */}
-      <div className="bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md">
+      <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white dark:from-blue-950/60 dark:via-slate-900 dark:to-indigo-950/40 border border-blue-100 dark:border-slate-800 rounded-2xl p-6 shadow-xs backdrop-blur-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
               <Sparkles className="w-4 h-4" />
               <span>Instant Digital Credit Discovery</span>
             </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Select Your Tailored Credit Solution
             </h2>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
               Transparent, competitive interest rates with instant decisioning and direct bank disbursement
             </p>
           </div>
@@ -83,37 +83,37 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
                 setAmount(Math.min(Math.max(amount, prod.minAmount), prod.maxAmount));
                 setTenure(Math.min(Math.max(tenure, prod.minTenureMonths), prod.maxTenureMonths));
               }}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between shadow-xs ${
                 isSelected
-                  ? 'bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-xl'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                  ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
+                  : 'bg-white dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                  <span className="p-2 rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">
                     <Layers className="w-5 h-5" />
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
                     {prod.interestRate}% p.a.
                   </span>
                 </div>
 
-                <h3 className="text-base font-bold text-white tracking-tight">{prod.name}</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">{prod.name}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                   {prod.description || 'Flexible digital credit facility with transparent terms.'}
                 </p>
 
-                <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Limit Range</div>
-                    <div className="text-slate-200 font-semibold mt-0.5">
+                    <div className="text-[10px] text-slate-400 uppercase">Limit Range</div>
+                    <div className="text-slate-900 dark:text-slate-200 font-semibold mt-0.5">
                       ₹{(prod.minAmount / 1000).toFixed(0)}k - ₹{(prod.maxAmount / 100000).toFixed(1)}L
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Tenure Window</div>
-                    <div className="text-slate-200 font-semibold mt-0.5">
+                    <div className="text-[10px] text-slate-400 uppercase">Tenure Window</div>
+                    <div className="text-slate-900 dark:text-slate-200 font-semibold mt-0.5">
                       {prod.minTenureMonths} - {prod.maxTenureMonths} Mos
                     </div>
                   </div>
@@ -121,10 +121,10 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
               </div>
 
               <div className="mt-4 pt-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-blue-400">
+                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
                   {isSelected ? '✓ Selected Plan' : 'Choose Scheme'}
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   Fee: {prod.processingFeePct}%
                 </span>
               </div>
@@ -135,14 +135,14 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
 
       {/* Interactive Loan Customizer Card */}
       {currentProduct && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs backdrop-blur-md space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
-              <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-blue-400" />
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <span>Customize Your {currentProduct.name}</span>
               </h3>
-              <p className="text-xs text-slate-400">Adjust amount and tenure to estimate your monthly EMI</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Adjust amount and tenure to estimate your monthly EMI</p>
             </div>
           </div>
 
@@ -151,8 +151,8 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
               {/* Amount Slider */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-slate-300">Required Loan Amount</label>
-                  <span className="text-lg font-black text-white font-mono">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Required Loan Amount</label>
+                  <span className="text-lg font-black text-slate-900 dark:text-white font-mono">
                     ₹{amount.toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -163,7 +163,7 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
                   step={5000}
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
                   <span>₹{currentProduct.minAmount.toLocaleString('en-IN')}</span>
@@ -174,8 +174,8 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
               {/* Tenure Slider */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-slate-300">Repayment Tenure</label>
-                  <span className="text-lg font-black text-white font-mono">{tenure} Months</span>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Repayment Tenure</label>
+                  <span className="text-lg font-black text-slate-900 dark:text-white font-mono">{tenure} Months</span>
                 </div>
                 <input
                   type="range"
@@ -184,7 +184,7 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
                   step={1}
                   value={tenure}
                   onChange={(e) => setTenure(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
                   <span>{currentProduct.minTenureMonths} Mos</span>
@@ -194,30 +194,30 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
             </div>
 
             {/* Financial Summary Card */}
-            <div className="p-5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+            <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
               <div>
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Indicative Monthly EMI
                 </div>
-                <div className="text-3xl font-black text-emerald-400 mt-2 font-mono">
+                <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono">
                   ₹{estimatedEmi.toLocaleString('en-IN')}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
                   At {currentProduct.interestRate}% annual reducing rate
                 </p>
 
-                <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-slate-400">
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800/80 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                     <span>Principal Amount:</span>
-                    <span className="font-semibold text-white">₹{amount.toLocaleString('en-IN')}</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">₹{amount.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-400">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                     <span>Total Tenure:</span>
-                    <span className="font-semibold text-white">{tenure} Months</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{tenure} Months</span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-400">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                     <span>Est. Processing Fee:</span>
-                    <span className="font-semibold text-white">
+                    <span className="font-semibold text-slate-900 dark:text-white">
                       ₹{Math.round((amount * currentProduct.processingFeePct) / 100).toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -226,7 +226,7 @@ export const ProductDiscovery: React.FC<ProductDiscoveryProps> = ({ onSelectProd
 
               <button
                 onClick={() => onSelectProduct(currentProduct, amount, tenure)}
-                className="mt-6 w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all"
+                className="mt-6 w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all"
               >
                 <span>Apply for this Loan</span>
                 <ArrowRight className="w-4 h-4" />

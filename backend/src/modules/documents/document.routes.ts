@@ -105,9 +105,16 @@ router.post(
       throw new BadRequestError('Please provide a file to upload in the "file" field');
     }
 
-    const customerId = req.body.customerId;
+    let customerId = req.body.customerId;
     if (!customerId) {
-      throw new BadRequestError('customerId is required for document upload');
+      const userCustomer = await prisma.customer.findFirst({
+        where: { userId: req.user?.id },
+      });
+      if (userCustomer) {
+        customerId = userCustomer.id;
+      } else {
+        throw new BadRequestError('customerId is required for document upload');
+      }
     }
 
     const isStaff = req.user?.roles.some((r) =>
@@ -171,7 +178,7 @@ router.post(
 
 router.patch(
   '/:id/verify',
-  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  authorize('CREDIT_ANALYST', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
   validate(verifyDocumentSchema),
   asyncHandler(async (req, res) => {
     const doc = await verifyDocument(req.params.id, req.body, req.user?.email, req.user?.id, {

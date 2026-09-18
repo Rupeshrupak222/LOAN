@@ -144,17 +144,20 @@ function CreditAssessmentQueueContent() {
       return { label: 'Not Eligible / Declined', color: 'rose', step: 5, actionText: 'View Assessment' };
     }
 
-    // 4. In Underwriting (Already Forwarded)
+    // 4. In Branch Review / Underwriting (Already Forwarded)
+    if (app.stage === 'BRANCH_MANAGER_REVIEW') {
+      return { label: 'Under BM Review (Forwarded)', color: 'blue', step: 6, actionText: 'Under BM Review' };
+    }
     if (app.status === 'UNDERWRITING') {
       return { label: 'In Underwriting (Forwarded)', color: 'indigo', step: 6, actionText: 'Already Forwarded' };
     }
 
-    // 5. Ready for Underwriting (Passed Financials and Risk Score)
+    // 5. Ready for Branch Manager Review (Passed Financials and Risk Score)
     if (
       (app.eligibility?.result === 'ELIGIBLE' && app.riskAssessment?.score != null) ||
       (app.eligibility?.factors as any)?.decision === 'ELIGIBLE'
     ) {
-      return { label: 'Ready for Underwriter', color: 'emerald', step: 6, actionText: 'Forward to Underwriter' };
+      return { label: 'Ready for Branch Manager', color: 'emerald', step: 6, actionText: 'Forward to Branch Manager' };
     }
 
     // 5. Verification Check (KYC and Documents)
