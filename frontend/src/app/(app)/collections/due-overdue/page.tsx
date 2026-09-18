@@ -30,8 +30,8 @@ export default function CollectionDueOverduePage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         breadcrumb="Collections / Due & Overdue"
-        title="Due & Overdue Cases"
-        subtitle="View and manage cases based on delinquency buckets (SMA-0, SMA-1, SMA-2)."
+        title="Due & Overdue"
+        subtitle="Accounts grouped by due date and DPD/aging buckets."
       />
 
       <CollectionQueueTable

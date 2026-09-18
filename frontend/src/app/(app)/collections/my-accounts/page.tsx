@@ -29,8 +29,8 @@ export default function CollectionMyAccountsPage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         breadcrumb="Collections / My Accounts"
-        title="My Assigned Accounts"
-        subtitle="Manage your personal portfolio of overdue accounts."
+        title="My Accounts"
+        subtitle="Only loan accounts assigned to the logged-in Collection Officer."
       />
 
       <CollectionQueueTable

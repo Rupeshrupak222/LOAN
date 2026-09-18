@@ -281,6 +281,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.view',
+    description: 'Overall collection portfolio, overdue amount, PTP, recovery and pending actions.',
   },
   {
     key: 'collections-queue',
@@ -290,6 +291,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.queue.view',
+    description: 'All collection cases that currently require collection action.',
   },
   {
     key: 'collections-my-accounts',
@@ -299,6 +301,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.account.view',
+    description: 'Only loan accounts assigned to the logged-in Collection Officer.',
   },
   {
     key: 'collections-due-overdue',
@@ -308,6 +311,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.view',
+    description: 'Accounts grouped by due date and DPD/aging buckets.',
   },
   {
     key: 'collections-ptp',
@@ -317,6 +321,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.promise.view',
+    description: 'Create, track and follow up on borrower payment commitments.',
   },
   {
     key: 'collections-activities',
@@ -326,6 +331,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.activity.view',
+    description: 'Calls, visits, follow-ups, communications and other collection activities.',
   },
   {
     key: 'collections-payments',
@@ -335,6 +341,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'collection.payment.view',
+    description: 'Collection-related payment records and permitted payment evidence.',
   },
   {
     key: 'collections-customers',
@@ -344,6 +351,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'customer.view',
+    description: 'Collection-authorized borrower/customer profiles.',
   },
   {
     key: 'collections-tasks',
@@ -353,6 +361,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'task.view',
+    description: 'Only Collection Officer tasks.',
   },
   {
     key: 'collections-reports',
@@ -362,6 +371,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'report.view',
+    description: 'Collection, recovery, DPD, PTP and payment reports.',
   },
   {
     key: 'collections-support',
@@ -371,6 +381,7 @@ export const CENTRALIZED_NAVIGATION: AppNavItem[] = [
     workspace: 'COLLECTIONS',
     group: 'COLLECTIONS',
     requiredPermission: 'support.view',
+    description: 'Collection-related support tickets/help.',
   },
 
   // ─── HUB 5: PARTNER & EMBEDDED LENDING ───

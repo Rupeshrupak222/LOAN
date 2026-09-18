@@ -152,6 +152,7 @@ export type PermissionKey =
   | 'collection.analytics.view'
   | 'task.view'
   | 'task.update'
+  | 'task.manage'
   | 'report.view'
   | 'report.export'
   | 'support.view'
@@ -209,6 +210,13 @@ export type PermissionKey =
   
   // Risk & Fraud Engine Domain (Phase 9)
   | 'risk.view'
+  | 'risk.analyse'
+  | 'risk.case.view'
+  | 'risk.case.manage'
+  | 'risk.signal.view'
+  | 'risk.signal.review'
+  | 'risk.analytics.view'
+  | 'risk.report.view'
   | 'risk.view_signals'
   | 'risk.evaluate'
   | 'risk.manage_policies'

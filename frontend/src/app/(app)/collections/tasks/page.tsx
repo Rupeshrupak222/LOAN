@@ -9,7 +9,7 @@ export default function CollectionTasksPage() {
       <PageHeader
         breadcrumb="Collections / Tasks"
         title="Tasks"
-        subtitle="Manage follow-ups, field visit assignments, and escalations."
+        subtitle="Only Collection Officer tasks."
       />
       <Card className="p-6 border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 shadow-sm">
         <div className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700/50 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
