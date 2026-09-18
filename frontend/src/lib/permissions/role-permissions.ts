@@ -136,14 +136,17 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
   ],
 
   RISK_ANALYST: [
-    // Risk Analyst: Credit Risk modeling, 6-pillar analysis, score evaluation, policy view/edit
-    'customer.view',
-    'application.view',
-    'credit.view', 'credit.assess', 'credit.bank_intelligence',
-    'risk.view', 'risk.view_signals', 'risk.evaluate', 'risk.manage_policies', 'risk.fraud_intel', 'risk.early_warnings',
-    'fraud.view_cases',
-    'decision.view', 'decision.evaluate', 'decision.simulate', 'decision.policy.view', 'decision.rules.view',
-    'reports.view', 'reports.export',
+    // Risk Analyst: Enforcing strict operational bounds
+    'risk.view',
+    'risk.analyse',
+    'risk.case.view',
+    'risk.case.manage',
+    'risk.signal.view',
+    'risk.signal.review',
+    'risk.analytics.view',
+    'risk.report.view',
+    'task.view',
+    'task.manage',
   ],
 
   FRAUD_ANALYST: [

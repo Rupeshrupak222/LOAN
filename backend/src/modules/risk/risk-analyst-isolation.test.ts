@@ -5,25 +5,15 @@ describe('Risk Analyst Isolation & Governance Verification', () => {
   it('should restrict RISK_ANALYST role to explicitly allowed risk-analysis capabilities', () => {
     const expectedPermissions = [
       'risk.view',
-      'risk.assess',
-      'risk.analysis.view',
-      'risk.analysis.create',
-      'risk.analysis.update',
-      'risk.alert.view',
-      'risk.alert.create',
-      'risk.recommend',
-      'risk.portfolio.view',
-      'application.view',
-      'customer.view',
-      'loan.view',
-      'credit.view',
-      'underwriting.view',
+      'risk.analyse',
+      'risk.case.view',
+      'risk.case.manage',
+      'risk.signal.view',
+      'risk.signal.review',
+      'risk.analytics.view',
+      'risk.report.view',
       'task.view',
-      'task.update',
-      'report.view',
-      'report.export',
-      'support.view',
-      'support.create',
+      'task.manage',
     ];
 
     const analystPermissions = rolePermissionService.getEffectivePermissions(['RISK_ANALYST'], 'tenant-adyapan-default');

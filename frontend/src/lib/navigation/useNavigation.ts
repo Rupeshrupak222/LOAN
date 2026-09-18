@@ -20,10 +20,11 @@ export function getDefaultWorkspaceForUser(user: AuthUser | null | undefined): W
       return 'ORIGINATION';
     case 'CREDIT_ANALYST':
     case 'UNDERWRITER':
+      return 'CREDIT';
     case 'RISK_MANAGER':
     case 'RISK_ANALYST':
     case 'FRAUD_ANALYST':
-      return 'CREDIT';
+      return 'RISK';
     case 'FINANCE_OFFICER':
       return 'FINANCE';
     case 'COLLECTION_OFFICER':

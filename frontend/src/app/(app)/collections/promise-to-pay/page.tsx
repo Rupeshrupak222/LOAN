@@ -29,8 +29,8 @@ export default function CollectionPtpPage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         breadcrumb="Collections / Promise to Pay"
-        title="Promise to Pay (PTP) Tracking"
-        subtitle="Track borrower commitments, upcoming dates, and broken promises."
+        title="Promise to Pay"
+        subtitle="Create, track and follow up on borrower payment commitments."
       />
 
       <CollectionQueueTable

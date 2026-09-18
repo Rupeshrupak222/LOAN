@@ -42,8 +42,8 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     description: 'Credit appraisal, financial analysis, BRE policy rules, 6-pillar risk scoring, fraud review, and credit sanctions',
     iconName: 'ShieldCheck',
     defaultRoute: '/credit-assessment',
-    primaryRoles: ['CREDIT_ANALYST', 'UNDERWRITER', 'RISK_MANAGER', 'BRANCH_MANAGER'],
-    allowedRoles: ['ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'RISK_MANAGER', 'RISK_ANALYST', 'FRAUD_ANALYST', 'AUDITOR'],
+    primaryRoles: ['CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'],
+    allowedRoles: ['ADMIN', 'UNDERWRITER', 'CREDIT_ANALYST', 'BRANCH_MANAGER', 'FRAUD_ANALYST', 'AUDITOR'],
   },
   FINANCE: {
     id: 'FINANCE',
@@ -105,6 +105,7 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     primaryRoles: ['CUSTOMER'],
     allowedRoles: ['CUSTOMER'],
   },
+
 };
 
 /**
