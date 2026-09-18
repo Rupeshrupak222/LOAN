@@ -43,9 +43,21 @@ export async function getAssessmentDashboardMetrics(
     }
   }
 
-  // Only proposals submitted into credit lifecycle (exclude draft)
+  // All proposals submitted into credit lifecycle and downstream disbursement
   where.status = {
-    in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED'],
+    in: [
+      'SUBMITTED',
+      'KYC_PENDING',
+      'KYC_VERIFIED',
+      'UNDER_REVIEW',
+      'CREDIT_ASSESSMENT',
+      'UNDERWRITING',
+      'APPROVED',
+      'REJECTED',
+      'AGREEMENT_PENDING',
+      'READY_FOR_DISBURSEMENT',
+      'DISBURSED',
+    ],
   };
 
   const applications = await prisma.loanApplication.findMany({
@@ -205,12 +217,24 @@ export async function getAssessmentQueue(
     // Sent back by Underwriter or Credit Head for corrections
     where.underwriting = { decision: 'SEND_BACK' };
   } else if (tab === 'APPROVED' || tab === 'COMPLETED') {
-    // Approved by Underwriter / Sanctioned
-    where.status = 'APPROVED';
+    // Approved by Underwriter / Sanctioned or Disbursed
+    where.status = { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] };
   } else {
-    // Default ALL: All proposals in credit lifecycle (NEVER DRAFT)
+    // Default ALL: All proposals in lifecycle (from intake through branch review, underwriting, and disbursement)
     where.status = {
-      in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED'],
+      in: [
+        'SUBMITTED',
+        'KYC_PENDING',
+        'KYC_VERIFIED',
+        'UNDER_REVIEW',
+        'CREDIT_ASSESSMENT',
+        'UNDERWRITING',
+        'APPROVED',
+        'REJECTED',
+        'AGREEMENT_PENDING',
+        'READY_FOR_DISBURSEMENT',
+        'DISBURSED',
+      ],
     };
   }
 

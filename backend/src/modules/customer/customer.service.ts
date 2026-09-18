@@ -39,66 +39,90 @@ export async function listCustomers(
   if (status) where.status = status as any;
   if (kycStatus) where.kycStatus = kycStatus as any;
 
+  const andConditions: Prisma.CustomerWhereInput[] = [];
+
   // Enforce Tenant & Branch Scoping and Role-Specific Defaults
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
-    if (actor.tenantId) {
-      where.tenantId = actor.tenantId;
-    }
-    if (
-      (actor.roles?.includes('BRANCH_MANAGER') ||
-        actor.roles?.includes('LOAN_OFFICER') ||
-        actor.roles?.includes('COLLECTION_OFFICER') ||
-        actor.roles?.includes('COLLECTION_AGENT')) &&
-      actor.branchId
-    ) {
-      where.branchId = actor.branchId;
-    }
-    // Collection officers strictly operate on borrowers who have been disbursed loans by finance officer
-    if (actor.roles?.includes('COLLECTION_OFFICER')) {
-      where.loans = {
-        some: {
-          status: { in: ['ACTIVE', 'OVERDUE', 'RESTRUCTURED', 'SETTLED', 'CLOSED', 'WRITTEN_OFF'] },
-        },
-      };
+    if (actor.tenantId && actor.tenantId !== 'ALL') {
+      andConditions.push({
+        OR: [
+          { tenantId: actor.tenantId },
+          { tenantId: null },
+          { tenantId: 'tenant-adyapan-default' },
+        ],
+      });
     }
 
-    // Show customers to Underwriters if forwarded by Credit Analyst to Branch Manager or by Branch Manager to Underwriting
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') ||
+        actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId
+    ) {
+      andConditions.push({
+        OR: [
+          { branchId: actor.branchId },
+          { branchId: null },
+          { applications: { some: { branchId: actor.branchId } } },
+        ],
+      });
+    }
+
+    // Collection officers strictly operate on borrowers who have been disbursed loans by finance officer
+    if (actor.roles?.includes('COLLECTION_OFFICER')) {
+      andConditions.push({
+        loans: {
+          some: {
+            status: { in: ['ACTIVE', 'OVERDUE', 'RESTRUCTURED', 'SETTLED', 'CLOSED', 'WRITTEN_OFF'] },
+          },
+        },
+      });
+    }
+
+    // Show customers to Underwriters if they have applications in the pipeline or previously forwarded
     if (
       actor.roles?.includes('UNDERWRITER') &&
       !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
     ) {
-      where.applications = {
-        some: {
-          OR: [
-            { stage: 'BRANCH_MANAGER_REVIEW' },
-            {
-              status: {
-                in: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'],
-              },
-            },
-            {
-              approvals: {
-                some: {
-                  status: { in: ['APPROVED', 'ESCALATED'] },
+      andConditions.push({
+        applications: {
+          some: {
+            OR: [
+              { stage: 'BRANCH_MANAGER_REVIEW' },
+              {
+                status: {
+                  in: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'CREDIT_ASSESSMENT'],
                 },
               },
-            },
-          ],
+              {
+                approvals: {
+                  some: {
+                    status: { in: ['APPROVED', 'ESCALATED'] },
+                  },
+                },
+              },
+            ],
+          },
         },
-      };
+      });
     }
   }
 
   if (params.search) {
-    where.OR = [
-      { firstName: { contains: params.search, mode: 'insensitive' } },
-      { lastName: { contains: params.search, mode: 'insensitive' } },
-      { mobile: { contains: params.search } },
-      { customerCode: { contains: params.search, mode: 'insensitive' } },
-      { email: { contains: params.search, mode: 'insensitive' } },
-      { city: { contains: params.search, mode: 'insensitive' } },
-      { loans: { some: { loanNo: { contains: params.search, mode: 'insensitive' } } } },
-    ];
+    andConditions.push({
+      OR: [
+        { firstName: { contains: params.search, mode: 'insensitive' } },
+        { lastName: { contains: params.search, mode: 'insensitive' } },
+        { mobile: { contains: params.search } },
+        { customerCode: { contains: params.search, mode: 'insensitive' } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { city: { contains: params.search, mode: 'insensitive' } },
+        { loans: { some: { loanNo: { contains: params.search, mode: 'insensitive' } } } },
+      ],
+    });
+  }
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
   }
 
   const [rows, total] = await Promise.all([
