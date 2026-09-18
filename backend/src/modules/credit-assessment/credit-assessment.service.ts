@@ -43,9 +43,21 @@ export async function getAssessmentDashboardMetrics(
     }
   }
 
-  // Only proposals submitted into credit lifecycle (exclude draft)
+  // All proposals submitted into credit lifecycle and downstream disbursement
   where.status = {
-    in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED'],
+    in: [
+      'SUBMITTED',
+      'KYC_PENDING',
+      'KYC_VERIFIED',
+      'UNDER_REVIEW',
+      'CREDIT_ASSESSMENT',
+      'UNDERWRITING',
+      'APPROVED',
+      'REJECTED',
+      'AGREEMENT_PENDING',
+      'READY_FOR_DISBURSEMENT',
+      'DISBURSED',
+    ],
   };
 
   const applications = await prisma.loanApplication.findMany({
@@ -205,12 +217,24 @@ export async function getAssessmentQueue(
     // Sent back by Underwriter or Credit Head for corrections
     where.underwriting = { decision: 'SEND_BACK' };
   } else if (tab === 'APPROVED' || tab === 'COMPLETED') {
-    // Approved by Underwriter / Sanctioned
-    where.status = 'APPROVED';
+    // Approved by Underwriter / Sanctioned or Disbursed
+    where.status = { in: ['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'] };
   } else {
-    // Default ALL: All proposals in credit lifecycle (NEVER DRAFT)
+    // Default ALL: All proposals in lifecycle (from intake through branch review, underwriting, and disbursement)
     where.status = {
-      in: ['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING', 'APPROVED', 'REJECTED'],
+      in: [
+        'SUBMITTED',
+        'KYC_PENDING',
+        'KYC_VERIFIED',
+        'UNDER_REVIEW',
+        'CREDIT_ASSESSMENT',
+        'UNDERWRITING',
+        'APPROVED',
+        'REJECTED',
+        'AGREEMENT_PENDING',
+        'READY_FOR_DISBURSEMENT',
+        'DISBURSED',
+      ],
     };
   }
 
@@ -976,16 +1000,16 @@ export async function forwardToUnderwriting(
 
   // Gate 3: Credit Risk Scoring Gate
   if (!app.riskAssessment || app.riskAssessment.score === null || app.riskAssessment.score === undefined) {
-    blockers.push('Credit Risk Scoring assessment must be evaluated before Underwriter handoff');
+    blockers.push('Credit Risk Scoring assessment must be evaluated before Branch Manager handoff');
   }
 
-  // Gate 2: Credit Recommendation Gate
+  // Gate 4: Credit Recommendation Gate
   const recommendationRecord = (app.eligibility?.factors as any)?.recommendation;
   if (!recommendationRecord || !recommendationRecord.recommendation) {
-    blockers.push('Credit Analyst recommendation must be recorded before Underwriter handoff');
+    blockers.push('Credit Analyst recommendation must be recorded before Branch Manager handoff');
   }
 
-  // Gate 3: All Uploaded Documents Must Be Verified
+  // Gate 5: All Uploaded Documents Must Be Verified
   const allDocs = app.customer?.documents || [];
   if (allDocs.length > 0) {
     const unverifiedDocs = allDocs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
@@ -994,26 +1018,29 @@ export async function forwardToUnderwriting(
         .map((d: any) => d.documentType || d.fileName || 'Document')
         .join(', ');
       blockers.push(
-        `${unverifiedDocs.length} document(s) are pending verification (${docNames}). All uploaded borrower documents must be verified before Underwriter handoff`
+        `${unverifiedDocs.length} document(s) are pending verification (${docNames}). All uploaded borrower documents must be verified before Branch Manager handoff`
       );
     }
   } else if (allDocs.length === 0) {
-    blockers.push('No borrower documents found. At least one verified document is required before Underwriter handoff');
+    blockers.push('No borrower documents found. At least one verified document is required before Branch Manager handoff');
   }
 
   if (blockers.length > 0) {
     throw new BadRequestError(
-      `Cannot forward application to Underwriting. Mandatory assessment gates incomplete: ${blockers.join('; ')}.`
+      `Cannot forward application to Branch Manager. Mandatory assessment gates incomplete: ${blockers.join('; ')}.`
     );
   }
 
-
-  const targetStatus: ApplicationStatus = 'UNDERWRITING';
+  const targetStatus: ApplicationStatus = 'CREDIT_ASSESSMENT';
+  const targetStage = 'BRANCH_MANAGER_REVIEW';
 
   const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.loanApplication.update({
       where: { id: applicationId },
-      data: { status: targetStatus },
+      data: {
+        status: targetStatus,
+        stage: targetStage,
+      },
     });
 
     if (app.customerId && app.customer?.kycStatus !== 'VERIFIED') {
@@ -1029,7 +1056,7 @@ export async function forwardToUnderwriting(
         fromStatus: app.status,
         toStatus: targetStatus,
         changedBy: actor.email || actor.id,
-        reason: input.reason?.trim() || `Credit assessment completed and recommended for underwriting by ${actor.email || 'Credit Analyst'}`,
+        reason: input.reason?.trim() || `Credit assessment completed and forwarded for Branch Manager review by ${actor.email || 'Credit Analyst'}`,
       },
     });
 
@@ -1040,12 +1067,13 @@ export async function forwardToUnderwriting(
     tenantId: app.tenantId || undefined,
     userId: actor.id || undefined,
     role: actor.roles?.[0] || 'CREDIT_ANALYST',
-    action: 'APPLICATION_FORWARDED_TO_UNDERWRITING',
+    action: 'APPLICATION_FORWARDED_TO_BRANCH_MANAGER',
     entity: 'LoanApplication',
     entityId: applicationId,
     newValue: {
       fromStatus: app.status,
       toStatus: targetStatus,
+      stage: targetStage,
       reason: input.reason,
     },
   });
@@ -1057,8 +1085,8 @@ export async function forwardToUnderwriting(
         customerId: app.customerId,
         channel: 'IN_APP',
         type: 'INFO',
-        title: `Application #${app.applicationNo} Forwarded to Underwriting`,
-        message: 'Your loan proposal has completed credit assessment and is now in the Underwriter sanction queue.',
+        title: `Application #${app.applicationNo} Forwarded to Branch Manager`,
+        message: 'Your loan proposal has completed credit assessment and is now under Branch Manager review.',
         metadata: { applicationId, link: `/applications/${applicationId}` },
       })
     ).catch(() => {});
@@ -1083,7 +1111,7 @@ export async function forwardToUnderwriting(
 
   return {
     success: true,
-    message: `Application #${app.applicationNo} successfully forwarded to Underwriting queue.`,
+    message: `Application #${app.applicationNo} successfully forwarded to Branch Manager review.`,
     application: result,
   };
 }

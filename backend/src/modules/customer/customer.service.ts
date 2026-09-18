@@ -39,45 +39,90 @@ export async function listCustomers(
   if (status) where.status = status as any;
   if (kycStatus) where.kycStatus = kycStatus as any;
 
-  // Enforce Tenant & Branch Scoping
+  const andConditions: Prisma.CustomerWhereInput[] = [];
+
+  // Enforce Tenant & Branch Scoping and Role-Specific Defaults
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
-    if (actor.tenantId) {
-      where.tenantId = actor.tenantId;
-    }
-    if (
-      (actor.roles?.includes('BRANCH_MANAGER') ||
-        actor.roles?.includes('LOAN_OFFICER') ||
-        actor.roles?.includes('COLLECTION_OFFICER') ||
-        actor.roles?.includes('COLLECTION_AGENT')) &&
-      actor.branchId
-    ) {
-      where.branchId = actor.branchId;
+    if (actor.tenantId && actor.tenantId !== 'ALL') {
+      andConditions.push({
+        OR: [
+          { tenantId: actor.tenantId },
+          { tenantId: null },
+          { tenantId: 'tenant-adyapan-default' },
+        ],
+      });
     }
 
-    // Only show customers to Underwriters if they have an application forwarded to underwriting
+    if (
+      (actor.roles?.includes('BRANCH_MANAGER') ||
+        actor.roles?.includes('LOAN_OFFICER')) &&
+      actor.branchId
+    ) {
+      andConditions.push({
+        OR: [
+          { branchId: actor.branchId },
+          { branchId: null },
+          { applications: { some: { branchId: actor.branchId } } },
+        ],
+      });
+    }
+
+    // Collection officers strictly operate on borrowers who have been disbursed loans by finance officer
+    if (actor.roles?.includes('COLLECTION_OFFICER')) {
+      andConditions.push({
+        loans: {
+          some: {
+            status: { in: ['ACTIVE', 'OVERDUE', 'RESTRUCTURED', 'SETTLED', 'CLOSED', 'WRITTEN_OFF'] },
+          },
+        },
+      });
+    }
+
+    // Show customers to Underwriters if they have applications in the pipeline or previously forwarded
     if (
       actor.roles?.includes('UNDERWRITER') &&
       !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
     ) {
-      where.applications = {
-        some: {
-          status: {
-            in: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'],
+      andConditions.push({
+        applications: {
+          some: {
+            OR: [
+              { stage: 'BRANCH_MANAGER_REVIEW' },
+              {
+                status: {
+                  in: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'CREDIT_ASSESSMENT'],
+                },
+              },
+              {
+                approvals: {
+                  some: {
+                    status: { in: ['APPROVED', 'ESCALATED'] },
+                  },
+                },
+              },
+            ],
           },
         },
-      };
+      });
     }
   }
 
   if (params.search) {
-    where.OR = [
-      { firstName: { contains: params.search, mode: 'insensitive' } },
-      { lastName: { contains: params.search, mode: 'insensitive' } },
-      { mobile: { contains: params.search } },
-      { customerCode: { contains: params.search, mode: 'insensitive' } },
-      { email: { contains: params.search, mode: 'insensitive' } },
-      { city: { contains: params.search, mode: 'insensitive' } },
-    ];
+    andConditions.push({
+      OR: [
+        { firstName: { contains: params.search, mode: 'insensitive' } },
+        { lastName: { contains: params.search, mode: 'insensitive' } },
+        { mobile: { contains: params.search } },
+        { customerCode: { contains: params.search, mode: 'insensitive' } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { city: { contains: params.search, mode: 'insensitive' } },
+        { loans: { some: { loanNo: { contains: params.search, mode: 'insensitive' } } } },
+      ],
+    });
+  }
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
   }
 
   const [rows, total] = await Promise.all([
@@ -88,6 +133,32 @@ export async function listCustomers(
       orderBy: { createdAt: params.sortDir },
       include: {
         branch: { select: { name: true, code: true } },
+        loans: {
+          where: {
+            status: { in: ['ACTIVE', 'OVERDUE', 'RESTRUCTURED', 'SETTLED', 'CLOSED', 'WRITTEN_OFF'] },
+          },
+          select: {
+            id: true,
+            loanNo: true,
+            principal: true,
+            outstandingPrincipal: true,
+            emiAmount: true,
+            status: true,
+            nextDueDate: true,
+            collectionCases: {
+              where: { status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED', 'LEGAL_REVIEW', 'SETTLEMENT_REVIEW'] } },
+              select: {
+                id: true,
+                caseNo: true,
+                dpd: true,
+                agingBucket: true,
+                overdueAmount: true,
+                priority: true,
+                status: true,
+              },
+            },
+          },
+        },
         _count: { select: { loans: true, applications: true } },
       },
     }),
@@ -95,24 +166,47 @@ export async function listCustomers(
   ]);
 
   return {
-    data: rows.map((c) => ({
-      id: c.id,
-      customerCode: c.customerCode,
-      name: `${c.firstName} ${c.lastName}`,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      mobile: c.mobile,
-      email: c.email,
-      city: c.city,
-      state: c.state,
-      branchName: c.branch?.name,
-      kycStatus: c.kycStatus,
-      riskCategory: c.riskCategory,
-      status: c.status,
-      activeLoans: c._count.loans,
-      totalApplications: c._count.applications,
-      createdAt: c.createdAt,
-    })),
+    data: rows.map((c) => {
+      const activeLoan = c.loans?.[0];
+      const activeCase = activeLoan?.collectionCases?.[0];
+      const totalOverdue = c.loans?.reduce((sum, l) => {
+        const cOverdue = l.collectionCases?.[0]?.overdueAmount;
+        return sum + (cOverdue ? Number(cOverdue) : 0);
+      }, 0) || 0;
+      const maxDpd = c.loans?.reduce((max, l) => {
+        const cDpd = l.collectionCases?.[0]?.dpd;
+        return Math.max(max, cDpd ? Number(cDpd) : 0);
+      }, 0) || 0;
+
+      return {
+        id: c.id,
+        customerCode: c.customerCode,
+        name: `${c.firstName} ${c.lastName}`.trim(),
+        firstName: c.firstName,
+        lastName: c.lastName,
+        mobile: c.mobile,
+        email: c.email || undefined,
+        city: c.city || undefined,
+        state: c.state || undefined,
+        branchName: c.branch?.name,
+        kycStatus: c.kycStatus,
+        riskCategory: c.riskCategory || undefined,
+        status: c.status,
+        activeLoans: c._count.loans,
+        totalApplications: c._count.applications,
+        activeLoanNo: activeLoan?.loanNo,
+        activeLoanId: activeLoan?.id,
+        loanStatus: activeLoan?.status,
+        emiAmount: activeLoan?.emiAmount ? Number(activeLoan.emiAmount) : undefined,
+        overdueAmount: totalOverdue,
+        dpd: maxDpd,
+        agingBucket: activeCase?.agingBucket,
+        priority: activeCase?.priority,
+        collectionCaseId: activeCase?.id,
+        hasOverdue: totalOverdue > 0 || maxDpd > 0,
+        createdAt: c.createdAt,
+      };
+    }),
     pagination: buildPagination(params.page, params.pageSize, total),
   };
 }

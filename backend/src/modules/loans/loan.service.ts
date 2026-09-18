@@ -26,7 +26,7 @@ export async function listLoans(
   if (customerId) where.customerId = customerId;
   if (userId) where.customer = { userId };
 
-  // Enforce Tenant & Branch Scoping
+  // Enforce Tenant & Branch Scoping and Role-Specific Defaults
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
     if (actor.tenantId) {
       where.tenantId = actor.tenantId;
@@ -39,6 +39,10 @@ export async function listLoans(
       actor.branchId
     ) {
       where.branchId = actor.branchId;
+    }
+    // Collection officers strictly operate on post-disbursement loan accounts
+    if (actor.roles?.includes('COLLECTION_OFFICER') && !status) {
+      where.status = { in: ['ACTIVE', 'OVERDUE', 'RESTRUCTURED', 'SETTLED', 'CLOSED', 'WRITTEN_OFF'] };
     }
   }
 

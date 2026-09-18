@@ -61,20 +61,21 @@ export async function listApplications(
         { customer: { branchId: null } },
       ];
     }
-    // Restrict underwriters to applications forwarded to underwriting
+    // Restrict underwriters to applications forwarded to Branch Manager review or Underwriting
     if (
       actor.roles?.includes('UNDERWRITER') &&
       !actor.roles?.some((r) => ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT', 'OPERATIONS_MANAGER'].includes(r))
     ) {
       const allowedStatuses = ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'];
-      if (status && !allowedStatuses.includes(status)) {
-        where.status = 'UNDERWRITING'; // Unmatchable if they queried a status they don't have access to
+      if (status && !allowedStatuses.includes(status) && status !== 'CREDIT_ASSESSMENT') {
+        where.status = 'UNDERWRITING';
       } else if (!status) {
         where.AND = [
           ...(where.AND || []),
           {
             OR: [
               { status: { in: allowedStatuses } },
+              { stage: 'BRANCH_MANAGER_REVIEW' },
               { underwriting: { isNot: null } },
               { stage: { contains: 'UNDERWRITING' } },
             ],
@@ -480,8 +481,13 @@ export async function getApplication(id: string, actor?: ApplicationActorContext
       actor.roles?.includes('UNDERWRITER') &&
       !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
     ) {
-      if (!['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)) {
-        throw new ForbiddenError('Access forbidden: Underwriters can only view applications forwarded to underwriting');
+      const allowedUnderwriterStatuses = ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'];
+      const isAllowed =
+        allowedUnderwriterStatuses.includes(app.status) ||
+        app.stage === 'BRANCH_MANAGER_REVIEW' ||
+        Boolean(app.underwriting);
+      if (!isAllowed) {
+        throw new ForbiddenError('Access forbidden: Underwriters can only view applications forwarded to branch review or underwriting');
       }
     }
   }
