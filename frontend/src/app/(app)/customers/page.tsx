@@ -33,7 +33,7 @@ interface CustomerRow {
 
 function StandardCustomersDirectoryView() {
   const { user } = useAuth();
-  const isLoanOfficer = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
+  const isLoanOfficer = Boolean(user?.roles?.some((r: string) => ['LOAN_OFFICER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'].includes(r)));
 
   const { isDark } = useTheme();
   const isUnderwriter = user?.roles?.includes('UNDERWRITER');

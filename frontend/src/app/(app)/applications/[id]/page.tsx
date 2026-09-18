@@ -302,7 +302,7 @@ export default function ApplicationDetailPage() {
   const isOnlyLoanOfficer = Boolean(isLoanOfficer && !isCreditAnalyst && !isUnderwriter && !isSuperAdmin);
 
   const isCreditAnalystOrHigher = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'COMPANY_ADMIN'].includes(r)
+    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'COMPANY_ADMIN'].includes(r)
   );
 
   // Extract consolidated documents safely with unique keys
@@ -390,18 +390,20 @@ export default function ApplicationDetailPage() {
     (isLoanOfficer || isCreditAnalystOrHigher) &&
     (isReturned || data.status === 'RETURNED' || data.underwriting?.decision === 'SEND_BACK');
 
-  const canAssessCredit = !isOnlyLoanOfficer && user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER'].includes(r)
+  const canAssessCredit = !isOnlyLoanOfficer && !isBranchManager && user?.roles?.some((r: string) =>
+    ['SUPER_ADMIN', 'ADMIN', 'CREDIT_ANALYST', 'UNDERWRITER'].includes(r)
   );
 
   const canForwardToUnderwriting =
     !isCreditAnalyst &&
+    !isBranchManager &&
     !isOnlyLoanOfficer &&
     !isUnderwriter &&
     ['DRAFT', 'SUBMITTED', 'KYC_VERIFIED', 'UNDER_REVIEW', 'CREDIT_ASSESSMENT'].includes(data.status);
 
   const canReject =
     !isCreditAnalyst &&
+    !isBranchManager &&
     !isOnlyLoanOfficer &&
     !['REJECTED', 'DISBURSED', 'CANCELLED'].includes(data.status);
 
@@ -693,19 +695,21 @@ export default function ApplicationDetailPage() {
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span><strong>Borrower Age Issue:</strong> {ageError} (Borrower DOB: {customer.dateOfBirth ? formatDate(customer.dateOfBirth) : 'Missing'})</span>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setKycStatusInput(customer.kycStatus || 'VERIFIED');
-                  setRiskCategoryInput(customer.riskCategory || 'LOW');
-                  setKycRemarks('');
-                  setKycModalOpen(true);
-                }}
-                className="text-xs shrink-0 cursor-pointer border-rose-300 text-rose-700 hover:bg-rose-50"
-              >
-                <UserCheck className="w-3 h-3" /> Rectify KYC / DOB
-              </Button>
+              {!isBranchManager && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setKycStatusInput(customer.kycStatus || 'VERIFIED');
+                    setRiskCategoryInput(customer.riskCategory || 'LOW');
+                    setKycRemarks('');
+                    setKycModalOpen(true);
+                  }}
+                  className="text-xs shrink-0 cursor-pointer border-rose-300 text-rose-700 hover:bg-rose-50"
+                >
+                  <UserCheck className="w-3 h-3" /> Rectify KYC / DOB
+                </Button>
+              )}
             </div>
           )}
 
@@ -1516,6 +1520,29 @@ export default function ApplicationDetailPage() {
                 )}
               </Card>
             </div>
+
+            {/* Branch Manager Review & Delegated Approval Section */}
+            {(isBranchManager || isSuperAdmin || data.stage === 'BRANCH_MANAGER_REVIEW' || !!data.eligibility || data.status === 'CREDIT_ASSESSMENT') && (
+              <BranchManagerReviewSection
+                applicationId={params.id}
+                applicationNo={data.applicationNo}
+                stage={data.stage}
+                requestedAmount={data.requestedAmount}
+                currentStatus={data.status}
+                customer={data.customer}
+                product={data.product}
+                eligibility={data.eligibility}
+                riskAssessment={data.riskAssessment}
+                approvals={data.approvals}
+                documents={documents}
+                onDecisionSubmitted={() => {
+                  queryClient.invalidateQueries({ queryKey: ['application', params.id] });
+                  queryClient.invalidateQueries({ queryKey: ['applications'] });
+                  queryClient.invalidateQueries({ queryKey: ['branch-manager-queue'] });
+                  queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+                }}
+              />
+            )}
 
             {/* Active Early Warning Surveillance Banner (Full Width) */}
             <EarlyWarningWidget applicationId={params.id} customerId={data?.customerId} />

@@ -35,7 +35,7 @@ export default function ApplicationsPage() {
   });
 
   const canCreate = user?.roles?.some((r: string) =>
-    ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'OPERATIONS_MANAGER', 'OPERATIONS_OFFICER', 'BRANCH_MANAGER'].includes(r)
+    ['SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'OPERATIONS_MANAGER', 'OPERATIONS_OFFICER'].includes(r)
   );
 
   return (

@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import argon2 from 'argon2';
 import { prisma } from '../../config/prisma';
-import { NotFoundError, ForbiddenError } from '../../common/errors';
+import { NotFoundError, ForbiddenError, ConflictError } from '../../common/errors';
 import { PageParams, buildPagination } from '../../common/pagination';
 import { generateCustomerCode } from '../shared/codes';
 import { Money } from '../finance/money';
@@ -58,6 +58,32 @@ export async function listCustomers(
       where.loans = {
         some: {
           status: { in: ['ACTIVE', 'OVERDUE', 'RESTRUCTURED', 'SETTLED', 'CLOSED', 'WRITTEN_OFF'] },
+        },
+      };
+    }
+
+    // Show customers to Underwriters if forwarded by Credit Analyst to Branch Manager or by Branch Manager to Underwriting
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
+    ) {
+      where.applications = {
+        some: {
+          OR: [
+            { stage: 'BRANCH_MANAGER_REVIEW' },
+            {
+              status: {
+                in: ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'],
+              },
+            },
+            {
+              approvals: {
+                some: {
+                  status: { in: ['APPROVED', 'ESCALATED'] },
+                },
+              },
+            },
+          ],
         },
       };
     }
@@ -221,6 +247,18 @@ export async function getCustomer(id: string, actor?: CustomerActorContext) {
       customer.branchId !== actor.branchId
     ) {
       throw new ForbiddenError('Access forbidden: Customer belongs to a different branch');
+    }
+
+    if (
+      actor.roles?.includes('UNDERWRITER') &&
+      !actor.roles?.some((r) => ['ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'RISK_MANAGER', 'COLLECTION_OFFICER', 'COLLECTION_AGENT'].includes(r))
+    ) {
+      const hasValidApp = customer.applications?.some((app) =>
+        ['UNDERWRITING', 'APPROVED', 'REJECTED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)
+      );
+      if (!hasValidApp) {
+        throw new ForbiddenError('Access forbidden: Underwriters can only view customers with applications forwarded to underwriting');
+      }
     }
   }
 
@@ -561,6 +599,12 @@ export async function createCustomer(
     // If email is provided, create linked User account with CUSTOMER role and hashed password
     if (input.email && passwordHash) {
       const cleanEmail = input.email.toLowerCase().trim();
+
+      const existingUser = await tx.user.findUnique({ where: { email: cleanEmail } });
+      if (existingUser) {
+        throw new ConflictError('Email already exists, use different email');
+      }
+
       const customerRole = await tx.role.findUnique({ where: { name: 'CUSTOMER' } });
 
       const user = await tx.user.upsert({

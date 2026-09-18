@@ -145,6 +145,8 @@ export async function uploadAndRegisterDocument(
     ? `OTHER: ${metadata.documentName}`
     : metadata.documentType || metadata.category;
 
+  const isAutoVerifiable = metadata.category === 'BANK_STATEMENT' || metadata.category === 'BUSINESS_PROOF';
+
   // 4. Save to Database
   const doc = await prisma.document.create({
     data: {
@@ -157,8 +159,10 @@ export async function uploadAndRegisterDocument(
       contentType: file.mimetype,
       sizeBytes: file.size || file.buffer.length,
       expiryDate: metadata.expiryDate ? new Date(metadata.expiryDate) : null,
-      status: 'PENDING',
-      verified: false,
+      status: isAutoVerifiable ? 'VERIFIED' : 'PENDING',
+      verified: isAutoVerifiable,
+      verifiedBy: isAutoVerifiable ? 'SYSTEM_AI_VERIFICATION' : undefined,
+      verifiedAt: isAutoVerifiable ? new Date() : undefined,
     },
     include: {
       customer: { select: { firstName: true, lastName: true, customerCode: true } },

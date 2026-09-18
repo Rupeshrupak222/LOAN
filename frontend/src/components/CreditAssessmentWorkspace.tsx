@@ -2685,14 +2685,16 @@ export function CreditAssessmentWorkspace({
                     return raw;
                   }
                   const backendBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
+                  let parsed = raw;
                   if (raw.startsWith('/uploads')) {
-                    return `${backendBase}${raw}`;
+                    parsed = `${backendBase}${raw}`;
+                  } else if (raw.startsWith('/')) {
+                    parsed = raw;
+                  } else {
+                    // If it's a raw filename, assume it's in the backend uploads directory
+                    parsed = `${backendBase}/uploads/${raw}`;
                   }
-                  if (raw.startsWith('/')) {
-                    return raw;
-                  }
-                  // If it's a raw filename, assume it's in the backend uploads directory
-                  return `${backendBase}/uploads/${raw}`;
+                  try { return encodeURI(parsed); } catch { return parsed; }
                 };
 
                 const fileUrl = getDocUrl(previewDoc);
@@ -2717,11 +2719,34 @@ export function CreditAssessmentWorkspace({
 
                 if (isImage) {
                   return (
-                    <img
-                      src={fileUrl}
-                      alt={previewDoc.fileName || 'Document Artifact'}
-                      className="max-h-[55vh] max-w-full object-contain rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                    />
+                    <div className="flex flex-col items-center justify-center space-y-4">
+                      <img
+                        src={fileUrl}
+                        alt={previewDoc.fileName || 'Document Artifact'}
+                        className="max-h-[55vh] max-w-full object-contain rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (!target.dataset.failed) {
+                            target.dataset.failed = 'true';
+                            target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+                            target.className = "w-24 h-24 opacity-50 mx-auto object-contain mt-8";
+                            
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.err-msg')) {
+                              const title = document.createElement('p');
+                              title.className = 'err-msg text-center text-sm text-slate-500 font-semibold';
+                              title.innerText = 'Document unavailable or moved';
+                              parent.appendChild(title);
+                              
+                              const subtitle = document.createElement('p');
+                              subtitle.className = 'err-msg text-center text-[11px] text-slate-400 font-mono break-all px-8 max-w-md mx-auto';
+                              subtitle.innerText = fileUrl;
+                              parent.appendChild(subtitle);
+                            }
+                          }
+                        }}
+                      />
+                    </div>
                   );
                 }
 

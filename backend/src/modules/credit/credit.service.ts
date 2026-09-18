@@ -963,10 +963,10 @@ export async function submitCreditDecision(
   let auditAction = '';
 
   if (input.decision === 'ELIGIBLE') {
-    // Passes credit assessment: moves to next approval stage (Underwriting / Branch Manager sanction)
-    nextApplicationStatus = 'UNDERWRITING';
-    historyReason = `Credit Assessment: ELIGIBLE — Forwarded to Underwriter (${input.reason})`;
-    auditAction = 'CREDIT_DECISION_FORWARDED_TO_UNDERWRITER';
+    // Passes credit assessment: moves to Branch Manager Review stage before Underwriting
+    nextApplicationStatus = 'CREDIT_ASSESSMENT';
+    historyReason = `Credit Assessment: ELIGIBLE — Forwarded to Branch Manager Review (${input.reason})`;
+    auditAction = 'CREDIT_DECISION_FORWARDED_TO_BRANCH_MANAGER';
   } else if (input.decision === 'NOT_ELIGIBLE') {
     // Marked Not Eligible: remains in CREDIT_ASSESSMENT with status recorded as NOT_ELIGIBLE
     // Does NOT forward to Underwriter
@@ -1053,10 +1053,13 @@ export async function submitCreditDecision(
         })
       : Promise.resolve(null),
 
-    // E. Update Application Status
+    // E. Update Application Status and Stage
     prisma.loanApplication.update({
       where: { id: applicationId },
-      data: { status: nextApplicationStatus },
+      data: {
+        status: nextApplicationStatus,
+        stage: input.decision === 'ELIGIBLE' ? 'BRANCH_MANAGER_REVIEW' : app.stage,
+      },
     }),
 
     // F. Record Application Status History
@@ -1104,7 +1107,7 @@ export async function submitCreditDecision(
     title: `Credit Assessment: ${input.decision.replace(/_/g, ' ')}`,
     message:
       input.decision === 'ELIGIBLE'
-        ? 'Your credit assessment has been completed and recommended for Underwriting sanction.'
+        ? 'Your credit assessment has been completed and forwarded to Branch Manager Review.'
         : input.decision === 'NOT_ELIGIBLE'
         ? `Application credit check result: Not Eligible. ${input.rejectionReason || input.reason}`
         : `Further review or documents are required: ${input.reason}`,

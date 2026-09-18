@@ -19,7 +19,7 @@ router.use(authenticate);
  */
 router.get(
   '/queue',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER'),
   asyncHandler(async (req, res) => {
     const queue = await getBranchManagerQueue(req.user as any, (req.query as any)?.tab);
     res.json(success(queue));
@@ -32,7 +32,7 @@ router.get(
  */
 router.post(
   '/applications/:id/decision',
-  authorize('SUPER_ADMIN', 'ADMIN', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN', 'BRANCH_MANAGER'),
   validate(branchManagerDecisionSchema),
   asyncHandler(async (req, res) => {
     const result = await submitBranchManagerDecision(
