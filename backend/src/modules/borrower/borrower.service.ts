@@ -414,6 +414,10 @@ export class BorrowerService {
         firstName: input.firstName,
         lastName: input.lastName,
         kycStatus: 'VERIFIED',
+        employmentType: input.employmentType,
+        employerName: input.employerName || input.businessName || input.institutionName || 'Independent',
+        monthlyIncome: Money.of(input.monthlyIncome || 0),
+        existingObligations: input.existingEmiObligations ? Money.of(input.existingEmiObligations) : null,
       },
     });
 
@@ -449,8 +453,10 @@ export class BorrowerService {
       data: {
         customerId: customer.id,
         employmentType: input.employmentType,
-        employerName: input.employerName,
-        monthlyIncome: Money.of(input.monthlyIncome),
+        employerName: input.employerName || input.businessName || input.institutionName || 'Independent',
+        designation: input.designation || input.professionType || null,
+        workExperienceYears: input.workExperienceYears || null,
+        monthlyIncome: Money.of(input.monthlyIncome || 0),
       },
     });
 
@@ -501,6 +507,14 @@ export class BorrowerService {
         tenantId: tenantId || product.tenantId || undefined,
       },
     });
+
+    // 6.1 Link uploaded documents if any
+    if (input.documentIds && input.documentIds.length > 0) {
+      await prisma.document.updateMany({
+        where: { id: { in: input.documentIds } },
+        data: { applicationId: application.id, customerId: customer.id },
+      });
+    }
 
     // 7. Generate Statutory Offer & KFS
     const sanctionAmount = input.requestedAmount;

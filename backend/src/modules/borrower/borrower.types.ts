@@ -107,15 +107,28 @@ export interface BorrowerApplicationInput {
   city: string;
   state: string;
   pincode: string;
-  // Step 3: Employment
-  employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'BUSINESS' | 'PROFESSIONAL';
+  // Step 3: Employment & Role Details
+  employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'BUSINESS' | 'PROFESSIONAL' | 'STUDENT' | 'FREELANCER' | 'FARMER' | 'OTHER';
   employerName: string;
+  designation?: string;
+  workExperienceYears?: number;
+  businessName?: string;
+  businessRegistrationType?: string;
+  gstin?: string;
+  annualTurnover?: number;
+  professionType?: string;
+  institutionName?: string;
+  courseName?: string;
+  coApplicantName?: string;
+  coApplicantRelation?: string;
+  coApplicantIncome?: number;
   monthlyIncome: number;
   existingEmiObligations?: number;
   // Step 4: KYC & Identity
   panNumber: string;
   aadhaarNumberMasked: string;
   kycConsentGiven: boolean;
+  documentIds?: string[];
   // Step 5: Bank details
   accountHolderName: string;
   accountNumber: string;
