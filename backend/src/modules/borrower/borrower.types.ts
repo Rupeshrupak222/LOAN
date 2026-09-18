@@ -20,6 +20,26 @@ export interface BorrowerHomeSummary {
     isBankVerified: boolean;
     mandateStatus: 'ACTIVE' | 'PENDING' | 'NOT_CONFIGURED';
     address?: string | null;
+    profileDetails?: {
+      dob?: string | null;
+      gender?: string | null;
+      addressLine1?: string | null;
+      addressLine2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      pincode?: string | null;
+      employmentType?: string | null;
+      employerName?: string | null;
+      designation?: string | null;
+      monthlyIncome?: number | null;
+      existingEmiObligations?: number | null;
+      workExperienceYears?: number | null;
+      panNumber?: string | null;
+      bankName?: string | null;
+      accountNumber?: string | null;
+      ifscCode?: string | null;
+      accountHolderName?: string | null;
+    };
   };
   creditLimit: {
     preApprovedLimit: number;

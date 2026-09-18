@@ -468,7 +468,18 @@ export default function CustomerDetailPage() {
   }
 
   const addresses = Array.isArray(data.addresses) ? data.addresses : [];
-  const documents = Array.isArray(data.documents) ? data.documents : [];
+  
+  // Deduplicate documents in UI as an ironclad safeguard: keep only single latest document per requirement
+  const rawDocuments = Array.isArray(data.documents) ? data.documents : [];
+  const seenDocKeys = new Set<string>();
+  const documents: any[] = [];
+  for (const doc of rawDocuments) {
+    const key = `${(doc.category || '').toUpperCase().trim()}__${(doc.documentType || '').toUpperCase().trim()}`;
+    if (!seenDocKeys.has(key)) {
+      seenDocKeys.add(key);
+      documents.push(doc);
+    }
+  }
   
   // Deduplicate bank accounts in UI as a safeguard
   const rawBankAccounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];

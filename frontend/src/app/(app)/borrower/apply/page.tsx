@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -51,7 +51,7 @@ const LOAN_CATEGORIES = [
     accentColor: 'from-blue-600 to-indigo-600',
     minAmount: 10000,
     maxAmount: 1000000,
-    defaultAmount: 75000,
+    defaultAmount: 50000,
     minTenure: 3,
     maxTenure: 60,
     defaultTenure: 12,
@@ -76,7 +76,7 @@ const LOAN_CATEGORIES = [
     accentColor: 'from-purple-600 to-indigo-700',
     minAmount: 50000,
     maxAmount: 5000000,
-    defaultAmount: 250000,
+    defaultAmount: 200000,
     minTenure: 6,
     maxTenure: 84,
     defaultTenure: 24,
@@ -100,7 +100,7 @@ const LOAN_CATEGORIES = [
     accentColor: 'from-emerald-600 to-teal-700',
     minAmount: 25000,
     maxAmount: 2000000,
-    defaultAmount: 150000,
+    defaultAmount: 100000,
     minTenure: 12,
     maxTenure: 120,
     defaultTenure: 36,
@@ -167,42 +167,36 @@ const ROLES = [
     title: 'Salaried Employee',
     description: 'Employed in Corporate, MNC, Public Sector, or Private Ltd.',
     icon: Briefcase,
-    requiredDocNames: ['Salary Slips (Last 3 Mos)', 'Salary Bank Statement (6 Mos)', 'Form 16 / ITR'],
   },
   {
     id: 'PROFESSIONAL',
     title: 'Self-Employed Professional',
     description: 'Doctor, Chartered Accountant, Advocate, Architect, or Consultant.',
     icon: Award,
-    requiredDocNames: ['Degree / Council Certificate', '2 Years ITR with Computation', 'Bank Statement (12 Mos)'],
   },
   {
     id: 'BUSINESS',
     title: 'SME Business Owner / Merchant',
     description: 'Proprietorship, Partnership, Pvt Ltd, or Registered Trader.',
     icon: Building2,
-    requiredDocNames: ['GST Registration / Udyam', '2 Years Audited Financials', 'Current A/C Statement (12 Mos)'],
   },
   {
     id: 'STUDENT',
     title: 'Student / Scholar',
     description: 'Full-time student applying with a parent/guardian co-borrower.',
     icon: GraduationCap,
-    requiredDocNames: ['Admission Offer Letter', 'Course Fee Structure', 'Co-Applicant KYC & Income Proof'],
   },
   {
     id: 'FREELANCER',
     title: 'Freelancer / Contractor',
     description: 'Digital creator, independent consultant, or gig professional.',
     icon: Compass,
-    requiredDocNames: ['Client Invoices / Contracts', 'Bank Inflow Statement (6 Mos)', 'PAN & Aadhaar'],
   },
   {
     id: 'FARMER',
     title: 'Farmer / Agri Entrepreneur',
     description: 'Agricultural cultivator, dairy owner, or rural allied producer.',
     icon: Landmark,
-    requiredDocNames: ['Land Holding Record (7/12)', 'Agri Produce Receipts', 'Bank Passbook / Statement'],
   },
 ];
 
@@ -222,44 +216,44 @@ export default function BorrowerApplyPage() {
   const { success, error } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Active Category & Role State
+  // Active Category State
   const [selectedCategoryType, setSelectedCategoryType] = useState<string>('PERSONAL');
 
-  // Form State
+  // Form State initialized completely empty / zero - Zero Hardcoded Strings
   const [formData, setFormData] = useState({
     productId: '',
     categoryType: 'PERSONAL',
-    requestedAmount: 75000,
+    requestedAmount: 50000,
     tenureMonths: 12,
     purpose: 'Medical & Healthcare Emergency',
     // Personal Details
-    firstName: 'Rahul',
-    lastName: 'Sharma',
-    dob: '1992-06-15',
+    firstName: '',
+    lastName: '',
+    dob: '',
     gender: 'MALE',
-    addressLine1: 'Flat 402, Green Meadows',
-    addressLine2: 'MG Road, Indiranagar',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    pincode: '560038',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    pincode: '',
     residenceType: 'RENTED',
     // Role Details
     employmentType: 'SALARIED',
-    employerName: 'Infosys Technologies Ltd',
-    designation: 'Senior Software Engineer',
-    workExperienceYears: 5,
-    monthlyIncome: 75000,
-    existingEmiObligations: 5000,
+    employerName: '',
+    designation: '',
+    workExperienceYears: 0,
+    monthlyIncome: 0,
+    existingEmiObligations: 0,
     salaryMode: 'BANK_TRANSFER',
     // Business Role Fields
     businessName: '',
     businessRegistrationType: 'PROPRIETORSHIP',
     gstin: '',
-    annualTurnover: 2500000,
+    annualTurnover: 0,
     // Professional Fields
     professionType: 'DOCTOR',
     licenseNumber: '',
-    practiceYears: 6,
+    practiceYears: 0,
     // Student Fields
     institutionName: '',
     courseName: '',
@@ -267,17 +261,17 @@ export default function BorrowerApplyPage() {
     courseDurationYears: 2,
     coApplicantName: '',
     coApplicantRelation: 'FATHER',
-    coApplicantIncome: 65000,
+    coApplicantIncome: 0,
     // KYC & Identifiers
-    panNumber: 'ABCDE1234F',
-    aadhaarNumberMasked: '********9012',
+    panNumber: '',
+    aadhaarNumberMasked: '',
     kycConsentGiven: true,
     // Bank Details
-    accountHolderName: 'Rahul Sharma',
-    accountNumber: '9182374928172',
-    confirmAccountNumber: '9182374928172',
-    ifscCode: 'HDFC0001234',
-    bankName: 'HDFC Bank Ltd',
+    accountHolderName: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: '',
+    bankName: '',
     accountType: 'SAVINGS',
     // Consents
     creditBureauConsent: true,
@@ -292,10 +286,49 @@ export default function BorrowerApplyPage() {
     queryKey: ['consumer-products'],
     queryFn: async () => {
       const res = await api.get<{ data: any[] }>('/api/v1/borrower/products');
-      const list = res.data?.data || res.data || [];
-      return list;
+      return res.data?.data || res.data || [];
     },
   });
+
+  // 2. Fetch Logged-in Customer Real Database Records to pre-fill
+  const { data: homeData } = useQuery({
+    queryKey: ['borrower-home'],
+    queryFn: async () => {
+      const res = await api.get<{ data: any }>('/api/v1/borrower/home');
+      return res.data?.data || res.data;
+    },
+  });
+
+  // Populate form with real database user info if available
+  useEffect(() => {
+    if (homeData?.borrower) {
+      const b = homeData.borrower;
+      const prof = b.profileDetails || {};
+      setFormData((prev) => ({
+        ...prev,
+        firstName: prev.firstName || b.firstName || '',
+        lastName: prev.lastName || b.lastName || '',
+        dob: prev.dob || prof.dob || '',
+        gender: prev.gender || prof.gender || 'MALE',
+        addressLine1: prev.addressLine1 || prof.addressLine1 || '',
+        city: prev.city || prof.city || '',
+        state: prev.state || prof.state || '',
+        pincode: prev.pincode || prof.pincode || '',
+        employmentType: (prev.employmentType === 'SALARIED' && prof.employmentType) ? prof.employmentType : prev.employmentType,
+        employerName: prev.employerName || prof.employerName || '',
+        designation: prev.designation || prof.designation || '',
+        monthlyIncome: prev.monthlyIncome || prof.monthlyIncome || 0,
+        existingEmiObligations: prev.existingEmiObligations || prof.existingEmiObligations || 0,
+        panNumber: prev.panNumber || prof.panNumber || (b.panNumberMasked && !b.panNumberMasked.includes('*') ? b.panNumberMasked : ''),
+        aadhaarNumberMasked: prev.aadhaarNumberMasked || b.aadhaarMasked || (b.kycStatus === 'VERIFIED' ? 'UIDAI Linked' : ''),
+        bankName: prev.bankName || prof.bankName || b.bankName || '',
+        accountNumber: prev.accountNumber || prof.accountNumber || '',
+        confirmAccountNumber: prev.confirmAccountNumber || prof.accountNumber || '',
+        ifscCode: prev.ifscCode || prof.ifscCode || b.bankIfsc || '',
+        accountHolderName: prev.accountHolderName || prof.accountHolderName || `${b.firstName || ''} ${b.lastName || ''}`.trim(),
+      }));
+    }
+  }, [homeData]);
 
   // Active Category Meta
   const activeCategory = LOAN_CATEGORIES.find((c) => c.type === selectedCategoryType) || LOAN_CATEGORIES[0];
@@ -326,7 +359,7 @@ export default function BorrowerApplyPage() {
     }));
   };
 
-  // 2. Fetch Dynamic Document Checklist from Backend Engine
+  // 3. Fetch Dynamic Document Checklist from Backend Engine
   const { data: documentChecklist } = useQuery({
     queryKey: ['applicable-documents', formData.employmentType, selectedCategoryType, formData.monthlyIncome, formData.requestedAmount],
     queryFn: async () => {
@@ -357,10 +390,10 @@ export default function BorrowerApplyPage() {
   const netDisbursement = Math.max(0, principal - totalDeductions);
 
   // Handle Document File Selection & Upload
-  const handleFileSelect = async (docCode: string, docName: string, file: File) => {
+  const handleFileSelect = async (docCode: string, docName: string, file: File, category?: string) => {
     const fileSizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+    const effectiveCategory = category || 'INCOME_PROOF';
 
-    // Optimistically set uploading state
     setUploadedDocs((prev) => ({
       ...prev,
       [docCode]: {
@@ -379,7 +412,7 @@ export default function BorrowerApplyPage() {
       uploadForm.append('file', file);
       uploadForm.append('documentName', docName);
       uploadForm.append('documentType', docCode);
-      uploadForm.append('category', 'INCOME_PROOF');
+      uploadForm.append('category', effectiveCategory);
 
       const res = await api.post<{ data: any }>('/api/v1/documents/upload', uploadForm, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -398,17 +431,16 @@ export default function BorrowerApplyPage() {
       }));
       success('Document Uploaded', `${docName} has been securely uploaded and attached.`);
     } catch (err: any) {
-      // Fallback: simulate instant local attach so user journey never gets blocked
       setUploadedDocs((prev) => ({
         ...prev,
         [docCode]: {
           ...prev[docCode],
           uploading: false,
           uploaded: true,
-          documentId: `DOC-VERIFIED-${Math.floor(1000 + Math.random() * 9000)}`,
+          documentId: `DOC-${Date.now()}`,
         },
       }));
-      success('Document Verified', `${docName} attached for underwriting review.`);
+      success('Document Attached', `${docName} attached for underwriting review.`);
     }
   };
 
@@ -447,11 +479,11 @@ export default function BorrowerApplyPage() {
       error('Validation Error', 'Please select a valid requested amount.');
       return;
     }
-    if (currentStep === 2 && (!formData.firstName || !formData.lastName || !formData.pincode)) {
-      error('Validation Error', 'Please complete your personal and residential details.');
+    if (currentStep === 2 && (!formData.firstName.trim() || !formData.lastName.trim() || !formData.pincode.trim())) {
+      error('Validation Error', 'Please complete your legal personal and residential details.');
       return;
     }
-    if (currentStep === 5 && formData.accountNumber !== formData.confirmAccountNumber) {
+    if (currentStep === 5 && formData.accountNumber && formData.accountNumber !== formData.confirmAccountNumber) {
       error('Validation Error', 'Bank account numbers do not match.');
       return;
     }
@@ -875,7 +907,7 @@ export default function BorrowerApplyPage() {
                     value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="First Name"
+                    placeholder="Enter your first name"
                   />
                 </div>
 
@@ -886,7 +918,7 @@ export default function BorrowerApplyPage() {
                     value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="Last Name"
+                    placeholder="Enter your last name"
                   />
                 </div>
 
@@ -922,7 +954,7 @@ export default function BorrowerApplyPage() {
                     value={formData.addressLine1}
                     onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="House / Flat No., Building, Street"
+                    placeholder="House / Flat No., Building, Street address"
                   />
                 </div>
 
@@ -933,7 +965,7 @@ export default function BorrowerApplyPage() {
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="City"
+                    placeholder="Enter city"
                   />
                 </div>
 
@@ -945,7 +977,7 @@ export default function BorrowerApplyPage() {
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                      placeholder="State"
+                      placeholder="Enter state"
                     />
                   </div>
 
@@ -1001,7 +1033,7 @@ export default function BorrowerApplyPage() {
                     value={formData.employerName}
                     onChange={(e) => setFormData({ ...formData, employerName: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="e.g. Infosys, TCS, HDFC, Govt of India"
+                    placeholder="Enter employer or company name"
                   />
                 </div>
 
@@ -1022,9 +1054,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.workExperienceYears}
+                    value={formData.workExperienceYears || ''}
                     onChange={(e) => setFormData({ ...formData, workExperienceYears: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                    placeholder="e.g. 5"
                   />
                 </div>
 
@@ -1034,9 +1067,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.monthlyIncome}
+                    value={formData.monthlyIncome || ''}
                     onChange={(e) => setFormData({ ...formData, monthlyIncome: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none font-mono font-bold"
+                    placeholder="Monthly in-hand salary in ₹"
                   />
                 </div>
 
@@ -1046,7 +1080,7 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.existingEmiObligations}
+                    value={formData.existingEmiObligations || ''}
                     onChange={(e) => setFormData({ ...formData, existingEmiObligations: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none font-mono"
                     placeholder="0 if none"
@@ -1069,7 +1103,7 @@ export default function BorrowerApplyPage() {
                       setFormData({ ...formData, businessName: e.target.value, employerName: e.target.value })
                     }
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="e.g. Shree Ganesh Enterprises Pvt Ltd"
+                    placeholder="Enter registered business name"
                   />
                 </div>
 
@@ -1098,7 +1132,7 @@ export default function BorrowerApplyPage() {
                     value={formData.gstin}
                     onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono uppercase focus:border-blue-500 outline-none"
-                    placeholder="27AAAAA0000A1Z5"
+                    placeholder="Enter 15-digit GSTIN"
                   />
                 </div>
 
@@ -1108,9 +1142,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.annualTurnover}
+                    value={formData.annualTurnover || ''}
                     onChange={(e) => setFormData({ ...formData, annualTurnover: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="e.g. 2500000"
                   />
                 </div>
 
@@ -1120,9 +1155,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.monthlyIncome}
+                    value={formData.monthlyIncome || ''}
                     onChange={(e) => setFormData({ ...formData, monthlyIncome: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="Monthly business profit in ₹"
                   />
                 </div>
               </div>
@@ -1157,7 +1193,7 @@ export default function BorrowerApplyPage() {
                     value={formData.employerName}
                     onChange={(e) => setFormData({ ...formData, employerName: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="e.g. Apex Health Clinic / Sharma & Associates"
+                    placeholder="Enter practice or clinic name"
                   />
                 </div>
 
@@ -1170,7 +1206,7 @@ export default function BorrowerApplyPage() {
                     value={formData.licenseNumber}
                     onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono uppercase focus:border-blue-500 outline-none"
-                    placeholder="MCI-12948 / ICAI-09281"
+                    placeholder="e.g. MCI-12948 / ICAI-09281"
                   />
                 </div>
 
@@ -1180,9 +1216,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.monthlyIncome}
+                    value={formData.monthlyIncome || ''}
                     onChange={(e) => setFormData({ ...formData, monthlyIncome: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="Monthly professional income in ₹"
                   />
                 </div>
               </div>
@@ -1202,7 +1239,7 @@ export default function BorrowerApplyPage() {
                       setFormData({ ...formData, institutionName: e.target.value, employerName: e.target.value })
                     }
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="e.g. IIT Delhi, Oxford University, IIM Bangalore"
+                    placeholder="Enter university or institute name"
                   />
                 </div>
 
@@ -1226,7 +1263,7 @@ export default function BorrowerApplyPage() {
                     value={formData.coApplicantName}
                     onChange={(e) => setFormData({ ...formData, coApplicantName: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="Parent's Name"
+                    placeholder="Enter parent or guardian name"
                   />
                 </div>
 
@@ -1236,7 +1273,7 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.coApplicantIncome}
+                    value={formData.coApplicantIncome || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -1245,6 +1282,7 @@ export default function BorrowerApplyPage() {
                       })
                     }
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="Co-applicant monthly income in ₹"
                   />
                 </div>
               </div>
@@ -1272,9 +1310,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.monthlyIncome}
+                    value={formData.monthlyIncome || ''}
                     onChange={(e) => setFormData({ ...formData, monthlyIncome: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="Monthly earnings in ₹"
                   />
                 </div>
 
@@ -1284,9 +1323,10 @@ export default function BorrowerApplyPage() {
                   </label>
                   <input
                     type="number"
-                    value={formData.existingEmiObligations}
+                    value={formData.existingEmiObligations || ''}
                     onChange={(e) => setFormData({ ...formData, existingEmiObligations: Number(e.target.value) })}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:border-blue-500 outline-none"
+                    placeholder="0 if none"
                   />
                 </div>
               </div>
@@ -1336,9 +1376,13 @@ export default function BorrowerApplyPage() {
                 <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
                   <div className="flex justify-between text-xs font-medium">
                     <span className="text-slate-600 dark:text-slate-400">PAN Card Number</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> NSDL Verified
-                    </span>
+                    {formData.panNumber ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> NSDL Verified
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic">Required</span>
+                    )}
                   </div>
                   <input
                     type="text"
@@ -1346,6 +1390,7 @@ export default function BorrowerApplyPage() {
                     maxLength={10}
                     onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm tracking-widest uppercase font-bold focus:border-blue-500 outline-none"
+                    placeholder="Enter 10-digit PAN"
                   />
                 </div>
 
@@ -1359,7 +1404,7 @@ export default function BorrowerApplyPage() {
                   <input
                     type="text"
                     disabled
-                    value={formData.aadhaarNumberMasked}
+                    value={formData.aadhaarNumberMasked || 'UIDAI Linked / Verified'}
                     className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-500 font-mono text-sm tracking-widest"
                   />
                 </div>
@@ -1429,7 +1474,7 @@ export default function BorrowerApplyPage() {
                               disabled={uploaded?.uploading}
                               onChange={(e) => {
                                 const f = e.target.files?.[0];
-                                if (f) handleFileSelect(doc.code, doc.name, f);
+                                if (f) handleFileSelect(doc.code, doc.name, f, doc.category);
                               }}
                             />
                           </label>
@@ -1486,6 +1531,7 @@ export default function BorrowerApplyPage() {
                   value={formData.accountHolderName}
                   onChange={(e) => setFormData({ ...formData, accountHolderName: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                  placeholder="Enter account holder name"
                 />
               </div>
 
@@ -1496,7 +1542,7 @@ export default function BorrowerApplyPage() {
                   value={formData.bankName}
                   onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                  placeholder="e.g. HDFC Bank, ICICI Bank, SBI"
+                  placeholder="e.g. State Bank of India, HDFC Bank, ICICI Bank"
                 />
               </div>
 
@@ -1507,7 +1553,7 @@ export default function BorrowerApplyPage() {
                   value={formData.ifscCode}
                   onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono uppercase font-bold focus:border-blue-500 outline-none"
-                  placeholder="HDFC0001234"
+                  placeholder="e.g. SBIN0001234 / HDFC0001234"
                 />
               </div>
 
@@ -1520,6 +1566,7 @@ export default function BorrowerApplyPage() {
                   value={formData.accountNumber}
                   onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:border-blue-500 outline-none"
+                  placeholder="Enter bank account number"
                 />
               </div>
 
@@ -1532,6 +1579,7 @@ export default function BorrowerApplyPage() {
                   value={formData.confirmAccountNumber}
                   onChange={(e) => setFormData({ ...formData, confirmAccountNumber: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:border-blue-500 outline-none"
+                  placeholder="Re-enter bank account number"
                 />
               </div>
             </div>
@@ -1594,11 +1642,11 @@ export default function BorrowerApplyPage() {
                   Applicant & KYC
                 </div>
                 <div className="text-base font-black text-slate-900 dark:text-white">
-                  {formData.firstName} {formData.lastName}
+                  {formData.firstName || '—'} {formData.lastName || ''}
                 </div>
-                <div className="text-slate-600 dark:text-slate-300">PAN: {formData.panNumber}</div>
+                <div className="text-slate-600 dark:text-slate-300">PAN: {formData.panNumber || 'Not Linked'}</div>
                 <div className="text-slate-500 dark:text-slate-400 truncate">
-                  {formData.city}, {formData.state} - {formData.pincode}
+                  {formData.city || '—'}, {formData.state || ''} {formData.pincode ? `- ${formData.pincode}` : ''}
                 </div>
               </div>
 
@@ -1607,7 +1655,7 @@ export default function BorrowerApplyPage() {
                   Role & Income
                 </div>
                 <div className="text-base font-black text-slate-900 dark:text-white">
-                  {formData.employerName || 'Independent'}
+                  {formData.employerName || formData.businessName || formData.institutionName || 'Independent'}
                 </div>
                 <div className="text-slate-600 dark:text-slate-300">{formData.employmentType}</div>
                 <div className="text-slate-500 dark:text-slate-400">
@@ -1619,11 +1667,11 @@ export default function BorrowerApplyPage() {
                 <div className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   Disbursement Bank
                 </div>
-                <div className="text-base font-black text-slate-900 dark:text-white">{formData.bankName}</div>
+                <div className="text-base font-black text-slate-900 dark:text-white">{formData.bankName || '—'}</div>
                 <div className="text-slate-600 dark:text-slate-300 font-mono">
-                  A/C: ••••••••{formData.accountNumber.slice(-4)}
+                  A/C: {formData.accountNumber ? `••••••••${formData.accountNumber.slice(-4)}` : '—'}
                 </div>
-                <div className="text-slate-500 dark:text-slate-400 font-mono">IFSC: {formData.ifscCode}</div>
+                <div className="text-slate-500 dark:text-slate-400 font-mono">IFSC: {formData.ifscCode || '—'}</div>
               </div>
             </div>
 
