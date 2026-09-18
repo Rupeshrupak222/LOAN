@@ -88,69 +88,64 @@ export async function getBranchManagerQueue(
     orderBy: { updatedAt: 'desc' },
   });
 
+  // Helper predicates matching specification
+  const isTerminal = (a: any) => ['APPROVED', 'REJECTED', 'DISBURSED', 'CANCELLED'].includes(a.status);
+
+  const isPendingReview = (a: any) => {
+    if (isTerminal(a)) return false;
+    if (!a.eligibility) return false;
+    const latestBmApproval = a.approvals?.find((app: any) => app.approverRole === 'BRANCH_MANAGER');
+    if (latestBmApproval && ['APPROVED', 'ESCALATED', 'SENT_BACK'].includes(latestBmApproval.status)) {
+      return false;
+    }
+    return true;
+  };
+
+  const isApprovedWithinLimit = (a: any) =>
+    a.approvals?.some((app: any) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'APPROVED');
+
+  const isSentBack = (a: any) => {
+    const latestBmApproval = a.approvals?.find((app: any) => app.approverRole === 'BRANCH_MANAGER');
+    return latestBmApproval?.status === 'SENT_BACK';
+  };
+
+  const isEscalated = (a: any) =>
+    a.approvals?.some((app: any) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'ESCALATED');
+
+  const isAwaitingCredit = (a: any) => {
+    if (isTerminal(a)) return false;
+    return !a.eligibility;
+  };
+
   // Calculate live management-level metrics
   const totalBranchApplications = allApps.length;
-
-  const pendingManagerReview = allApps.filter((a) => {
-    const hasBmApproval = a.approvals?.some(
-      (app) => app.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(app.status)
-    );
-    return (
-      !hasBmApproval &&
-      !!a.eligibility &&
-      ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(a.status)
-    );
-  }).length;
-
-  const approvedWithinLimit = allApps.filter((a) =>
-    a.approvals?.some((app) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'APPROVED')
-  ).length;
-
-  const sentBackForCorrection = allApps.filter((a) =>
-    a.approvals?.some((app) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'SENT_BACK')
-  ).length;
-
-  const escalatedToUnderwriter = allApps.filter((a) =>
-    a.approvals?.some((app) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'ESCALATED')
-  ).length;
+  const pendingManagerReview = allApps.filter(isPendingReview).length;
+  const approvedWithinLimit = allApps.filter(isApprovedWithinLimit).length;
+  const sentBackForCorrection = allApps.filter(isSentBack).length;
+  const escalatedToUnderwriter = allApps.filter(isEscalated).length;
 
   const awaitingDocuments = allApps.filter(
     (a) =>
       a.customer?.kycStatus === 'PENDING' ||
       a.customer?.documents?.some(
-        (d) => d.status === 'PENDING' || (d.status as string) === 'REQUIRES_CORRECTION'
+        (d: any) => d.status === 'PENDING' || (d.status as string) === 'REQUIRES_CORRECTION'
       )
   ).length;
 
-  const awaitingCreditAssessment = allApps.filter((a) => !a.eligibility).length;
+  const awaitingCreditAssessment = allApps.filter(isAwaitingCredit).length;
 
   // Filter items by tab
   let items = allApps;
   if (tab === 'PENDING') {
-    items = allApps.filter((a) => {
-      const hasBmApproval = a.approvals?.some(
-        (app) => app.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(app.status)
-      );
-      return (
-        !hasBmApproval &&
-        !!a.eligibility &&
-        ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(a.status)
-      );
-    });
+    items = allApps.filter(isPendingReview);
   } else if (tab === 'APPROVED') {
-    items = allApps.filter((a) =>
-      a.approvals?.some((app) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'APPROVED')
-    );
+    items = allApps.filter(isApprovedWithinLimit);
   } else if (tab === 'SENT_BACK') {
-    items = allApps.filter((a) =>
-      a.approvals?.some((app) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'SENT_BACK')
-    );
+    items = allApps.filter(isSentBack);
   } else if (tab === 'ESCALATED') {
-    items = allApps.filter((a) =>
-      a.approvals?.some((app) => app.approverRole === 'BRANCH_MANAGER' && app.status === 'ESCALATED')
-    );
+    items = allApps.filter(isEscalated);
   } else if (tab === 'AWAITING_CREDIT') {
-    items = allApps.filter((a) => !a.eligibility);
+    items = allApps.filter(isAwaitingCredit);
   }
 
   // Enrich each item with computed reviewStatus, FOIR/DTI, risk metrics, and delegated authority checks
@@ -184,7 +179,7 @@ export async function getBranchManagerQueue(
       eligibilityFactors.riskGrade ||
       'LOW';
 
-    const bmApproval = app.approvals?.find((ap) => ap.approverRole === 'BRANCH_MANAGER');
+    const bmApproval = app.approvals?.find((ap: any) => ap.approverRole === 'BRANCH_MANAGER');
 
     let reviewStatus = 'PENDING_BRANCH_MANAGER_REVIEW';
     if (bmApproval?.status === 'APPROVED') {
@@ -201,12 +196,14 @@ export async function getBranchManagerQueue(
 
     const requestedAmountNum = Number(app.requestedAmount || 0);
     const isWithinLimit = requestedAmountNum <= BRANCH_MANAGER_LIMIT;
-    const previousStageCompleted = !['DRAFT', 'SUBMITTED', 'CANCELLED', 'REJECTED', 'APPROVED', 'DISBURSED'].includes(app.status);
+    const isTerminalStatus = ['APPROVED', 'REJECTED', 'DISBURSED', 'CANCELLED'].includes(app.status);
     const creditAssessmentCompleted = !!app.eligibility;
+    const isAlreadyReviewed = !!bmApproval && ['APPROVED', 'ESCALATED', 'SENT_BACK'].includes(bmApproval.status);
     const canApprove =
       isWithinLimit &&
       creditAssessmentCompleted &&
-      previousStageCompleted &&
+      !isTerminalStatus &&
+      !isAlreadyReviewed &&
       reviewStatus === 'PENDING_BRANCH_MANAGER_REVIEW';
 
     return {
@@ -251,7 +248,7 @@ export async function submitBranchManagerDecision(
 ) {
   // 1. RBAC Verification
   const isAuthorized = actor.roles.some((r) =>
-    ['BRANCH_MANAGER', 'SUPER_ADMIN', 'ADMIN'].includes(r)
+    ['BRANCH_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'COMPANY_ADMIN'].includes(r)
   );
   if (!isAuthorized) {
     throw new ForbiddenError(
@@ -274,6 +271,7 @@ export async function submitBranchManagerDecision(
       product: true,
       eligibility: true,
       riskAssessment: true,
+      approvals: { orderBy: { createdAt: 'desc' } },
     },
   });
 
@@ -300,14 +298,28 @@ export async function submitBranchManagerDecision(
     );
   }
 
+  // Check if a Branch Manager decision has already been recorded (Prevent duplicate decisions)
+  const existingApproval = app.approvals?.find(
+    (a) => a.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(a.status)
+  );
+  if (existingApproval) {
+    throw new BadRequestError(
+      `A Branch Manager review decision (${existingApproval.status}) has already been recorded for this application.`
+    );
+  }
+
   // 5. Evaluate Decision & Enforce Delegated Authority
   const requestedAmount = Number(app.requestedAmount);
   let nextApplicationStatus: ApplicationStatus = app.status;
+  let nextStage = 'UNDERWRITING';
   let historyReason = '';
   let approvalRequestStatus = '';
   let auditAction = '';
 
   const remarksText = (input.remarks || input.reason || input.managerRemarks || '').trim();
+  if (remarksText.length < 10) {
+    throw new BadRequestError('A mandatory remark/reason (minimum 10 characters) is required to record a Branch Manager decision.');
+  }
 
   if (input.decision === 'APPROVE') {
     // 5a. Delegated Limit Validation
@@ -331,31 +343,26 @@ export async function submitBranchManagerDecision(
     }
 
     nextApplicationStatus = 'UNDERWRITING';
-    historyReason = `Branch Approved Within Delegated Limit (₹${BRANCH_MANAGER_LIMIT.toLocaleString('en-IN')}) & Sent to Underwriter${
-      remarksText ? ': ' + remarksText : ''
-    }`;
+    nextStage = 'UNDERWRITING';
+    historyReason = `Branch Manager Approved (Within Delegated Limit ₹${BRANCH_MANAGER_LIMIT.toLocaleString('en-IN')}) — Forwarded to Underwriter: ${remarksText}`;
     approvalRequestStatus = 'APPROVED';
-    auditAction = 'BRANCH_MANAGER_APPROVED_AND_FORWARDED_TO_UNDERWRITER';
+    auditAction = 'BRANCH_MANAGER_APPROVED';
   } else if (input.decision === 'SEND_BACK') {
-    if (remarksText.length < 10) {
-      throw new BadRequestError('A mandatory reason/remark (at least 10 characters) is required to send back an application for correction.');
-    }
     nextApplicationStatus = 'SUBMITTED';
-    historyReason = `Sent Back for Correction by Branch Manager — ${remarksText}`;
+    nextStage = 'REWORK';
+    historyReason = `Sent Back for Correction by Branch Manager: ${remarksText}`;
     approvalRequestStatus = 'SENT_BACK';
     auditAction = 'BRANCH_MANAGER_SENT_BACK';
   } else if (input.decision === 'ESCALATE') {
-    if (remarksText.length < 10) {
-      throw new BadRequestError('A mandatory escalation reason/remark (at least 10 characters) is required to escalate to Underwriting.');
-    }
     nextApplicationStatus = 'UNDERWRITING';
-    historyReason = `Escalated to Underwriter by Branch Manager — ${remarksText}`;
+    nextStage = 'UNDERWRITING';
+    historyReason = `Escalated to Underwriter by Branch Manager: ${remarksText}`;
     approvalRequestStatus = 'ESCALATED';
-    auditAction = 'BRANCH_MANAGER_ESCALATED_TO_UNDERWRITER';
+    auditAction = 'BRANCH_MANAGER_ESCALATED';
   }
 
-  // 4. Concurrently execute updates
-  const [approvalReq, updatedApp] = await Promise.all([
+  // 6. Concurrently execute updates
+  const [approvalReq] = await Promise.all([
     prisma.approvalRequest.create({
       data: {
         applicationId,
@@ -363,14 +370,17 @@ export async function submitBranchManagerDecision(
         approverUserId: actor.id,
         level: 2,
         status: approvalRequestStatus,
-        decisionReason: remarksText || 'Management approval within limit',
+        decisionReason: remarksText,
         actionAt: new Date(),
       },
     }),
 
     prisma.loanApplication.update({
       where: { id: applicationId },
-      data: { status: nextApplicationStatus },
+      data: {
+        status: nextApplicationStatus,
+        stage: nextStage,
+      },
     }),
 
     prisma.applicationStatusHistory.create({
@@ -389,13 +399,17 @@ export async function submitBranchManagerDecision(
       action: auditAction,
       entity: 'LoanApplication',
       entityId: applicationId,
+      previousValue: {
+        status: app.status,
+        stage: app.stage,
+      },
       newValue: {
         decision: input.decision,
         status: nextApplicationStatus,
+        stage: nextStage,
         requestedAmount,
         delegatedLimit: BRANCH_MANAGER_LIMIT,
-        reason: input.reason,
-        remarks: input.managerRemarks,
+        remarks: remarksText,
       },
     }),
   ]);

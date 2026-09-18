@@ -35,6 +35,7 @@ export const BRANCH_MANAGER_LIMIT = 500000; // ₹5,00,000 Delegated Authority L
 interface BranchManagerReviewSectionProps {
   applicationId: string;
   applicationNo?: string;
+  stage?: string;
   requestedAmount: number;
   currentStatus: string;
   customer: any;
@@ -49,6 +50,7 @@ interface BranchManagerReviewSectionProps {
 export function BranchManagerReviewSection({
   applicationId,
   applicationNo,
+  stage,
   requestedAmount,
   currentStatus,
   customer,
@@ -75,7 +77,35 @@ export function BranchManagerReviewSection({
   const terminalStages = ['APPROVED', 'REJECTED', 'DISBURSED', 'CANCELLED'];
   const isTerminal = terminalStages.includes(currentStatus);
   const previousStageCompleted = !['DRAFT', 'SUBMITTED', 'CANCELLED', 'REJECTED'].includes(currentStatus);
-  const canApprove = isWithinLimit && hasCreditAssessment && previousStageCompleted && !isTerminal;
+
+  // Check if BM already recorded an approval, escalation, or send back on this application
+  const existingBmApproval = approvals.find(
+    (app: any) => app.approverRole === 'BRANCH_MANAGER'
+  );
+  const isApprovedByBm = existingBmApproval?.status === 'APPROVED';
+  const isEscalatedByBm = existingBmApproval?.status === 'ESCALATED';
+  const isSentBackByBm = existingBmApproval?.status === 'SENT_BACK';
+  const isAlreadyReviewed = isApprovedByBm || isEscalatedByBm;
+
+  const isApproveDisabled =
+    isTerminal ||
+    isApprovedByBm ||
+    isEscalatedByBm ||
+    !isWithinLimit ||
+    !hasCreditAssessment ||
+    !previousStageCompleted;
+
+  const isSendBackDisabled =
+    isTerminal ||
+    isApprovedByBm ||
+    isEscalatedByBm;
+
+  const isEscalateDisabled =
+    isTerminal ||
+    isApprovedByBm ||
+    isEscalatedByBm;
+
+  const canApprove = !isApproveDisabled;
 
   // Calculate FOIR / DTI
   const monthlyIncome = Number(customer?.monthlyIncome || 0);
@@ -89,12 +119,6 @@ export function BranchManagerReviewSection({
     : (customer?.documents && customer.documents.length > 0)
     ? customer.documents
     : [];
-
-  // Check if BM already recorded an approval or escalation on this application
-  const existingBmApproval = approvals.find(
-    (app: any) => app.approverRole === 'BRANCH_MANAGER'
-  );
-  const isAlreadyReviewed = !!existingBmApproval && ['APPROVED', 'ESCALATED', 'SENT_BACK'].includes(existingBmApproval.status);
 
   const decisionMutation = useMutation({
     mutationFn: async ({ decision, remarks }: { decision: 'APPROVE' | 'SEND_BACK' | 'ESCALATE'; remarks: string }) => {
@@ -129,11 +153,15 @@ export function BranchManagerReviewSection({
       toast.error(`Application is in terminal '${currentStatus}' state and cannot receive branch management review actions.`);
       return;
     }
-    if (isAlreadyReviewed) {
-      toast.error('A Branch Manager review decision has already been recorded for this application.');
-      return;
-    }
     if (type === 'APPROVE') {
+      if (isApprovedByBm) {
+        toast.error('This proposal has already been approved by the Branch Manager.');
+        return;
+      }
+      if (isEscalatedByBm) {
+        toast.error('This proposal has already been escalated to the Underwriter.');
+        return;
+      }
       if (!isWithinLimit) {
         toast.error(`Approval limit exceeded: Requested loan ${formatMoney(numRequestedAmount)} exceeds your ₹5,00,000 limit. Please escalate to Underwriter.`);
         return;
@@ -144,6 +172,24 @@ export function BranchManagerReviewSection({
       }
       if (!previousStageCompleted) {
         toast.error('Prerequisite Credit Assessment stage has not been completed yet.');
+        return;
+      }
+    } else if (type === 'SEND_BACK') {
+      if (isApprovedByBm) {
+        toast.error('Proposal has already been approved by Branch Manager and cannot be sent back.');
+        return;
+      }
+      if (isEscalatedByBm) {
+        toast.error('Proposal has already been escalated to Underwriter.');
+        return;
+      }
+    } else if (type === 'ESCALATE') {
+      if (isApprovedByBm) {
+        toast.error('Proposal has already been approved by Branch Manager.');
+        return;
+      }
+      if (isEscalatedByBm) {
+        toast.error('Proposal has already been escalated to the Underwriter.');
         return;
       }
     }
@@ -237,7 +283,59 @@ export function BranchManagerReviewSection({
         </div>
       </div>
 
-      {/* 1. Credit Analyst Completed Assessment Inspection (Read-Only) */}
+      {/* 1. Application Summary */}
+      <div className="rounded-xl border p-4 bg-white dark:bg-[#171B36] border-slate-200 dark:border-[#2B3566] space-y-3">
+        <div className="flex items-center gap-2 border-b pb-2.5 border-slate-100 dark:border-[#2B3566]">
+          <FileText className="w-4 h-4 text-[#2563EB]" />
+          <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+            Application Summary
+          </h4>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Application ID</span>
+            <span className="font-mono font-bold text-[#2563EB] text-xs">
+              {applicationNo || applicationId.slice(0, 8)}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Borrower Name</span>
+            <span className="font-bold text-slate-900 dark:text-white text-xs">
+              {customer?.firstName} {customer?.lastName}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Product</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+              {product?.name || 'Standard Loan'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Requested Amount</span>
+            <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+              {formatMoney(numRequestedAmount)}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Tenure</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+              {product?.tenureMonths || 12} Months
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Current Stage</span>
+            <span className="font-semibold text-purple-600 dark:text-purple-400 text-xs">
+              {stage || 'Branch Manager Review'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 block uppercase">Current Status</span>
+            <Badge status={currentStatus} />
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Credit Analyst Completed Assessment Inspection (Read-Only) */}
       <div className="rounded-xl border p-4 bg-slate-50/70 dark:bg-[#1E2445]/40 border-slate-200 dark:border-[#2B3566] space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -468,18 +566,20 @@ export function BranchManagerReviewSection({
             size="sm"
             variant="secondary"
             onClick={() => handleOpenModal('SEND_BACK')}
-            disabled={isTerminal || isAlreadyReviewed}
+            disabled={isSendBackDisabled}
             className={cn(
               'text-xs gap-1.5 border-slate-200 dark:border-[#2B3566]',
-              isTerminal || isAlreadyReviewed
+              isSendBackDisabled
                 ? 'opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-500'
                 : 'cursor-pointer text-slate-700 dark:text-slate-200'
             )}
             title={
               isTerminal
                 ? `Application is in terminal '${currentStatus}' status. Review actions are closed.`
-                : isAlreadyReviewed
-                ? 'Branch Manager decision already recorded'
+                : isApprovedByBm
+                ? 'Proposal has already been approved by Branch Manager'
+                : isEscalatedByBm
+                ? 'Proposal has already been escalated'
                 : 'Send back for correction'
             }
           >
@@ -487,27 +587,29 @@ export function BranchManagerReviewSection({
             Send Back
           </Button>
 
-          {/* Action 3: Escalate to Underwriter / Higher Authority */}
+          {/* Action 3: Escalate to Underwriter */}
           <Button
             size="sm"
             onClick={() => handleOpenModal('ESCALATE')}
-            disabled={isTerminal || isAlreadyReviewed}
+            disabled={isEscalateDisabled}
             className={cn(
               'text-xs gap-1.5 font-semibold shadow-sm',
-              isTerminal || isAlreadyReviewed
+              isEscalateDisabled
                 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
                 : 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
             )}
             title={
               isTerminal
                 ? `Application is in terminal '${currentStatus}' status. Review actions are closed.`
-                : isAlreadyReviewed
-                ? 'Branch Manager decision already recorded'
-                : 'Escalate to Underwriter / Higher Authority'
+                : isApprovedByBm
+                ? 'Proposal has already been approved by Branch Manager'
+                : isEscalatedByBm
+                ? 'Proposal has already been escalated to Underwriter'
+                : 'Escalate to Underwriter'
             }
           >
             <Send className="w-3.5 h-3.5" />
-            Escalate to Underwriter / Higher Authority
+            Escalate to Underwriter
           </Button>
 
           {/* Action 4: Approval Status Indicator if Limit Exceeded */}
@@ -522,18 +624,20 @@ export function BranchManagerReviewSection({
           <Button
             size="sm"
             onClick={() => handleOpenModal('APPROVE')}
-            disabled={!canApprove || isAlreadyReviewed}
+            disabled={isApproveDisabled}
             className={cn(
               'text-xs gap-1.5 font-bold shadow-sm transition-all',
-              canApprove && !isAlreadyReviewed
+              !isApproveDisabled
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
                 : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
             )}
             title={
               isTerminal
                 ? `Application is in terminal '${currentStatus}' status. Review actions are closed.`
-                : isAlreadyReviewed
-                ? 'Branch Manager decision already recorded'
+                : isApprovedByBm
+                ? 'Branch Manager approval already recorded'
+                : isEscalatedByBm
+                ? 'Proposal already escalated to Underwriter'
                 : !isWithinLimit
                 ? `Approval limit exceeded (${formatMoney(numRequestedAmount)} > ${formatMoney(BRANCH_MANAGER_LIMIT)})`
                 : !hasCreditAssessment
@@ -546,8 +650,10 @@ export function BranchManagerReviewSection({
             <CheckCircle2 className="w-3.5 h-3.5" />
             {isTerminal
               ? `Approved (${currentStatus})`
-              : isAlreadyReviewed
-              ? 'Reviewed'
+              : isApprovedByBm
+              ? 'BM Approved'
+              : isEscalatedByBm
+              ? 'Escalated'
               : !isWithinLimit
               ? 'Approve (Limit Exceeded)'
               : !hasCreditAssessment
@@ -611,15 +717,20 @@ export function BranchManagerReviewSection({
                         <FileText className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-slate-900 dark:text-white">
-                            {doc.documentType?.replace(/_/g, ' ') || 'Document'}
+                            {doc.fileName || doc.documentType?.replace(/_/g, ' ') || 'Document'}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#171B36] text-slate-600 dark:text-slate-400 font-mono">
+                            Type: {doc.documentType?.replace(/_/g, ' ') || 'KYC'}
                           </span>
                           <Badge status={doc.status || 'VERIFIED'} />
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {doc.fileName || 'Uploaded file'} · Uploaded {doc.createdAt ? formatDate(doc.createdAt) : 'Recently'}
-                        </p>
+                        <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                          <span>Uploaded: {doc.createdAt ? formatDate(doc.createdAt) : 'Recently'}</span>
+                          <span>•</span>
+                          <span>Verified by: <strong className="text-slate-600 dark:text-slate-300 font-medium">{doc.verifiedBy || (doc.status === 'VERIFIED' ? 'Credit Analyst' : 'Pending Verification')}</strong></span>
+                        </div>
                       </div>
                     </div>
 
