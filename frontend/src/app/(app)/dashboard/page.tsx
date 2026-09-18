@@ -74,6 +74,7 @@ import { CreditAnalystDashboardView } from '@/components/CreditAnalystDashboardV
 import { SuperAdminDashboardView } from '@/components/SuperAdminDashboardView';
 import { UnderwriterDashboardView } from '@/components/UnderwriterDashboardView';
 import { FinanceDashboardView } from '@/components/FinanceDashboardView';
+import { CollectionOfficerDashboardView } from '@/components/CollectionOfficerDashboardView';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -386,6 +387,10 @@ export default function DashboardPage() {
 
   if (primaryRole === 'FINANCE_OFFICER') {
     return <FinanceDashboardView />;
+  }
+
+  if (primaryRole === 'COLLECTION_OFFICER') {
+    return <CollectionOfficerDashboardView />;
   }
 
   const cardBgClass = isDark
@@ -1306,241 +1311,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* F. COLLECTION OFFICER WORKSPACE */}
-      {primaryRole === 'COLLECTION_OFFICER' && (
-        <div className="space-y-6">
-          {/* Top 6 Collection KPIs */}
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiItem
-              label="TOTAL OVERDUE"
-              value={totalOverdueFormatted}
-              hint="Across delinquent portfolio"
-              icon={<AlertTriangle className="h-4 w-4" />}
-              iconColor="rose"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={overdueLoansCount > 0 ? `${overdueLoansCount} Overdue` : undefined}
-            />
-            <KpiItem
-              label="ACTIVE DELINQUENCIES"
-              value={String(collectionsData?.summary?.activeCases ?? overdueLoansCount)}
-              hint="Overdue recovery cases"
-              icon={<Users className="h-4 w-4" />}
-              iconColor="amber"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="PROMISES-TO-PAY (PTP)"
-              value={String(collectionsData?.summary?.pendingPtps ?? 0)}
-              hint="Pending payment dates"
-              icon={<Clock className="h-4 w-4" />}
-              iconColor="purple"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="PAYMENT INTIMATIONS"
-              value={String(Array.isArray(submissionsData) ? submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length : 0)}
-              hint="Borrower UTR proofs"
-              icon={<FileCheck className="h-4 w-4" />}
-              iconColor="blue"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              highlightText={
-                Array.isArray(submissionsData) && submissionsData.filter((s: any) => s.status === 'PENDING_VERIFICATION').length > 0
-                  ? "Verify Proofs"
-                  : undefined
-              }
-            />
-            <KpiItem
-              label="COLLECTIONS RECOVERED"
-              value={totalCollectedFormatted}
-              hint={`${dateFilter} Volume`}
-              icon={<Coins className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-            />
-            <KpiItem
-              label="PORTFOLIO RECOVERY"
-              value={`${totalLoansCount > 0 ? (((totalLoansCount - overdueLoansCount) / totalLoansCount) * 100).toFixed(1) : '100'}%`}
-              hint="Accounts in good standing"
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              iconColor="emerald"
-              cardBgClass={cardBgClass}
-              isDark={isDark}
-              valueColor="text-emerald-600"
-            />
-          </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            {/* Left 8 Cols: Delinquency Queue & Payment Submissions */}
-            <div className="lg:col-span-8 space-y-6">
-              {/* Card 1: Delinquent Borrowers Queue */}
-              <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">Delinquent Borrowers & Call Follow-Up Queue</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Prioritized recovery cases requiring follow-up</p>
-                  </div>
-                  <Link href="/collections" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
-                    Collections Desk →
-                  </Link>
-                </div>
-
-                <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
-                  {Array.isArray(casesData) && casesData.length > 0 ? (
-                    casesData.map((c: any) => (
-                      <div key={c.id} className="py-3 flex items-center justify-between transition-colors hover:bg-slate-50/50 dark:hover:bg-[#16203D]/60 rounded-xl px-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 dark:text-white">{c.customerName || 'Borrower'}</span>
-                            <span className="font-mono text-[10px] text-slate-400">Loan #{c.loanNo}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                              {c.dpd} DPD ({c.agingBucket})
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Mobile: {c.mobile || '-'} · City: {c.city || 'N/A'} · Priority: <strong className="text-amber-500">{c.priority || 'MEDIUM'}</strong>
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">
-                            {formatMoney(c.overdueAmount || 0)}
-                          </span>
-                          <Link href={`/collections/${c.id}`}>
-                            <Button size="sm" className="text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-semibold">
-                              Log Activity →
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-8 text-center text-xs text-slate-400 space-y-1.5">
-                      <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-full w-10 h-10 flex items-center justify-center mx-auto text-emerald-600">
-                        <CheckCircle2 className="w-5 h-5" />
-                      </div>
-                      <p className="font-semibold text-slate-700 dark:text-slate-300">All customer loan accounts are current and up-to-date.</p>
-                      <p className="text-[11px] text-slate-400">Zero default cases in delinquency recovery queue.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Card 2: Recent Payment Proofs / Intimations */}
-              <div className={cn('rounded-2xl border p-5 space-y-4', cardBgClass)}>
-                <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-[#2B3566]">
-                  <div>
-                    <h3 className="text-sm font-bold tracking-tight">Borrower Payment Proofs & Intimations</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Recent UTR submissions from borrowers awaiting verification</p>
-                  </div>
-                  <Link href="/payments" className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline">
-                    View in Payments Ledger →
-                  </Link>
-                </div>
-
-                <div className="divide-y divide-slate-100 dark:divide-[#2B3566] text-xs">
-                  {Array.isArray(submissionsData) && submissionsData.length > 0 ? (
-                    submissionsData.slice(0, 4).map((sub: any) => (
-                      <div key={sub.id} className="py-3 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 dark:text-white">{sub.customerName || 'Borrower'}</span>
-                            <span className="font-mono text-[10px] text-blue-500 font-bold">Loan #{sub.loanNo}</span>
-                            <span className="font-mono text-[10px] text-slate-400">Ref: {sub.reference}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Channel: <strong>{sub.method}</strong> · Submitted: {sub.createdAt ? formatDate(sub.createdAt) : '-'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                            {formatMoney(sub.amount || 0)}
-                          </span>
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded text-[10px] font-bold border",
-                              sub.status === 'VERIFIED'
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                : sub.status === 'REJECTED'
-                                ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
-                                : "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                            )}
-                          >
-                            {sub.status === 'PENDING_VERIFICATION' ? 'Awaiting Verification' : sub.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-center text-xs text-slate-400">
-                      No recent payment intimations submitted by borrowers.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Right 4 Cols: DPD Aging & Shortcuts */}
-            <div className="lg:col-span-4 space-y-6">
-              <div className={cn('rounded-2xl border p-5 space-y-4 flex flex-col justify-between', cardBgClass)}>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight">DPD Aging Summary</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Delinquency distribution across standard aging buckets</p>
-                  
-                  <div className="space-y-2.5 pt-3 text-xs">
-                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-[#2B3566]">
-                      <span className="text-slate-500">1-30 Days (SMA-0)</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">
-                        {formatMoney(collectionsData?.agingBuckets?.find((b: any) => b.bucket === '0-30')?.totalAmount || 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-[#2B3566]">
-                      <span className="text-slate-500">31-60 Days (SMA-1)</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400">
-                        {formatMoney(collectionsData?.agingBuckets?.find((b: any) => b.bucket === '31-60')?.totalAmount || 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-[#2B3566]">
-                      <span className="text-slate-500">61-90 Days (SMA-2)</span>
-                      <span className="font-bold text-rose-600 dark:text-rose-400">
-                        {formatMoney(collectionsData?.agingBuckets?.find((b: any) => b.bucket === '61-90')?.totalAmount || 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-[#2B3566]">
-                      <span className="text-slate-500">91-180 Days (NPA-Substandard)</span>
-                      <span className="font-bold text-purple-600 dark:text-purple-400">
-                        {formatMoney(collectionsData?.agingBuckets?.find((b: any) => b.bucket === '91-180')?.totalAmount || 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1.5">
-                      <span className="text-slate-500">180+ Days (Doubtful / Loss)</span>
-                      <span className="font-bold text-rose-700 dark:text-rose-500">
-                        {formatMoney(collectionsData?.agingBuckets?.find((b: any) => b.bucket === '180+')?.totalAmount || 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#2B3566]">
-                  <Link href="/collections" className="block">
-                    <Button size="sm" className="w-full text-xs text-white bg-[#2563EB] hover:bg-blue-700 font-semibold shadow-sm">
-                      Open Collections Workspace →
-                    </Button>
-                  </Link>
-                  <Link href="/payments" className="block">
-                    <Button size="sm" variant="secondary" className="w-full text-xs">
-                      Payments & Verifications Ledger →
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* G. AUDITOR WORKSPACE */}
       {primaryRole === 'AUDITOR' && (

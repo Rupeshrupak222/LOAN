@@ -14,6 +14,7 @@ import { DataTable, Column } from '@/components/DataTable';
 import { formatDate, formatDateTime, cn } from '@/lib/utils';
 
 import { CreditAnalystCustomersView } from '@/components/CreditAnalystCustomersView';
+import { CollectionOfficerCustomersView } from '@/components/CollectionOfficerCustomersView';
 
 interface CustomerRow {
   id: string;
@@ -404,9 +405,14 @@ function StandardCustomersDirectoryView() {
 export default function CustomersPage() {
   const { user } = useAuth();
   const isCreditAnalyst = Boolean(user?.roles?.includes('CREDIT_ANALYST'));
+  const isCollectionOfficer = Boolean(user?.roles?.includes('COLLECTION_OFFICER'));
 
   if (isCreditAnalyst) {
     return <CreditAnalystCustomersView />;
+  }
+
+  if (isCollectionOfficer) {
+    return <CollectionOfficerCustomersView />;
   }
 
   return <StandardCustomersDirectoryView />;

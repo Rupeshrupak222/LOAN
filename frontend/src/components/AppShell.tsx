@@ -307,7 +307,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Workspace Switcher Pill (hidden for SUPER_ADMIN, CUSTOMER, and focused operational desks) */}
-        {authorizedWorkspaces.length > 1 && primaryRole !== 'SUPER_ADMIN' && primaryRole !== 'CUSTOMER' && primaryRole !== 'CREDIT_ANALYST' && primaryRole !== 'UNDERWRITER' && primaryRole !== 'FINANCE_OFFICER' && primaryRole !== 'LOAN_OFFICER' && (
+        {authorizedWorkspaces.length > 1 &&
+          primaryRole !== 'SUPER_ADMIN' &&
+          primaryRole !== 'CUSTOMER' &&
+          primaryRole !== 'CREDIT_ANALYST' &&
+          primaryRole !== 'UNDERWRITER' &&
+          primaryRole !== 'FINANCE_OFFICER' &&
+          primaryRole !== 'LOAN_OFFICER' &&
+          primaryRole !== 'COLLECTION_OFFICER' &&
+          primaryRole !== 'RISK_ANALYST' &&
+          primaryRole !== 'FRAUD_ANALYST' &&
+          primaryRole !== 'RISK_MANAGER' && (
           <div className="relative px-3 pt-3 flex-none">
             <button
               type="button"
@@ -421,7 +431,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 })}
               </div>
             </div>
-          ) : primaryRole === 'CREDIT_ANALYST' || primaryRole === 'UNDERWRITER' || primaryRole === 'FINANCE_OFFICER' || primaryRole === 'LOAN_OFFICER' ? (
+          ) : primaryRole === 'CREDIT_ANALYST' ||
+            primaryRole === 'UNDERWRITER' ||
+            primaryRole === 'FINANCE_OFFICER' ||
+            primaryRole === 'LOAN_OFFICER' ||
+            primaryRole === 'COLLECTION_OFFICER' ||
+            primaryRole === 'RISK_ANALYST' ||
+            primaryRole === 'FRAUD_ANALYST' ||
+            primaryRole === 'RISK_MANAGER' ? (
             <div className="space-y-1">
               <div className="space-y-0.5 pt-1">
                 {roleCfg.nav.map((navKey) => {
