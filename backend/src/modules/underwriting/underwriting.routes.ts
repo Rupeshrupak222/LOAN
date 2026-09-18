@@ -20,7 +20,7 @@ router.use(authenticate);
 // 1. Underwriting Queue (filtered by tab and search)
 router.get(
   '/queue',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD'),
   asyncHandler(async (req, res) => {
     const tab = (req.query as any)?.tab;
     const search = (req.query as any)?.search;
@@ -37,7 +37,7 @@ router.get(
 // 2. Consolidated Underwriting Workspace (9-step model)
 router.get(
   '/:applicationId/workspace',
-  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD', 'BRANCH_MANAGER'),
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'UNDERWRITER', 'CREDIT_HEAD'),
   asyncHandler(async (req, res) => {
     const workspace = await getUnderwritingWorkspace(req.params.applicationId, {
       id: req.user!.id,

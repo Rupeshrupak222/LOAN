@@ -44,6 +44,10 @@ export default function UnderwritingQueuePage() {
   const [riskFilter, setRiskFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
 
+  const isUnderwriter = user?.roles?.some((r: string) =>
+    ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_HEAD'].includes(r)
+  );
+
   // Fetch Underwriting Queue directly from Backend (ALL active cases)
   const {
     data: queueData,
@@ -54,6 +58,7 @@ export default function UnderwritingQueuePage() {
     error,
   } = useQuery({
     queryKey: ['underwriting-queue', searchQuery, statusFilter],
+    enabled: Boolean(isUnderwriter),
     queryFn: async () => {
       const res = await api.get('/underwriting/queue', {
         params: {
@@ -65,6 +70,26 @@ export default function UnderwritingQueuePage() {
     },
     refetchInterval: 10000,
   });
+
+  if (!isUnderwriter) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Access Restricted
+        </p>
+        <p className="text-xs text-slate-400">
+          The Underwriting Work Queue is reserved strictly for Underwriters and Credit Committee members. Branch Managers do not have permission to access the Underwriting Desk.
+        </p>
+        <div className="pt-2">
+          <Link href="/branch-review">
+            <Button size="sm" className="text-xs">
+              Go to Branch Review Desk →
+            </Button>
+          </Link>
+        </div>
+      </Card>
+    );
+  }
 
   const queueItems = Array.isArray(queueData) ? queueData : [];
 

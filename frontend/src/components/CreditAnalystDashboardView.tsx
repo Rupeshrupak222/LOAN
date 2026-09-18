@@ -427,6 +427,9 @@ export function CreditAnalystDashboardView() {
                         } else if (item.status === 'UNDERWRITING') {
                           badgeLabel = 'IN UNDERWRITING';
                           badgeClass = 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800';
+                        } else if (item.status === 'UNDER_REVIEW') {
+                          badgeLabel = 'AT BRANCH MANAGER';
+                          badgeClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800';
                         } else if (item.isReadyForUnderwriter) {
                           badgeLabel = 'READY FOR BM';
                           badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
@@ -471,6 +474,10 @@ export function CreditAnalystDashboardView() {
                           actionLabel = 'In Underwriting';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
                           actionClass = 'bg-purple-700 hover:bg-purple-800 text-white';
+                        } else if (item.status === 'UNDER_REVIEW') {
+                          actionLabel = 'Forwarded to BM';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
+                          actionClass = 'bg-slate-700 hover:bg-slate-800 text-white';
                         } else if (item.isReadyForUnderwriter) {
                           actionLabel = 'Forward to Branch Manager';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;

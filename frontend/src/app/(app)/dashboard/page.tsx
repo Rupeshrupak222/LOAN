@@ -1367,17 +1367,19 @@ export default function DashboardPage() {
       {/* H. BRANCH MANAGER WORKSPACE */}
       {primaryRole === 'BRANCH_MANAGER' && (() => {
         const bmMetrics = branchQueueData?.metrics || {
-          totalBranchApplications: appsList.length,
-          pendingManagerReview: appsList.filter((a: any) => !!a.eligibility && ['UNDER_REVIEW', 'CREDIT_ASSESSMENT', 'UNDERWRITING'].includes(a.status)).length,
-          approvedWithinLimit: appsList.filter((a: any) => a.status === 'APPROVED').length,
+          totalBranchApplications: 0,
+          pendingManagerReview: 0,
+          approvedWithinLimit: 0,
           sentBackForCorrection: 0,
           escalatedToUnderwriter: 0,
-          awaitingDocuments: appsList.filter((a: any) => a.customer?.kycStatus === 'PENDING').length,
-          awaitingCreditAssessment: appsList.filter((a: any) => !a.eligibility).length,
+          awaitingDocuments: 0,
+          awaitingCreditAssessment: 0,
           delegatedLimit: 500000,
         };
 
-        const branchProposals = branchQueueData?.items?.length ? branchQueueData.items : appsList;
+        const branchProposals = (branchQueueData?.items || []).filter(
+          (app: any) => app.reviewStatus === 'PENDING_BRANCH_MANAGER_REVIEW' || app.status === 'UNDER_REVIEW'
+        );
 
         return (
           <div className="space-y-6">

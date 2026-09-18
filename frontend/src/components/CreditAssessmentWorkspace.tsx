@@ -384,8 +384,7 @@ export function CreditAssessmentWorkspace({
   const isStep6Complete = Boolean(
     isBorrowerEligibleForBranchManager &&
     (app?.stage === 'BRANCH_MANAGER_REVIEW' ||
-      app?.status === 'UNDERWRITING' ||
-      ['APPROVED', 'DISBURSED'].includes(app?.status))
+      ['UNDER_REVIEW', 'UNDERWRITING', 'APPROVED', 'DISBURSED'].includes(app?.status))
   );
 
   // Strict sequential gating: A step is only unlocked when the previous step is complete!
@@ -717,11 +716,11 @@ export function CreditAssessmentWorkspace({
     mutationFn: async () => {
       return api.post(`/credit-assessment/${applicationId}/forward-underwriting`, {
         recommendationId: existingRecommendation?.id,
-        forwardingNotes: notes || existingRecommendation?.notes || 'Credit assessment completed & verified. Handover to Branch Manager for review.',
+        forwardingNotes: notes || existingRecommendation?.notes || 'Credit assessment completed & verified. Handover to Branch Manager for review and approval.',
       });
     },
     onSuccess: () => {
-      toast.success('Proposal successfully handed over to Branch Manager review desk.');
+      toast.success('Proposal successfully handed over to Branch Manager Review Queue.');
       queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['branch-manager'] });
@@ -921,7 +920,7 @@ export function CreditAssessmentWorkspace({
             { step: 5, label: '5. Recommendation', isComplete: isStep5Complete, isBlocked: false },
             {
               step: 6,
-              label: !isBorrowerEligibleForBranchManager ? '6. Handover (Locked)' : '6. Branch Review Handover',
+              label: !isBorrowerEligibleForBranchManager ? '6. Handover (Locked)' : '6. Branch Manager Handover',
               isComplete: isStep6Complete && isBorrowerEligibleForBranchManager,
               isBlocked: !isBorrowerEligibleForBranchManager,
             },
@@ -2572,10 +2571,10 @@ export function CreditAssessmentWorkspace({
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Step 6: Branch Manager Handover & Review Queue Forwarding
+                Step 6: Branch Manager Handover & Approval Queue Forwarding
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Review complete assessment packet and forward proposal to the Branch Manager for review
+                Review complete assessment packet and forward proposal to the Branch Manager for review and approval
               </p>
             </div>
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1.5">
@@ -2628,10 +2627,10 @@ export function CreditAssessmentWorkspace({
                 Handover to Branch Manager
               </p>
               <p className="text-xs text-blue-800 dark:text-blue-300">
-                Forwarding transitions proposal stage to <span className="font-semibold">BRANCH_MANAGER_REVIEW</span> and assigns the dossier to the Branch Manager for review and approval/escalation.
+                Forwarding transitions proposal to the <span className="font-semibold">Branch Manager Review Desk</span> for management review and approval before underwriting sanction.
               </p>
             </div>
-            {app?.stage === 'BRANCH_MANAGER_REVIEW' || app?.status === 'UNDERWRITING' || app?.status === 'APPROVED' || app?.status === 'SANCTIONED' || app?.status === 'DISBURSED' || app?.status === 'REJECTED' ? (
+            {app?.stage === 'BRANCH_MANAGER_REVIEW' || app?.status === 'UNDER_REVIEW' || app?.status === 'UNDERWRITING' || app?.status === 'APPROVED' || app?.status === 'SANCTIONED' || app?.status === 'DISBURSED' || app?.status === 'REJECTED' ? (
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs border border-emerald-300/60 dark:border-emerald-800/40 shrink-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Handed Over to Branch Manager ({app?.stage === 'BRANCH_MANAGER_REVIEW' ? 'Under BM Review' : app?.status})</span>
