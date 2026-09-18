@@ -351,10 +351,23 @@ export async function getCustomer(id: string, actor?: CustomerActorContext) {
     }
   }
 
+  // Deduplicate customer documents: keep the single latest uploaded record for each distinct document type / requirement
+  const rawDocs = customer.documents || [];
+  const seenDocKeys = new Set<string>();
+  const documents = [];
+  for (const doc of rawDocs) {
+    const key = `${(doc.category || '').toUpperCase().trim()}__${(doc.documentType || '').toUpperCase().trim()}`;
+    if (!seenDocKeys.has(key)) {
+      seenDocKeys.add(key);
+      documents.push(doc);
+    }
+  }
+
   const enrichedCustomer = {
     ...customer,
     addresses,
     bankAccounts,
+    documents,
   };
 
   const originationEligibility = evaluateCustomerOnboardingStatus(enrichedCustomer);
