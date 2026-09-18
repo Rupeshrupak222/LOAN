@@ -428,7 +428,7 @@ export function CreditAnalystDashboardView() {
                           badgeLabel = 'IN UNDERWRITING';
                           badgeClass = 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800';
                         } else if (item.isReadyForUnderwriter) {
-                          badgeLabel = 'READY FOR UW';
+                          badgeLabel = 'READY FOR BM';
                           badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
                         } else if (item.kycStatus !== 'VERIFIED' || (Number(item.documentsCount || 0) > 0 && Number(item.verifiedDocumentsCount || 0) < Number(item.documentsCount || 0))) {
                           badgeLabel = 'KYC / DOCS PENDING';
@@ -463,12 +463,16 @@ export function CreditAnalystDashboardView() {
                           actionLabel = 'View Sanction';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
                           actionClass = 'bg-emerald-600 hover:bg-emerald-700 text-white';
+                        } else if (item.stage === 'BRANCH_MANAGER_REVIEW') {
+                          actionLabel = 'Under BM Review';
+                          actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
+                          actionClass = 'bg-blue-700 hover:bg-blue-800 text-white';
                         } else if (item.status === 'UNDERWRITING') {
-                          actionLabel = 'Already Forwarded';
+                          actionLabel = 'In Underwriting';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
                           actionClass = 'bg-purple-700 hover:bg-purple-800 text-white';
                         } else if (item.isReadyForUnderwriter) {
-                          actionLabel = 'Forward to Underwriter';
+                          actionLabel = 'Forward to Branch Manager';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
                           actionClass = 'bg-[#2563EB] hover:bg-blue-700 text-white';
                         } else if (item.status === 'CREDIT_ASSESSMENT') {

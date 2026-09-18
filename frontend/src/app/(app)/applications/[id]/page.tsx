@@ -887,11 +887,11 @@ export default function ApplicationDetailPage() {
             >
               {isForwardedToUnderwriting ? (
                 <>
-                  <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Underwriter
+                  <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Branch Manager
                 </>
               ) : (
                 <>
-                  <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Underwriter
+                  <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Branch Manager
                 </>
               )}
             </Button>
@@ -1499,11 +1499,11 @@ export default function ApplicationDetailPage() {
                         >
                           {isForwardedToUnderwriting ? (
                             <>
-                              <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Underwriter
+                              <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Branch Manager
                             </>
                           ) : (
                             <>
-                              <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Underwriter
+                              <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Branch Manager
                             </>
                           )}
                         </Button>
