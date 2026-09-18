@@ -58,11 +58,11 @@ export default function BorrowerHomePage() {
               Consumer Digital Lending
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              ID: {borrower?.customerCode || 'CUST-LIVE'}
+              ID: {borrower?.customerCode || '—'}
             </span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Welcome back, {borrower?.firstName || 'Borrower'} 👋
+            Welcome back, {[borrower?.firstName, borrower?.lastName].filter(Boolean).join(' ') || 'Borrower'} 👋
           </h1>
           <p className="text-xs text-slate-600 dark:text-slate-400">
             Instant paperless credit with 100% transparent pricing and RBI fair practice protection.
@@ -102,21 +102,30 @@ export default function BorrowerHomePage() {
             </div>
           </div>
           <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            ₹{creditLimit?.availableLimit ? creditLimit.availableLimit.toLocaleString('en-IN') : '1,50,000'}
+            ₹{(creditLimit?.availableLimit ?? 0).toLocaleString('en-IN')}
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Total pre-approved credit line: ₹{creditLimit?.preApprovedLimit ? creditLimit.preApprovedLimit.toLocaleString('en-IN') : '1,50,000'}
+            {creditLimit?.isEligible && (creditLimit?.preApprovedLimit ?? 0) > 0
+              ? `Total pre-approved credit line: ₹${(creditLimit?.preApprovedLimit ?? 0).toLocaleString('en-IN')}`
+              : 'Complete profile & KYC to unlock pre-approved limits'}
           </p>
 
           <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> 100% Pre-Qualified
-            </span>
+            {creditLimit?.isEligible && (creditLimit?.availableLimit ?? 0) > 0 ? (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> 100% Pre-Qualified
+              </span>
+            ) : (
+              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" /> Complete Verification
+              </span>
+            )}
             <Link
               href="/borrower/apply"
               className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 group"
             >
-              Draw Funds <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              {creditLimit?.isEligible && (creditLimit?.availableLimit ?? 0) > 0 ? 'Draw Funds' : 'Check Offers'}{' '}
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
         </div>
@@ -136,7 +145,7 @@ export default function BorrowerHomePage() {
             <div>
               <div className="flex items-baseline justify-between">
                 <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                  ₹{activeLoan.nextEmiAmount.toLocaleString('en-IN')}
+                  ₹{(activeLoan.nextEmiAmount || 0).toLocaleString('en-IN')}
                 </div>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
                   {activeLoan.status}
@@ -145,7 +154,13 @@ export default function BorrowerHomePage() {
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Next EMI due on{' '}
                 <span className="text-slate-700 dark:text-slate-200 font-medium">
-                  {activeLoan.nextEmiDueDate || '15th of next month'}
+                  {activeLoan.nextEmiDueDate
+                    ? new Date(activeLoan.nextEmiDueDate).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : 'As per schedule'}
                 </span>
               </p>
 
@@ -206,22 +221,42 @@ export default function BorrowerHomePage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 dark:text-slate-400">DigiLocker e-KYC:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
-              </span>
+              {borrower?.kycStatus === 'VERIFIED' ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
+                </span>
+              ) : borrower?.kycStatus === 'SUBMITTED' || borrower?.kycStatus === 'UNDER_REVIEW' ? (
+                <span className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" /> IN REVIEW
+                </span>
+              ) : (
+                <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" /> {borrower?.kycStatus ? borrower.kycStatus.replace(/_/g, ' ') : 'NOT STARTED'}
+                </span>
+              )}
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 dark:text-slate-400">Registered PAN:</span>
-              <span className="text-slate-800 dark:text-slate-200 font-mono">{borrower?.panNumberMasked || 'ABCDE****F'}</span>
+              <span className={`font-mono ${borrower?.panNumberMasked ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic'}`}>
+                {borrower?.panNumberMasked || 'Not Linked'}
+              </span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 dark:text-slate-400">Repayment Mandate:</span>
-              <span className="text-blue-600 dark:text-blue-400 font-medium">eNACH / Auto-Debit Ready</span>
+              {borrower?.mandateStatus === 'ACTIVE' ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">eNACH / Auto-Debit Ready</span>
+              ) : borrower?.mandateStatus === 'PENDING' ? (
+                <span className="text-amber-600 dark:text-amber-400 font-medium">Mandate Setup Pending</span>
+              ) : (
+                <span className="text-slate-400 dark:text-slate-500 font-medium">Not Configured</span>
+              )}
             </div>
           </div>
 
           <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Bank Details Linked</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[170px]" title={borrower?.bankName || 'No Bank Linked'}>
+              {borrower?.bankName ? `${borrower.bankName}` : 'No Bank Linked'}
+            </span>
             <Link
               href="/borrower/profile"
               className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"

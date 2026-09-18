@@ -11,7 +11,15 @@ export interface BorrowerHomeSummary {
     email: string;
     mobile: string;
     kycStatus: string;
-    panNumberMasked: string;
+    panNumberMasked: string | null;
+    aadhaarMasked?: string | null;
+    bankLinked: boolean;
+    bankName: string | null;
+    bankAccountNoMasked: string | null;
+    bankIfsc: string | null;
+    isBankVerified: boolean;
+    mandateStatus: 'ACTIVE' | 'PENDING' | 'NOT_CONFIGURED';
+    address?: string | null;
   };
   creditLimit: {
     preApprovedLimit: number;

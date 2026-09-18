@@ -37,9 +37,10 @@ export class BorrowerService {
         ...tenantFilter,
       },
       include: {
-        addresses: true,
-        bankAccounts: true,
-        employmentDetails: true,
+        addresses: { orderBy: { createdAt: 'desc' } },
+        bankAccounts: { orderBy: { createdAt: 'desc' } },
+        employmentDetails: { orderBy: { createdAt: 'desc' } },
+        CustomerIdentifier: true,
       },
     });
 
@@ -61,14 +62,32 @@ export class BorrowerService {
           tenantId: tenantId || undefined,
         },
         include: {
-          addresses: true,
-          bankAccounts: true,
-          employmentDetails: true,
+          addresses: { orderBy: { createdAt: 'desc' } },
+          bankAccounts: { orderBy: { createdAt: 'desc' } },
+          employmentDetails: { orderBy: { createdAt: 'desc' } },
+          CustomerIdentifier: true,
         },
       });
     }
 
     return customer;
+  }
+
+  /**
+   * Helper: Resolve masked PAN from identifiers or customer fields
+   */
+  public getMaskedPan(customer: any): string | null {
+    const panIdentifier = customer.CustomerIdentifier?.find(
+      (id: any) => id.idType?.toUpperCase() === 'PAN'
+    );
+    if (panIdentifier?.maskedValue) {
+      return panIdentifier.maskedValue;
+    }
+    const rawPan = customer.panNumber || customer.pan;
+    if (rawPan && typeof rawPan === 'string' && rawPan.length >= 5) {
+      return `${rawPan.slice(0, 2)}******${rawPan.slice(-2)}`.toUpperCase();
+    }
+    return null;
   }
 
   /**
@@ -176,7 +195,7 @@ export class BorrowerService {
         applicationNumber: latestApplication.applicationNo,
         productName: latestApplication.product?.name || 'Digital Loan',
         requestedAmount: Number(latestApplication.requestedAmount),
-        status: currentStage, // Expose customer-safe status instead of internal status
+        status: currentStage,
         currentStage,
         progressPercent,
         nextRequiredAction: nextAction,
@@ -204,12 +223,50 @@ export class BorrowerService {
       reference: p.reference || p.paymentNo,
     }));
 
+    // Dynamic PAN and Aadhaar Extraction
+    const panNumberMasked = this.getMaskedPan(customer);
+
+    const aadhaarId = customer.CustomerIdentifier?.find(
+      (id: any) => id.idType?.toUpperCase() === 'AADHAAR'
+    );
+    const aadhaarMasked = aadhaarId?.maskedValue || null;
+
+    // Dynamic Bank & Mandate Info
+    const primaryBank = customer.bankAccounts?.[0] || null;
+    const bankAccNo = primaryBank?.accountNumber || customer.bankAccountNo || null;
+    const bankAccountNoMasked = bankAccNo
+      ? (bankAccNo.length > 4 ? `••••••••${bankAccNo.slice(-4)}` : bankAccNo)
+      : null;
+    const bankName = primaryBank?.bankName || customer.bankName || null;
+    const bankIfsc = primaryBank?.ifscCode || customer.bankIfsc || null;
+    const isBankVerified = Boolean(primaryBank?.isVerified || customer.bankAccountNo);
+    const bankLinked = Boolean(primaryBank || customer.bankAccountNo);
+    const mandateStatus: 'ACTIVE' | 'PENDING' | 'NOT_CONFIGURED' = bankLinked
+      ? (isBankVerified ? 'ACTIVE' : 'PENDING')
+      : 'NOT_CONFIGURED';
+
+    // Address
+    const primaryAddress = customer.addresses?.[0] || null;
+    const formattedAddress = primaryAddress
+      ? `${primaryAddress.addressLine}, ${primaryAddress.city}, ${primaryAddress.state} - ${primaryAddress.pincode}`
+      : customer.addressLine
+      ? `${customer.addressLine}, ${customer.city || ''}, ${customer.state || ''} ${customer.pincode ? `- ${customer.pincode}` : ''}`.trim()
+      : null;
+
     // Credit limits computation
     const totalOutstandingAcrossLoans = loans
       .filter((l) => l.status === 'ACTIVE')
       .reduce((sum, l) => sum + Number(l.outstandingPrincipal), 0);
 
-    const basePreApprovedLimit = 150000;
+    const monthlyIncome = Number(
+      customer.employmentDetails?.[0]?.monthlyIncome || customer.monthlyIncome || 0
+    );
+
+    // Dynamic pre-approved limit derived from verified profile & income
+    const basePreApprovedLimit = monthlyIncome > 0
+      ? Math.round(monthlyIncome * 3)
+      : (customer.kycStatus === 'VERIFIED' ? 150000 : 0);
+
     const availableLimit = Math.max(0, basePreApprovedLimit - totalOutstandingAcrossLoans);
 
     return {
@@ -221,14 +278,22 @@ export class BorrowerService {
         email: customer.email || `${customer.customerCode.toLowerCase()}@adyapan.local`,
         mobile: customer.mobile,
         kycStatus: customer.kycStatus,
-        panNumberMasked: 'ABCDE****F',
+        panNumberMasked,
+        aadhaarMasked,
+        bankLinked,
+        bankName,
+        bankAccountNoMasked,
+        bankIfsc,
+        isBankVerified,
+        mandateStatus,
+        address: formattedAddress,
       },
       creditLimit: {
         preApprovedLimit: basePreApprovedLimit,
         availableLimit,
         utilizedLimit: totalOutstandingAcrossLoans,
         currency: 'INR',
-        isEligible: customer.kycStatus === 'VERIFIED',
+        isEligible: customer.kycStatus === 'VERIFIED' && basePreApprovedLimit > 0,
       },
       activeLoan: activeLoanSummary,
       activeApplication: activeAppSummary,
@@ -388,6 +453,31 @@ export class BorrowerService {
         monthlyIncome: Money.of(input.monthlyIncome),
       },
     });
+
+    // 4.1 Upsert Customer Identifiers (PAN & Aadhaar)
+    if (input.panNumber) {
+      const panClean = input.panNumber.trim().toUpperCase();
+      const masked = `${panClean.slice(0, 2)}******${panClean.slice(-2)}`;
+      await prisma.customerIdentifier.create({
+        data: {
+          customerId: customer.id,
+          idType: 'PAN',
+          maskedValue: masked,
+          verificationStatus: 'VERIFIED',
+        },
+      });
+    }
+
+    if (input.aadhaarNumberMasked) {
+      await prisma.customerIdentifier.create({
+        data: {
+          customerId: customer.id,
+          idType: 'AADHAAR',
+          maskedValue: input.aadhaarNumberMasked,
+          verificationStatus: 'VERIFIED',
+        },
+      });
+    }
 
     // 5. Fetch Product
     const product = await prisma.loanProduct.findUnique({
@@ -1018,7 +1108,7 @@ export class BorrowerService {
       issueDate: new Date().toISOString().split('T')[0],
       borrowerName: `${customer.firstName} ${customer.lastName}`,
       customerCode: customer.customerCode,
-      panMasked: 'ABCDE****F',
+      panMasked: this.getMaskedPan(customer) || '—',
       loanAccountNumber: loan.loanNo,
       sanctionedAmount: Number(loan.principal),
       closureDate: loan.updatedAt.toISOString().split('T')[0],

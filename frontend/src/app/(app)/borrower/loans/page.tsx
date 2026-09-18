@@ -169,7 +169,7 @@ export default function BorrowerLoansHubPage() {
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">No Loan Accounts Found</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
-              You do not have any active or past loans. Apply today to get instant digital credit up to ₹1,50,000.
+              You do not have any active or past loans. Apply today to get instant digital credit with flexible tenures.
             </p>
           </div>
           <Link href="/borrower/apply">
