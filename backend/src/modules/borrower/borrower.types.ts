@@ -129,7 +129,7 @@ export interface BorrowerApplicationInput {
   pincode: string;
   // Step 3: Employment & Role Details
   employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'BUSINESS' | 'PROFESSIONAL' | 'STUDENT' | 'FREELANCER' | 'FARMER' | 'OTHER';
-  employerName: string;
+  employerName?: string;
   designation?: string;
   workExperienceYears?: number;
   businessName?: string;
@@ -142,6 +142,11 @@ export interface BorrowerApplicationInput {
   coApplicantName?: string;
   coApplicantRelation?: string;
   coApplicantIncome?: number;
+  landAreaAcres?: number;
+  cropType?: string;
+  kccLimit?: number;
+  farmLocation?: string;
+  clientRemittanceType?: string;
   monthlyIncome: number;
   existingEmiObligations?: number;
   // Step 4: KYC & Identity

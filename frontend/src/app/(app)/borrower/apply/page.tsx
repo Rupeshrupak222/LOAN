@@ -245,6 +245,19 @@ export default function BorrowerApplyPage() {
     monthlyIncome: 0,
     existingEmiObligations: 0,
     salaryMode: 'BANK_TRANSFER',
+    // Farmer Fields
+    landAreaAcres: 0,
+    cropType: 'WHEAT_PADDY',
+    khasraNumber: '',
+    farmLocation: '',
+    annualCropIncome: 0,
+    kccLimit: 0,
+    // Freelancer Fields
+    freelanceDomain: '',
+    clientRemittanceType: 'DOMESTIC_TRANSFER',
+    // Retired Fields
+    pensionPpoNumber: '',
+    pensionOrganization: '',
     // Business Role Fields
     businessName: '',
     businessRegistrationType: 'PROPRIETORSHIP',
@@ -474,17 +487,252 @@ export default function BorrowerApplyPage() {
     },
   });
 
+  // Mandatory documents list (computed from dynamic engine or specialized role/product defaults)
+  const dynamicMandatoryDocs =
+    documentChecklist?.mandatory && documentChecklist.mandatory.length > 0
+      ? documentChecklist.mandatory
+      : [
+          { code: 'IDENTITY_PROOF', category: 'IDENTITY_PROOF', name: 'Proof of Identity (PoI)', description: 'Valid Government Photo ID (PAN / Aadhaar / Passport / Voter ID)' },
+          { code: 'ADDRESS_PROOF', category: 'ADDRESS_PROOF', name: 'Proof of Address (PoA)', description: 'Current Residence Utility Bill, Aadhaar, or Gram Panchayat Certificate' },
+          { code: 'APPLICANT_PHOTO', category: 'APPLICANT_PHOTO', name: 'Applicant Live Photo / Selfie', description: 'Recent passport photo or live selfie for face match' },
+          ...(formData.employmentType === 'SALARIED'
+            ? [
+                { code: 'SALARY_SLIPS', category: 'INCOME_PROOF', name: 'Salary Slips (Last 3 Months)', description: 'Official payslips issued by employer' },
+                { code: 'BANK_STATEMENTS', category: 'INCOME_PROOF', name: 'Salary Bank Statement (6 Months)', description: 'PDF statement with salary credits visible' },
+              ]
+            : formData.employmentType === 'FARMER'
+            ? [
+                { code: 'LAND_OWNERSHIP', category: 'PROPERTY_PROOF', name: 'Land Ownership Record (7/12 Extract / Khasra-Khatauni / Kisan Passbook)', description: 'Revenue land record or Kisan Passbook confirming cultivable acreage' },
+                { code: 'BANK_STATEMENTS', category: 'INCOME_PROOF', name: 'Bank Statement / Kisan Credit Card Account (6–12 Months)', description: 'Bank statement showing crop proceeds and agricultural inflows' },
+              ]
+            : formData.employmentType === 'BUSINESS'
+            ? [
+                { code: 'BUSINESS_ITR', category: 'INCOME_PROOF', name: '2 Years ITR with Financials', description: 'Computation of income and Profit & Loss sheet' },
+                { code: 'BANK_STATEMENTS', category: 'INCOME_PROOF', name: 'Current Account Bank Statement (12 Mos)', description: 'Primary business operating account statement' },
+              ]
+            : formData.employmentType === 'PROFESSIONAL'
+            ? [
+                { code: 'PROFESSIONAL_DEGREE', category: 'EMPLOYMENT_PROOF', name: 'Professional Degree / License (MCI/ICAI/Bar Council)', description: 'Medical Council, Bar Council, or ICAI practice certificate' },
+                { code: 'BANK_STATEMENTS', category: 'INCOME_PROOF', name: 'Professional Bank Statement (12 Mos)', description: 'Bank statement with professional fee credits' },
+                { code: 'BUSINESS_ITR', category: 'INCOME_PROOF', name: '2 Years ITR with Computation', description: 'Income Tax Return with professional schedules' },
+              ]
+            : formData.employmentType === 'STUDENT'
+            ? [
+                { code: 'ADMISSION_LETTER', category: 'EMPLOYMENT_PROOF', name: 'Admission Offer Letter', description: 'Official letter from University / Institute' },
+                { code: 'FEE_STRUCTURE', category: 'EMPLOYMENT_PROOF', name: 'Course Fee Structure Breakdown', description: 'Tuition and living expense document' },
+                { code: 'STUDENT_ID_PROOF', category: 'EMPLOYMENT_PROOF', name: 'Student ID Card / College Enrollment Proof', description: 'Institutional student identity card' },
+                { code: 'CO_APPLICANT_INCOME', category: 'CO_APPLICANT', name: 'Co-Applicant Income & KYC Proof', description: 'Salary slips / ITR of parent or guardian' },
+              ]
+            : formData.employmentType === 'RETIRED'
+            ? [
+                { code: 'PENSION_PROOF', category: 'INCOME_PROOF', name: 'Pension Payment Order (PPO) / Pension Credit Passbook', description: 'Official PPO or pension bank credit statement' },
+              ]
+            : [
+                { code: 'BANK_STATEMENTS', category: 'INCOME_PROOF', name: 'Bank Account Statement (6 Months)', description: 'Bank statement showing regular client remittances / receipts' },
+              ]),
+        ];
+
+  // Comprehensive Step Validation Function
+  const validateCurrentStep = (step: number): { valid: boolean; errorMsg?: string } => {
+    // Step 1: Category & Amount Validation
+    if (step === 1) {
+      if (!formData.requestedAmount || formData.requestedAmount <= 0) {
+        return { valid: false, errorMsg: 'Loan amount is mandatory. Please enter a valid amount.' };
+      }
+      if (formData.requestedAmount < activeCategory.minAmount || formData.requestedAmount > activeCategory.maxAmount) {
+        return {
+          valid: false,
+          errorMsg: `For ${activeCategory.name}, loan amount must be between ₹${activeCategory.minAmount.toLocaleString('en-IN')} and ₹${activeCategory.maxAmount.toLocaleString('en-IN')}.`,
+        };
+      }
+      if (!formData.tenureMonths || formData.tenureMonths < activeCategory.minTenure || formData.tenureMonths > activeCategory.maxTenure) {
+        return {
+          valid: false,
+          errorMsg: `Loan tenure must be between ${activeCategory.minTenure} and ${activeCategory.maxTenure} months.`,
+        };
+      }
+      if (!formData.purpose || !formData.purpose.trim()) {
+        return { valid: false, errorMsg: 'Loan purpose is mandatory. Please select a purpose.' };
+      }
+    }
+
+    // Step 2: Legal Personal & Residential Details
+    if (step === 2) {
+      if (!formData.firstName || !formData.firstName.trim()) {
+        return { valid: false, errorMsg: 'First Legal Name is mandatory as per Aadhaar/PAN.' };
+      }
+      if (!formData.lastName || !formData.lastName.trim()) {
+        return { valid: false, errorMsg: 'Last Legal Name is mandatory as per Aadhaar/PAN.' };
+      }
+      if (!formData.dob) {
+        return { valid: false, errorMsg: 'Date of Birth is mandatory.' };
+      }
+      // Validate applicant age >= 18
+      const birthDate = new Date(formData.dob);
+      const ageDifMs = Date.now() - birthDate.getTime();
+      const ageDate = new Date(ageDifMs);
+      const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+      if (isNaN(age) || age < 18) {
+        return { valid: false, errorMsg: 'Applicant must be at least 18 years old to apply for credit.' };
+      }
+      if (!formData.gender) {
+        return { valid: false, errorMsg: 'Gender selection is mandatory.' };
+      }
+      if (!formData.addressLine1 || !formData.addressLine1.trim()) {
+        return { valid: false, errorMsg: 'Current residential address is mandatory.' };
+      }
+      if (!formData.city || !formData.city.trim()) {
+        return { valid: false, errorMsg: 'City is mandatory.' };
+      }
+      if (!formData.state || !formData.state.trim()) {
+        return { valid: false, errorMsg: 'State is mandatory.' };
+      }
+      const cleanPin = (formData.pincode || '').trim();
+      if (!cleanPin || !/^\d{6}$/.test(cleanPin)) {
+        return { valid: false, errorMsg: 'Valid 6-digit postal Pincode is mandatory.' };
+      }
+    }
+
+    // Step 3: Role-Specific Income & Operational Details
+    if (step === 3) {
+      const emp = formData.employmentType;
+      if (emp === 'SALARIED') {
+        if (!formData.employerName || !formData.employerName.trim()) {
+          return { valid: false, errorMsg: 'Employer / Company Name is mandatory for Salaried applicants.' };
+        }
+        if (!formData.designation || !formData.designation.trim()) {
+          return { valid: false, errorMsg: 'Designation / Job Role is mandatory.' };
+        }
+        if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+          return { valid: false, errorMsg: 'Net monthly in-hand salary is mandatory.' };
+        }
+        if (formData.workExperienceYears == null || formData.workExperienceYears < 0) {
+          return { valid: false, errorMsg: 'Total work experience is mandatory.' };
+        }
+      } else if (emp === 'FARMER') {
+        if (!formData.landAreaAcres || formData.landAreaAcres <= 0) {
+          return { valid: false, errorMsg: 'Total Cultivable Land Holding (in Acres) is mandatory.' };
+        }
+        if (!formData.khasraNumber || !formData.khasraNumber.trim()) {
+          return { valid: false, errorMsg: 'Land Revenue Survey / Khasra-Khatauni Number is mandatory.' };
+        }
+        if (!formData.farmLocation || !formData.farmLocation.trim()) {
+          return { valid: false, errorMsg: 'Farm / Village & District Location is mandatory.' };
+        }
+        if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+          return { valid: false, errorMsg: 'Estimated Annual Crop Harvest Income is mandatory.' };
+        }
+      } else if (emp === 'BUSINESS' || emp === 'SELF_EMPLOYED') {
+        if (!formData.businessName && !formData.employerName) {
+          return { valid: false, errorMsg: 'Registered Business / Entity Name is mandatory.' };
+        }
+        if (!formData.annualTurnover || formData.annualTurnover <= 0) {
+          return { valid: false, errorMsg: 'Gross annual business turnover is mandatory.' };
+        }
+        if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+          return { valid: false, errorMsg: 'Average monthly net business profit / draw is mandatory.' };
+        }
+      } else if (emp === 'PROFESSIONAL') {
+        if (!formData.licenseNumber || !formData.licenseNumber.trim()) {
+          return { valid: false, errorMsg: 'Professional council registration / license number (e.g. MCI/ICAI/Bar Council) is mandatory.' };
+        }
+        if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+          return { valid: false, errorMsg: 'Net monthly professional income is mandatory.' };
+        }
+      } else if (emp === 'STUDENT') {
+        if (!formData.institutionName && !formData.employerName) {
+          return { valid: false, errorMsg: 'College / University / Institute name is mandatory.' };
+        }
+        if (!formData.courseName || !formData.courseName.trim()) {
+          return { valid: false, errorMsg: 'Course / Degree program name is mandatory.' };
+        }
+        if (!formData.coApplicantName || !formData.coApplicantName.trim()) {
+          return { valid: false, errorMsg: 'Co-Applicant / Parent / Sponsor full name is mandatory for student financing.' };
+        }
+        if (!formData.coApplicantIncome || formData.coApplicantIncome <= 0) {
+          return { valid: false, errorMsg: 'Co-Applicant / Parent monthly income is mandatory.' };
+        }
+      } else if (emp === 'RETIRED') {
+        if (!formData.pensionOrganization || !formData.pensionOrganization.trim()) {
+          return { valid: false, errorMsg: 'Former Organization / Pension Issuing Authority is mandatory.' };
+        }
+        if (!formData.pensionPpoNumber || !formData.pensionPpoNumber.trim()) {
+          return { valid: false, errorMsg: 'Pension Payment Order (PPO) Number is mandatory.' };
+        }
+        if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+          return { valid: false, errorMsg: 'Net Monthly Pension Draw is mandatory.' };
+        }
+      } else {
+        if (!formData.freelanceDomain && !formData.employerName) {
+          return { valid: false, errorMsg: 'Primary domain / freelance skill is mandatory.' };
+        }
+        if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
+          return { valid: false, errorMsg: 'Estimated average monthly inflow is mandatory.' };
+        }
+      }
+    }
+
+    // Step 4: Regulatory KYC & Mandatory Documents Checklist
+    if (step === 4) {
+      const cleanPan = (formData.panNumber || '').trim().toUpperCase();
+      if (!cleanPan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+        return { valid: false, errorMsg: 'Valid 10-character PAN Card number (e.g. ABCDE1234F) is mandatory.' };
+      }
+      if (!formData.kycConsentGiven) {
+        return { valid: false, errorMsg: 'Identity verification consent is mandatory under RBI regulations.' };
+      }
+
+      // Check all dynamic mandatory documents for this role & loan product
+      for (const doc of dynamicMandatoryDocs) {
+        const isUploaded = Boolean(uploadedDocs[doc.code]?.uploaded || uploadedDocs[doc.code]?.documentId);
+        if (!isUploaded) {
+          return {
+            valid: false,
+            errorMsg: `Mandatory Document Missing: Please upload "${doc.name}" to proceed with underwriting.`,
+          };
+        }
+      }
+    }
+
+    // Step 5: Disbursement Bank Account
+    if (step === 5) {
+      if (!formData.accountHolderName || !formData.accountHolderName.trim()) {
+        return { valid: false, errorMsg: 'Bank Account Holder Name is mandatory.' };
+      }
+      if (!formData.bankName || !formData.bankName.trim()) {
+        return { valid: false, errorMsg: 'Bank Name is mandatory.' };
+      }
+      const cleanAcc = (formData.accountNumber || '').trim();
+      const cleanConf = (formData.confirmAccountNumber || '').trim();
+      if (!cleanAcc || cleanAcc.length < 8) {
+        return { valid: false, errorMsg: 'Valid Bank Account Number (8–20 digits) is mandatory.' };
+      }
+      if (cleanAcc !== cleanConf) {
+        return { valid: false, errorMsg: 'Bank Account Number and Confirmation Number do not match.' };
+      }
+      const cleanIfsc = (formData.ifscCode || '').trim().toUpperCase();
+      if (!cleanIfsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
+        return { valid: false, errorMsg: 'Valid 11-character Bank IFSC Code (e.g. SBIN0001234 / HDFC0001234) is mandatory.' };
+      }
+    }
+
+    // Step 6: Final Review & Statutory Consents
+    if (step === 6) {
+      if (!formData.creditBureauConsent) {
+        return { valid: false, errorMsg: 'Credit Bureau pull consent is mandatory for loan decisioning.' };
+      }
+      if (!formData.termsAccepted) {
+        return { valid: false, errorMsg: 'Acceptance of Institutional Loan Agreement terms is mandatory.' };
+      }
+    }
+
+    return { valid: true };
+  };
+
   const handleNext = () => {
-    if (currentStep === 1 && (!formData.requestedAmount || formData.requestedAmount <= 0)) {
-      error('Validation Error', 'Please select a valid requested amount.');
-      return;
-    }
-    if (currentStep === 2 && (!formData.firstName.trim() || !formData.lastName.trim() || !formData.pincode.trim())) {
-      error('Validation Error', 'Please complete your legal personal and residential details.');
-      return;
-    }
-    if (currentStep === 5 && formData.accountNumber && formData.accountNumber !== formData.confirmAccountNumber) {
-      error('Validation Error', 'Bank account numbers do not match.');
+    const validation = validateCurrentStep(currentStep);
+    if (!validation.valid) {
+      error('Mandatory Field Missing', validation.errorMsg || 'Please complete all mandatory details to proceed.');
       return;
     }
 
@@ -505,40 +753,6 @@ export default function BorrowerApplyPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
-
-  // Mandatory documents list (computed from backend checklist or role-based default)
-  const dynamicMandatoryDocs =
-    documentChecklist?.mandatory && documentChecklist.mandatory.length > 0
-      ? documentChecklist.mandatory
-      : [
-          { code: 'IDENTITY_PROOF', name: 'Proof of Identity (PoI)', description: 'Valid Government Photo ID (PAN / Aadhaar / Passport)' },
-          { code: 'ADDRESS_PROOF', name: 'Proof of Address (PoA)', description: 'Current Residence Utility Bill, Aadhaar, or Rent Agreement' },
-          ...(formData.employmentType === 'SALARIED'
-            ? [
-                { code: 'SALARY_SLIPS', name: 'Salary Slips (Last 3 Months)', description: 'Official payslips issued by employer' },
-                { code: 'BANK_STATEMENTS', name: 'Salary Bank Statement (6 Months)', description: 'PDF statement with salary credits visible' },
-              ]
-            : formData.employmentType === 'BUSINESS'
-            ? [
-                { code: 'BUSINESS_REGISTRATION', name: 'GST Certificate / Udyam MSME', description: 'Entity incorporation proof or GST registration' },
-                { code: 'BUSINESS_ITR', name: '2 Years ITR with Financials', description: 'Computation of income and Profit & Loss sheet' },
-                { code: 'BANK_STATEMENTS', name: 'Current Account Bank Statement (12 Mos)', description: 'Primary business operating account statement' },
-              ]
-            : formData.employmentType === 'PROFESSIONAL'
-            ? [
-                { code: 'DEGREE_CERTIFICATE', name: 'Professional Degree / License', description: 'MCI, ICAI, Bar Council, or COA license' },
-                { code: 'BANK_STATEMENTS', name: 'Professional Bank Statement (12 Mos)', description: 'Bank statement with professional fee credits' },
-              ]
-            : formData.employmentType === 'STUDENT'
-            ? [
-                { code: 'ADMISSION_LETTER', name: 'Admission Offer Letter', description: 'Official letter from University / Institute' },
-                { code: 'FEE_STRUCTURE', name: 'Course Fee Structure Breakdown', description: 'Tuition and living expense document' },
-                { code: 'CO_APPLICANT_INCOME', name: 'Co-Applicant Income Proof', description: 'Salary slips / ITR of parent or guardian' },
-              ]
-            : [
-                { code: 'INCOME_PROOF', name: 'Income / Inflow Records', description: 'Bank statements or invoices showing earnings' },
-              ]),
-        ];
 
   if (isProductsLoading) {
     return (
@@ -901,7 +1115,9 @@ export default function BorrowerApplyPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">First Legal Name</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    First Legal Name <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.firstName}
@@ -912,7 +1128,9 @@ export default function BorrowerApplyPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Last Legal Name</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Last Legal Name <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.lastName}
@@ -923,7 +1141,9 @@ export default function BorrowerApplyPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Date of Birth</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Date of Birth <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="date"
                     value={formData.dob}
@@ -933,7 +1153,9 @@ export default function BorrowerApplyPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Gender</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Gender <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <select
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
@@ -947,7 +1169,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Current Residential Address
+                    Current Residential Address <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -959,7 +1181,9 @@ export default function BorrowerApplyPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">City</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    City <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.city}
@@ -971,7 +1195,9 @@ export default function BorrowerApplyPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">State</label>
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      State <span className="text-rose-500 font-bold">*</span>
+                    </label>
                     <input
                       type="text"
                       value={formData.state}
@@ -982,7 +1208,9 @@ export default function BorrowerApplyPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Pincode</label>
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Pincode <span className="text-rose-500 font-bold">*</span>
+                    </label>
                     <input
                       type="text"
                       value={formData.pincode}
@@ -1026,7 +1254,7 @@ export default function BorrowerApplyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Employer / Corporate Organization Name
+                    Employer / Corporate Organization Name <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1038,7 +1266,9 @@ export default function BorrowerApplyPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Designation / Role</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Designation / Role <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.designation}
@@ -1050,7 +1280,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Total Work Experience (Years)
+                    Total Work Experience (Years) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1063,7 +1293,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Net Monthly In-Hand Salary (₹)
+                    Net Monthly In-Hand Salary (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1076,7 +1306,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Existing Monthly Loan EMIs (₹)
+                    Existing Monthly Loan EMIs (₹) <span className="text-slate-400 font-normal text-[11px]">(Optional)</span>
                   </label>
                   <input
                     type="number"
@@ -1094,7 +1324,7 @@ export default function BorrowerApplyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Business / Company Legal Name
+                    Business / Company Legal Name <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1109,7 +1339,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Business Constitution Type
+                    Business Constitution Type <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <select
                     value={formData.businessRegistrationType}
@@ -1125,7 +1355,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    GSTIN Number (Optional/Mandatory)
+                    GSTIN Number <span className="text-slate-400 font-normal text-[11px]">(Optional / If applicable)</span>
                   </label>
                   <input
                     type="text"
@@ -1138,7 +1368,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Gross Annual Turnover (₹)
+                    Gross Annual Turnover (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1151,7 +1381,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Average Net Monthly Profit / Inflows (₹)
+                    Average Net Monthly Profit / Inflows (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1169,7 +1399,7 @@ export default function BorrowerApplyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Professional Field
+                    Professional Field <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <select
                     value={formData.professionType}
@@ -1186,7 +1416,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Practice / Clinic / Firm Name
+                    Practice / Clinic / Firm Name <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1199,7 +1429,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Council / Registration License No.
+                    Council / Registration License No. <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1212,7 +1442,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Net Monthly Professional Income (₹)
+                    Net Monthly Professional Income (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1230,7 +1460,7 @@ export default function BorrowerApplyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    University / College / Institute Name
+                    University / College / Institute Name <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1244,7 +1474,9 @@ export default function BorrowerApplyPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Course / Degree</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Course / Degree <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.courseName}
@@ -1256,7 +1488,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Co-Applicant Full Name (Parent/Guardian)
+                    Co-Applicant Full Name (Parent/Guardian) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1269,7 +1501,7 @@ export default function BorrowerApplyPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Co-Applicant Monthly Income (₹)
+                    Co-Applicant Monthly Income (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1288,25 +1520,159 @@ export default function BorrowerApplyPage() {
               </div>
             )}
 
-            {/* E. Dynamic Fields for FREELANCER / FARMER */}
-            {['FREELANCER', 'FARMER', 'OTHER'].includes(formData.employmentType) && (
+            {/* E. Dynamic Fields for FARMER / AGRICULTURIST */}
+            {formData.employmentType === 'FARMER' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2 space-y-1.5">
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Primary Trade / Occupation Name
+                    Total Cultivable Land Holding (in Acres) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
-                    type="text"
-                    value={formData.employerName}
-                    onChange={(e) => setFormData({ ...formData, employerName: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
-                    placeholder="e.g. Independent UI/UX Consultant / Organic Farming"
+                    type="number"
+                    step="0.1"
+                    value={formData.landAreaAcres || ''}
+                    onChange={(e) => setFormData({ ...formData, landAreaAcres: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="e.g. 5.5 Acres"
                   />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Estimated Monthly Inflow (₹)
+                    Primary Crop Types / Agricultural Produce <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <select
+                    value={formData.cropType}
+                    onChange={(e) => setFormData({ ...formData, cropType: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                  >
+                    <option value="WHEAT_PADDY">Food Grains (Wheat, Paddy, Maize, Barley)</option>
+                    <option value="CASH_CROPS">Cash Crops (Cotton, Sugarcane, Tobacco, Jute)</option>
+                    <option value="PULSES_OILSEEDS">Pulses & Oilseeds (Soybean, Mustard, Gram)</option>
+                    <option value="HORTICULTURE_FRUITS">Horticulture (Vegetables, Fruits, Floriculture)</option>
+                    <option value="DAIRY_ALLIED">Dairy, Poultry & Animal Husbandry</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Land Revenue Survey / Khasra-Khatauni No. <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.khasraNumber}
+                    onChange={(e) => setFormData({ ...formData, khasraNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                    placeholder="e.g. Khasra No. 142/3, Khatauni 89"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Farm Location / Village & District <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.farmLocation}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        farmLocation: e.target.value,
+                        employerName: `Agricultural Farm (${e.target.value || 'Rural'})`,
+                      })
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                    placeholder="e.g. Village Rampur, District Karnal"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Estimated Annual Crop Harvest Inflow (₹) <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.annualCropIncome || formData.monthlyIncome * 12 || ''}
+                    onChange={(e) => {
+                      const annual = Number(e.target.value);
+                      setFormData({
+                        ...formData,
+                        annualCropIncome: annual,
+                        monthlyIncome: Math.round(annual / 12),
+                      });
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="e.g. 600000 (Annual crop sales)"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Equates to ₹{Math.round((formData.annualCropIncome || formData.monthlyIncome * 12 || 0) / 12).toLocaleString('en-IN')}/month for credit underwriting
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Kisan Credit Card (KCC) Limit (₹) <span className="text-slate-400 font-normal text-[11px]">(Optional / If active)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.kccLimit || ''}
+                    onChange={(e) => setFormData({ ...formData, kccLimit: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:border-blue-500 outline-none"
+                    placeholder="0 if none"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Existing Agricultural Loan EMIs (₹) <span className="text-slate-400 font-normal text-[11px]">(Optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.existingEmiObligations || ''}
+                    onChange={(e) => setFormData({ ...formData, existingEmiObligations: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:border-blue-500 outline-none"
+                    placeholder="0 if none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* F. Dynamic Fields for FREELANCER */}
+            {formData.employmentType === 'FREELANCER' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Primary Domain / Freelance Specialization <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.freelanceDomain || formData.employerName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, freelanceDomain: e.target.value, employerName: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                    placeholder="e.g. Full-Stack Developer, UI/UX Designer, Growth Marketing"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Primary Remittance Channel <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <select
+                    value={formData.clientRemittanceType}
+                    onChange={(e) => setFormData({ ...formData, clientRemittanceType: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                  >
+                    <option value="DOMESTIC_TRANSFER">Domestic Bank Transfers (NEFT/RTGS/UPI)</option>
+                    <option value="INTERNATIONAL_WIRE">International Wire Remittances (SWIFT)</option>
+                    <option value="PLATFORM_DIRECT">Marketplace Payouts (Upwork / Fiverr / Deel / PayPal)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Average Monthly Inflow / Retainers (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1316,17 +1682,50 @@ export default function BorrowerApplyPage() {
                     placeholder="Monthly earnings in ₹"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* G. Dynamic Fields for RETIRED */}
+            {formData.employmentType === 'RETIRED' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Former Organization / Pension Authority <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.pensionOrganization || formData.employerName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, pensionOrganization: e.target.value, employerName: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:border-blue-500 outline-none"
+                    placeholder="e.g. Central Govt / Indian Railways / State Treasury"
+                  />
+                </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Existing Monthly Obligations (₹)
+                    Pension Payment Order (PPO) Number <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.pensionPpoNumber}
+                    onChange={(e) => setFormData({ ...formData, pensionPpoNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono uppercase focus:border-blue-500 outline-none"
+                    placeholder="Enter 12-digit PPO Number"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Net Monthly Pension Draw (₹) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
-                    value={formData.existingEmiObligations || ''}
-                    onChange={(e) => setFormData({ ...formData, existingEmiObligations: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:border-blue-500 outline-none"
-                    placeholder="0 if none"
+                    value={formData.monthlyIncome || ''}
+                    onChange={(e) => setFormData({ ...formData, monthlyIncome: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 outline-none"
+                    placeholder="Monthly pension in ₹"
                   />
                 </div>
               </div>
@@ -1375,13 +1774,15 @@ export default function BorrowerApplyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
                   <div className="flex justify-between text-xs font-medium">
-                    <span className="text-slate-600 dark:text-slate-400">PAN Card Number</span>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      PAN Card Number <span className="text-rose-500 font-bold">*</span>
+                    </span>
                     {formData.panNumber ? (
                       <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" /> NSDL Verified
                       </span>
                     ) : (
-                      <span className="text-slate-400 italic">Required</span>
+                      <span className="text-rose-500 italic text-[11px]">Mandatory</span>
                     )}
                   </div>
                   <input
@@ -1438,7 +1839,7 @@ export default function BorrowerApplyPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-xs text-slate-900 dark:text-white">{doc.name}</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 font-bold border border-rose-200 dark:border-rose-500/20">
-                            MANDATORY
+                            MANDATORY *
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">{doc.description}</p>
@@ -1466,7 +1867,7 @@ export default function BorrowerApplyPage() {
                         ) : (
                           <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 text-xs font-bold shadow-xs transition-colors">
                             <UploadCloud className="w-4 h-4" />
-                            <span>{uploaded?.uploading ? 'Uploading...' : 'Upload File (PDF/Image)'}</span>
+                            <span>{uploaded?.uploading ? 'Uploading...' : 'Upload File (PDF/Image) *'}</span>
                             <input
                               type="file"
                               accept=".pdf,.png,.jpg,.jpeg"
@@ -1496,7 +1897,7 @@ export default function BorrowerApplyPage() {
                 className="mt-0.5 accent-blue-600 cursor-pointer"
               />
               <label htmlFor="kycConsentDirect" className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
-                I hereby grant consent to verify my identity records and financial documents with government portals & credit agencies for loan decisioning under RBI Digital Lending Directives.
+                I hereby grant consent to verify my identity records and financial documents with government portals & credit agencies for loan decisioning under RBI Digital Lending Directives. <span className="text-rose-500 font-bold">*</span>
               </label>
             </div>
           </div>
@@ -1524,7 +1925,7 @@ export default function BorrowerApplyPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2 space-y-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Account Holder Name (as in Bank Records)
+                  Account Holder Name (as in Bank Records) <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -1536,7 +1937,9 @@ export default function BorrowerApplyPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Bank Name</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Bank Name <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.bankName}
@@ -1547,7 +1950,9 @@ export default function BorrowerApplyPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">IFSC Code</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  IFSC Code <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.ifscCode}
@@ -1559,7 +1964,7 @@ export default function BorrowerApplyPage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Bank Account Number
+                  Bank Account Number <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="password"
@@ -1572,7 +1977,7 @@ export default function BorrowerApplyPage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Confirm Bank Account Number
+                  Confirm Bank Account Number <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -1729,7 +2134,7 @@ export default function BorrowerApplyPage() {
                   className="mt-0.5 accent-blue-600 cursor-pointer"
                 />
                 <label htmlFor="bureauConsentFinal" className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
-                  I authorize Adyapan Lending OS and its partner regulated banking institutions to fetch my credit bureau report (CIBIL / Experian / CRIF) to evaluate this application.
+                  I authorize Adyapan Lending OS and its partner regulated banking institutions to fetch my credit bureau report (CIBIL / Experian / CRIF) to evaluate this application. <span className="text-rose-500 font-bold">*</span>
                 </label>
               </div>
 
@@ -1742,7 +2147,7 @@ export default function BorrowerApplyPage() {
                   className="mt-0.5 accent-blue-600 cursor-pointer"
                 />
                 <label htmlFor="termsAcceptedFinal" className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
-                  I accept the digital lending loan terms, statutory KFS pricing schedule, and agree to the 3-day cooling-off period policy under RBI Guidelines.
+                  I accept the digital lending loan terms, statutory KFS pricing schedule, and agree to the 3-day cooling-off period policy under RBI Guidelines. <span className="text-rose-500 font-bold">*</span>
                 </label>
               </div>
             </div>

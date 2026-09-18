@@ -421,8 +421,8 @@ export function CreditAnalystDashboardView() {
                         } else if (item.underwriterStatus === 'SENT_BACK' || item.creditAnalysisStatus === 'SENT_BACK') {
                           badgeLabel = 'SENT BACK';
                           badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
-                        } else if (item.status === 'APPROVED') {
-                          badgeLabel = 'APPROVED';
+                        } else if (['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(item.status)) {
+                          badgeLabel = item.status === 'DISBURSED' ? 'DISBURSED' : item.status === 'READY_FOR_DISBURSEMENT' ? 'READY FOR DISBURSAL' : item.status === 'AGREEMENT_PENDING' ? 'AGREEMENT PENDING' : 'APPROVED';
                           badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
                         } else if (item.status === 'UNDERWRITING') {
                           badgeLabel = 'IN UNDERWRITING';
@@ -459,8 +459,8 @@ export function CreditAnalystDashboardView() {
                           actionLabel = 'Review Corrections';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=2`;
                           actionClass = 'bg-amber-600 hover:bg-amber-700 text-white';
-                        } else if (item.status === 'APPROVED') {
-                          actionLabel = 'View Sanction';
+                        } else if (['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(item.status)) {
+                          actionLabel = item.status === 'DISBURSED' ? 'Disbursed' : 'View Sanction';
                           actionHref = `/credit-assessment?applicationId=${item.id}&step=6`;
                           actionClass = 'bg-emerald-600 hover:bg-emerald-700 text-white';
                         } else if (item.stage === 'BRANCH_MANAGER_REVIEW') {

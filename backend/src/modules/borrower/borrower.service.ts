@@ -434,7 +434,15 @@ export class BorrowerService {
         lastName: input.lastName,
         kycStatus: 'VERIFIED',
         employmentType: input.employmentType,
-        employerName: input.employerName || input.businessName || input.institutionName || 'Independent',
+        employerName:
+          input.employerName ||
+          input.businessName ||
+          input.institutionName ||
+          (input.employmentType === 'FARMER'
+            ? `Agricultural Farm (${input.cropType || 'Crop Producer'})`
+            : input.employmentType === 'FREELANCER'
+            ? 'Independent Freelance Practice'
+            : 'Independent Trade'),
         monthlyIncome: Money.of(input.monthlyIncome || 0),
         existingObligations: input.existingEmiObligations ? Money.of(input.existingEmiObligations) : null,
       },
