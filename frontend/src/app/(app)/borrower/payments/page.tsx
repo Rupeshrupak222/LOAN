@@ -67,7 +67,7 @@ export default function BorrowerPaymentsHubPage() {
     return (
       <div className="py-24 text-center">
         <Spinner />
-        <p className="text-xs text-slate-400 mt-2">Loading payments & mandate hub...</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Loading payments & mandate hub...</p>
       </div>
     );
   }
@@ -79,16 +79,16 @@ export default function BorrowerPaymentsHubPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/borrower"
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-xs transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-emerald-400" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Payments & Repayment Hub
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Make instant EMI repayments, manage eNACH AutoPay, and download payment receipts
             </p>
           </div>
@@ -98,13 +98,13 @@ export default function BorrowerPaymentsHubPage() {
       {/* Main Payment & Mandate Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Quick Pay Box */}
-        <div className="md:col-span-2 p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-5 shadow-xl">
+        <div className="md:col-span-2 p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 space-y-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               Pay EMI / Custom Amount
             </h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 font-semibold">
               Instant UPI Rails
             </span>
           </div>
@@ -113,7 +113,7 @@ export default function BorrowerPaymentsHubPage() {
             <div className="space-y-4">
               {/* Select Loan Dropdown */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-300">Select Loan Account</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Select Loan Account</label>
                 <select
                   value={selectedLoanId}
                   onChange={(e) => {
@@ -121,7 +121,7 @@ export default function BorrowerPaymentsHubPage() {
                     const l = loans.find((x: any) => x.id === e.target.value);
                     if (l) setRepayAmount(l.nextEmiAmount || 4500);
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-blue-500 outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs focus:border-blue-500 outline-none"
                 >
                   {loans.map((l: any) => (
                     <option key={l.id} value={l.id}>
@@ -134,22 +134,22 @@ export default function BorrowerPaymentsHubPage() {
               {/* Amount Input */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="font-medium text-slate-300">Repayment Amount (₹)</span>
-                  <span className="text-slate-400">
-                    Next Due EMI: <strong className="text-white">₹{activeLoan.nextEmiAmount?.toLocaleString('en-IN')}</strong>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Repayment Amount (₹)</span>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    Next Due EMI: <strong className="text-slate-900 dark:text-white">₹{activeLoan.nextEmiAmount?.toLocaleString('en-IN')}</strong>
                   </span>
                 </div>
                 <input
                   type="number"
                   value={repayAmount}
                   onChange={(e) => setRepayAmount(Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-lg font-bold focus:border-emerald-500 outline-none"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold focus:border-emerald-500 outline-none"
                 />
               </div>
 
               {/* Payment Methods */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-300">Select Payment Method</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Select Payment Method</label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { id: 'UPI', label: 'UPI (GPay/PhonePe)', icon: Smartphone },
@@ -163,8 +163,8 @@ export default function BorrowerPaymentsHubPage() {
                         onClick={() => setPaymentMethod(m.id as any)}
                         className={`p-3 rounded-xl border text-center cursor-pointer transition-all ${
                           paymentMethod === m.id
-                            ? 'bg-emerald-600/10 border-emerald-500 text-emerald-400 font-semibold'
-                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                            ? 'bg-emerald-50 dark:bg-emerald-600/10 border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold shadow-xs'
+                            : 'bg-slate-50/70 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                         }`}
                       >
                         <Icon className="w-4 h-4 mx-auto mb-1" />
@@ -177,47 +177,47 @@ export default function BorrowerPaymentsHubPage() {
 
               <Button
                 onClick={() => setIsPayModalOpen(true)}
-                className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-3 shadow-lg shadow-emerald-500/20"
+                className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-3 shadow-md shadow-emerald-500/10"
               >
                 Proceed to Pay ₹{repayAmount?.toLocaleString('en-IN')}
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-slate-400">No active loans found to repay.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">No active loans found to repay.</p>
           )}
         </div>
 
         {/* Mandate Status Card */}
-        <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-xl">
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white">Auto-Debit Mandate</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Auto-Debit Mandate</h3>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 font-semibold">
               ACTIVE
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-2.5">
-            <div className="flex justify-between text-slate-400">
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs space-y-2.5">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
               <span>Mandate Type:</span>
-              <span className="text-white font-semibold">eNACH / NPCI AutoPay</span>
+              <span className="text-slate-900 dark:text-white font-semibold">eNACH / NPCI AutoPay</span>
             </div>
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
               <span>Linked Bank:</span>
-              <span className="text-white">HDFC Bank Ltd</span>
+              <span className="text-slate-900 dark:text-white">HDFC Bank Ltd</span>
             </div>
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
               <span>Next Auto-Debit:</span>
-              <span className="text-emerald-400 font-semibold">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                 {activeLoan?.nextEmiDueDate || '15th of next month'}
               </span>
             </div>
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
               <span>Auto-Debit Limit:</span>
-              <span className="text-slate-200">Up to ₹50,000 / cycle</span>
+              <span className="text-slate-700 dark:text-slate-200">Up to ₹50,000 / cycle</span>
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-400 leading-relaxed">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
             Automatic debits occur on the scheduled due date. To change linked bank account or revoke consent, contact grievance support.
           </div>
         </div>
@@ -225,21 +225,21 @@ export default function BorrowerPaymentsHubPage() {
 
       {/* Payment Modal */}
       {isPayModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-sm font-bold text-white">Confirm Payment via {paymentMethod}</h3>
+                <Smartphone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Confirm Payment via {paymentMethod}</h3>
               </div>
-              <span className="text-sm font-black text-emerald-400">₹{repayAmount?.toLocaleString('en-IN')}</span>
+              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{repayAmount?.toLocaleString('en-IN')}</span>
             </div>
 
             <div className="space-y-3 text-xs">
-              <p className="text-slate-300">
-                You are initiating a real-time EMI repayment towards loan account <strong className="text-white">{activeLoan?.loanAccountNumber}</strong>.
+              <p className="text-slate-600 dark:text-slate-300">
+                You are initiating a real-time EMI repayment towards loan account <strong className="text-slate-900 dark:text-white">{activeLoan?.loanAccountNumber}</strong>.
               </p>
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
                 <div>Payment Rail: UPI 2.0 Instant Settlement</div>
                 <div>Allocated Bucket: Principal & Accrued Interest</div>
               </div>
@@ -250,7 +250,7 @@ export default function BorrowerPaymentsHubPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsPayModalOpen(false)}
-                className="rounded-xl border-slate-800 text-xs"
+                className="rounded-xl border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 Cancel
               </Button>
