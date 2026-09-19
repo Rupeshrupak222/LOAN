@@ -149,10 +149,17 @@ export function AppSidebar({ open, onClose, collapsed = false }: AppSidebarProps
                 )}
                 {group.items.map((item) => {
                   const ItemIcon = ICON_MAP[item.icon] || FileText;
-                  const isActive =
-                    pathname === item.route ||
-                    (item.route === '/underwriting-queue' && pathname.startsWith('/underwriting')) ||
-                    (item.route !== '/dashboard' && item.route !== '/borrower' && (pathname.startsWith(`${item.route}/`) || pathname.startsWith(`${item.route}?`)));
+                  let isActive = pathname === item.route;
+                  
+                  if (!isActive && item.route !== '/dashboard' && item.route !== '/borrower' && item.route !== '/collections' && item.route !== '/collections/dashboard') {
+                    if (pathname.startsWith(`${item.route}/`) || pathname.startsWith(`${item.route}?`)) {
+                      isActive = true;
+                    }
+                  }
+                  
+                  if (item.route === '/underwriting-queue' && pathname.startsWith('/underwriting')) {
+                    isActive = true;
+                  }
 
                   return (
                     <Link

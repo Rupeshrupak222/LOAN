@@ -620,46 +620,59 @@ export function BranchManagerReviewSection({
             </span>
           )}
 
-          {/* Action 5: Approve (Within Delegated Limit) Button */}
-          <Button
-            size="sm"
-            onClick={() => handleOpenModal('APPROVE')}
-            disabled={isApproveDisabled}
-            className={cn(
-              'text-xs gap-1.5 font-bold shadow-sm transition-all',
-              !isApproveDisabled
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
-            )}
-            title={
-              isTerminal
-                ? `Application is in terminal '${currentStatus}' status. Review actions are closed.`
-                : isApprovedByBm
-                ? 'Branch Manager approval already recorded'
+          {/* Action 5: Approve (Within Delegated Limit) or Forward to Underwriter after Approval */}
+          {isApprovedByBm ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                toast.success('Proposal is approved by Branch Manager and forwarded to Underwriter queue.');
+                queryClient.invalidateQueries({ queryKey: ['application', applicationId] });
+                queryClient.invalidateQueries({ queryKey: ['branch-manager-queue'] });
+                queryClient.invalidateQueries({ queryKey: ['underwriting-queue'] });
+              }}
+              className="text-xs gap-1.5 font-bold shadow-sm bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+              title="Proposal approved by Branch Manager. Click to refresh Underwriter forwarding status."
+            >
+              <Send className="w-3.5 h-3.5" />
+              Forward to Underwriter
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => handleOpenModal('APPROVE')}
+              disabled={isApproveDisabled}
+              className={cn(
+                'text-xs gap-1.5 font-bold shadow-sm transition-all',
+                !isApproveDisabled
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
+              )}
+              title={
+                isTerminal
+                  ? `Application is in terminal '${currentStatus}' status. Review actions are closed.`
+                  : isEscalatedByBm
+                  ? 'Proposal already escalated to Underwriter'
+                  : !isWithinLimit
+                  ? `Approval limit exceeded (${formatMoney(numRequestedAmount)} > ${formatMoney(BRANCH_MANAGER_LIMIT)})`
+                  : !hasCreditAssessment
+                  ? 'Credit Analyst assessment must be completed before approval'
+                  : !previousStageCompleted
+                  ? 'Prerequisite stage incomplete'
+                  : 'Approve proposal within delegated limit'
+              }
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {isTerminal
+                ? `Approved (${currentStatus})`
                 : isEscalatedByBm
-                ? 'Proposal already escalated to Underwriter'
+                ? 'Escalated'
                 : !isWithinLimit
-                ? `Approval limit exceeded (${formatMoney(numRequestedAmount)} > ${formatMoney(BRANCH_MANAGER_LIMIT)})`
+                ? 'Approve (Limit Exceeded)'
                 : !hasCreditAssessment
-                ? 'Credit Analyst assessment must be completed before approval'
-                : !previousStageCompleted
-                ? 'Prerequisite stage incomplete'
-                : 'Approve proposal within delegated limit'
-            }
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            {isTerminal
-              ? `Approved (${currentStatus})`
-              : isApprovedByBm
-              ? 'BM Approved'
-              : isEscalatedByBm
-              ? 'Escalated'
-              : !isWithinLimit
-              ? 'Approve (Limit Exceeded)'
-              : !hasCreditAssessment
-              ? 'Approve (Assessment Required)'
-              : 'Approve'}
-          </Button>
+                ? 'Approve (Assessment Required)'
+                : 'Approve'}
+            </Button>
+          )}
         </div>
       </div>
 

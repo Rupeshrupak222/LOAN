@@ -39,7 +39,7 @@ export default function CollectionQueuePage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         title="Collection Queue"
-        subtitle="Manage delinquency tracking, DPD aging buckets, and collector queues."
+        subtitle="All collection cases that currently require collection action."
       />
 
       <CollectionQueueTable

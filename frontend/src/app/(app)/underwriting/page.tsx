@@ -101,9 +101,14 @@ function UnderwritingWorkspaceContent() {
   // Timeline Modal State
   const [showTimelineModal, setShowTimelineModal] = useState(false);
 
+  const isUnderwriter = user?.roles?.some((r: string) =>
+    ['UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_HEAD'].includes(r)
+  );
+
   // 1. Fetch Inbound Queue for Case Selection (ALL lifecycle cases including decided/approved/rejected)
   const { data: queueData, isLoading: queueLoading } = useQuery({
     queryKey: ['underwriting-queue', 'ALL', selectorSearch],
+    enabled: Boolean(isUnderwriter),
     queryFn: async () => {
       const res = await api.get('/underwriting/queue', {
         params: { tab: 'ALL', search: selectorSearch.trim() || undefined },
@@ -112,6 +117,26 @@ function UnderwritingWorkspaceContent() {
       return (Array.isArray(raw) ? raw : raw?.items || []) as any[];
     },
   });
+
+  if (!isUnderwriter) {
+    return (
+      <Card className="p-8 text-center space-y-3">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Access Restricted
+        </p>
+        <p className="text-xs text-slate-400">
+          The Underwriting Workspace is restricted to Underwriters and Credit Committee members. Branch Managers do not have permission to access the Underwriting Desk.
+        </p>
+        <div className="pt-2">
+          <Link href="/branch-review">
+            <Button size="sm" className="text-xs">
+              Go to Branch Review Desk →
+            </Button>
+          </Link>
+        </div>
+      </Card>
+    );
+  }
 
   const availableCases = Array.isArray(queueData) ? queueData : [];
 

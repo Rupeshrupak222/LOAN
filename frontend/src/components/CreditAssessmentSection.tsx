@@ -293,7 +293,7 @@ export function CreditAssessmentSection({
     },
     onSuccess: () => {
       if (decision === 'ELIGIBLE') {
-        toast.success('Proposal recommended as ELIGIBLE and forwarded to Underwriting Queue.');
+        toast.success('Proposal recommended as ELIGIBLE and forwarded to Branch Manager Review Queue.');
       } else if (decision === 'NOT_ELIGIBLE') {
         toast.warning('Credit assessment recorded as NOT ELIGIBLE.');
       } else {
@@ -371,7 +371,7 @@ export function CreditAssessmentSection({
     { num: 4, title: 'Financial Eligibility', subtitle: 'FOIR, DTI & Policy', isComplete: workflow.step4Complete },
     { num: 5, title: 'Credit Risk', subtitle: '4-Pillar Model', isComplete: workflow.step5Complete },
     { num: 6, title: 'Analyst Decision', subtitle: 'Recommendation', isComplete: workflow.step6Complete },
-    { num: 7, title: 'Branch Review Handover', subtitle: 'Branch Desk', isComplete: workflow.step7Complete },
+    { num: 7, title: 'Branch Manager Handover', subtitle: 'Management Queue', isComplete: workflow.step7Complete },
   ];
 
   return (

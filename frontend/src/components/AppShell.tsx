@@ -96,6 +96,17 @@ const NAV_ICONS: Record<string, any> = {
   accounting: Scale,
   settlements: Coins,
   collections: AlertCircle,
+  'collections-dashboard': LayoutDashboard,
+  'collections-queue': Layers,
+  'collections-my-accounts': UserCheck,
+  'collections-due-overdue': AlertTriangle,
+  'collections-ptp': Clock,
+  'collections-activities': Activity,
+  'collections-payments': Receipt,
+  'collections-customers': Users,
+  'collections-tasks': ClipboardCheck,
+  'collections-reports': FileSpreadsheet,
+  'collections-support': Headphones,
   reconciliation: CheckCircle2,
   communications: Mail,
   'support-sla': LifeBuoy,
@@ -239,7 +250,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isItemActive = (href: string) => {
     if (!pathname || !href) return false;
     if (pathname === href) return true;
-    if (href === '/dashboard' || href === '/' || href === '/borrower') return false;
+    if (href === '/dashboard' || href === '/' || href === '/borrower' || href === '/collections' || href === '/collections/dashboard') return false;
     if (href === '/underwriting-queue' && pathname.startsWith('/underwriting')) return true;
     return pathname.startsWith(`${href}/`) || pathname.startsWith(`${href}?`);
   };

@@ -28,7 +28,7 @@ import { Badge, Button, Card, KpiCard, Spinner, Input } from '@/components/ui';
 import { TableSkeleton } from '@/components/LoadingSkeletons';
 import { formatMoney, formatDate, cn } from '@/lib/utils';
 
-type TabKey = 'ALL' | 'PENDING' | 'APPROVED' | 'SENT_BACK' | 'ESCALATED' | 'AWAITING_CREDIT';
+type TabKey = 'ALL' | 'PENDING' | 'APPROVED' | 'SENT_BACK' | 'ESCALATED';
 
 export default function BranchReviewQueuePage() {
   const { isDark } = useTheme();
@@ -170,12 +170,6 @@ export default function BranchReviewQueuePage() {
           hint="Incomplete KYC/proofs"
           icon={<FileCheck className="h-4 w-4 text-amber-500" />}
         />
-        <KpiCard
-          label="Awaiting Credit"
-          value={String(metrics.awaitingCreditAssessment)}
-          hint="Credit analyst stage"
-          icon={<AlertCircle className="h-4 w-4 text-slate-400" />}
-        />
       </div>
 
       <Card noPadding className="p-5 space-y-4">
@@ -220,7 +214,6 @@ export default function BranchReviewQueuePage() {
             { key: 'APPROVED', label: 'Approved Within Limit', count: metrics.approvedWithinLimit },
             { key: 'SENT_BACK', label: 'Sent Back', count: metrics.sentBackForCorrection },
             { key: 'ESCALATED', label: 'Escalated to Underwriter', count: metrics.escalatedToUnderwriter },
-            { key: 'AWAITING_CREDIT', label: 'Awaiting Credit Assessment', count: metrics.awaitingCreditAssessment },
           ].map((tab) => (
             <button
               key={tab.key}

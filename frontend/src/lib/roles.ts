@@ -47,6 +47,17 @@ export type NavKey =
   | 'disbursements'
   | 'payments'
   | 'collections'
+  | 'collections-dashboard'
+  | 'collections-queue'
+  | 'collections-my-accounts'
+  | 'collections-due-overdue'
+  | 'collections-ptp'
+  | 'collections-activities'
+  | 'collections-payments'
+  | 'collections-customers'
+  | 'collections-tasks'
+  | 'collections-reports'
+  | 'collections-support'
   | 'general-ledger'
   | 'accounting'
   | 'reports'
@@ -59,8 +70,15 @@ export type NavKey =
   | 'audit-logs'
   | 'fraud-intelligence'
   | 'risk'
-  | 'risk-queue'
+  | 'risk-portfolio'
+  | 'risk-cases'
+  | 'risk-signals'
   | 'risk-policies'
+  | 'risk-analytics'
+  | 'risk-reports'
+  | 'risk-tasks'
+  | 'risk-support'
+  | 'risk-queue'
   | 'fraud'
   | 'fraud-queue'
   | 'fraud-cases'
@@ -130,6 +148,17 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   partners: { key: 'partners', href: '/partners', label: 'Partners & DSAs', group: 'LENDING' },
   payments: { key: 'payments', href: '/payments', label: 'Repayments & Payments', group: 'SERVICING' },
   collections: { key: 'collections', href: '/collections', label: 'Collections & Delinquency', group: 'SERVICING' },
+  'collections-dashboard': { key: 'collections-dashboard', href: '/collections', label: 'Dashboard', group: 'SERVICING' },
+  'collections-queue': { key: 'collections-queue', href: '/collections/queue', label: 'Collection Queue', group: 'SERVICING' },
+  'collections-my-accounts': { key: 'collections-my-accounts', href: '/collections/my-accounts', label: 'My Accounts', group: 'SERVICING' },
+  'collections-due-overdue': { key: 'collections-due-overdue', href: '/collections/due-overdue', label: 'Due & Overdue', group: 'SERVICING' },
+  'collections-ptp': { key: 'collections-ptp', href: '/collections/promise-to-pay', label: 'Promise to Pay', group: 'SERVICING' },
+  'collections-activities': { key: 'collections-activities', href: '/collections/activities', label: 'Collection Activities', group: 'SERVICING' },
+  'collections-payments': { key: 'collections-payments', href: '/collections/payments', label: 'Payments', group: 'SERVICING' },
+  'collections-customers': { key: 'collections-customers', href: '/collections/customers', label: 'Customers', group: 'SERVICING' },
+  'collections-tasks': { key: 'collections-tasks', href: '/collections/tasks', label: 'Tasks', group: 'SERVICING' },
+  'collections-reports': { key: 'collections-reports', href: '/collections/reports', label: 'Reports', group: 'SERVICING' },
+  'collections-support': { key: 'collections-support', href: '/collections/support', label: 'Support', group: 'SERVICING' },
   'general-ledger': { key: 'general-ledger', href: '/general-ledger', label: 'General Ledger (GL)', group: 'SERVICING' },
   accounting: { key: 'accounting', href: '/accounting', label: 'Accounting & Finance', group: 'SERVICING' },
   reconciliation: { key: 'reconciliation', href: '/reconciliation', label: 'Reconciliation', group: 'SERVICING' },
@@ -142,9 +171,16 @@ export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   reports: { key: 'reports', href: '/reports', label: 'Reports & Analytics', group: 'INSIGHTS' },
   'npa-monitoring': { key: 'npa-monitoring', href: '/npa-monitoring', label: 'NPA & Asset Quality', group: 'INSIGHTS' },
   'fraud-intelligence': { key: 'fraud-intelligence', href: '/fraud-intelligence', label: 'Fraud & Anomaly Intelligence', group: 'INSIGHTS' },
-  risk: { key: 'risk', href: '/risk', label: 'Risk Intelligence Hub', group: 'INSIGHTS' },
+  risk: { key: 'risk', href: '/risk/dashboard', label: 'Dashboard', group: 'INSIGHTS' },
+  'risk-portfolio': { key: 'risk-portfolio', href: '/risk/portfolio', label: 'Risk Portfolio', group: 'INSIGHTS' },
+  'risk-cases': { key: 'risk-cases', href: '/risk/cases', label: 'Risk Cases', group: 'INSIGHTS' },
+  'risk-signals': { key: 'risk-signals', href: '/risk/early-warnings', label: 'Early Warning Signals', group: 'INSIGHTS' },
+  'risk-policies': { key: 'risk-policies', href: '/risk/policies', label: 'Risk Models & Policies', group: 'ADMINISTRATION' },
+  'risk-analytics': { key: 'risk-analytics', href: '/risk/analytics', label: 'Risk Analytics', group: 'INSIGHTS' },
+  'risk-reports': { key: 'risk-reports', href: '/risk/reports', label: 'Reports', group: 'INSIGHTS' },
+  'risk-tasks': { key: 'risk-tasks', href: '/risk/tasks', label: 'Tasks', group: 'INSIGHTS' },
+  'risk-support': { key: 'risk-support', href: '/risk/support', label: 'Support', group: 'INSIGHTS' },
   'risk-queue': { key: 'risk-queue', href: '/risk/queue', label: 'Risk Assessment Queue', group: 'LENDING' },
-  'risk-policies': { key: 'risk-policies', href: '/risk/policies', label: 'Risk Policy Studio', group: 'ADMINISTRATION' },
   fraud: { key: 'fraud', href: '/fraud', label: 'Fraud Intelligence Hub', group: 'INSIGHTS' },
   'fraud-queue': { key: 'fraud-queue', href: '/fraud/queue', label: 'Fraud Review Queue', group: 'LENDING' },
   'fraud-cases': { key: 'fraud-cases', href: '/fraud/cases', label: 'Fraud Investigation Cases', group: 'INSIGHTS' },
@@ -318,20 +354,19 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
   },
   RISK_ANALYST: {
     label: 'Risk Analyst',
-    description: 'Credit risk modeling, 6-pillar signal analysis, score calibration, and portfolio risk telemetry',
+    description: 'Risk portfolio monitoring, case investigation, and analytics.',
     nav: [
-      'dashboard',
       'risk',
-      'risk-queue',
+      'risk-portfolio',
+      'risk-cases',
+      'risk-signals',
       'risk-policies',
-      'fraud-intelligence',
-      'early-warnings',
-      'applications',
-      'customers',
-      'reports',
-      'emi-calculator',
+      'risk-analytics',
+      'risk-reports',
+      'risk-tasks',
+      'risk-support',
     ],
-    landing: '/risk',
+    landing: '/risk/dashboard',
     dashboard: 'RISK_ANALYST',
   },
   FRAUD_ANALYST: {
@@ -397,16 +432,19 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     label: 'Collection Officer',
     description: 'Delinquency tracking, DPD aging buckets, customer follow-ups, and PTPs',
     nav: [
-      'dashboard',
-      'collections',
-      'loans',
-      'customers',
-      'payments',
-      'early-warnings',
-      'tasks',
-      'support',
+      'collections-dashboard',
+      'collections-queue',
+      'collections-my-accounts',
+      'collections-due-overdue',
+      'collections-ptp',
+      'collections-activities',
+      'collections-payments',
+      'collections-customers',
+      'collections-tasks',
+      'collections-reports',
+      'collections-support',
     ],
-    landing: '/dashboard',
+    landing: '/collections',
     dashboard: 'COLLECTION_OFFICER',
   },
   BRANCH_MANAGER: {

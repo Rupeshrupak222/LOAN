@@ -163,7 +163,7 @@ export async function listApplications(
         isOnline,
         returnDetails,
         createdAt: a.createdAt,
-        submittedAt: a.submittedAt,
+        submittedAt: (a as any).submittedAt,
       };
     }),
     pagination: buildPagination(params.page, params.pageSize, total),

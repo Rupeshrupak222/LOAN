@@ -9,9 +9,9 @@ export type PortalKey =
   | 'COLLECTIONS'
   | 'FINANCE'
   | 'MANAGEMENT'
-  | 'ADMIN'
   | 'BORROWER'
-  | 'PARTNER';
+  | 'PARTNER'
+  | 'RISK';
 
 export type DepartmentKey =
   | 'OPERATIONS'
@@ -47,7 +47,8 @@ export type WorkspaceKey =
   | 'ADMIN_CONFIGURATION'
   | 'ADMIN_AUDIT_COMPLIANCE'
   | 'BORROWER_SELF_SERVICE'
-  | 'PARTNER_EMBEDDED_HUB';
+  | 'PARTNER_EMBEDDED_HUB'
+  | 'RISK_ANALYST_PORTAL';
 
 export interface PortalDefinition {
   key: PortalKey;

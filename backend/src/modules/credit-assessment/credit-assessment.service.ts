@@ -207,9 +207,8 @@ export async function getAssessmentQueue(
       ...where.customer,
       kycStatus: { not: 'VERIFIED' },
     };
-  } else if (tab === 'UNDERWRITING' || tab === 'FORWARDED_TO_UNDERWRITER' || tab === 'FORWARDED' || tab === 'READY_FOR_UNDERWRITER') {
     // In Underwriting queue: applications forwarded or in underwriting
-    where.status = { in: ['CREDIT_ASSESSMENT', 'UNDERWRITING'] };
+    where.status = { in: ['CREDIT_ASSESSMENT', 'UNDER_REVIEW', 'UNDERWRITING'] };
     where.customer = { ...where.customer, kycStatus: 'VERIFIED' };
     where.OR = [
       { underwriting: null },
@@ -1036,7 +1035,7 @@ export async function forwardToUnderwriting(
     );
   }
 
-  const targetStatus: ApplicationStatus = 'CREDIT_ASSESSMENT';
+  const targetStatus: ApplicationStatus = 'UNDER_REVIEW';
   const targetStage = 'BRANCH_MANAGER_REVIEW';
 
   const result = await prisma.$transaction(async (tx) => {
@@ -1061,7 +1060,7 @@ export async function forwardToUnderwriting(
         fromStatus: app.status,
         toStatus: targetStatus,
         changedBy: actor.email || actor.id,
-        reason: input.reason?.trim() || `Credit assessment completed and forwarded for Branch Manager review by ${actor.email || 'Credit Analyst'}`,
+        reason: input.reason?.trim() || `Credit assessment completed and forwarded to Branch Manager for review by ${actor.email || 'Credit Analyst'}`,
       },
     });
 
@@ -1091,7 +1090,7 @@ export async function forwardToUnderwriting(
         channel: 'IN_APP',
         type: 'INFO',
         title: `Application #${app.applicationNo} Forwarded to Branch Manager`,
-        message: 'Your loan proposal has completed credit assessment and is now under Branch Manager review.',
+        message: 'Your loan proposal has completed credit assessment and is now forwarded to Branch Manager review.',
         metadata: { applicationId, link: `/applications/${applicationId}` },
       })
     ).catch(() => {});
@@ -1116,7 +1115,7 @@ export async function forwardToUnderwriting(
 
   return {
     success: true,
-    message: `Application #${app.applicationNo} successfully forwarded to Branch Manager review.`,
+    message: `Application #${app.applicationNo} successfully forwarded to Branch Manager review queue.`,
     application: result,
   };
 }

@@ -1364,11 +1364,13 @@ export default function ApplicationDetailPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge status={data.status} />
-                    <Link href={isCreditAnalyst ? `/credit-assessment?applicationId=${data.id}` : "/underwriting"}>
-                      <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold cursor-pointer">
-                        <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Open Assessment Desk
-                      </Button>
-                    </Link>
+                    {!isBranchManager && (
+                      <Link href={isCreditAnalyst ? `/credit-assessment?applicationId=${data.id}` : "/underwriting"}>
+                        <Button size="sm" variant="secondary" className="gap-1.5 text-xs font-semibold cursor-pointer">
+                          <Calculator className="w-3.5 h-3.5 text-indigo-600" /> Open Assessment Desk
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -1439,84 +1441,86 @@ export default function ApplicationDetailPage() {
                 )}
 
                 {/* Forward to Underwriter Section / Blocker Alert */}
-                {!hasCreditScore ? (
-                  <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-                      <div>
-                        <p className="font-bold text-amber-800 dark:text-amber-200">
-                          Credit Risk Score Evaluation Pending
+                {!isBranchManager && (
+                  !hasCreditScore ? (
+                    <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                        <div>
+                          <p className="font-bold text-amber-800 dark:text-amber-200">
+                            Credit Risk Score Evaluation Pending
+                          </p>
+                          <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                            Proposal cannot be forwarded to Underwriting until the 4-pillar credit risk score is evaluated.
+                          </p>
+                        </div>
+                      </div>
+                      <Link href={isUnderwriter || isSuperAdmin ? "/underwriting" : `/credit-assessment?applicationId=${params.id}&step=4`}>
+                        <Button size="sm" className="gap-1.5 font-semibold text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 whitespace-nowrap">
+                          <Calculator className="w-3.5 h-3.5 shrink-0" /> {isUnderwriter || isSuperAdmin ? 'Run Credit Score in Desk →' : 'Evaluate Credit Score in Assessment Desk →'}
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                      <div className="text-xs space-y-0.5">
+                        <p className="font-bold text-slate-700 dark:text-slate-200">
+                          {isForwardedToUnderwriting ? 'Proposal in Underwriting Workflow' : 'Credit Assessment Complete — Ready for Underwriter'}
                         </p>
-                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                          Proposal cannot be forwarded to Underwriting until the 4-pillar credit risk score is evaluated.
+                        <p className="text-[11px] text-slate-500">
+                          {isForwardedToUnderwriting
+                            ? 'Proposal has been forwarded. You can re-forward if updated or decline if invalid.'
+                            : 'All credit scores and recommendations are recorded. Forward proposal to Underwriting committee or reject.'}
                         </p>
                       </div>
-                    </div>
-                    <Link href={isUnderwriter || isSuperAdmin ? "/underwriting" : `/credit-assessment?applicationId=${params.id}&step=4`}>
-                      <Button size="sm" className="gap-1.5 font-semibold text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 whitespace-nowrap">
-                        <Calculator className="w-3.5 h-3.5 shrink-0" /> {isUnderwriter || isSuperAdmin ? 'Run Credit Score in Desk →' : 'Evaluate Credit Score in Assessment Desk →'}
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <div className="text-xs space-y-0.5">
-                      <p className="font-bold text-slate-700 dark:text-slate-200">
-                        {isForwardedToUnderwriting ? 'Proposal in Underwriting Workflow' : 'Credit Assessment Complete — Ready for Underwriter'}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        {isForwardedToUnderwriting
-                          ? 'Proposal has been forwarded. You can re-forward if updated or decline if invalid.'
-                          : 'All credit scores and recommendations are recorded. Forward proposal to Underwriting committee or reject.'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {canReject && !isCreditAnalyst && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => {
-                            setRejectReason('');
-                            setRejectModalOpen(true);
-                          }}
-                          className="gap-1.5 font-semibold text-xs border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40 whitespace-nowrap shrink-0"
-                        >
-                          <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" /> Reject Application
-                        </Button>
-                      )}
-                      {canForwardToUnderwriting && !isCreditAnalyst && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setForwardReason(
-                              isForwardedToUnderwriting
-                                ? 'Application re-forwarded to Underwriting queue for re-appraisal'
-                                : 'Credit assessment verified & recommended for underwriting sanction'
-                            );
-                            setForwardModalOpen(true);
-                          }}
-                          className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
-                        >
-                          {isForwardedToUnderwriting ? (
-                            <>
-                              <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Branch Manager
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Branch Manager
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {isCreditAnalyst && (
-                        <Link href={`/credit-assessment?applicationId=${data.id}`}>
-                          <Button size="sm" className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 whitespace-nowrap">
-                            <Calculator className="w-3.5 h-3.5 shrink-0" /> Assessment Workspace →
+                      <div className="flex items-center gap-2">
+                        {canReject && !isCreditAnalyst && !['APPROVED', 'UNDERWRITING'].includes(data.status) && (
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            onClick={() => {
+                              setRejectReason('');
+                              setRejectModalOpen(true);
+                            }}
+                            className="gap-1.5 font-semibold text-xs border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40 whitespace-nowrap shrink-0"
+                          >
+                            <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" /> Reject Application
                           </Button>
-                        </Link>
-                      )}
+                        )}
+                        {canForwardToUnderwriting && !isCreditAnalyst && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setForwardReason(
+                                isForwardedToUnderwriting
+                                  ? 'Application re-forwarded to Branch Manager review queue for re-appraisal'
+                                  : 'Credit assessment verified & recommended for branch manager review'
+                              );
+                              setForwardModalOpen(true);
+                            }}
+                            className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
+                          >
+                            {isForwardedToUnderwriting ? (
+                              <>
+                                <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Re-Forward to Branch Manager
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-3.5 h-3.5 shrink-0" /> Forward to Branch Manager
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        {isCreditAnalyst && (
+                          <Link href={`/credit-assessment?applicationId=${data.id}`}>
+                            <Button size="sm" className="gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 whitespace-nowrap">
+                              <Calculator className="w-3.5 h-3.5 shrink-0" /> Assessment Workspace →
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
               </Card>
             </div>
