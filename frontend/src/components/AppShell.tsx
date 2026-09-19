@@ -163,6 +163,7 @@ const WORKSPACE_ICONS: Record<WorkspaceId, any> = {
   PARTNER: Handshake,
   SUPPORT: Headphones,
   PLATFORM: Layers,
+  RISK: ShieldAlert,
   BORROWER: Users,
 };
 

@@ -11,7 +11,8 @@ export type PortalKey =
   | 'MANAGEMENT'
   | 'BORROWER'
   | 'PARTNER'
-  | 'RISK';
+  | 'RISK'
+  | 'ADMIN';
 
 export type DepartmentKey =
   | 'OPERATIONS'

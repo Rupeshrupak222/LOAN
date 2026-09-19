@@ -183,6 +183,7 @@ export interface CollectionCaseDetail extends CollectionCaseSummary {
 export interface CollectionDashboardData {
   summary: {
     activeCases: number;
+    totalDueAmount?: number;
     totalOverdueAmount: number;
     pendingPtps: number;
     dueTodayPtps: number;

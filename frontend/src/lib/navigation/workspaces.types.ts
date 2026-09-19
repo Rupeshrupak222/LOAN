@@ -11,6 +11,7 @@ export type WorkspaceId =
   | 'PARTNER'       // Hub 5: Partner/DSA Sourcing, Applications, Commissions, API Credentials
   | 'SUPPORT'       // Hub 6: Customer Operations, Tickets & SLA, Omnichannel Hub, Grievances
   | 'PLATFORM'      // Hub 7: Multi-Tenant Governance, Branches, Users, Roles, Workflows, Integrations, Audit
+  | 'RISK'          // Hub 8: Risk Analysis, Fraud Review, Portfolio Early Warning Studio
   | 'BORROWER';     // Customer Self-Service Portal (/customer/*)
 
 export interface WorkspaceConfig {
@@ -94,6 +95,16 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     defaultRoute: '/dashboard',
     primaryRoles: ['SUPER_ADMIN', 'ADMIN'],
     allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'AUDITOR'],
+  },
+  RISK: {
+    id: 'RISK',
+    name: 'Risk & Fraud Analytics Studio',
+    shortLabel: 'Risk & Fraud',
+    description: 'Portfolio health, risk scoring models, fraud detection investigations, and early warning systems',
+    iconName: 'ShieldAlert',
+    defaultRoute: '/risk-analyst/dashboard',
+    primaryRoles: ['RISK_ANALYST', 'RISK_MANAGER', 'FRAUD_ANALYST'],
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'RISK_ANALYST', 'RISK_MANAGER', 'FRAUD_ANALYST', 'AUDITOR'],
   },
   BORROWER: {
     id: 'BORROWER',
