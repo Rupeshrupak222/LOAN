@@ -5,6 +5,7 @@ import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
 import { approvalAuthorityService } from '../approval-authority/approval-authority.service';
+import { verificationGateService } from '../verification/verification-gate.service';
 import type { UnderwritingDecisionInput, ResolveDeviationInput } from './underwriting.schema';
 
 export interface UnderwriterActorContext {
@@ -700,32 +701,9 @@ export async function submitUnderwritingDecision(
 
   const isApprovalDecision = input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS';
 
-  const hasBmApproval = (app as any).approvals?.some(
-    (ap: any) => ap.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(ap.status)
-  );
-  if (isApprovalDecision && !hasBmApproval) {
-    throw new BadRequestError(
-      'Cannot approve loan application: Branch Manager review and approval/escalation is mandatory before final underwriting sanction.'
-    );
-  }
-
-  // KYC Prerequisite Gate: Cannot sanction proposals with REJECTED KYC status
-  if (isApprovalDecision && app.customer?.kycStatus === 'REJECTED') {
-    throw new BadRequestError(
-      'Cannot approve loan application with REJECTED borrower KYC status. KYC verification must be resolved prior to credit sanction.'
-    );
-  }
-
-  // Mandatory Document Verification Check
-  if (isApprovalDecision && app.customer?.documents) {
-    const unverifiedDocs = app.customer.documents.filter(
-      (d) => !d.verified && d.status !== 'VERIFIED'
-    );
-    if (unverifiedDocs.length > 0) {
-      throw new BadRequestError(
-        `Cannot approve loan application: ${unverifiedDocs.length} uploaded document(s) are pending inspection & verification.`
-      );
-    }
+  if (isApprovalDecision) {
+    // KYC and Document Verification Gate
+    await verificationGateService.assertCreditAssessmentAllowed(applicationId);
   }
 
   // Level 2 Delegated Authority Limit Gate (₹25,00,000)
