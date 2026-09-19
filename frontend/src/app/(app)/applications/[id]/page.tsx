@@ -45,6 +45,7 @@ import { CreditAssessmentSection } from '@/components/CreditAssessmentSection';
 import { BranchManagerReviewSection } from '@/components/BranchManagerReviewSection';
 import { PendingWorkWarningModal, PendingWorkItem } from '@/components/PendingWorkWarningModal';
 import { evaluateDocumentFulfillment } from '@/lib/documentRules';
+import { VerificationWorkspace } from '@/components/VerificationWorkspace';
 
 export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -54,6 +55,7 @@ export default function ApplicationDetailPage() {
   const { user } = useAuth();
   const { isDark } = useTheme();
 
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'VERIFICATION'>('OVERVIEW');
   const [uwWizardOpen, setUwWizardOpen] = useState(false);
 
   // Modals state
@@ -1137,8 +1139,42 @@ export default function ApplicationDetailPage() {
         )}
       </div>
 
+      {/* Role-Based Navigation Tabs */}
+      {!isOnlyLoanOfficer && (
+        <div className="flex items-center gap-6 border-b border-slate-200 dark:border-slate-800 mb-6">
+          <button
+            onClick={() => setActiveTab('OVERVIEW')}
+            className={cn(
+              "pb-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer",
+              activeTab === 'OVERVIEW' 
+                ? "border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400" 
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            )}
+          >
+            Application Overview & Intelligence
+          </button>
+          
+          {(isCreditAnalyst || isAdmin) && (
+            <button
+              onClick={() => setActiveTab('VERIFICATION')}
+              className={cn(
+                "pb-3 text-sm font-semibold border-b-2 transition-colors cursor-pointer",
+                activeTab === 'VERIFICATION' 
+                  ? "border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400" 
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              )}
+            >
+              Verification Workspace
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Main Application Details & Intelligence Sections */}
-      <div className="space-y-6">
+      {activeTab === 'VERIFICATION' && (isCreditAnalyst || isAdmin) ? (
+        <VerificationWorkspace applicationId={params.id} />
+      ) : (
+        <div className="space-y-6">
         {/* Top Row: Borrower Profile & Loan Product Terms (Side-by-side) */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Borrower Profile Card */}
@@ -2239,6 +2275,9 @@ export default function ApplicationDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
         </div>
       )}
 
