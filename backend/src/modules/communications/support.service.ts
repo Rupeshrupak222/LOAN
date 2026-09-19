@@ -11,7 +11,7 @@ export class SupportService {
   private complaintSequence: number = 500;
 
   constructor(private ticketService: TicketService = defaultTicketService) {
-    this.seedSampleComplaints();
+    // Clean initial state
   }
 
   private generateComplaintNumber(): string {
