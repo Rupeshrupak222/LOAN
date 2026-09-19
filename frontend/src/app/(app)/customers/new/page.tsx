@@ -39,6 +39,7 @@ import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Card, Input } from '@/components/ui';
 import { CustomerOnboardingStepper, StepItem } from '@/components/CustomerOnboardingStepper';
+import { OtpVerificationField } from '@/components/OtpVerificationField';
 import {
   EmploymentType,
   ProductType,
@@ -205,6 +206,8 @@ export default function NewCustomerPage() {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [savedSteps, setSavedSteps] = useState<number[]>([]);
+  const [mobileVerified, setMobileVerified] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   // Form State
   const [form, setForm] = useState({
@@ -403,7 +406,9 @@ export default function NewCustomerPage() {
     Boolean(form.firstName.trim()) &&
     Boolean(form.lastName.trim()) &&
     /^[6-9]\d{9}$/.test(form.mobile.trim()) &&
+    mobileVerified &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) &&
+    emailVerified &&
     Boolean(form.dateOfBirth) &&
     Boolean(form.employmentType) &&
     form.password.trim().length >= 6;
@@ -453,12 +458,18 @@ export default function NewCustomerPage() {
       } else if (!/^[6-9]\d{9}$/.test(form.mobile.trim())) {
         stepErrors.mobile = 'Mobile number must be a valid 10-digit number starting with 6-9';
         if (!firstInvalidField) firstInvalidField = 'mobile';
+      } else if (!mobileVerified) {
+        stepErrors.mobile = 'Mobile number must be verified via OTP before continuing';
+        if (!firstInvalidField) firstInvalidField = 'mobile';
       }
       if (!form.email.trim()) {
         stepErrors.email = 'Email address (portal username) is required';
         if (!firstInvalidField) firstInvalidField = 'email';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
         stepErrors.email = 'Please enter a valid email address';
+        if (!firstInvalidField) firstInvalidField = 'email';
+      } else if (!emailVerified) {
+        stepErrors.email = 'Email address must be verified via OTP before continuing';
         if (!firstInvalidField) firstInvalidField = 'email';
       }
       if (!form.dateOfBirth) {
@@ -943,60 +954,41 @@ export default function NewCustomerPage() {
                 )}
               </div>
 
-              {/* Mobile Number */}
-              <div>
-                <label className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  <span>Mobile Phone Number <span className="text-rose-500 font-bold">*</span></span>
-                  <span className="text-[10px] font-mono font-medium text-slate-400">{form.mobile.length}/10 digits</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 border-r border-slate-200 dark:border-slate-700 pr-2">
-                    +91
-                  </span>
-                  <Input
-                    ref={fieldRefs.mobile}
-                    type="tel"
-                    maxLength={10}
-                    value={form.mobile}
-                    onChange={handleMobileChange}
-                    placeholder="9876543210"
-                    className={cn(
-                      'pl-14 font-mono font-medium tracking-wider',
-                      errors.mobile && 'border-rose-500 focus:border-rose-600 ring-1 ring-rose-500'
-                    )}
-                    required
-                  />
-                </div>
-                {errors.mobile ? (
-                  <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" /> {errors.mobile}
-                  </p>
-                ) : (
-                  <p className="text-[10px] text-slate-400 mt-1">Must be exactly 10 digits starting with 6-9</p>
-                )}
-              </div>
+              {/* Mobile Number with Live OTP Verification */}
+              <OtpVerificationField
+                type="MOBILE"
+                label="Mobile Phone Number"
+                subLabel={`${form.mobile.length}/10 digits`}
+                value={form.mobile}
+                onChange={(val) => {
+                  const cleaned = val.replace(/\D/g, '');
+                  update('mobile', cleaned);
+                  if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: '' }));
+                }}
+                isVerified={mobileVerified}
+                onVerificationChange={setMobileVerified}
+                maxLength={10}
+                placeholder="9876543210"
+                error={errors.mobile}
+                required
+              />
 
-              {/* Email Address */}
-              <div>
-                <label className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  <span>Email Address (Portal Username) <span className="text-rose-500 font-bold">*</span></span>
-                  <span className="text-[10px] text-slate-400">For Login & Notices</span>
-                </label>
-                <Input
-                  ref={fieldRefs.email}
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => update('email', e.target.value)}
-                  placeholder="e.g. rajesh.kumar@example.com"
-                  className={cn(errors.email && 'border-rose-500 focus:border-rose-600 ring-1 ring-rose-500')}
-                  required
-                />
-                {errors.email && (
-                  <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" /> {errors.email}
-                  </p>
-                )}
-              </div>
+              {/* Email Address with Live OTP Verification */}
+              <OtpVerificationField
+                type="EMAIL"
+                label="Email Address (Portal Username)"
+                subLabel="For Login & Notices"
+                value={form.email}
+                onChange={(val) => {
+                  update('email', val);
+                  if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+                }}
+                isVerified={emailVerified}
+                onVerificationChange={setEmailVerified}
+                placeholder="e.g. rajesh.kumar@example.com"
+                error={errors.email}
+                required
+              />
 
               {/* Date of Birth */}
               <div>

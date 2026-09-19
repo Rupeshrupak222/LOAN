@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BorrowerFormData, INDIAN_STATES } from './BorrowerTypes';
 import { Button, Input } from '@/components/ui';
+import { OtpVerificationField } from '@/components/OtpVerificationField';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -39,6 +40,8 @@ export const BorrowerPersonalStep: React.FC<Props> = ({
   isDark,
 }) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [mobileVerified, setMobileVerified] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   const cardBgClass = isDark
     ? 'border-[#2B3566] bg-[#1E2445] text-white shadow-none'
@@ -52,11 +55,15 @@ export const BorrowerPersonalStep: React.FC<Props> = ({
 
     if (!formData.email.trim() || !EMAIL_REGEX.test(formData.email.trim())) {
       errs.email = 'Valid email address is required';
+    } else if (!emailVerified) {
+      errs.email = 'Email address must be verified via OTP before continuing';
     }
 
     const cleanMobile = formData.mobile.replace(/\D/g, '');
     if (!cleanMobile || !MOBILE_REGEX.test(cleanMobile)) {
       errs.mobile = 'Enter a valid 10-digit Indian mobile number';
+    } else if (!mobileVerified) {
+      errs.mobile = 'Mobile phone number must be verified via OTP before continuing';
     }
 
     const upperPan = formData.pan.trim().toUpperCase();
@@ -252,58 +259,39 @@ export const BorrowerPersonalStep: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Contact info */}
+        {/* Contact info with Live OTP Verification */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-[#2B3566]">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5 flex items-center gap-1">
-              <Mail className="w-3.5 h-3.5 text-blue-500" />
-              <span>Email Address (For e-Statements & Sanction Letters) *</span>
-            </label>
-            <Input
-              type="email"
-              placeholder="rahul.sharma@example.com"
-              value={formData.email}
-              onChange={(e) => {
-                updateField('email', e.target.value);
-                if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
-              }}
-              className="text-xs"
-            />
-            {errors.email && (
-              <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {errors.email}
-              </p>
-            )}
-          </div>
+          <OtpVerificationField
+            type="EMAIL"
+            label="Email Address (For e-Statements & Sanctions)"
+            value={formData.email}
+            onChange={(val) => {
+              updateField('email', val);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+            }}
+            isVerified={emailVerified}
+            onVerificationChange={setEmailVerified}
+            placeholder="rahul.sharma@example.com"
+            error={errors.email}
+            required
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5 flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5 text-blue-500" />
-              <span>Mobile Phone (10 digits) *</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-semibold">
-                +91
-              </span>
-              <Input
-                type="tel"
-                maxLength={10}
-                placeholder="9876543210"
-                value={formData.mobile}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  updateField('mobile', val);
-                  if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: '' }));
-                }}
-                className="pl-12 text-xs font-mono"
-              />
-            </div>
-            {errors.mobile && (
-              <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {errors.mobile}
-              </p>
-            )}
-          </div>
+          <OtpVerificationField
+            type="MOBILE"
+            label="Mobile Phone (10 digits)"
+            value={formData.mobile}
+            onChange={(val) => {
+              const cleaned = val.replace(/\D/g, '');
+              updateField('mobile', cleaned);
+              if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: '' }));
+            }}
+            isVerified={mobileVerified}
+            onVerificationChange={setMobileVerified}
+            maxLength={10}
+            placeholder="9876543210"
+            error={errors.mobile}
+            required
+          />
         </div>
       </div>
 

@@ -67,10 +67,12 @@ import accountingRoutes from '../modules/accounting/accounting.routes';
 import { analyticsRoutes } from '../modules/analytics/analytics.routes';
 import { directLendingRoutes } from '../modules/direct-lending';
 import leadRoutes from '../modules/origination/lead.routes';
+import otpRoutes from '../modules/otp/otp.routes';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/otp', otpRoutes);
 router.use('/customers', customerRoutes);
 router.use('/documents', documentRoutes);
 router.use('/loan-products', productRoutes);
