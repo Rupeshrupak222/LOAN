@@ -130,10 +130,20 @@ export async function getUnderwritingQueue(
   let where: any = {};
   const normalizedTab = (tab || 'ALL').toUpperCase();
 
+  const bmApprovedCondition = {
+    approvals: {
+      some: {
+        approverRole: 'BRANCH_MANAGER',
+        status: { in: ['APPROVED', 'ESCALATED'] },
+      },
+    },
+  };
+
   if (normalizedTab === 'READY' || normalizedTab === 'DECISION_REQUIRED') {
-    // Only proposals explicitly forwarded by Credit Analyst into UNDERWRITING and awaiting underwriter sanction
+    // Only proposals approved & forwarded by Branch Manager into UNDERWRITING and awaiting underwriter sanction
     where = {
       status: 'UNDERWRITING',
+      ...bmApprovedCondition,
       OR: [
         { underwriting: null },
         { underwriting: { decision: { notIn: ['APPROVE', 'REJECT', 'SEND_BACK'] } } },
@@ -142,6 +152,7 @@ export async function getUnderwritingQueue(
   } else if (normalizedTab === 'IN_REVIEW') {
     where = {
       status: 'UNDERWRITING',
+      ...bmApprovedCondition,
       stage: { contains: 'IN_REVIEW' },
     };
   } else if (normalizedTab === 'SENT_BACK') {
@@ -183,27 +194,29 @@ export async function getUnderwritingQueue(
         },
       ],
     };
-  } else if (normalizedTab === 'BRANCH_REVIEW') {
-    where = {
-      stage: 'BRANCH_MANAGER_REVIEW',
-    };
   } else {
-    // ALL proposals that have officially been forwarded from Credit Analyst to Branch Manager or to Underwriting
+    // ALL proposals that have officially reached Underwriting after Branch Manager approval
     where = {
-      OR: [
+      AND: [
         {
-          status: {
-            in: [
-              'UNDERWRITING',
-              'APPROVED',
-              'REJECTED',
-              'AGREEMENT_PENDING',
-              'READY_FOR_DISBURSEMENT',
-              'DISBURSED',
-            ],
-          },
+          OR: [
+            {
+              status: 'UNDERWRITING',
+              ...bmApprovedCondition,
+            },
+            {
+              status: {
+                in: [
+                  'APPROVED',
+                  'REJECTED',
+                  'AGREEMENT_PENDING',
+                  'READY_FOR_DISBURSEMENT',
+                  'DISBURSED',
+                ],
+              },
+            },
+          ],
         },
-        { stage: 'BRANCH_MANAGER_REVIEW' },
       ],
     };
   }
@@ -391,8 +404,14 @@ export async function getUnderwritingWorkspace(
   );
 
   const blockers: string[] = [];
+  const hasBmApproval = app.approvals?.some(
+    (ap) => ap.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(ap.status)
+  );
   if (!isForwardedToUnderwriting) {
-    blockers.push(`Proposal is currently in ${app.status} stage and has NOT been forwarded to Underwriting by the Credit Analyst.`);
+    blockers.push(`Proposal is currently in ${app.status} stage and has NOT been forwarded to Underwriting.`);
+  }
+  if (!hasBmApproval && !['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'REJECTED'].includes(app.status)) {
+    blockers.push('Application has not been reviewed and forwarded by Branch Manager.');
   }
   if (hasKycRejected) {
     blockers.push('Borrower KYC is marked as REJECTED');
@@ -633,6 +652,7 @@ export async function submitUnderwritingDecision(
       customer: { include: { documents: true } },
       statusHistory: true,
       eligibility: true,
+      approvals: true,
     },
   });
   if (!app) throw new NotFoundError('Loan application not found');
@@ -839,9 +859,19 @@ export async function startUnderwritingCase(
       customer: true,
       product: true,
       statusHistory: true,
+      approvals: true,
     },
   });
   if (!app) throw new NotFoundError('Loan application not found');
+
+  const hasBmApproval = (app as any).approvals?.some(
+    (ap: any) => ap.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(ap.status)
+  );
+  if (!hasBmApproval && !['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'REJECTED'].includes(app.status)) {
+    throw new BadRequestError(
+      'Cannot start underwriting appraisal: Proposal must first be reviewed and forwarded by Branch Manager.'
+    );
+  }
 
   if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
     if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {

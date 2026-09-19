@@ -97,11 +97,11 @@ export async function getAssessmentDashboardMetrics(
       sentBack++;
     } else if (isAppApproved) {
       approved++;
-    } else if (app.status === 'UNDERWRITING' || (isAssessmentComplete && app.status === 'CREDIT_ASSESSMENT')) {
+    } else if (app.status === 'UNDERWRITING' || (app.status === 'UNDER_REVIEW' && isEligible) || (isAssessmentComplete && app.status === 'CREDIT_ASSESSMENT')) {
       inUnderwriting++;
     } else if (app.status === 'CREDIT_ASSESSMENT') {
       inProgress++;
-    } else if (['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED', 'UNDER_REVIEW'].includes(app.status)) {
+    } else if (['SUBMITTED', 'KYC_PENDING', 'KYC_VERIFIED'].includes(app.status) || (app.status === 'UNDER_REVIEW' && !isEligible)) {
       pendingAssessment++;
     }
 
@@ -204,11 +204,11 @@ export async function getAssessmentQueue(
       kycStatus: { in: ['NOT_STARTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REJECTED'] },
     };
   } else if (tab === 'UNDERWRITING' || tab === 'FORWARDED_TO_UNDERWRITER' || tab === 'FORWARDED' || tab === 'READY_FOR_UNDERWRITER') {
-    // In Underwriting / Ready for Underwriter: KYC verified + assessment (eligibility + risk) completed and ELIGIBLE
+    // In Underwriting / Ready for Underwriter / Forwarded: KYC verified + assessment completed
     where.customer = { ...where.customer, kycStatus: 'VERIFIED' };
     where.eligibility = { result: { in: ['ELIGIBLE', 'CONDITIONALLY_ELIGIBLE'] } };
     where.riskAssessment = { isNot: null };
-    where.status = { in: ['CREDIT_ASSESSMENT', 'UNDERWRITING'] };
+    where.status = { in: ['CREDIT_ASSESSMENT', 'UNDER_REVIEW', 'UNDERWRITING'] };
     where.OR = [
       { underwriting: null },
       { underwriting: { decision: { notIn: ['SEND_BACK', 'APPROVE', 'REJECT'] } } },
@@ -1031,7 +1031,7 @@ export async function forwardToUnderwriting(
     );
   }
 
-  const targetStatus: ApplicationStatus = 'CREDIT_ASSESSMENT';
+  const targetStatus: ApplicationStatus = 'UNDER_REVIEW';
   const targetStage = 'BRANCH_MANAGER_REVIEW';
 
   const result = await prisma.$transaction(async (tx) => {
@@ -1056,7 +1056,7 @@ export async function forwardToUnderwriting(
         fromStatus: app.status,
         toStatus: targetStatus,
         changedBy: actor.email || actor.id,
-        reason: input.reason?.trim() || `Credit assessment completed and forwarded for Branch Manager review by ${actor.email || 'Credit Analyst'}`,
+        reason: input.reason?.trim() || `Credit assessment completed and forwarded to Branch Manager for review by ${actor.email || 'Credit Analyst'}`,
       },
     });
 
@@ -1086,7 +1086,7 @@ export async function forwardToUnderwriting(
         channel: 'IN_APP',
         type: 'INFO',
         title: `Application #${app.applicationNo} Forwarded to Branch Manager`,
-        message: 'Your loan proposal has completed credit assessment and is now under Branch Manager review.',
+        message: 'Your loan proposal has completed credit assessment and is now forwarded to Branch Manager review.',
         metadata: { applicationId, link: `/applications/${applicationId}` },
       })
     ).catch(() => {});
@@ -1111,7 +1111,7 @@ export async function forwardToUnderwriting(
 
   return {
     success: true,
-    message: `Application #${app.applicationNo} successfully forwarded to Branch Manager review.`,
+    message: `Application #${app.applicationNo} successfully forwarded to Branch Manager review queue.`,
     application: result,
   };
 }

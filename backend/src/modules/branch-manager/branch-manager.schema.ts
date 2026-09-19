@@ -12,12 +12,15 @@ export const branchManagerDecisionSchema = z.object({
   delegatedAuthorityAmount: z.number().optional(),
 }).refine(
   (data) => {
-    const text = (data.reason || data.remarks || data.managerRemarks || '').trim();
-    return text.length >= 10;
+    const text = data.reason || data.remarks || data.managerRemarks;
+    if (data.decision === 'SEND_BACK' || data.decision === 'ESCALATE') {
+      return typeof text === 'string' && text.trim().length >= 10;
+    }
+    return true;
   },
   {
-    message: 'A mandatory remark/reason (at least 10 characters) is required to record a Branch Manager decision.',
-    path: ['remarks'],
+    message: 'A detailed reason or remarks (at least 10 characters) is mandatory when sending back or escalating an application.',
+    path: ['reason'],
   }
 );
 
