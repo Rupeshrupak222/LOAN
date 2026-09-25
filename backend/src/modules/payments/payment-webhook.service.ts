@@ -7,6 +7,7 @@ import { SandboxPaymentProvider } from './sandbox-payment-provider';
 import { paymentAllocationService } from './payment-allocation.service';
 import { generalLedgerService } from '../finance/gl.service';
 import { paymentDisputeService } from './payment-dispute.service';
+import { Money } from '../finance/money';
 import type { PaymentTransaction } from './payment.types';
 
 export interface IngestedWebhookEvent {
@@ -46,6 +47,7 @@ export class PaymentWebhookService {
     eventType: string;
     provider?: string;
     signature?: string;
+    timestamp?: string | number;
     rawBody?: string;
     payload: Record<string, any>;
   }): Promise<{ success: boolean; eventId: string; status: string; message: string }> {
@@ -56,6 +58,24 @@ export class PaymentWebhookService {
       `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const eventType = input.eventType || input.payload.event || input.payload.type || 'unknown';
     const provider = input.provider || 'SANDBOX';
+
+    // Signature verification check if signature provided
+    if (input.signature && input.rawBody) {
+      const isValid = this.verifySignature(input.rawBody, input.signature);
+      if (!isValid) {
+        throw new BadRequestError('Invalid payment webhook signature');
+      }
+    }
+
+    // Timestamp replay protection (300 seconds)
+    if (input.timestamp) {
+      const ts = typeof input.timestamp === 'string' ? Number(input.timestamp) : input.timestamp;
+      const now = Date.now();
+      const eventTimeMs = ts < 10000000000 ? ts * 1000 : ts;
+      if (Math.abs(now - eventTimeMs) > 300 * 1000) {
+        throw new BadRequestError('Payment webhook timestamp outside valid 300s replay window');
+      }
+    }
 
     // 1. Idempotency check: If already processed, return idempotent ACK immediately
     if (processedEventRegistry.has(eventId)) {
@@ -182,15 +202,92 @@ export class PaymentWebhookService {
     const loanId = payload.loanId;
     const amount = Number(payload.amount || payload.captured_amount || 0);
 
-    if (loanId && amount > 0) {
-      const allocation = await paymentAllocationService.allocatePayment({
-        paymentId: paymentId || `pay_wh_${Date.now()}`,
-        paymentNo: payload.paymentNo || payload.reference || `PN-${Date.now()}`,
-        loanId,
-        amount,
+    // If payment record in DB exists, check if already SUCCESS
+    if (paymentId) {
+      const dbPayment = await prisma.payment.findFirst({
+        where: { OR: [{ id: paymentId }, { reference: paymentId }, { paymentNo: payload.paymentNo }] },
+        include: { loan: true },
       });
+      if (dbPayment) {
+        if (dbPayment.status === 'SUCCESS') {
+          return `Payment ${dbPayment.paymentNo} already allocated and completed.`;
+        }
+        const payAmount = amount > 0 ? amount : dbPayment.amount.toNumber();
+        const allocation = await paymentAllocationService.allocatePayment({
+          paymentId: dbPayment.id,
+          paymentNo: dbPayment.paymentNo,
+          loanId: dbPayment.loanId,
+          amount: payAmount,
+        });
 
-      return `Payment captured and allocated: ₹${amount} allocated to loan ${loanId} (Schedule items updated: ${allocation.scheduleItemsUpdatedCount}).`;
+        await generalLedgerService.postRepaymentJournal({
+          loanId: dbPayment.loanId,
+          loanNo: dbPayment.loan.loanNo,
+          paymentNo: dbPayment.paymentNo,
+          tenantId: dbPayment.tenantId || undefined,
+          totalAmount: payAmount,
+          allocatedPrincipal: allocation.allocatedPrincipal,
+          allocatedInterest: allocation.allocatedInterest,
+          allocatedFees: allocation.allocatedFees,
+          allocatedPenalties: allocation.allocatedPenalties,
+          excessRefund: allocation.allocatedExcess,
+          receivedBy: 'WEBHOOK_PAYMENT_GATEWAY',
+        });
+
+        await prisma.payment.update({
+          where: { id: dbPayment.id },
+          data: {
+            status: 'SUCCESS',
+            paidAt: new Date(),
+            reference: payload.utr || payload.reference || dbPayment.reference,
+          },
+        });
+
+        return `Payment ${dbPayment.paymentNo} captured and allocated: ₹${payAmount} allocated to loan ${dbPayment.loanId}.`;
+      }
+    }
+
+    if (loanId && amount > 0) {
+      const loan = await prisma.loan.findUnique({ where: { id: loanId } });
+      if (loan) {
+        const paymentNo = payload.paymentNo || payload.reference || `PN-${Date.now()}`;
+        const newPayment = await prisma.payment.create({
+          data: {
+            paymentNo,
+            loanId: loan.id,
+            customerId: loan.customerId,
+            tenantId: loan.tenantId,
+            amount: Money.toDb(amount),
+            method: 'GATEWAY',
+            reference: payload.utr || payload.reference || payload.id || `WH-${Date.now()}`,
+            status: 'SUCCESS',
+            paidAt: new Date(),
+          },
+        });
+
+        const allocation = await paymentAllocationService.allocatePayment({
+          paymentId: newPayment.id,
+          paymentNo,
+          loanId,
+          amount,
+        });
+
+        await generalLedgerService.postRepaymentJournal({
+          loanId,
+          loanNo: loan.loanNo,
+          paymentNo,
+          tenantId: loan.tenantId || undefined,
+          totalAmount: amount,
+          allocatedPrincipal: allocation.allocatedPrincipal,
+          allocatedInterest: allocation.allocatedInterest,
+          allocatedFees: allocation.allocatedFees,
+          allocatedPenalties: allocation.allocatedPenalties,
+          excessRefund: allocation.allocatedExcess,
+          receivedBy: 'WEBHOOK_PAYMENT_GATEWAY',
+        });
+
+        return `Payment captured and allocated: ₹${amount} allocated to loan ${loanId} (Schedule items updated: ${allocation.scheduleItemsUpdatedCount}).`;
+      }
     }
 
     return `Payment ${paymentId} captured.`;

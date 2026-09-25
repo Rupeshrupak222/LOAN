@@ -35,7 +35,9 @@ export class WebhookFrameworkService {
   private constructor() {
     this.webhookSecrets.set('sandbox_payment', 'adyapan_sandbox_payment_secret_2026');
     this.webhookSecrets.set('sandbox_payout', 'adyapan_sandbox_payout_secret_2026');
+    this.webhookSecrets.set('disbursement_payout', process.env.DISBURSEMENT_GATEWAY_WEBHOOK_SECRET || 'adyapan_sandbox_payout_secret_2026');
     this.webhookSecrets.set('sandbox_esign', 'adyapan_sandbox_esign_secret_2026');
+    this.webhookSecrets.set('esign', process.env.ESIGN_WEBHOOK_SECRET || 'adyapan_sandbox_esign_secret_2026');
     this.webhookSecrets.set('sandbox_mandate', 'adyapan_sandbox_mandate_secret_2026');
     this.webhookSecrets.set('sandbox_kyc', 'adyapan_sandbox_kyc_secret_2026');
   }

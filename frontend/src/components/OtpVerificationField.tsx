@@ -60,6 +60,31 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
   const [debugOtpHint, setDebugOtpHint] = useState<string | null>(null);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
+  const internalInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus and select the main input field
+  const focusMainInput = () => {
+    setTimeout(() => {
+      if (inputRef && typeof inputRef === 'object' && 'current' in inputRef && inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      } else if (internalInputRef.current) {
+        internalInputRef.current.focus();
+        internalInputRef.current.select();
+      }
+    }, 50);
+  };
+
+  // Reset verification & OTP state to change number/email
+  const handleChangeTarget = () => {
+    onVerificationChange(false);
+    setIsOtpSent(false);
+    setOtpCode('');
+    setOtpError(null);
+    setDebugOtpHint(null);
+    focusMainInput();
+  };
+
   // Countdown timer for resend cooldown
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -154,14 +179,14 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
           {isVerified && (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
               <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-              Verified
+              Verified ✓
             </span>
           )}
         </label>
         {subLabel && <span className="text-[10px] text-slate-400">{subLabel}</span>}
       </div>
 
-      {/* Main Input + Send Button Container */}
+      {/* Main Input + Action Buttons Container */}
       <div className="relative flex items-center">
         {type === 'MOBILE' && (
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 border-r border-slate-200 dark:border-slate-700 pr-2 pointer-events-none z-10">
@@ -173,7 +198,7 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
         )}
 
         <Input
-          ref={inputRef}
+          ref={inputRef || internalInputRef}
           type={type === 'MOBILE' ? 'tel' : 'email'}
           value={value}
           onChange={handleInputChange}
@@ -181,8 +206,9 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
           maxLength={maxLength}
           disabled={disabled || isVerified}
           className={cn(
-            type === 'MOBILE' ? 'pl-14 pr-28' : 'pl-9 pr-28',
-            'font-medium tracking-wide h-10',
+            type === 'MOBILE' ? 'pl-14' : 'pl-9',
+            isVerified ? 'pr-36' : 'pr-28',
+            'font-medium tracking-wide h-10 transition-all',
             isVerified && 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-400 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200',
             error && !isVerified && 'border-rose-500 ring-1 ring-rose-500'
           )}
@@ -193,14 +219,12 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
           {isVerified ? (
             <button
               type="button"
-              onClick={() => {
-                onVerificationChange(false);
-                setIsOtpSent(false);
-              }}
-              title="Change number/email"
-              className="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1 transition"
+              onClick={handleChangeTarget}
+              title={`Change ${type === 'MOBILE' ? 'Mobile Number' : 'Email Address'}`}
+              className="px-2.5 py-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 rounded-lg border border-blue-200 dark:border-blue-800 flex items-center gap-1.5 transition-all shadow-2xs"
             >
-              <Edit2 className="h-3 w-3" /> Edit
+              <Edit2 className="h-3 w-3" />
+              <span>Change {type === 'MOBILE' ? 'Number' : 'Email'}</span>
             </button>
           ) : (
             <Button
@@ -245,15 +269,20 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
       {isOtpSent && !isVerified && (
         <div className="p-3.5 rounded-xl border border-sky-200 dark:border-sky-800/80 bg-sky-50/70 dark:bg-sky-950/40 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
-              <KeyRound className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-              Enter 6-digit OTP code sent to {type === 'MOBILE' ? `+91 ${value}` : value}
-            </span>
-            {debugOtpHint && (
-              <span className="text-[10px] font-mono font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-300 dark:border-amber-700">
-                Dev Hint: {debugOtpHint}
+            <div className="flex items-center gap-1.5 font-semibold text-sky-900 dark:text-sky-200">
+              <KeyRound className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <span>
+                Enter OTP sent to <strong className="font-bold">{type === 'MOBILE' ? `+91 ${value}` : value}</strong>
               </span>
-            )}
+            </div>
+            <button
+              type="button"
+              onClick={handleChangeTarget}
+              className="text-[11px] font-bold text-sky-700 dark:text-sky-300 hover:underline flex items-center gap-1"
+            >
+              <Edit2 className="h-2.5 w-2.5" />
+              Change {type === 'MOBILE' ? 'Number' : 'Email'}
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -305,8 +334,17 @@ export const OtpVerificationField: React.FC<OtpVerificationFieldProps> = ({
             </p>
           )}
 
-          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-            <span>Didn't receive code?</span>
+          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-sky-200/60 dark:border-sky-800/40">
+            <div className="flex items-center gap-1">
+              <span>Wrong {type === 'MOBILE' ? 'number' : 'email'}?</span>
+              <button
+                type="button"
+                onClick={handleChangeTarget}
+                className="font-bold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+              >
+                Change {type === 'MOBILE' ? 'mobile number' : 'email'}
+              </button>
+            </div>
             <button
               type="button"
               onClick={handleSendOtp}

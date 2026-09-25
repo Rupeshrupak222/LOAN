@@ -402,6 +402,8 @@ export async function getAssessmentDetail(
           bankAccounts: true,
           addresses: true,
           employmentDetails: true,
+          CustomerIdentifier: true,
+          consents: { orderBy: { grantedAt: 'desc' } },
         },
       },
       documents: true,
@@ -765,6 +767,26 @@ export async function getAssessmentDetail(
       bankIfsc: customer.bankIfsc,
       kycStatus: customer.kycStatus,
       riskCategory: customer.riskCategory,
+      panNumber: (customer as any).CustomerIdentifier?.find((i: any) => i.idType === 'PAN')?.maskedValue || null,
+      aadhaarNumber: (customer as any).CustomerIdentifier?.find((i: any) => i.idType === 'AADHAAR')?.maskedValue || null,
+      identifiers: ((customer as any).CustomerIdentifier || []).map((i: any) => ({
+        id: i.id,
+        idType: i.idType,
+        maskedValue: i.maskedValue,
+        verificationStatus: i.verificationStatus,
+        verifiedAt: i.verifiedAt ? i.verifiedAt.toISOString() : null,
+        verifiedBy: i.verifiedBy,
+      })),
+      consents: ((customer as any).consents || []).map((c: any) => ({
+        id: c.id,
+        consentType: c.consentType,
+        purpose: c.purpose,
+        version: c.version,
+        granted: c.granted,
+        grantedAt: c.grantedAt ? c.grantedAt.toISOString() : new Date().toISOString(),
+        channel: c.channel,
+        ipAddress: c.ipAddress,
+      })),
     },
     kycChecklist,
     creditHealth,
@@ -848,14 +870,6 @@ export async function submitCreditRecommendation(
       where: { id: applicationId },
       data: { status: newStatus },
     });
-
-    // Auto-update borrower KYC status to VERIFIED on recommendation if documents exist or recommended
-    if (app.customerId && (input.recommendation === 'RECOMMEND' || input.recommendation === 'RECOMMEND_WITH_CONDITIONS')) {
-      await tx.customer.update({
-        where: { id: app.customerId },
-        data: { kycStatus: 'VERIFIED', status: 'ACTIVE' },
-      }).catch(() => null);
-    }
 
     // 2. Persist recommendation in EligibilityAssessment metadata while PRESERVING factors list
     const existingEligibility = await tx.eligibilityAssessment.findUnique({
@@ -1046,13 +1060,6 @@ export async function forwardToUnderwriting(
         stage: targetStage,
       },
     });
-
-    if (app.customerId && app.customer?.kycStatus !== 'VERIFIED') {
-      await tx.customer.update({
-        where: { id: app.customerId },
-        data: { kycStatus: 'VERIFIED', status: 'ACTIVE' },
-      }).catch(() => null);
-    }
 
     await tx.applicationStatusHistory.create({
       data: {

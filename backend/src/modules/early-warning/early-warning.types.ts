@@ -44,7 +44,12 @@ export type WarningRuleCode =
   | 'CRED_DPD_THRESHOLD_60'
   | 'CRED_REPEATED_BOUNCE'
   | 'FRAUD_NEW_HIGH_RISK'
-  | 'COLL_BROKEN_PTP';
+  | 'COLL_BROKEN_PTP'
+  | 'UPCOMING_EMI'
+  | 'FIRST_MISSED_PAYMENT'
+  | 'INCREASING_OVERDUE'
+  | 'REPEATED_PARTIAL_PAYMENTS';
+
 
 export interface EarlyWarningAlert {
   warningId: string;

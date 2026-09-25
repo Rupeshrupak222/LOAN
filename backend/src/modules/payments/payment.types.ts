@@ -227,6 +227,7 @@ export interface InitiatePaymentDto {
   provider?: 'SANDBOX' | 'RAZORPAY' | 'CASHFREE' | 'CORE_BANKING';
   excessHandlingMode?: 'FUTURE_DUES' | 'CUSTOMER_WALLET' | 'REFUND';
   notes?: string;
+  forceMode?: 'REAL_PROVIDER' | 'SANDBOX_PROVIDER';
 }
 
 export interface ConfirmPaymentDto {
@@ -234,6 +235,7 @@ export interface ConfirmPaymentDto {
   gatewayReference?: string;
   utrNumber?: string;
   paidAt?: string;
+  forceMode?: 'REAL_PROVIDER' | 'SANDBOX_PROVIDER';
 }
 
 export interface RefundPaymentDto {

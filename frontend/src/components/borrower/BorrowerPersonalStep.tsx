@@ -17,6 +17,7 @@ import {
 import { BorrowerFormData, INDIAN_STATES } from './BorrowerTypes';
 import { Button, Input } from '@/components/ui';
 import { OtpVerificationField } from '@/components/OtpVerificationField';
+import { PanVerificationField } from '@/components/PanVerificationField';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -42,6 +43,7 @@ export const BorrowerPersonalStep: React.FC<Props> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [mobileVerified, setMobileVerified] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
+  const [panVerified, setPanVerified] = useState(false);
 
   const cardBgClass = isDark
     ? 'border-[#2B3566] bg-[#1E2445] text-white shadow-none'
@@ -227,35 +229,19 @@ export const BorrowerPersonalStep: React.FC<Props> = ({
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1">
-                <CreditCard className="w-3.5 h-3.5 text-blue-500" />
-                <span>Permanent Account Number (PAN) *</span>
-              </span>
-              {isPanValid && (
-                <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-0.5">
-                  <CheckCircle2 className="w-3 h-3" /> Valid
-                </span>
-              )}
-            </label>
-            <Input
-              type="text"
-              maxLength={10}
-              placeholder="e.g. ABCDE1234F"
+          <div className="col-span-1 sm:col-span-1">
+            <PanVerificationField
               value={formData.pan}
-              onChange={(e) => {
-                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+              fullName={`${formData.firstName} ${formData.lastName}`.trim()}
+              onChange={(val) => {
                 updateField('pan', val);
                 if (errors.pan) setErrors((prev) => ({ ...prev, pan: '' }));
               }}
-              className="text-xs font-mono tracking-wider uppercase"
+              isVerified={panVerified}
+              onVerificationChange={setPanVerified}
+              error={errors.pan}
+              required
             />
-            {errors.pan && (
-              <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {errors.pan}
-              </p>
-            )}
           </div>
         </div>
 

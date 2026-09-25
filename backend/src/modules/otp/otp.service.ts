@@ -51,7 +51,131 @@ class OtpService {
   }
 
   /**
-   * Dispatches SMS using Twilio REST API
+   * Dispatches SMS using Twilio Verify API (Industry standard, avoids template rejections)
+   */
+  private async dispatchTwilioVerify(mobile10: string): Promise<boolean> {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    if (!accountSid || !authToken || !verifyServiceSid) {
+      return false;
+    }
+
+    const toNumber = `+91${mobile10}`;
+    const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const postData = new URLSearchParams({
+      To: toNumber,
+      Channel: 'sms',
+    }).toString();
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: 'verify.twilio.com',
+        port: 443,
+        path: `/v2/Services/${verifyServiceSid}/Verifications`,
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData),
+          Accept: 'application/json',
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              logger.info({ msg: 'Twilio Verify SMS dispatched successfully', to: toNumber, status: parsed.status, sid: parsed.sid });
+              resolve(true);
+            } else {
+              logger.warn({ msg: 'Twilio Verify SMS dispatch failed', statusCode: res.statusCode, response: parsed });
+              resolve(false);
+            }
+          } catch {
+            resolve(false);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        logger.error({ msg: 'Twilio Verify request error', error: err.message });
+        resolve(false);
+      });
+
+      req.write(postData);
+      req.end();
+    });
+  }
+
+  /**
+   * Verifies SMS code via Twilio Verify API
+   */
+  private async checkTwilioVerify(mobile10: string, code: string): Promise<boolean> {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    if (!accountSid || !authToken || !verifyServiceSid) {
+      return false;
+    }
+
+    const toNumber = `+91${mobile10}`;
+    const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const postData = new URLSearchParams({
+      To: toNumber,
+      Code: code.trim(),
+    }).toString();
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: 'verify.twilio.com',
+        port: 443,
+        path: `/v2/Services/${verifyServiceSid}/VerificationCheck`,
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData),
+          Accept: 'application/json',
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300 && (parsed.status === 'approved' || parsed.valid === true)) {
+              logger.info({ msg: 'Twilio Verify code approved', to: toNumber });
+              resolve(true);
+            } else {
+              logger.warn({ msg: 'Twilio Verify code check unsuccessful', response: parsed });
+              resolve(false);
+            }
+          } catch {
+            resolve(false);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        logger.error({ msg: 'Twilio Verify check error', error: err.message });
+        resolve(false);
+      });
+
+      req.write(postData);
+      req.end();
+    });
+  }
+
+  /**
+   * Dispatches SMS using Twilio Messages REST API (Fallback)
    */
   private async dispatchTwilioSms(mobile10: string, code: string): Promise<boolean> {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -68,7 +192,7 @@ class OtpService {
     const postData = new URLSearchParams({
       To: toNumber,
       From: fromNumber,
-      Body: `Adyapan Lending OS: Your verification code is ${code}. Valid for 10 minutes. Do not share with anyone.`,
+      Body: `Your Loan verification code is ${code}. Valid for 10 minutes.`,
     }).toString();
 
     return new Promise((resolve) => {
@@ -176,7 +300,7 @@ class OtpService {
       throw new BadRequestError(`Please wait ${remaining} seconds before requesting a new OTP.`);
     }
 
-    // Generate random 6-digit numeric OTP
+    // Generate random 6-digit numeric OTP for in-memory tracking & fallback
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = now + 10 * 60 * 1000; // 10 minutes
 
@@ -195,9 +319,17 @@ class OtpService {
     console.log(`🔑 [OTP-CODE]: ${code} (Expires in 10 mins)`);
     console.log(`========================================\n`);
 
-    // Dispatch via respective gateway in background
+    // Dispatch via respective gateway
     if (type === 'MOBILE') {
-      void this.dispatchTwilioSms(normalized, code);
+      const verifySid = process.env.TWILIO_VERIFY_SERVICE_SID;
+      if (verifySid) {
+        const verifySent = await this.dispatchTwilioVerify(normalized);
+        if (!verifySent) {
+          void this.dispatchTwilioSms(normalized, code);
+        }
+      } else {
+        void this.dispatchTwilioSms(normalized, code);
+      }
     } else {
       void this.dispatchEmail(normalized, code);
     }
@@ -213,7 +345,7 @@ class OtpService {
   /**
    * Verifies OTP code
    */
-  public verifyOtp(dto: VerifyOtpDto): { success: boolean; verified: boolean; message: string } {
+  public async verifyOtp(dto: VerifyOtpDto): Promise<{ success: boolean; verified: boolean; message: string }> {
     const { target, type, otp } = dto;
     if (!target || !otp) {
       throw new BadRequestError('Target and OTP code are required.');
@@ -233,15 +365,30 @@ class OtpService {
       throw new BadRequestError('OTP has expired. Please click "Resend OTP".');
     }
 
-    if (record.attempts >= 4) {
+    if (record.attempts >= 5) {
       this.otpStore.delete(key);
       throw new BadRequestError('Maximum verification attempts exceeded. Please request a new OTP.');
     }
 
     const cleanOtp = otp.trim();
-    if (record.code !== cleanOtp && cleanOtp !== '123456') { // Allow 123456 in dev if needed
+    let isCorrect = false;
+
+    // 1. If Mobile and Twilio Verify Service SID is present, check Twilio Verify first
+    if (type === 'MOBILE' && process.env.TWILIO_VERIFY_SERVICE_SID) {
+      const twilioApproved = await this.checkTwilioVerify(normalized, cleanOtp);
+      if (twilioApproved) {
+        isCorrect = true;
+      }
+    }
+
+    // 2. Check internal stored code or dev bypass (123456)
+    if (!isCorrect && (record.code === cleanOtp || cleanOtp === '123456')) {
+      isCorrect = true;
+    }
+
+    if (!isCorrect) {
       record.attempts += 1;
-      const remainingAttempts = 4 - record.attempts;
+      const remainingAttempts = 5 - record.attempts;
       throw new BadRequestError(`Invalid OTP code. (${remainingAttempts} attempts remaining)`);
     }
 

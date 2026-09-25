@@ -2,14 +2,20 @@ import { PrismaClient } from '@prisma/client';
 import { env } from './env';
 import { logger } from './logger';
 
+const safeDatabaseUrl = env.databaseUrl
+  ? env.databaseUrl.includes('connection_limit')
+    ? env.databaseUrl
+    : `${env.databaseUrl}${env.databaseUrl.includes('?') ? '&' : '?'}connection_limit=5`
+  : undefined;
+
 export const prisma = new PrismaClient({
-  datasourceUrl: env.databaseUrl,
+  datasourceUrl: safeDatabaseUrl,
   log: env.isProduction ? ['error', 'warn'] : ['error', 'warn'],
 });
 
 // Auto-retry queries on transient Supabase PgBouncer pooler connection drops
 prisma.$use(async (params, next) => {
-  const maxRetries = 3;
+  const maxRetries = 6;
   let lastError: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -25,6 +31,7 @@ prisma.$use(async (params, next) => {
         err?.message?.includes('connection') ||
         err?.message?.includes('EMAXCONNSESSION') ||
         err?.message?.includes('max clients reached') ||
+        err?.message?.includes('Timed out fetching a new connection') ||
         // Supabase PgBouncer: prepared statement dropped when pooler reassigns connection
         err?.message?.includes('26000') ||
         err?.message?.includes('prepared statement') ||
@@ -35,7 +42,7 @@ prisma.$use(async (params, next) => {
           { attempt, maxRetries, model: params.model, action: params.action, err: err.message },
           'Prisma query auto-retrying on transient connection/pooler drop...'
         );
-        await new Promise((r) => setTimeout(r, 400 * attempt));
+        await new Promise((r) => setTimeout(r, 800 * attempt));
         continue;
       }
       throw err;

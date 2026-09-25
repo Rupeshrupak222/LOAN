@@ -613,7 +613,7 @@ class PartnerService {
         const bankCount = await prisma.customerBankAccount.count({ where: { customerId: customer.id } });
         if (bankCount === 0) {
           await prisma.customerBankAccount.create({
-            data: { customerId: customer.id, accountHolderName: `${customer.firstName} ${customer.lastName}`, bankName: 'HDFC Bank', accountNumber: '50100998877665', ifscCode: 'HDFC0001234', accountType: 'SAVINGS', isPrimary: true, isVerified: true },
+            data: { customerId: customer.id, accountHolderName: `${customer.firstName} ${customer.lastName}`, bankName: 'HDFC Bank', accountNumber: '50100998877665', ifscCode: 'HDFC0001234', accountType: 'SAVINGS', isPrimary: true, isVerified: false },
           });
         }
         const empCount = await prisma.customerEmployment.count({ where: { customerId: customer.id } });
@@ -625,7 +625,7 @@ class PartnerService {
         const cleanMobile = (customer.mobile || '9876543210').replace(/\D/g, '').slice(-10) || '9876543210';
         await prisma.customer.update({
           where: { id: customer.id },
-          data: { kycStatus: 'VERIFIED', status: 'ACTIVE', mobile: cleanMobile, employerName: customer.employerName || 'Partner Enterprise Corp', monthlyIncome: customer.monthlyIncome || new Decimal(85000) },
+          data: { kycStatus: customer.kycStatus === 'VERIFIED' ? 'VERIFIED' : 'PENDING', status: 'ACTIVE', mobile: cleanMobile, employerName: customer.employerName || 'Partner Enterprise Corp', monthlyIncome: customer.monthlyIncome || new Decimal(85000) },
         });
       } else {
         const cleanMobile = (dto.phone || '9876543210').replace(/\D/g, '').slice(-10) || '9876543210';
@@ -646,7 +646,7 @@ class PartnerService {
             bankName: 'HDFC Bank',
             bankAccountNo: '50100998877665',
             bankIfsc: 'HDFC0001234',
-            kycStatus: 'VERIFIED',
+            kycStatus: 'PENDING',
             status: 'ACTIVE',
             addresses: {
               create: {
@@ -674,7 +674,7 @@ class PartnerService {
                 ifscCode: 'HDFC0001234',
                 accountType: 'SAVINGS',
                 isPrimary: true,
-                isVerified: true,
+                isVerified: false,
               },
             },
             documents: {
@@ -684,9 +684,9 @@ class PartnerService {
                   documentType: 'PAN_CARD',
                   fileName: 'pan_card.pdf',
                   storageKey: `docs/partner/pan_${Date.now()}.pdf`,
-                  status: 'VERIFIED',
-                  verified: true,
-                  verifiedAt: new Date(),
+                  status: 'PENDING',
+                  verified: false,
+                  verifiedAt: null,
                 },
                 {
                   category: 'ADDRESS',

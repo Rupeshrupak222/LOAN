@@ -86,9 +86,20 @@ export class CollectionAssignmentService {
       },
     });
 
+    const eventOutcome = colCase.assignedOfficerId ? 'CASE_REASSIGNED' : 'CASE_ASSIGNED';
+    await prisma.collectionActivity.create({
+      data: {
+        caseId: input.caseId,
+        activityType: 'EVENT',
+        outcome: eventOutcome,
+        notes: `Case assigned to ${userName} (${assignedUser.email}) via ${assignment.strategy}.${input.notes ? ' Notes: ' + input.notes : ''}`,
+        performedBy: actor.email || 'system',
+      },
+    });
+
     await logAudit({
       userId: actor.id,
-      action: 'COLLECTION_CASE_ASSIGNED',
+      action: `COLLECTION_${eventOutcome}`,
       entity: 'CollectionCase',
       entityId: input.caseId,
       newValue: {
@@ -102,6 +113,7 @@ export class CollectionAssignmentService {
 
     return assignment;
   }
+
 
   /**
    * Run auto-assignment algorithm across unassigned delinquent cases

@@ -550,8 +550,13 @@ export class FinancialControlService {
     return task;
   }
 
+  public getTask(taskId: string): FinancialTaskRecord | undefined {
+    return this.tasks.get(taskId);
+  }
+
   /**
    * Final Execution: Execute an approved financial task with Idempotency and Anti-Tamper fingerprint validation
+
    */
   public async executeFinancialTask<T = any>(
     taskId: string,

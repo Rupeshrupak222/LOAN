@@ -13,7 +13,11 @@ import { generalLedgerService } from '../finance/gl.service';
 import { SandboxPaymentProvider } from './sandbox-payment-provider';
 import { SandboxPayoutProvider } from './sandbox-payout-provider';
 import { paymentAllocationService } from './payment-allocation.service';
+import { collectionPtpService } from '../collections/collection-ptp.service';
+import { resolveCollectionCasesOnPayment } from '../collections/collection.service';
+import { ProviderRegistryService } from '../integrations/provider-registry.service';
 import type { RecordPaymentInput } from './payment.schema';
+
 import type {
   PaymentTransaction,
   PayoutTransaction,
@@ -255,27 +259,73 @@ export async function initiatePayment(
     }
   }
 
+  // Tenant Isolation & Ownership Check
+  if (loan && actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && loan.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Loan belongs to another tenant institution.');
+    }
+  }
+
   const customerId = input.customerId || loan?.customerId;
   if (!customerId) {
     throw new BadRequestError('A valid customerId or loanId is required to initiate payment.');
   }
 
+  // Idempotency Protection: If idempotencyKey exists, return the existing payment intent
+  if (input.idempotencyKey) {
+    const existing = await prisma.payment.findUnique({
+      where: { idempotencyKey: input.idempotencyKey },
+    });
+    if (existing) {
+      return {
+        paymentId: existing.id,
+        paymentNo: existing.paymentNo,
+        amount: existing.amount.toNumber(),
+        currency: 'INR',
+        status: existing.status,
+        providerOrderId: existing.reference || '',
+        checkoutUrl: `https://checkout.sandbox.adyapan.io/pay/${existing.reference || existing.paymentNo}`,
+        idempotencyKey: existing.idempotencyKey || input.idempotencyKey,
+      };
+    }
+  }
+
   const paymentNo = generatePaymentNo();
   const idempotencyKey = input.idempotencyKey || `idem-${Date.now()}-${uuid().slice(0, 8)}`;
+  const tenantId = loan?.tenantId || actor?.tenantId || 'tenant-adyapan-default';
+
+  // Centralized Provider Resolution
+  const providerResolution = ProviderRegistryService.getInstance().getPaymentProvider({
+    tenantId,
+    forceMode: input.forceMode,
+  });
+
+  const correlationId = `pay_req_${Date.now()}_${uuid().slice(0, 6)}`;
+  const customerName = loan?.customer ? `${loan.customer.firstName} ${loan.customer.lastName}` : 'Borrower';
 
   // Provider Order Creation
-  const order = await sandboxPaymentProvider.createOrder({
-    amount: input.amount,
-    currency: 'INR',
-    receipt: paymentNo,
-    customerId,
-    notes: {
-      loanId: loan?.id,
-      loanNo: loan?.loanNo,
+  const order = await providerResolution.provider.createOrder(
+    {
+      orderId: paymentNo,
+      amount: input.amount,
+      currency: 'INR',
+      receipt: paymentNo,
       customerId,
-      paymentType: input.type || 'EMI',
+      customerName,
+      customerEmail: loan?.customer?.email || undefined,
+      customerPhone: loan?.customer?.mobile || undefined,
+      description: `Repayment for Loan ${loan?.loanNo || paymentNo}`,
+      notes: {
+        loanId: loan?.id,
+        loanNo: loan?.loanNo,
+        customerId,
+        paymentType: input.type || 'EMI',
+      },
     },
-  });
+    correlationId
+  );
+
+  const providerOrderId = order.providerOrderId || order.orderId || `order_${Date.now()}`;
 
   // Create PENDING payment in DB
   const created = await prisma.payment.create({
@@ -283,10 +333,10 @@ export async function initiatePayment(
       paymentNo,
       loanId: loan?.id || '',
       customerId,
-      tenantId: loan?.tenantId || actor?.tenantId,
+      tenantId,
       amount: Money.toDb(input.amount),
       method: input.method || 'GATEWAY',
-      reference: order.orderId,
+      reference: providerOrderId,
       idempotencyKey,
       status: 'PENDING',
     },
@@ -294,7 +344,7 @@ export async function initiatePayment(
 
   addTimelineEvent(created.id, {
     status: 'INITIATED',
-    note: `Payment initiated for ₹${input.amount}. Gateway Order ID: ${order.orderId}`,
+    note: `Payment initiated for ₹${input.amount}. Mode: ${providerResolution.mode}. Provider Order ID: ${providerOrderId}`,
     actorId: actor?.id,
     actorName: actor?.email || 'Customer/LSP',
   });
@@ -307,8 +357,10 @@ export async function initiatePayment(
     newValue: {
       paymentNo,
       amount: input.amount,
-      orderId: order.orderId,
+      orderId: providerOrderId,
       checkoutUrl: order.checkoutUrl,
+      mode: providerResolution.mode,
+      isSandbox: providerResolution.isSandbox,
     },
   });
 
@@ -318,9 +370,12 @@ export async function initiatePayment(
     amount: input.amount,
     currency: 'INR',
     status: 'INITIATED',
-    providerOrderId: order.orderId,
+    providerOrderId,
     checkoutUrl: order.checkoutUrl,
     idempotencyKey,
+    mode: providerResolution.mode,
+    isSandbox: providerResolution.isSandbox,
+    verificationMode: providerResolution.isSandbox ? 'SANDBOX_SIMULATION' : undefined,
   };
 }
 
@@ -339,6 +394,14 @@ export async function confirmPayment(
   });
   if (!payment) throw new NotFoundError(`Payment not found: ${paymentId}`);
 
+  // Anti-IDOR / Tenant Isolation Check
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (actor.tenantId && payment.tenantId && payment.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Payment record belongs to another institution.');
+    }
+  }
+
+  // Idempotency: Already successful payments return without duplicating allocations or GL journals
   if (payment.status === 'SUCCESS') {
     return {
       message: 'Payment already confirmed and allocated successfully.',
@@ -346,13 +409,47 @@ export async function confirmPayment(
     };
   }
 
-  // Gateway Verification
-  const verifyResult = await sandboxPaymentProvider.verifyPayment({
-    orderId: payment.reference || '',
-    providerPaymentId: input.providerPaymentId || `pay_sbx_${Date.now()}`,
+  const tenantId = payment.tenantId || actor?.tenantId || 'tenant-adyapan-default';
+
+  // Centralized Provider Resolution
+  const providerResolution = ProviderRegistryService.getInstance().getPaymentProvider({
+    tenantId,
+    forceMode: input.forceMode,
   });
 
-  if (!verifyResult.verified || verifyResult.status === 'FAILED') {
+  const correlationId = `pay_cnf_${Date.now()}_${uuid().slice(0, 6)}`;
+
+  // Gateway Verification
+  const verifyResult = await providerResolution.provider.verifyPayment(
+    {
+      orderId: payment.reference || '',
+      providerOrderId: payment.reference || '',
+      providerPaymentId: input.providerPaymentId || `pay_${Date.now()}`,
+    },
+    correlationId
+  );
+
+  const isVerified = verifyResult.isVerified !== undefined ? verifyResult.isVerified : verifyResult.verified;
+  const providerStatus = verifyResult.status;
+
+  // Handle PENDING gateway state
+  if (providerStatus === 'PAYMENT_PENDING' || (!isVerified && providerStatus !== 'PAYMENT_FAILED' && verifyResult.status === 'PENDING')) {
+    addTimelineEvent(payment.id, {
+      status: 'PENDING',
+      note: `Payment pending in gateway: ${verifyResult.errorDescription || 'Awaiting bank clearance'}`,
+      actorId: actor?.id,
+      actorName: actor?.email || 'Gateway',
+    });
+
+    return {
+      payment,
+      status: 'PENDING',
+      message: 'Payment is pending confirmation from provider.',
+    };
+  }
+
+  // Handle FAILED gateway state
+  if (!isVerified || providerStatus === 'PAYMENT_FAILED' || verifyResult.status === 'FAILED') {
     await prisma.payment.update({
       where: { id: payment.id },
       data: { status: 'FAILED' },
@@ -369,6 +466,7 @@ export async function confirmPayment(
   }
 
   const paidAt = input.paidAt ? new Date(input.paidAt) : new Date();
+  const utrOrReference = input.utrNumber || verifyResult.utrNumber || verifyResult.providerPaymentId;
 
   // Pure Decimal.js Waterfall Allocation
   const allocation = await paymentAllocationService.allocatePayment({
@@ -399,7 +497,7 @@ export async function confirmPayment(
       creditLimitsService.applyRepaymentLimitRestoration(
         payment.customerId,
         allocation.allocatedPrincipal,
-        input.utrNumber || payment.paymentNo,
+        utrOrReference || payment.paymentNo,
         payment.id
       );
     } catch (e) {
@@ -413,14 +511,14 @@ export async function confirmPayment(
     data: {
       status: 'SUCCESS',
       paidAt,
-      reference: input.utrNumber || verifyResult.providerPaymentId,
+      reference: utrOrReference,
     },
     include: { allocations: true },
   });
 
   addTimelineEvent(payment.id, {
     status: 'SUCCESS',
-    note: `Payment confirmed. UTR: ${input.utrNumber || verifyResult.providerPaymentId}. Allocated: Principal ₹${allocation.allocatedPrincipal}, Interest ₹${allocation.allocatedInterest}, Fees ₹${allocation.allocatedFees}.`,
+    note: `Payment confirmed. Mode: ${providerResolution.mode}. UTR: ${utrOrReference}. Allocated: Principal ₹${allocation.allocatedPrincipal}, Interest ₹${allocation.allocatedInterest}, Fees ₹${allocation.allocatedFees}.`,
     actorId: actor?.id,
     actorName: actor?.email || 'Payment Service',
   });
@@ -434,6 +532,9 @@ export async function confirmPayment(
       paymentNo: payment.paymentNo,
       amount: payment.amount.toNumber(),
       allocation,
+      mode: providerResolution.mode,
+      isSandbox: providerResolution.isSandbox,
+      utr: utrOrReference,
     },
   });
 
@@ -446,11 +547,23 @@ export async function confirmPayment(
     message: `Receipt #${payment.paymentNo} confirmed. Remaining balance: ₹${allocation.remainingDue.toFixed(2)}.`,
   }).catch(() => {});
 
+  // Synchronize Collections PTP and Delinquency state
+  if (payment.loanId) {
+    void collectionPtpService.evaluatePtpOnPayment({
+      loanId: payment.loanId,
+      paymentAmount: payment.amount.toNumber(),
+      paymentReference: utrOrReference,
+    }).catch(() => {});
+
+    void resolveCollectionCasesOnPayment(payment.loanId).catch(() => {});
+  }
+
   return {
     payment: updatedPayment,
     allocation,
   };
 }
+
 
 // ---------------------------------------------------------------------------
 // 4. REFUND PROCESSING

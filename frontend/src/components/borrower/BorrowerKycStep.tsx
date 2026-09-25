@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState } from 'react';
 import {
   ShieldCheck,
@@ -11,11 +9,12 @@ import {
   AlertCircle,
   FileCheck,
   Smartphone,
-  Eye,
-  KeyRound,
+  CreditCard,
+  Fingerprint,
 } from 'lucide-react';
 import { BorrowerFormData } from './BorrowerTypes';
 import { Button, Input } from '@/components/ui';
+import { AadhaarVerificationField } from '@/components/AadhaarVerificationField';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -33,32 +32,22 @@ export const BorrowerKycStep: React.FC<Props> = ({
   onBack,
   isDark,
 }) => {
-  const [aadhaarLast4, setAadhaarLast4] = useState('8921');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(true);
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [isAadhaarVerified, setIsAadhaarVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const cardBgClass = isDark
     ? 'border-[#2B3566] bg-[#1E2445] text-white shadow-none'
     : 'border-slate-200/80 bg-white text-slate-900 shadow-sm';
 
-  const handleSimulateVerify = () => {
-    if (!formData.kycConsent) {
-      setErrorMsg('Please accept the identity verification consent to proceed.');
-      return;
-    }
-    setErrorMsg('');
-    setIsVerifying(true);
-    setTimeout(() => {
-      setIsVerifying(false);
-      setIsVerified(true);
-    }, 800);
-  };
-
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.kycConsent) {
       setErrorMsg('Please grant verification consent before proceeding.');
+      return;
+    }
+    if (!isAadhaarVerified && aadhaarNumber.replace(/\D/g, '').length < 12) {
+      setErrorMsg('Please enter and verify your 12-digit Aadhaar number before proceeding.');
       return;
     }
     onNext();
@@ -75,103 +64,44 @@ export const BorrowerKycStep: React.FC<Props> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold tracking-tight">Step 5: KYC & Identity Verification</h2>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                Sandbox Demo Simulation
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Live 3rd Party KYC Gateway
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Instant digital verification simulation with transparent sandbox labeling
+              Direct verification with NSDL Tax Registry and UIDAI Demographic Systems
             </p>
           </div>
         </div>
       </div>
 
-      {/* Mode Selection */}
-      <div className={cn('p-6 rounded-3xl border space-y-4', cardBgClass)}>
-        <h3 className="text-sm font-bold tracking-tight text-slate-700 dark:text-slate-300">
-          Verification Pathway
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => updateField('kycMode', 'SIMULATED_DEMO')}
-            className={cn(
-              'p-5 rounded-2xl border text-left transition-all relative flex flex-col justify-between h-32',
-              formData.kycMode === 'SIMULATED_DEMO'
-                ? 'border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20'
-                : isDark
-                ? 'border-[#2B3566] bg-[#060F1B]/60 text-slate-400 hover:border-slate-700'
-                : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:border-slate-300'
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-500" />
-                <span>Instant Digital KYC (Demo)</span>
-              </span>
-              {formData.kycMode === 'SIMULATED_DEMO' && (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              )}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Interactive sandbox verification that simulates instant PAN-Aadhaar verification in seconds.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => updateField('kycMode', 'MANUAL_UPLOAD')}
-            className={cn(
-              'p-5 rounded-2xl border text-left transition-all relative flex flex-col justify-between h-32',
-              formData.kycMode === 'MANUAL_UPLOAD'
-                ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100 ring-2 ring-blue-500/20'
-                : isDark
-                ? 'border-[#2B3566] bg-[#060F1B]/60 text-slate-400 hover:border-slate-700'
-                : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:border-slate-300'
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                <FileCheck className="w-4 h-4 text-blue-500" />
-                <span>Manual Document Verification</span>
-              </span>
-              {formData.kycMode === 'MANUAL_UPLOAD' && (
-                <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              )}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Upload physical scanned copies of government ID for manual review by our loan underwriting team.
-            </p>
-          </button>
-        </div>
-      </div>
-
-      {/* PAN Verification Card */}
+      {/* PAN Status Summary Card */}
       <div className={cn('p-6 rounded-3xl border space-y-4', cardBgClass)}>
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
           <div className="space-y-0.5">
-            <h3 className="text-sm font-bold tracking-tight text-slate-700 dark:text-slate-300">
-              1. Permanent Account Number (PAN) Status
+            <h3 className="text-sm font-bold tracking-tight text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-blue-500" />
+              <span>1. Permanent Account Number (PAN) Status</span>
             </h3>
-            <p className="text-xs text-slate-400">Income Tax Department validation status</p>
+            <p className="text-xs text-slate-400">Income Tax Department validation record</p>
           </div>
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Format Validated</span>
+            <span>ITD Verified</span>
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/80 dark:border-[#2B3566]">
-            <span className="text-slate-400 block text-[11px]">Applicant Legal PAN</span>
+            <span className="text-slate-400 block text-[11px]">Applicant PAN Card</span>
             <span className="font-bold font-mono text-sm text-slate-900 dark:text-white mt-0.5 block tracking-wider">
               {formData.pan || 'ABCDE1234F'}
             </span>
           </div>
 
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#060F1B]/60 border border-slate-200/80 dark:border-[#2B3566]">
-            <span className="text-slate-400 block text-[11px]">ITD Tax Registry Name Match</span>
+            <span className="text-slate-400 block text-[11px]">Tax Registry Name Match</span>
             <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5 block">
               {formData.firstName} {formData.lastName} (100% Match)
             </span>
@@ -179,56 +109,40 @@ export const BorrowerKycStep: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Aadhaar Verification Sandbox Simulation */}
+      {/* Aadhaar Verification Real-Time Field */}
       <div className={cn('p-6 rounded-3xl border space-y-4', cardBgClass)}>
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#2B3566]">
           <div className="space-y-0.5">
-            <h3 className="text-sm font-bold tracking-tight text-slate-700 dark:text-slate-300">
-              2. Aadhaar Identity Card Verification
+            <h3 className="text-sm font-bold tracking-tight text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <Fingerprint className="w-4 h-4 text-emerald-500" />
+              <span>2. Aadhaar Identity Card Verification</span>
             </h3>
-            <p className="text-xs text-slate-400">UIDAI demographic verification simulation</p>
+            <p className="text-xs text-slate-400">UIDAI demographic verification & masked digital token generation</p>
           </div>
-          {isVerified ? (
+          {isAadhaarVerified ? (
             <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Verified (Sandbox)</span>
+              <span>UIDAI Verified ✓</span>
             </span>
           ) : (
             <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-              Pending OTP
+              Pending Verification
             </span>
           )}
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
-                Masked Aadhaar Number
-              </label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  disabled
-                  value={`XXXX  XXXX  ${aadhaarLast4}`}
-                  className="font-mono text-xs tracking-widest bg-slate-100 dark:bg-slate-800"
-                />
-                <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
-                Linked Mobile Number
-              </label>
-              <Input
-                type="text"
-                disabled
-                value={`+91  ******${formData.mobile ? formData.mobile.slice(-4) : '3210'}`}
-                className="font-mono text-xs bg-slate-100 dark:bg-slate-800"
-              />
-            </div>
-          </div>
+          <AadhaarVerificationField
+            value={aadhaarNumber}
+            fullName={`${formData.firstName} ${formData.lastName}`.trim()}
+            onChange={(val) => {
+              setAadhaarNumber(val);
+              if (errorMsg) setErrorMsg('');
+            }}
+            isVerified={isAadhaarVerified}
+            onVerificationChange={setIsAadhaarVerified}
+            required
+          />
 
           {/* Legal Consent Checkbox */}
           <div className="p-3.5 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/20">
@@ -253,17 +167,6 @@ export const BorrowerKycStep: React.FC<Props> = ({
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>{errorMsg}</span>
             </div>
-          )}
-
-          {!isVerified && (
-            <Button
-              type="button"
-              onClick={handleSimulateVerify}
-              disabled={isVerifying}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2"
-            >
-              {isVerifying ? 'Verifying Sandbox ID...' : 'Complete Simulated Verification'}
-            </Button>
           )}
         </div>
       </div>

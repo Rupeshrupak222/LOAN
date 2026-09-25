@@ -13,6 +13,9 @@ import {
   updateKycStatusSchema,
   createAddressSchema,
   createBankAccountSchema,
+  createConsentSchema,
+  batchConsentSchema,
+  createIdentifierSchema,
 } from './customer.schema';
 import {
   listCustomers,
@@ -26,6 +29,11 @@ import {
   deleteCustomerBankAccount,
   deleteCustomer,
   validateLoanOfficerOriginationEligibility,
+  captureCustomerConsent,
+  batchCaptureCustomerConsents,
+  listCustomerConsents,
+  saveCustomerIdentifier,
+  listCustomerIdentifiers,
 } from './customer.service';
 import { borrowerJourneyService } from './borrower-journey.service';
 
@@ -260,6 +268,56 @@ router.delete(
   asyncHandler(async (req, res) => {
     const result = await deleteCustomer(req.params.id, req.user?.id, req.user as any);
     res.json(success(result));
+  })
+);
+
+router.post(
+  '/:id/consents',
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  validate(createConsentSchema),
+  asyncHandler(async (req, res) => {
+    const ip = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    const consent = await captureCustomerConsent(req.params.id, req.body, req.user as any, ip, userAgent);
+    res.status(201).json(success(consent));
+  })
+);
+
+router.post(
+  '/:id/consents/batch',
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  validate(batchConsentSchema),
+  asyncHandler(async (req, res) => {
+    const ip = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    const consents = await batchCaptureCustomerConsents(req.params.id, req.body, req.user as any, ip, userAgent);
+    res.status(201).json(success(consents));
+  })
+);
+
+router.get(
+  '/:id/consents',
+  asyncHandler(async (req, res) => {
+    const consents = await listCustomerConsents(req.params.id, req.user as any);
+    res.json(success(consents));
+  })
+);
+
+router.post(
+  '/:id/identifiers',
+  authorize('LOAN_OFFICER', 'BRANCH_MANAGER', 'CREDIT_ANALYST', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN'),
+  validate(createIdentifierSchema),
+  asyncHandler(async (req, res) => {
+    const identifier = await saveCustomerIdentifier(req.params.id, req.body, req.user as any);
+    res.status(201).json(success(identifier));
+  })
+);
+
+router.get(
+  '/:id/identifiers',
+  asyncHandler(async (req, res) => {
+    const identifiers = await listCustomerIdentifiers(req.params.id, req.user as any);
+    res.json(success(identifiers));
   })
 );
 

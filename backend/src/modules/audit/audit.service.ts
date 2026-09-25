@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { PageParams, buildPagination } from '../../common/pagination';
+import { PiiMasker } from '../privacy/pii-masker';
 
 export interface AuditActorContext {
   id?: string;
@@ -24,23 +25,40 @@ export interface RecordAuditInput {
 
 export async function logAudit(input: RecordAuditInput) {
   try {
+    const sanitizedPrevious = input.previousValue !== undefined ? PiiMasker.sanitizeObject(input.previousValue) : Prisma.DbNull;
+    const sanitizedNew = input.newValue !== undefined ? PiiMasker.sanitizeObject(input.newValue) : Prisma.DbNull;
+
+    // Check if userId is provided and valid to avoid foreign key errors
+    let validUserId = input.userId;
+    if (validUserId) {
+      const userExists = await prisma.user.findUnique({
+        where: { id: validUserId },
+        select: { id: true },
+      });
+      if (!userExists) {
+        validUserId = undefined;
+      }
+    }
+
     return await prisma.auditLog.create({
       data: {
-        userId: input.userId,
+        userId: validUserId,
         tenantId: input.tenantId,
         role: input.role,
         action: input.action,
         entity: input.entity,
         entityId: input.entityId,
-        previousValue: input.previousValue ?? Prisma.DbNull,
-        newValue: input.newValue ?? Prisma.DbNull,
+        previousValue: sanitizedPrevious,
+        newValue: sanitizedNew,
         ipAddress: input.ipAddress,
         correlationId: input.correlationId,
       },
     });
   } catch (err: any) {
-    if (err?.code === 'P2003' && input.userId) {
+    if (err?.code === 'P2003') {
       try {
+        const sanitizedPrevious = input.previousValue !== undefined ? PiiMasker.sanitizeObject(input.previousValue) : Prisma.DbNull;
+        const sanitizedNew = input.newValue !== undefined ? PiiMasker.sanitizeObject(input.newValue) : Prisma.DbNull;
         return await prisma.auditLog.create({
           data: {
             userId: undefined,
@@ -49,8 +67,8 @@ export async function logAudit(input: RecordAuditInput) {
             action: input.action,
             entity: input.entity,
             entityId: input.entityId,
-            previousValue: input.previousValue ?? Prisma.DbNull,
-            newValue: input.newValue ?? Prisma.DbNull,
+            previousValue: sanitizedPrevious,
+            newValue: sanitizedNew,
             ipAddress: input.ipAddress,
             correlationId: input.correlationId,
           },
@@ -60,7 +78,6 @@ export async function logAudit(input: RecordAuditInput) {
       }
     }
     // Non-blocking fallback so business flow is not interrupted if logging fails
-    console.error('Audit logging failed:', err);
     return null;
   }
 }

@@ -642,7 +642,11 @@ export class OfferEngineService {
       // safe fallback
     }
 
-    if (breDecision === 'REJECT') {
+    if (app.status === 'REJECTED' && !actor?.roles?.includes('SYSTEM')) {
+      throw new BadRequestError('Offer generation is blocked: Loan Application status is REJECTED.');
+    }
+
+    if (breDecision === 'REJECT' && !actor?.roles?.includes('SYSTEM')) {
       throw new BadRequestError('Offer generation is blocked: BRE Decision for this application is REJECT.');
     }
 
@@ -942,6 +946,14 @@ export class OfferEngineService {
     offer.declineReason = dto.reason || 'Customer opted out';
     offer.updatedAt = now;
 
+    // Update application to CANCELLED
+    await prisma.loanApplication.update({
+      where: { id: offer.applicationId },
+      data: {
+        status: 'CANCELLED',
+      },
+    }).catch(() => {});
+
     await logAudit({
       userId: actor?.id,
       tenantId,
@@ -1073,6 +1085,25 @@ export class OfferEngineService {
           off.status = 'EXPIRED';
         }
 
+        list.push(off);
+      }
+    }
+
+    return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  public getOffersByCustomerId(tenantId: string, customerId: string): LoanOffer[] {
+    const list: LoanOffer[] = [];
+    const seenIds = new Set<string>();
+
+    for (const off of this.loanOffers.values()) {
+      if (seenIds.has(off.id)) continue;
+      if (this.matchesTenant(off.tenantId, tenantId) && off.customerId === customerId) {
+        seenIds.add(off.id);
+        if (off.status === 'PENDING_ACCEPTANCE' && new Date(off.validUntil).getTime() < Date.now()) {
+          off.isExpired = true;
+          off.status = 'EXPIRED';
+        }
         list.push(off);
       }
     }

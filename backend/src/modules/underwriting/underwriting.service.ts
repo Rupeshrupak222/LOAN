@@ -129,20 +129,9 @@ export async function getUnderwritingQueue(
   let where: any = {};
   const normalizedTab = (tab || 'ALL').toUpperCase();
 
-  const bmApprovedCondition = {
-    approvals: {
-      some: {
-        approverRole: 'BRANCH_MANAGER',
-        status: { in: ['APPROVED', 'ESCALATED'] },
-      },
-    },
-  };
-
   if (normalizedTab === 'READY' || normalizedTab === 'DECISION_REQUIRED') {
-    // Only proposals approved & forwarded by Branch Manager into UNDERWRITING and awaiting underwriter sanction
     where = {
       status: 'UNDERWRITING',
-      ...bmApprovedCondition,
       OR: [
         { underwriting: null },
         { underwriting: { decision: { notIn: ['APPROVE', 'REJECT', 'SEND_BACK'] } } },
@@ -151,17 +140,16 @@ export async function getUnderwritingQueue(
   } else if (normalizedTab === 'IN_REVIEW') {
     where = {
       status: 'UNDERWRITING',
-      ...bmApprovedCondition,
       stage: { contains: 'IN_REVIEW' },
     };
   } else if (normalizedTab === 'SENT_BACK') {
     where = {
-      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+      status: { in: ['UNDERWRITING', 'UNDER_REVIEW', 'SUBMITTED', 'CREDIT_ASSESSMENT'] },
       underwriting: { decision: 'SEND_BACK' },
     };
   } else if (normalizedTab === 'HOLD' || normalizedTab === 'AWAITING_INFO') {
     where = {
-      status: { in: ['UNDERWRITING', 'UNDER_REVIEW'] },
+      status: { in: ['UNDERWRITING', 'UNDER_REVIEW', 'HOLD'] },
       OR: [
         { underwriting: { decision: 'HOLD' } },
         { stage: 'AWAITING_INFORMATION' },
@@ -194,29 +182,19 @@ export async function getUnderwritingQueue(
       ],
     };
   } else {
-    // ALL proposals that have officially reached Underwriting after Branch Manager approval
+    // ALL proposals that have officially reached Underwriting
     where = {
-      AND: [
-        {
-          OR: [
-            {
-              status: 'UNDERWRITING',
-              ...bmApprovedCondition,
-            },
-            {
-              status: {
-                in: [
-                  'APPROVED',
-                  'REJECTED',
-                  'AGREEMENT_PENDING',
-                  'READY_FOR_DISBURSEMENT',
-                  'DISBURSED',
-                ],
-              },
-            },
-          ],
-        },
-      ],
+      status: {
+        in: [
+          'UNDERWRITING',
+          'APPROVED',
+          'REJECTED',
+          'AGREEMENT_PENDING',
+          'READY_FOR_DISBURSEMENT',
+          'DISBURSED',
+          'UNDER_REVIEW',
+        ],
+      },
     };
   }
 
@@ -355,6 +333,7 @@ export async function getUnderwritingWorkspace(
           employmentDetails: true,
           addresses: true,
           consents: true,
+          CustomerIdentifier: true,
         },
       },
       product: true,
@@ -388,29 +367,34 @@ export async function getUnderwritingWorkspace(
   const requestedAmt = Number(app.requestedAmount || 0);
   const deviations = computeDeviationsForApplication(app);
 
-  // Level 2 Underwriter delegated authority limit is ₹25 Lakh
-  const UNDERWRITER_MAX_AUTHORITY = 2500000;
-  const isExceedingAuthority = requestedAmt > UNDERWRITER_MAX_AUTHORITY;
+  // Dynamic Approval Authority Matrix Check
+  const tenantId = app.tenantId || actor.tenantId || 'tenant-adyapan-default';
+  const activePolicy = approvalAuthorityService.getActivePolicy(tenantId, app.productId || undefined);
+  const matchingLevels = activePolicy.levels.filter((l) => l.roles.some((r) => actor.roles.includes(r)));
+  const userAuthorityLimit = matchingLevels.length > 0 ? Math.max(...matchingLevels.map((l) => l.maxAmount)) : 2500000;
+  const isExceedingAuthority = requestedAmt > userAuthorityLimit;
 
   // Evaluate sequential workflow gates
   const docs = app.customer?.documents || [];
   const unverifiedDocs = docs.filter((d: any) => !d.verified && d.status !== 'VERIFIED');
   const hasKycRejected = app.customer?.kycStatus === 'REJECTED';
   const hasAnalystRecommendation = !!(app.eligibility?.factors as any)?.recommendation;
-  const isForwardedToUnderwriting = ['UNDERWRITING', 'APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status);
+  const isForwardedToUnderwriting = [
+    'UNDERWRITING',
+    'APPROVED',
+    'AGREEMENT_PENDING',
+    'READY_FOR_DISBURSEMENT',
+    'DISBURSED',
+    'CREDIT_ASSESSMENT',
+    'UNDER_REVIEW',
+  ].includes(app.status);
   const unresolvedCriticalDeviations = deviations.filter(
     (d) => (d.severity === 'CRITICAL' || d.severity === 'HIGH') && d.status === 'PENDING'
   );
 
   const blockers: string[] = [];
-  const hasBmApproval = app.approvals?.some(
-    (ap) => ap.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(ap.status)
-  );
   if (!isForwardedToUnderwriting) {
     blockers.push(`Proposal is currently in ${app.status} stage and has NOT been forwarded to Underwriting.`);
-  }
-  if (!hasBmApproval && !['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT', 'DISBURSED', 'REJECTED'].includes(app.status)) {
-    blockers.push('Application has not been reviewed and forwarded by Branch Manager.');
   }
   if (hasKycRejected) {
     blockers.push('Borrower KYC is marked as REJECTED');
@@ -423,7 +407,7 @@ export async function getUnderwritingWorkspace(
   }
   if (isExceedingAuthority) {
     blockers.push(
-      `Requested amount ₹${requestedAmt.toLocaleString('en-IN')} exceeds Level 2 Underwriter limit (₹25,00,000). Escalation to Level 3 Credit Head is required.`
+      `Requested amount ₹${requestedAmt.toLocaleString('en-IN')} exceeds delegated sanction limit (₹${userAuthorityLimit.toLocaleString('en-IN')}). Escalation to Level 3 Credit Head is required.`
     );
   }
 
@@ -432,7 +416,7 @@ export async function getUnderwritingWorkspace(
     creditAssessmentReviewed: isForwardedToUnderwriting,
     kycVerified: !hasKycRejected,
     documentsVerified: unverifiedDocs.length === 0,
-    financialAssessmentComplete: isForwardedToUnderwriting,
+    financialAssessmentComplete: !!app.eligibility,
     riskPolicyChecked: true,
     deviationsResolved: unresolvedCriticalDeviations.length === 0,
     canApprove: blockers.length === 0,
@@ -442,11 +426,13 @@ export async function getUnderwritingWorkspace(
   // Authority matrix result
   const authorityCheck = {
     hasAuthority: !isExceedingAuthority,
-    userLevel: 2,
-    requiredLevel: isExceedingAuthority ? 3 : 2,
-    maxLimit: UNDERWRITER_MAX_AUTHORITY,
+    userLevel: matchingLevels[0]?.level || 2,
+    requiredLevel: isExceedingAuthority ? 3 : (matchingLevels[0]?.level || 2),
+    maxLimit: userAuthorityLimit,
     requestedAmount: requestedAmt,
     isEscalationRequired: isExceedingAuthority,
+    policyName: activePolicy.name,
+    policyVersion: activePolicy.version,
   };
 
   // Proposed/active loan offer terms
@@ -478,17 +464,24 @@ export async function getUnderwritingWorkspace(
     pricingTier: (app.riskAssessment as any)?.grade ? `PRIME_GRADE_${(app.riskAssessment as any).grade}` : 'STANDARD_TIER',
   };
 
-  // Pull real audit logs from database
-  const auditLogs = await prisma.auditLog.findMany({
-    where: {
-      OR: [
-        { entityId: applicationId },
-        { entityId: app.customerId },
-      ],
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-  });
+  // Pull real audit logs from database safely
+  let auditLogs: any[] = [];
+  try {
+    if (typeof (prisma as any).auditLog?.findMany === 'function') {
+      auditLogs = await prisma.auditLog.findMany({
+        where: {
+          OR: [
+            { entityId: applicationId },
+            { entityId: app.customerId },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+    }
+  } catch {
+    auditLogs = [];
+  }
 
   const customerMonthlyIncome = Number(app.customer?.monthlyIncome || 0);
   const existingObligations = Number(
@@ -636,7 +629,7 @@ export async function submitUnderwritingDecision(
   }
 
   // Service layer defense-in-depth: Credit Analysts, Loan Officers, and non-deciders cannot commit underwriting decisions
-  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'COMPANY_ADMIN', 'ADMIN'];
+  const DECISION_MAKER_ROLES = ['UNDERWRITER', 'COMPANY_ADMIN', 'ADMIN', 'CREDIT_HEAD'];
   const isAuthorizedDecider = actor.roles?.some((r) => DECISION_MAKER_ROLES.includes(r));
   if (!isAuthorizedDecider) {
     throw new ForbiddenError(
@@ -671,13 +664,22 @@ export async function submitUnderwritingDecision(
     }
   }
 
+  const isApprovalDecision = input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS';
+
   // Segregation of Duties (SoD) Gate: Prohibit self-approval if user was the loan maker/submitter
   const wasOriginatingMaker = app.statusHistory?.some(
     (h) => h.fromStatus === 'DRAFT' && (h.changedBy === actor.email || h.changedBy === actor.id)
   );
-  if (wasOriginatingMaker && (input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS')) {
+  if (wasOriginatingMaker && isApprovalDecision) {
     throw new ForbiddenError(
       'Segregation of Duties (SoD) violation: An underwriter cannot approve a loan application they personally originated as loan officer.'
+    );
+  }
+
+  // SoD: Applicant cannot approve their own loan application
+  if ((app.customerId === actor.id || (app.customer as any)?.userId === actor.id) && isApprovalDecision) {
+    throw new ForbiddenError(
+      'Segregation of Duties (SoD) violation: An underwriter cannot approve their own loan application.'
     );
   }
 
@@ -698,22 +700,32 @@ export async function submitUnderwritingDecision(
     );
   }
 
-  const isApprovalDecision = input.decision === 'APPROVE' || input.decision === 'APPROVE_WITH_CONDITIONS';
-
-  const hasBmApproval = (app as any).approvals?.some(
-    (ap: any) => ap.approverRole === 'BRANCH_MANAGER' && ['APPROVED', 'ESCALATED'].includes(ap.status)
-  );
-  if (isApprovalDecision && !hasBmApproval) {
+  // Credit Analyst Assessment Prerequisite Gate
+  if (isApprovalDecision && !app.eligibility) {
     throw new BadRequestError(
-      'Cannot approve loan application: Branch Manager review and approval/escalation is mandatory before final underwriting sanction.'
+      'Cannot approve loan application: Credit Analyst financial assessment and eligibility must be evaluated prior to underwriting sanction.'
     );
   }
 
-  // KYC Prerequisite Gate: Cannot sanction proposals with REJECTED KYC status
-  if (isApprovalDecision && app.customer?.kycStatus === 'REJECTED') {
+  // KYC Prerequisite Gate: Cannot sanction proposals unless KYC is VERIFIED
+  if (isApprovalDecision && app.customer?.kycStatus !== 'VERIFIED') {
     throw new BadRequestError(
-      'Cannot approve loan application with REJECTED borrower KYC status. KYC verification must be resolved prior to credit sanction.'
+      'KYC_VERIFICATION_REQUIRED: Customer KYC must be VERIFIED prior to underwriting sanction approval.'
     );
+  }
+
+  // Bank Verification Prerequisite Gate: Verified Beneficiary Bank Account Required
+  if (isApprovalDecision) {
+    const hasVerifiedBank =
+      (app.customer as any)?.bankAccounts?.some((b: any) => b.isVerified) ||
+      (await (prisma as any).customerBankAccount?.findFirst?.({
+        where: { customerId: app.customerId, isVerified: true },
+      }));
+    if (!hasVerifiedBank) {
+      throw new BadRequestError(
+        'BANK_VERIFICATION_REQUIRED: A verified beneficiary bank account is required prior to underwriting sanction approval.'
+      );
+    }
   }
 
   // Mandatory Document Verification Check
@@ -728,23 +740,26 @@ export async function submitUnderwritingDecision(
     }
   }
 
-  // Level 2 Delegated Authority Limit Gate (₹25,00,000)
-  const requestedAmount = Number(app.requestedAmount);
-  const LEVEL_2_UNDERWRITER_LIMIT = 2500000;
+  // Dynamic Delegated Authority Limit Gate
+  const sanctionAmount = Number(input.approvedAmount || app.requestedAmount);
+  const tenantId = app.tenantId || actor.tenantId || 'tenant-adyapan-default';
+  const activePolicy = approvalAuthorityService.getActivePolicy(tenantId, app.productId || undefined);
+  const matchingLevels = activePolicy.levels.filter((l) => l.roles.some((r) => actor.roles.includes(r)));
+  const userAuthorityLimit = matchingLevels.length > 0 ? Math.max(...matchingLevels.map((l) => l.maxAmount)) : 2500000;
 
   if (isApprovalDecision) {
-    if (requestedAmount > LEVEL_2_UNDERWRITER_LIMIT) {
+    if (sanctionAmount > userAuthorityLimit) {
       throw new BadRequestError(
-        `Approval authority exceeded: Proposal of ₹${requestedAmount.toLocaleString(
+        `Approval authority exceeded: Proposal of ₹${sanctionAmount.toLocaleString(
           'en-IN'
-        )} exceeds Level 2 Underwriter delegated sanction limit (₹${LEVEL_2_UNDERWRITER_LIMIT.toLocaleString(
+        )} exceeds delegated sanction limit (₹${userAuthorityLimit.toLocaleString(
           'en-IN'
         )}). This application must be escalated to Level 3 Credit Head / Board Committee.`
       );
     }
   }
 
-  // Determine next status in canonical P4 workflow:
+  // Determine next status in canonical workflow:
   // SUBMITTED -> CREDIT_ASSESSMENT -> UNDERWRITING -> APPROVED -> AGREEMENT_PENDING -> READY_FOR_DISBURSEMENT -> DISBURSED
   let nextStatus: ApplicationStatus;
   let nextStage = 'SANCTIONED';
@@ -815,7 +830,7 @@ export async function submitUnderwritingDecision(
     return {
       ...decision,
       status: nextStatus,
-      approvalLevel: 2,
+      approvalLevel: matchingLevels[0]?.level || 2,
     };
   });
 
@@ -854,6 +869,29 @@ export async function submitUnderwritingDecision(
       },
       app.tenantId || undefined
     ).catch(() => {});
+
+    // Offer Engine Integration Hook
+    try {
+      const { OfferEngineService } = await import('../offers/offers.service');
+      await OfferEngineService.getInstance().generateOffer(
+        tenantId,
+        applicationId,
+        {
+          customOfferedAmount: Number(input.approvedAmount || app.requestedAmount),
+          customTenureMonths: input.approvedTenure || app.tenureMonths,
+          overrideRatePct: input.approvedRate || Number((app.product as any)?.interestRate || 12.0),
+          notes: input.reason || 'Underwriting final sanction',
+        },
+        {
+          id: actor.id,
+          email: actor.email,
+          roles: actor.roles,
+          tenantId,
+        }
+      );
+    } catch (offerErr) {
+      // Non-blocking for offline or simulated offers
+    }
   }
 
   // Synchronize case with Approval Authority Queue immediately so it is present in /approval-queue
@@ -960,6 +998,49 @@ export async function forwardToFinanceOfficer(
   const decision = app.underwriting?.decision;
   if (!decision || !['APPROVE', 'APPROVE_WITH_CONDITIONS'].includes(decision)) {
     throw new BadRequestError('Cannot forward to Finance: Application must have an approved underwriting decision.');
+  }
+
+  // Phase 9D Gate: Verify Offer acceptance from OfferEngineService
+  const tenantId = app.tenantId || actor.tenantId || 'tenant-adyapan-default';
+  try {
+    const { OfferEngineService } = await import('../offers/offers.service');
+    const offers = OfferEngineService.getInstance().getApplicationOffers(tenantId, applicationId);
+    const latestOffer = offers[0];
+    if (latestOffer) {
+      if (latestOffer.status === 'PENDING_ACCEPTANCE') {
+        throw new BadRequestError('Cannot forward to Finance: Sanctioned loan offer has not been accepted by the borrower.');
+      }
+      if (latestOffer.status === 'DECLINED') {
+        throw new BadRequestError('Cannot forward to Finance: Sanctioned loan offer was declined by the borrower.');
+      }
+      if (latestOffer.status === 'EXPIRED') {
+        throw new BadRequestError('Cannot forward to Finance: Sanctioned loan offer has expired.');
+      }
+      if (latestOffer.status !== 'ACCEPTED') {
+        throw new BadRequestError(`Cannot forward to Finance: Sanctioned loan offer is in '${latestOffer.status}' status.`);
+      }
+    }
+  } catch (err: any) {
+    if (err instanceof BadRequestError || err instanceof ForbiddenError) {
+      throw err;
+    }
+  }
+
+  // Phase 9D Gate: Verify Digital Agreement & Contract status
+  try {
+    const { contractsService } = await import('../contracts/contracts.service');
+    const contractStatus = await contractsService.getApplicationContractStatus(applicationId);
+    if (!contractStatus.hasAgreement && !['READY_FOR_DISBURSEMENT', 'DISBURSED'].includes(app.status)) {
+      // If no agreement created yet, create one or verify agreement readiness
+      await contractsService.generateDigitalAgreement(applicationId, {
+        id: actor.id,
+        tenantId,
+      });
+    }
+  } catch (err: any) {
+    if (err instanceof BadRequestError || err instanceof ForbiddenError) {
+      throw err;
+    }
   }
 
   const isAlreadyForwarded = app.status === 'READY_FOR_DISBURSEMENT';

@@ -33,7 +33,7 @@ export default function BorrowerPaymentsHubPage() {
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ['borrower-loans-payment'],
     queryFn: async () => {
-      const res = await api.get<{ data: any[] }>('/api/v1/borrower/loans');
+      const res = await api.get<{ data: any[] }>('/borrower/loans');
       const list = res.data?.data || res.data || [];
       if (list.length > 0 && !selectedLoanId) {
         setSelectedLoanId(list[0].id);
@@ -48,7 +48,7 @@ export default function BorrowerPaymentsHubPage() {
   // Repayment Mutation
   const payMutation = useMutation({
     mutationFn: async (payload: { loanId: string; amount: number; paymentMethod: string }) => {
-      const res = await api.post<{ data: any }>(`/api/v1/borrower/loans/${payload.loanId}/pay`, payload);
+      const res = await api.post<{ data: any }>(`/borrower/loans/${payload.loanId}/pay`, payload);
       return res.data?.data || res.data;
     },
     onSuccess: (data) => {

@@ -62,8 +62,22 @@ export class SandboxKycProvider implements KycProvider {
       };
     }
 
+    if (!req.fullName || !req.fullName.trim()) {
+      return {
+        status: 'FAILED',
+        panNumber: pan,
+        nameOnCard: '',
+        nameMatchScore: 0,
+        isPanValid: true,
+        isOperative: false,
+        category: 'INDIVIDUAL',
+        providerReference: `SBX-PAN-FAIL-${Date.now()}`,
+        verifiedAt: new Date().toISOString(),
+      };
+    }
+
     const isMismatch = this.forcedScenario === 'NAME_MISMATCH' || pan.endsWith('8888M');
-    const returnedName = isMismatch ? 'UNMATCHED NAME TEST' : req.fullName.toUpperCase();
+    const returnedName = isMismatch ? 'UNMATCHED NAME TEST' : req.fullName.trim().toUpperCase();
     const matchScore = isMismatch ? 35 : 98;
 
     return {
@@ -104,10 +118,36 @@ export class SandboxKycProvider implements KycProvider {
       };
     }
 
+    const last4 = req.aadhaarNumber ? req.aadhaarNumber.slice(-4) : '8842';
+
+    if (!req.fullName || !req.fullName.trim()) {
+      return {
+        status: 'FAILED',
+        aadhaarLast4: last4,
+        name: '',
+        gender: 'OTHER',
+        dateOfBirth: '',
+        address: {
+          line1: '',
+          city: '',
+          district: '',
+          state: '',
+          pincode: '',
+          country: 'India',
+        },
+        isMasked: true,
+        providerReference: `SBX-UIDAI-FAIL-${Date.now()}`,
+        verifiedAt: new Date().toISOString(),
+      };
+    }
+
+    const isMismatch = this.forcedScenario === 'NAME_MISMATCH' || (req.aadhaarNumber && req.aadhaarNumber.endsWith('8888'));
+    const returnedName = isMismatch ? 'UNMATCHED CITIZEN' : req.fullName.trim().toUpperCase();
+
     return {
       status: 'VERIFIED',
-      aadhaarLast4: '8842',
-      name: 'Adyapan Verified Borrower',
+      aadhaarLast4: last4,
+      name: returnedName,
       gender: 'MALE',
       dateOfBirth: '1992-06-15',
       address: {

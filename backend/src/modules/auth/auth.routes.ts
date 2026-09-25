@@ -5,7 +5,7 @@ import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { authLimiter } from '../../middleware/rateLimiter';
 import * as authService from './auth.service';
-import { changePasswordSchema, loginSchema, refreshSchema, registerSchema } from './auth.schema';
+import { changePasswordSchema, loginSchema, otpLoginSchema, refreshSchema, registerSchema } from './auth.schema';
 
 const router = Router();
 
@@ -24,6 +24,18 @@ router.post(
   asyncHandler(async (req, res) => {
     const { identifier, password } = req.body;
     const result = await authService.login(identifier, password);
+    res.cookie('refreshToken', result.refreshToken, cookieOptions);
+    return ok(res, { accessToken: result.accessToken, user: result.user });
+  }),
+);
+
+router.post(
+  '/otp-login',
+  authLimiter,
+  validate({ body: otpLoginSchema }),
+  asyncHandler(async (req, res) => {
+    const { mobile, otp } = req.body;
+    const result = await authService.loginWithOtp(mobile, otp);
     res.cookie('refreshToken', result.refreshToken, cookieOptions);
     return ok(res, { accessToken: result.accessToken, user: result.user });
   }),

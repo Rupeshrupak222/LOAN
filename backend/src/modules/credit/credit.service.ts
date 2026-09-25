@@ -81,6 +81,10 @@ export interface FinancialCapacitySummary {
     panOrKycStatus: string;
     kycStatus: string;
     riskCategory: string | null;
+    panNumber?: string | null;
+    aadhaarNumber?: string | null;
+    identifiers?: any[];
+    consents?: any[];
   };
 
   // Step 3: Document Checklist
@@ -225,6 +229,8 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
           employmentDetails: true,
           loans: true,
           documents: true,
+          CustomerIdentifier: true,
+          consents: { orderBy: { grantedAt: 'desc' } },
         },
       },
       documents: true,
@@ -482,6 +488,25 @@ export async function getFinancialCapacity(applicationId: string): Promise<Finan
       panOrKycStatus: customer.kycStatus === 'VERIFIED' ? 'PAN & Aadhaar Verified' : 'Verification Incomplete',
       kycStatus: customer.kycStatus,
       riskCategory: customer.riskCategory || null,
+      panNumber: (customer as any).CustomerIdentifier?.find((i: any) => i.idType === 'PAN')?.maskedValue || null,
+      aadhaarNumber: (customer as any).CustomerIdentifier?.find((i: any) => i.idType === 'AADHAAR')?.maskedValue || null,
+      identifiers: ((customer as any).CustomerIdentifier || []).map((i: any) => ({
+        id: i.id,
+        idType: i.idType,
+        maskedValue: i.maskedValue,
+        verificationStatus: i.verificationStatus,
+        verifiedAt: i.verifiedAt ? i.verifiedAt.toISOString() : null,
+        verifiedBy: i.verifiedBy,
+      })),
+      consents: ((customer as any).consents || []).map((c: any) => ({
+        id: c.id,
+        consentType: c.consentType,
+        purpose: c.purpose,
+        version: c.version,
+        granted: c.granted,
+        grantedAt: c.grantedAt ? c.grantedAt.toISOString() : new Date().toISOString(),
+        channel: c.channel,
+      })),
     },
 
     documentChecklist,
@@ -626,10 +651,17 @@ export async function verifyKycStep(
   await logAudit({
     userId: actor.id,
     role: 'CREDIT_ANALYST',
-    action: 'KYC_STEP_VERIFIED',
+    action: input.kycStatus === 'VERIFIED' ? 'KYC_MANUAL_ATTESTED' : 'KYC_STEP_VERIFIED',
     entity: 'LoanApplication',
     entityId: applicationId,
-    newValue: { kycStatus: input.kycStatus, remarks: input.remarks },
+    newValue: {
+      kycStatus: input.kycStatus,
+      remarks: input.remarks,
+      verificationMode: 'MANUAL_ATTESTATION',
+      attestedBy: actor.id,
+      attestedRole: actor.roles?.[0] || 'CREDIT_ANALYST',
+      attestedAt: new Date().toISOString(),
+    },
   });
 
   return { success: true, kycStatus: input.kycStatus, customer: result };
@@ -662,10 +694,16 @@ export async function verifyDocumentStep(
   await logAudit({
     userId: actor.id,
     role: 'CREDIT_ANALYST',
-    action: 'DOCUMENT_STEP_VERIFIED',
+    action: input.status === 'VERIFIED' ? 'DOCUMENT_MANUALLY_VERIFIED' : 'DOCUMENT_STEP_VERIFIED',
     entity: 'Document',
     entityId: input.documentId,
-    newValue: { status: input.status, rejectionReason: input.remarks },
+    newValue: {
+      status: input.status,
+      rejectionReason: input.remarks,
+      verificationMode: 'MANUAL_OPERATOR_REVIEW',
+      operatorId: actor.id,
+      operatorEmail: actor.email,
+    },
   });
 
   return { success: true, document: updated };
@@ -693,10 +731,15 @@ export async function batchVerifyDocumentsStep(
   await logAudit({
     userId: actor.id,
     role: 'CREDIT_ANALYST',
-    action: 'DOCUMENTS_BATCH_VERIFIED',
+    action: input.status === 'VERIFIED' ? 'DOCUMENT_BATCH_MANUALLY_VERIFIED' : 'DOCUMENTS_BATCH_VERIFIED',
     entity: 'LoanApplication',
     entityId: applicationId,
-    newValue: { documentIds: input.documentIds, status: input.status },
+    newValue: {
+      documentIds: input.documentIds,
+      status: input.status,
+      verificationMode: 'MANUAL_OPERATOR_REVIEW',
+      operatorId: actor.id,
+    },
   });
 
   return { success: true, updatedCount: count.count };

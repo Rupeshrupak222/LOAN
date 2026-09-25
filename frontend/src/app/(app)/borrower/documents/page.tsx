@@ -22,7 +22,7 @@ export default function BorrowerDocumentsPage() {
   const { data: homeData } = useQuery({
     queryKey: ['borrower-home'],
     queryFn: async () => {
-      const res = await api.get<{ data: any }>('/api/v1/borrower/home');
+      const res = await api.get<{ data: any }>('/borrower/home');
       return res.data?.data || res.data;
     },
   });
@@ -30,7 +30,7 @@ export default function BorrowerDocumentsPage() {
   const { data: requirements = [], isLoading: loadingReqs } = useQuery({
     queryKey: ['documents-requirements'],
     queryFn: async () => {
-      const res = await api.get<{ data: any }>('/api/v1/documents/applicable-requirements');
+      const res = await api.get<{ data: any }>('/documents/applicable-requirements');
       return res.data?.data?.requirements || [];
     },
   });
@@ -38,7 +38,7 @@ export default function BorrowerDocumentsPage() {
   const { data: documents = [], isLoading: loadingDocs, refetch } = useQuery({
     queryKey: ['my-documents'],
     queryFn: async () => {
-      const res = await api.get<{ data: any[] }>('/api/v1/documents');
+      const res = await api.get<{ data: any[] }>('/documents');
       return res.data?.data || [];
     },
   });

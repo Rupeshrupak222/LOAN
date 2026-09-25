@@ -635,3 +635,4 @@ export class TemplateService {
 }
 
 export const defaultTemplateService = new TemplateService();
+export const templateService = defaultTemplateService;

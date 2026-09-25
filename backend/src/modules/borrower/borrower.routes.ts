@@ -70,6 +70,47 @@ const applicationSchema = z.object({
   termsAccepted: z.boolean(),
 });
 
+const draftApplicationSchema = z.object({
+  applicationId: z.string().optional(),
+  productId: z.string().optional(),
+  requestedAmount: z.number().positive().optional(),
+  tenureMonths: z.number().int().min(1).max(120).optional(),
+  purpose: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  dob: z.string().optional(),
+  gender: z.string().optional(),
+  addressLine1: z.string().optional(),
+  addressLine2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  pincode: z.string().optional(),
+  employmentType: z.enum(['SALARIED', 'SELF_EMPLOYED', 'BUSINESS', 'PROFESSIONAL', 'STUDENT', 'FREELANCER', 'FARMER', 'OTHER']).optional(),
+  employerName: z.string().optional(),
+  designation: z.string().optional(),
+  workExperienceYears: z.number().optional(),
+  businessName: z.string().optional(),
+  businessRegistrationType: z.string().optional(),
+  gstin: z.string().optional(),
+  annualTurnover: z.number().optional(),
+  professionType: z.string().optional(),
+  institutionName: z.string().optional(),
+  courseName: z.string().optional(),
+  coApplicantName: z.string().optional(),
+  coApplicantRelation: z.string().optional(),
+  coApplicantIncome: z.number().optional(),
+  monthlyIncome: z.number().nonnegative().optional(),
+  existingEmiObligations: z.number().nonnegative().optional(),
+  panNumber: z.string().optional(),
+  aadhaarNumberMasked: z.string().optional(),
+  accountHolderName: z.string().optional(),
+  accountNumber: z.string().optional(),
+  ifscCode: z.string().optional(),
+  bankName: z.string().optional(),
+  accountType: z.enum(['SAVINGS', 'CURRENT']).optional(),
+  documentIds: z.array(z.string()).optional(),
+});
+
 const esignSchema = z.object({
   otp: z.string().length(6),
 });
@@ -84,6 +125,14 @@ const repaymentSchema = z.object({
   paymentMethod: z.enum(['UPI', 'NET_BANKING', 'DEBIT_CARD']),
   upiVpa: z.string().optional(),
   emiNumber: z.number().optional(),
+});
+
+const ptpSchema = z.object({
+  loanId: z.string().min(1),
+  promisedAmount: z.number().positive(),
+  promisedDate: z.string().min(1),
+  paymentMode: z.enum(['UPI', 'NET_BANKING', 'DEBIT_CARD', 'NACH']).optional(),
+  notes: z.string().optional(),
 });
 
 const supportTicketSchema = z.object({
@@ -121,6 +170,34 @@ router.post(
   })
 );
 
+// 3.1 Get Active / In-Flight Application or Draft
+router.get(
+  '/applications/active',
+  asyncHandler(async (req, res) => {
+    const activeApp = await borrowerService.getActiveBorrowerApplication(req.user!.id, req.user?.tenantId);
+    res.json(success(activeApp));
+  })
+);
+
+// 3.2 Save / Resume Application Draft
+router.post(
+  '/applications/draft',
+  validate(draftApplicationSchema),
+  asyncHandler(async (req, res) => {
+    const draft = await borrowerService.saveBorrowerDraftApplication(req.user!.id, req.body, req.user?.tenantId);
+    res.json(success(draft));
+  })
+);
+
+// 3.3 Get Specific Application Details by ID
+router.get(
+  '/applications/:applicationId',
+  asyncHandler(async (req, res) => {
+    const app = await borrowerService.getBorrowerApplicationById(req.user!.id, req.params.applicationId, req.user?.tenantId);
+    res.json(success(app));
+  })
+);
+
 // 4. Digital Loan Application Submission
 router.post(
   '/apply',
@@ -131,7 +208,25 @@ router.post(
   })
 );
 
-// 5. Get Statutory Key Fact Statement (KFS)
+// 5. List All Borrower Offers
+router.get(
+  '/offers',
+  asyncHandler(async (req, res) => {
+    const offers = await borrowerService.getBorrowerOffers(req.user!.id, req.user?.tenantId);
+    res.json(success(offers));
+  })
+);
+
+// 5.1 Get Specific Offer Details
+router.get(
+  '/offers/:offerId',
+  asyncHandler(async (req, res) => {
+    const offer = await borrowerService.getBorrowerOfferDetails(req.user!.id, req.params.offerId, req.user?.tenantId);
+    res.json(success(offer));
+  })
+);
+
+// 5.2 Get Statutory Key Fact Statement (KFS)
 router.get(
   '/offers/:offerId/kfs',
   asyncHandler(async (req, res) => {
@@ -144,8 +239,59 @@ router.get(
 router.post(
   '/offers/:offerId/accept',
   asyncHandler(async (req, res) => {
-    const result = await borrowerService.acceptBorrowerOffer(req.user!.id, req.params.offerId, req.user?.tenantId);
+    const result = await borrowerService.acceptBorrowerOffer(req.user!.id, req.params.offerId, req.body, req.user?.tenantId);
     res.json(success(result));
+  })
+);
+
+// 6.1 Decline Loan Offer
+router.post(
+  '/offers/:offerId/decline',
+  asyncHandler(async (req, res) => {
+    const result = await borrowerService.declineBorrowerOffer(req.user!.id, req.params.offerId, req.body, req.user?.tenantId);
+    res.json(success(result));
+  })
+);
+
+// 6.2 Get Digital Loan Agreement & Contract Status
+router.get(
+  '/applications/:applicationId/agreement',
+  asyncHandler(async (req, res) => {
+    const agreement = await borrowerService.getBorrowerAgreement(req.user!.id, req.params.applicationId, req.user?.tenantId);
+    res.json(success(agreement));
+  })
+);
+
+router.get(
+  '/agreements/:applicationId',
+  asyncHandler(async (req, res) => {
+    const agreement = await borrowerService.getBorrowerAgreement(req.user!.id, req.params.applicationId, req.user?.tenantId);
+    res.json(success(agreement));
+  })
+);
+
+router.get(
+  '/applications/:applicationId/contract-status',
+  asyncHandler(async (req, res) => {
+    const agreement = await borrowerService.getBorrowerAgreement(req.user!.id, req.params.applicationId, req.user?.tenantId);
+    res.json(success(agreement));
+  })
+);
+
+// 6.3 Pre-Disbursement, Finance Processing & Payout Status Visibility
+router.get(
+  '/applications/:applicationId/disbursement-status',
+  asyncHandler(async (req, res) => {
+    const status = await borrowerService.getBorrowerDisbursementStatus(req.user!.id, req.params.applicationId, req.user?.tenantId);
+    res.json(success(status));
+  })
+);
+
+router.get(
+  '/disbursement-status/:applicationId',
+  asyncHandler(async (req, res) => {
+    const status = await borrowerService.getBorrowerDisbursementStatus(req.user!.id, req.params.applicationId, req.user?.tenantId);
+    res.json(success(status));
   })
 );
 
@@ -207,6 +353,70 @@ router.post(
   })
 );
 
+router.post(
+  '/payments',
+  validate(repaymentSchema),
+  asyncHandler(async (req, res) => {
+    const result = await borrowerService.processBorrowerRepayment(req.user!.id, req.body, req.user?.tenantId);
+    res.json(success(result));
+  })
+);
+
+// 11.1 Payment History & Transactions Ledger
+router.get(
+  '/payments',
+  asyncHandler(async (req, res) => {
+    const loanId = req.query.loanId ? String(req.query.loanId) : undefined;
+    const payments = await borrowerService.getBorrowerPayments(req.user!.id, loanId, req.user?.tenantId);
+    res.json(success(payments));
+  })
+);
+
+router.get(
+  '/loans/:loanId/payments',
+  asyncHandler(async (req, res) => {
+    const payments = await borrowerService.getBorrowerPayments(req.user!.id, req.params.loanId, req.user?.tenantId);
+    res.json(success(payments));
+  })
+);
+
+// 11.2 Authoritative Overdue Summary & Delinquency (Phase M7)
+router.get(
+  '/overdue',
+  asyncHandler(async (req, res) => {
+    const summary = await borrowerService.getBorrowerOverdueSummary(req.user!.id, req.user?.tenantId);
+    res.json(success(summary));
+  })
+);
+
+// 11.3 Promise to Pay (PTP) Registration (Phase M7)
+router.post(
+  '/ptp',
+  validate(ptpSchema),
+  asyncHandler(async (req, res) => {
+    const ptp = await borrowerService.createBorrowerPtp(req.user!.id, req.body, req.user?.tenantId);
+    res.json(success(ptp));
+  })
+);
+
+// 11.4 Promise to Pay (PTP) History
+router.get(
+  '/ptp',
+  asyncHandler(async (req, res) => {
+    const loanId = req.query.loanId ? String(req.query.loanId) : undefined;
+    const ptps = await borrowerService.getBorrowerPtps(req.user!.id, loanId, req.user?.tenantId);
+    res.json(success(ptps));
+  })
+);
+
+router.get(
+  '/loans/:loanId/ptp',
+  asyncHandler(async (req, res) => {
+    const ptps = await borrowerService.getBorrowerPtps(req.user!.id, req.params.loanId, req.user?.tenantId);
+    res.json(success(ptps));
+  })
+);
+
 // 12. No-Objection Certificate (NOC)
 router.get(
   '/loans/:loanId/noc',
@@ -216,13 +426,66 @@ router.get(
   })
 );
 
-// 13. Create Support / Grievance Ticket
-router.post(
-  '/support/tickets',
-  validate(supportTicketSchema),
+// 12.1 Authoritative Statement of Account (SOA)
+router.get(
+  '/loans/:loanId/statement',
   asyncHandler(async (req, res) => {
-    const ticket = await borrowerService.createBorrowerSupportTicket(req.user!.id, req.body, req.user?.tenantId);
-    res.status(201).json(success(ticket));
+    const statement = await borrowerService.getBorrowerLoanStatement(req.user!.id, req.params.loanId, req.user?.tenantId);
+    res.json(success(statement));
+  })
+);
+
+
+// 14. Real-Time Borrower Journey State
+router.get(
+  '/journey-state',
+  asyncHandler(async (req, res) => {
+    const journey = await borrowerService.getBorrowerJourneyState(req.user!.id, req.user?.tenantId);
+    res.json(success(journey));
+  })
+);
+
+// 15. Consents Ledger & Audit
+router.get(
+  '/consents',
+  asyncHandler(async (req, res) => {
+    const consents = await borrowerService.getBorrowerConsents(req.user!.id, req.user?.tenantId);
+    res.json(success(consents));
+  })
+);
+
+router.post(
+  '/consents',
+  asyncHandler(async (req, res) => {
+    const consent = await borrowerService.recordBorrowerConsent(req.user!.id, req.body, req.user?.tenantId);
+    res.status(201).json(success(consent));
+  })
+);
+
+// 16. Borrower Document Vault
+router.get(
+  '/documents',
+  asyncHandler(async (req, res) => {
+    const documents = await borrowerService.getBorrowerDocuments(req.user!.id, req.user?.tenantId);
+    res.json(success(documents));
+  })
+);
+
+// 17. Borrower Detailed Profile
+router.get(
+  '/profile',
+  asyncHandler(async (req, res) => {
+    const profile = await borrowerService.getBorrowerDetailedProfile(req.user!.id, req.user?.tenantId);
+    res.json(success(profile));
+  })
+);
+
+// 18. Update Borrower Profile
+router.patch(
+  '/profile',
+  asyncHandler(async (req, res) => {
+    const updated = await borrowerService.updateBorrowerProfile(req.user!.id, req.body, req.user?.tenantId);
+    res.json(success(updated));
   })
 );
 

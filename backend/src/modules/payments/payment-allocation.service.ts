@@ -171,9 +171,12 @@ export class PaymentAllocationService {
     // -------------------------------------------------------------------------
     // 2. OUTSTANDING LOAN PRINCIPAL DIRECT AMORTIZATION (FORECLOSURE / PREPAYMENT)
     // -------------------------------------------------------------------------
-    let currentOutstandingPrincipal = new Decimal(loan.outstandingPrincipal);
-    if (remainingFunds.greaterThan(0) && currentOutstandingPrincipal.greaterThan(0)) {
-      const extraPrincipal = Decimal.min(remainingFunds, currentOutstandingPrincipal);
+    let remainingOutstandingPrincipal = Decimal.max(
+      0,
+      new Decimal(loan.outstandingPrincipal).minus(allocatedPrincipal)
+    );
+    if (remainingFunds.greaterThan(0) && remainingOutstandingPrincipal.greaterThan(0)) {
+      const extraPrincipal = Decimal.min(remainingFunds, remainingOutstandingPrincipal);
       allocatedPrincipal = allocatedPrincipal.plus(extraPrincipal);
       remainingFunds = remainingFunds.minus(extraPrincipal);
 
@@ -203,7 +206,7 @@ export class PaymentAllocationService {
     // -------------------------------------------------------------------------
     // 4. UPDATE LOAN RECORD BALANCES
     // -------------------------------------------------------------------------
-    const newOutstandingPrincipal = Decimal.max(0, currentOutstandingPrincipal.minus(allocatedPrincipal));
+    const newOutstandingPrincipal = Decimal.max(0, new Decimal(loan.outstandingPrincipal).minus(allocatedPrincipal));
     const newOutstandingInterest = Decimal.max(0, new Decimal(loan.outstandingInterest).minus(allocatedInterest));
     const newOutstandingFees = Decimal.max(
       0,

@@ -26,10 +26,10 @@ router.post('/send', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
-router.post('/verify', (req: Request, res: Response, next: NextFunction) => {
+router.post('/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = verifyOtpSchema.parse(req.body);
-    const result = otpService.verifyOtp(data);
+    const result = await otpService.verifyOtp(data);
     res.json(result);
   } catch (err) {
     next(err);

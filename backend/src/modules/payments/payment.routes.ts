@@ -45,11 +45,18 @@ router.post(
       req.headers['x-webhook-signature'] ||
       req.headers['x-signature'] ||
       '') as string;
+    const timestamp = (req.headers['x-webhook-timestamp'] ||
+      req.headers['x-timestamp'] ||
+      '') as string;
+
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
 
     const result = await paymentWebhookService.ingestWebhook({
       eventType: req.body?.event || req.body?.type || 'payment.captured',
       provider: (req.headers['x-provider'] as string) || 'SANDBOX',
       signature,
+      timestamp,
+      rawBody,
       payload: req.body || {},
     });
 
