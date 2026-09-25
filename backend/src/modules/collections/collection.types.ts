@@ -300,3 +300,32 @@ export interface PartnerSafeCollectionSummary {
   hasActivePtp: boolean;
   lastPaymentDate: string | null;
 }
+
+export type CollectionEventType =
+  | 'CASE_CREATED'
+  | 'CASE_ASSIGNED'
+  | 'CASE_REASSIGNED'
+  | 'CONTACT_LOGGED'
+  | 'PTP_CREATED'
+  | 'PTP_UPDATED'
+  | 'PTP_KEPT'
+  | 'PTP_BROKEN'
+  | 'ESCALATED'
+  | 'CASE_ON_HOLD'
+  | 'CASE_RESOLVED'
+  | 'CASE_CLOSED';
+
+export interface CollectionCaseEventRecord {
+  id: string;
+  caseId: string;
+  eventType: CollectionEventType;
+  actorId?: string;
+  actorEmail?: string;
+  actorRole?: string;
+  previousState?: string;
+  newState?: string;
+  notes?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+

@@ -18,7 +18,7 @@ export default function CollectionsDashboardPage() {
     queryFn: () => collectionsApi.getDashboard(),
   });
 
-  const summary = dashboard?.summary || {};
+  const summary = (dashboard?.summary || {}) as any;
   const activeCases = summary.activeCases || 0;
   const totalDue = summary.totalDueAmount || 0;
   const totalOverdue = summary.totalOverdueAmount || 0;

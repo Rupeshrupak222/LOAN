@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
@@ -13,15 +13,19 @@ import {
   FileText,
   AlertCircle,
   TrendingUp,
+  Award,
+  Layers,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button, Spinner, Card, Badge } from '@/components/ui';
 
 export default function BorrowerLoansHubPage() {
+  const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'CLOSED'>('ALL');
+
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ['borrower-loans'],
     queryFn: async () => {
-      const res = await api.get<{ data: any[] }>('/api/v1/borrower/loans');
+      const res = await api.get<{ data: any[] }>('/borrower/loans');
       return res.data?.data || res.data || [];
     },
   });
@@ -34,6 +38,16 @@ export default function BorrowerLoansHubPage() {
       </div>
     );
   }
+
+  const filteredLoans = loans.filter((loan: any) => {
+    const isClosed = loan.status === 'CLOSED' || loan.status === 'SETTLED' || loan.isNocAvailable;
+    if (filter === 'ACTIVE') return !isClosed;
+    if (filter === 'CLOSED') return isClosed;
+    return true;
+  });
+
+  const activeCount = loans.filter((l: any) => l.status !== 'CLOSED' && l.status !== 'SETTLED' && !l.isNocAvailable).length;
+  const closedCount = loans.filter((l: any) => l.status === 'CLOSED' || l.status === 'SETTLED' || l.isNocAvailable).length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 py-4 animate-in fade-in duration-300">
@@ -52,7 +66,7 @@ export default function BorrowerLoansHubPage() {
               My Loan Accounts & Facilities
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Manage your active loan facilities, repayment amortization schedules, and NOCs
+              Manage your active loan facilities, repayment amortization schedules, and NOC certificates
             </p>
           </div>
         </div>
@@ -64,11 +78,47 @@ export default function BorrowerLoansHubPage() {
         </Link>
       </div>
 
+      {/* Filter Tabs */}
+      {loans.length > 0 && (
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 w-fit">
+          <button
+            onClick={() => setFilter('ALL')}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all ${
+              filter === 'ALL'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            All Loans ({loans.length})
+          </button>
+          <button
+            onClick={() => setFilter('ACTIVE')}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all ${
+              filter === 'ACTIVE'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Active ({activeCount})
+          </button>
+          <button
+            onClick={() => setFilter('CLOSED')}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all ${
+              filter === 'CLOSED'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Closed & Settled ({closedCount})
+          </button>
+        </div>
+      )}
+
       {/* Loans Grid / List */}
-      {loans.length > 0 ? (
+      {filteredLoans.length > 0 ? (
         <div className="space-y-4">
-          {loans.map((loan: any) => {
-            const isClosed = loan.status === 'CLOSED';
+          {filteredLoans.map((loan: any) => {
+            const isClosed = loan.status === 'CLOSED' || loan.status === 'SETTLED' || loan.isNocAvailable;
             const progress = Math.min(100, Math.round((loan.paidEmis / (loan.totalEmis || 1)) * 100));
 
             return (
@@ -92,6 +142,11 @@ export default function BorrowerLoansHubPage() {
                       >
                         {loan.status}
                       </Badge>
+                      {isClosed && (
+                        <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          NOC Ready
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">{loan.productName}</h3>
                   </div>
@@ -111,13 +166,15 @@ export default function BorrowerLoansHubPage() {
                       {loan.paidEmis} of {loan.totalEmis} EMIs Paid ({progress}%)
                     </span>
                     <span>
-                      Outstanding: <strong className="text-slate-900 dark:text-white">₹{loan.outstandingPrincipal?.toLocaleString('en-IN')}</strong>
+                      Outstanding: <strong className={isClosed ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}>
+                        ₹{loan.outstandingPrincipal?.toLocaleString('en-IN')}
+                      </strong>
                     </span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        isClosed ? 'bg-slate-400 dark:bg-slate-600' : 'bg-gradient-to-r from-blue-500 to-emerald-400'
+                        isClosed ? 'bg-emerald-500' : 'bg-gradient-to-r from-blue-500 to-emerald-400'
                       }`}
                       style={{ width: `${progress}%` }}
                     />
@@ -132,8 +189,12 @@ export default function BorrowerLoansHubPage() {
                         Next EMI: <strong className="text-emerald-600 dark:text-emerald-400">₹{loan.nextEmiAmount?.toLocaleString('en-IN')}</strong> due on{' '}
                         <span className="text-slate-800 dark:text-slate-200 font-medium">{loan.nextEmiDueDate}</span>
                       </span>
+                    ) : isClosed ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Loan fully paid and settled.
+                      </span>
                     ) : (
-                      <span className="text-slate-500 dark:text-slate-400">Loan fully paid and settled.</span>
+                      <span className="text-slate-500">As per repayment schedule</span>
                     )}
                   </div>
 
@@ -144,10 +205,19 @@ export default function BorrowerLoansHubPage() {
                         variant="outline"
                         className="w-full sm:w-auto rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white shadow-2xs"
                       >
-                        <FileText className="w-3.5 h-3.5 mr-1.5" /> Servicing & Statement
+                        <FileText className="w-3.5 h-3.5 mr-1.5" /> Servicing & SOA
                       </Button>
                     </Link>
-                    {!isClosed && (
+                    {isClosed ? (
+                      <Link href={`/borrower/loans/${loan.id}`} className="w-full sm:w-auto">
+                        <Button
+                          size="sm"
+                          className="w-full sm:w-auto rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-sm"
+                        >
+                          <Award className="w-3.5 h-3.5 mr-1" /> View NOC
+                        </Button>
+                      </Link>
+                    ) : (
                       <Link href="/borrower/payments" className="w-full sm:w-auto">
                         <Button
                           size="sm"
@@ -167,16 +237,22 @@ export default function BorrowerLoansHubPage() {
         <div className="p-12 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center space-y-4 shadow-sm">
           <CreditCard className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" />
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">No Loan Accounts Found</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              {filter === 'ALL' ? 'No Loan Accounts Found' : filter === 'ACTIVE' ? 'No Active Loans' : 'No Closed Loans'}
+            </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
-              You do not have any active or past loans. Apply today to get instant digital credit with flexible tenures.
+              {filter === 'CLOSED'
+                ? 'You do not have any closed loans yet. Settled loans with NOC certificates will appear here.'
+                : 'Apply today to get instant digital credit with flexible tenures.'}
             </p>
           </div>
-          <Link href="/borrower/apply">
-            <Button size="sm" className="rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Start Instant Application
-            </Button>
-          </Link>
+          {filter !== 'CLOSED' && (
+            <Link href="/borrower/apply">
+              <Button size="sm" className="rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-sm">
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Start Instant Application
+              </Button>
+            </Link>
+          )}
         </div>
       )}
     </div>

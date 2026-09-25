@@ -552,31 +552,81 @@ function FinanceWorkspaceContent({ applicationId }: { applicationId: string }) {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              {gates?.checks?.map((gate: any) => (
-                <div
-                  key={gate.name || gate.code}
-                  className={cn(
-                    'p-3 rounded-xl border flex items-center justify-between transition-colors',
-                    gate.passed
-                      ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300'
-                      : 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-300'
-                  )}
-                >
-                  <div className="flex items-center gap-2.5">
-                    {gate.passed ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                    )}
-                    <span className="font-semibold text-xs">{gate.description}</span>
+            {gates?.categories && gates.categories.length > 0 ? (
+              <div className="space-y-4">
+                {gates.categories.map((cat: any) => (
+                  <div
+                    key={cat.category}
+                    className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <span className={cn(
+                          'h-2 w-2 rounded-full',
+                          cat.status === 'VERIFIED' ? 'bg-emerald-500' : 'bg-rose-500'
+                        )} />
+                        {cat.title}
+                      </span>
+                      <Badge variant={cat.status === 'VERIFIED' ? 'success' : 'danger'} className="text-[10px] font-bold">
+                        {cat.status}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {cat.items?.map((item: any) => (
+                        <div
+                          key={item.code}
+                          className={cn(
+                            'p-2.5 rounded-lg border flex items-center justify-between text-xs',
+                            item.passed
+                              ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/30 text-emerald-900 dark:text-emerald-300'
+                              : 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/30 text-rose-900 dark:text-rose-300'
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            {item.passed ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                            )}
+                            <span className="font-medium text-[11px]">{item.description}</span>
+                          </div>
+                          <Badge variant={item.passed ? 'success' : 'danger'} className="text-[8px] py-0 px-1 font-bold">
+                            {item.passed ? 'PASS' : 'FAIL'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <Badge variant={gate.passed ? 'success' : 'danger'} className="text-[9px] py-0 font-bold">
-                    {gate.passed ? 'PASSED' : 'PENDING'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                {gates?.checks?.map((gate: any) => (
+                  <div
+                    key={gate.name || gate.code}
+                    className={cn(
+                      'p-3 rounded-xl border flex items-center justify-between transition-colors',
+                      gate.passed
+                        ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300'
+                        : 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-300'
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {gate.passed ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                      )}
+                      <span className="font-semibold text-xs">{gate.description}</span>
+                    </div>
+                    <Badge variant={gate.passed ? 'success' : 'danger'} className="text-[9px] py-0 font-bold">
+                      {gate.passed ? 'PASSED' : 'PENDING'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {!gates?.canDisburse && (
               <div className="mt-4 p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2.5">

@@ -24,6 +24,7 @@ export interface PanVerificationResult {
 
 export interface AadhaarDigilockerRequest {
   aadhaarNumber?: string;
+  fullName?: string;
   otp?: string;
   consentId: string;
   redirectUrl?: string;

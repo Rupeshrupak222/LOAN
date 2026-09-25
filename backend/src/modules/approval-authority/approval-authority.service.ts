@@ -91,7 +91,7 @@ export class ApprovalAuthorityService {
         code: 'LEVEL_3_CREDIT_HEAD',
         name: 'Head of Credit / Vice President Sanction',
         description: 'Sanction limit up to ₹1,00,00,000 covering high exposure and subprime risk bands.',
-        roles: ['CREDIT_HEAD', 'UNDERWRITER', 'SUPER_ADMIN', 'COMPANY_ADMIN'],
+        roles: ['CREDIT_HEAD', 'SUPER_ADMIN', 'COMPANY_ADMIN'],
         minAmount: 2500000.01,
         maxAmount: 10000000,
         allowedRiskGrades: ['A', 'B', 'C', 'D', 'E'],
@@ -715,20 +715,21 @@ export class ApprovalAuthorityService {
   }
 
   public getApprovalQueue(
-    actor: ApprovalActorContext,
+    actor?: ApprovalActorContext,
     filter?: { tab?: string; search?: string }
   ): ApprovalTask[] {
-    const tenantId = actor.tenantId || 'tenant-adyapan-default';
-    const isSuperAdmin = actor.roles.includes('SUPER_ADMIN');
-    const isAdmin = actor.roles.includes('ADMIN') || actor.roles.includes('COMPANY_ADMIN');
+    const tenantId = actor?.tenantId || 'tenant-adyapan-default';
+    const roles = actor?.roles || ['SUPER_ADMIN'];
+    const isSuperAdmin = roles.includes('SUPER_ADMIN');
+    const isAdmin = roles.includes('ADMIN') || roles.includes('COMPANY_ADMIN');
     const isUnderwriterOrApprover =
-      actor.roles.includes('UNDERWRITER') ||
-      actor.roles.includes('CREDIT_HEAD') ||
-      actor.roles.includes('BRANCH_MANAGER') ||
+      roles.includes('UNDERWRITER') ||
+      roles.includes('CREDIT_HEAD') ||
+      roles.includes('BRANCH_MANAGER') ||
       isAdmin ||
       isSuperAdmin;
 
-    const activeDelegations = this.getActiveDelegationsForUser(tenantId, actor.id);
+    const activeDelegations = actor?.id ? this.getActiveDelegationsForUser(tenantId, actor.id) : [];
 
     const tasks: ApprovalTask[] = [];
 
@@ -737,7 +738,7 @@ export class ApprovalAuthorityService {
       if (!isSuperAdmin && !this.matchesTenant(task.tenantId, tenantId)) continue;
 
       // Check role assignment or delegation
-      const hasDirectRole = isUnderwriterOrApprover || task.assignedRoles.some((r) => actor.roles.includes(r));
+      const hasDirectRole = isUnderwriterOrApprover || (actor?.roles ? task.assignedRoles.some((r) => actor.roles.includes(r)) : true);
       const hasDelegatedAuthority = activeDelegations.some((d) =>
         task.assignedRoles.includes(d.delegatorRole)
       );
@@ -749,8 +750,8 @@ export class ApprovalAuthorityService {
       // Branch restriction check
       const policy = this.getPolicyById(task.tenantId, task.policyId);
       const levelDef = policy.levels.find((l) => l.level === task.level);
-      if (levelDef?.branchRestricted && !isSuperAdmin && !isAdmin && actor.branchId) {
-        if (task.branchId && task.branchId !== actor.branchId) {
+      if (levelDef?.branchRestricted && !isSuperAdmin && !isAdmin && actor?.branchId) {
+        if (task.branchId && task.branchId !== actor?.branchId) {
           continue;
         }
       }

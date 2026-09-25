@@ -69,3 +69,33 @@ export function authorize(...allowedRoles: string[]) {
     next();
   };
 }
+
+/** Attaches req.user if a valid token is present, but does NOT throw if omitted. */
+export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+
+  if (!token) {
+    return next();
+  }
+
+  if (securityService.isTokenRevoked(token)) {
+    return next();
+  }
+
+  try {
+    const payload = verifyAccessToken(token);
+    if (payload.type === 'access') {
+      req.user = {
+        id: payload.sub,
+        email: payload.email,
+        roles: payload.roles,
+        tenantId: payload.tenantId || 'tenant-adyapan-default',
+      };
+    }
+  } catch {
+    // Proceed without throwing - allows public/guest access
+  }
+  next();
+}
+

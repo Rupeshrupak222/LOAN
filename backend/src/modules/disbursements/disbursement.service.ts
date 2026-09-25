@@ -1,11 +1,6 @@
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError, ForbiddenError } from '../../common/errors';
-import { calculateEmi } from '../finance/emi';
-import { Money } from '../finance/money';
-import { generateLoanNo } from '../shared/codes';
-import { logAudit } from '../audit/audit.service';
-import { sendNotification } from '../notifications/notification.service';
-import { communicationService } from '../communication/communication.service';
+import { ForbiddenError } from '../../common/errors';
+import { financeService } from '../finance/finance.service';
 import type { ExecuteDisbursementInput } from './disbursement.schema';
 
 export async function getReadyForDisbursementQueue(actor?: {
@@ -98,217 +93,25 @@ export async function executeDisbursement(
     throw new ForbiddenError('Access forbidden: You do not have permission to disburse loans.');
   }
 
-  const app = await prisma.loanApplication.findUnique({
-    where: { id: input.applicationId },
-    include: {
-      customer: { include: { bankAccounts: true } },
-      product: true,
-      branch: true,
-    },
-  });
-  if (!app) throw new NotFoundError('Loan application not found');
-
-  // Multi-Tenant Isolation & Anti-IDOR Check
-  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
-    if (actor.tenantId && app.tenantId && app.tenantId !== actor.tenantId) {
-      throw new ForbiddenError('Access forbidden: Application belongs to another institution');
-    }
-    if (
-      (actor.roles?.includes('BRANCH_MANAGER') || actor.roles?.includes('LOAN_OFFICER')) &&
-      actor.branchId &&
-      app.customer?.branchId &&
-      app.customer.branchId !== actor.branchId
-    ) {
-      throw new ForbiddenError('Access forbidden: Application belongs to another branch');
-    }
-  }
-
-  // Pre-Disbursement Mandatory Checklist
-  if (!['APPROVED', 'AGREEMENT_PENDING', 'READY_FOR_DISBURSEMENT'].includes(app.status)) {
-    throw new BadRequestError(`Cannot disburse loan application in status ${app.status}. Must be APPROVED or READY_FOR_DISBURSEMENT.`);
-  }
-
-  if (app.customer.kycStatus !== 'VERIFIED') {
-    throw new BadRequestError(`Pre-disbursement check failed: Customer KYC status is ${app.customer.kycStatus}. Must be VERIFIED before fund release.`);
-  }
-
-  if (app.customer.status === 'BLOCKED' || app.customer.status === 'INACTIVE') {
-    throw new BadRequestError(`Pre-disbursement check failed: Customer account is ${app.customer.status}.`);
-  }
-
-  const hasBankAccount = (app.customer.bankAccounts && app.customer.bankAccounts.length > 0) || Boolean(app.customer.bankAccountNo);
-  if (!hasBankAccount) {
-    throw new BadRequestError(`Pre-disbursement check failed: No valid bank account on record for fund release.`);
-  }
-
-  if (app.product.isActive === false) {
-    throw new BadRequestError(`Pre-disbursement check failed: Loan product ${app.product.code} is inactive.`);
-  }
-
-  const principalNum = Number(app.requestedAmount);
-
-  // Segregation of Duties: Super Admin cannot execute operational disbursements
+  // Segregation of Duties: Super Admin cannot execute operational disbursements alone
   if (actor.roles?.includes('SUPER_ADMIN') && !actor.roles.some((r) => ['FINANCE_OFFICER', 'DISBURSEMENT_OFFICER', 'COMPANY_ADMIN', 'ADMIN'].includes(r))) {
     throw new ForbiddenError(
       'Access forbidden: Super Admin is a platform control-plane role and cannot execute operational disbursements.'
     );
   }
 
-  // Enforce Payout Limits
-  let payoutLimit = 10000000; // Default ₹1 Crore for Finance Officer / Admin
-  if (actor.roles?.includes('DISBURSEMENT_OFFICER') && !actor.roles?.includes('FINANCE_OFFICER')) {
-    payoutLimit = 5000000; // ₹50 Lakhs for junior Disbursement Officer
-  }
-  if (principalNum > payoutLimit) {
-    throw new BadRequestError(
-      `Payout amount of ₹${principalNum.toLocaleString('en-IN')} exceeds authorized officer payout limit of ₹${payoutLimit.toLocaleString('en-IN')}. Requires senior committee authorization.`
-    );
-  }
-
-  const rateNum = Number(app.product.interestRate);
-  const tenure = app.tenureMonths;
-
-  // Calculate EMI & schedule
-  const emiResult = calculateEmi(principalNum, rateNum, tenure);
-  const emiAmount = emiResult.emi;
-  const loanNo = generateLoanNo();
-  const disbursementDate = new Date();
-  const maturityDate = new Date();
-  maturityDate.setMonth(maturityDate.getMonth() + tenure);
-
-  const firstDueDate = new Date();
-  firstDueDate.setMonth(firstDueDate.getMonth() + 1);
-
-  // Atomic database transaction for financial integrity
-  const loan = await prisma.$transaction(async (tx) => {
-    // 1. Create Loan Account
-    const createdLoan = await tx.loan.create({
-      data: {
-        loanNo,
-        applicationId: app.id,
-        customerId: app.customerId,
-        productId: app.productId,
-        branchId: app.branchId || app.customer.branchId,
-        tenantId: app.tenantId || actor.tenantId,
-        principal: Money.toDb(principalNum),
-        interestRate: Money.round(rateNum).toFixed(3),
-        tenureMonths: tenure,
-        emiAmount,
-        disbursementDate,
-        maturityDate,
-        outstandingPrincipal: Money.toDb(principalNum),
-        outstandingInterest: '0.00',
-        outstandingFees: '0.00',
-        nextDueDate: firstDueDate,
-        status: 'ACTIVE',
-      },
-    });
-
-    // 2. Generate and persist Repayment Schedule
-    const scheduleData = emiResult.schedule.map((row) => {
-      const dueDate = new Date();
-      dueDate.setMonth(dueDate.getMonth() + row.emiNumber);
-
-      return {
-        loanId: createdLoan.id,
-        emiNumber: row.emiNumber,
-        dueDate,
-        principal: row.principal,
-        interest: row.interest,
-        fees: '0.00',
-        totalDue: row.emi,
-        paidAmount: '0.00',
-        outstanding: row.emi,
-        status: 'UPCOMING' as const,
-      };
-    });
-
-    await tx.repaymentScheduleItem.createMany({ data: scheduleData });
-
-    // 3. Create Disbursement Record
-    const disbMethod = input.disbursementMethod || 'IMPS';
-    const disbRef = input.referenceNumber || (input as any).reference || `DISB-TXN-${Date.now()}`;
-
-    await tx.disbursement.create({
-      data: {
-        loanId: createdLoan.id,
-        amount: Money.toDb(principalNum),
-        method: disbMethod,
-        reference: disbRef,
-        status: 'COMPLETED',
-        disbursedBy: actor.email,
-      },
-    });
-
-    // 4. Create Transaction Ledger Entry (DEBIT for fund release)
-    await tx.transaction.create({
-      data: {
-        loanId: createdLoan.id,
-        type: 'DISBURSEMENT',
-        direction: 'DEBIT',
-        amount: Money.toDb(principalNum),
-        reference: disbRef,
-        description: `Disbursement of principal via ${disbMethod}. Ref: ${disbRef}`,
-      },
-    });
-
-    // 5. Update Application Status to DISBURSED
-    await tx.loanApplication.update({
-      where: { id: app.id },
-      data: { status: 'DISBURSED' },
-    });
-
-    await tx.applicationStatusHistory.create({
-      data: {
-        applicationId: app.id,
-        fromStatus: app.status,
-        toStatus: 'DISBURSED',
-        changedBy: actor.email,
-        reason: `Loan disbursed with account #${loanNo}. Ref: ${input.referenceNumber}`,
-      },
-    });
-
-    return createdLoan;
-  }, { maxWait: 10000, timeout: 30000 });
-
-  await logAudit({
-    userId: actor.id,
-    role: actor.roles[0],
-    action: 'LOAN_DISBURSED',
-    entity: 'Loan',
-    entityId: loan.id,
-    newValue: {
-      loanNo,
-      amount: principalNum,
-      method: input.disbursementMethod,
-      reference: input.referenceNumber,
-    },
-  });
-
-  // Async non-blocking notification
-  void sendNotification({
-    customerId: app.customerId,
-    channel: 'IN_APP',
-    type: 'SUCCESS',
-    title: `Loan #${loanNo} Disbursed Successfully`,
-    message: `Principal amount of ₹${principalNum.toLocaleString('en-IN')} has been transferred via ${input.disbursementMethod}. Ref: ${input.referenceNumber}. First EMI is scheduled for ${firstDueDate.toLocaleDateString()}.`,
-  }).catch(() => {});
-
-  void communicationService.dispatchSystemEvent(
-    'DISBURSEMENT_SUCCESSFUL',
+  return financeService.executeDisbursementWithControls(
+    input.applicationId,
     {
-      customerId: app.customerId,
-      customerName: `${app.customer?.firstName || 'Borrower'} ${app.customer?.lastName || ''}`.trim(),
-      customerEmail: app.customer?.email || undefined,
-      customerMobile: app.customer?.mobile || undefined,
-      loanNo,
-      netDisbursedAmount: String(principalNum),
-      bankAccount: app.customer?.bankAccountNo || 'On Record',
-      utrNumber: input.referenceNumber,
-      emiAmount: String(loan.emiAmount || '0.00'),
+      disbursementMethod: input.disbursementMethod,
+      referenceNumber: input.referenceNumber,
     },
-    app.tenantId || undefined
-  ).catch(() => {});
-
-  return loan;
+    {
+      id: actor.id,
+      email: actor.email,
+      roles: actor.roles,
+      tenantId: actor.tenantId,
+      branchId: actor.branchId,
+    }
+  );
 }

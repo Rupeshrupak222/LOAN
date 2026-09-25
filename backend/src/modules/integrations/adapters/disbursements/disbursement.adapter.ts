@@ -2,11 +2,18 @@ import { BaseAdapter } from '../base.adapter';
 import { IntegrationCategory, ProviderConfig } from '../../integration.types';
 import { getProviderConfigurations } from '../../integration.config';
 import { IntegrationHubError } from '../../integration.errors';
+import {
+  PayoutProvider,
+  PayoutRequest,
+  PayoutResult,
+  PayoutStatus,
+} from '../../interfaces/payments.interface';
 
-export class DisbursementAdapter extends BaseAdapter {
+export class DisbursementAdapter extends BaseAdapter implements PayoutProvider {
   readonly providerId = 'disbursement_payout';
   readonly name = 'Commercial Banking & Payout Gateway (IMPS / NEFT)';
   readonly category: IntegrationCategory = 'DISBURSEMENT';
+  readonly environment = 'PRODUCTION' as const;
   config: ProviderConfig;
 
   constructor(customConfig?: Partial<ProviderConfig>) {
@@ -14,6 +21,72 @@ export class DisbursementAdapter extends BaseAdapter {
     this.config = {
       ...getProviderConfigurations().disbursement_payout,
       ...customConfig,
+    };
+  }
+
+  public async initiatePayout(req: PayoutRequest, correlationId: string): Promise<PayoutResult> {
+    const result = await this.execute<any>('INITIATE_PAYOUT', req, correlationId);
+    if (!result.success || !result.data) {
+      throw new IntegrationHubError(
+        result.error?.httpStatus || 502,
+        result.error?.code || 'PROVIDER_EXECUTION_FAILED',
+        result.error?.message || 'Real Disbursement payout initiation failed.',
+        { correlationId }
+      );
+    }
+    const data = result.data;
+    const rawStatus = (data.status || data.transferStatus || '').toUpperCase();
+    let status: PayoutStatus = 'PAYOUT_PENDING';
+    if (['SUCCESS', 'PAYOUT_SUCCESS', 'PROCESSED', 'COMPLETED', 'SETTLED'].includes(rawStatus)) {
+      status = 'PAYOUT_SUCCESS';
+    } else if (['FAILED', 'PAYOUT_FAILED', 'REJECTED', 'REVERSED', 'ERROR'].includes(rawStatus)) {
+      status = 'PAYOUT_FAILED';
+    }
+
+    return {
+      payoutId: data.payoutId || data.transferId || req.payoutId,
+      status,
+      providerReference: data.providerReference || data.transferId || data.payoutId || result.providerRequestId || '',
+      utr: data.utr || data.utrNumber || data.bankReference || '',
+      amount: data.amount ?? req.amount,
+      fees: data.fees ?? 0,
+      tax: data.tax ?? 0,
+      initiatedAt: data.initiatedAt || new Date().toISOString(),
+      completedAt: data.completedAt,
+      failureReason: data.failureReason || data.errorDescription || data.message,
+    };
+  }
+
+  public async checkPayoutStatus(payoutId: string, correlationId: string): Promise<PayoutResult> {
+    const result = await this.execute<any>('FETCH_PAYOUT_STATUS', { payoutId }, correlationId);
+    if (!result.success || !result.data) {
+      throw new IntegrationHubError(
+        result.error?.httpStatus || 502,
+        result.error?.code || 'PROVIDER_EXECUTION_FAILED',
+        result.error?.message || 'Real Disbursement status check failed.',
+        { correlationId }
+      );
+    }
+    const data = result.data;
+    const rawStatus = (data.status || data.transferStatus || '').toUpperCase();
+    let status: PayoutStatus = 'PAYOUT_PENDING';
+    if (['SUCCESS', 'PAYOUT_SUCCESS', 'PROCESSED', 'COMPLETED', 'SETTLED'].includes(rawStatus)) {
+      status = 'PAYOUT_SUCCESS';
+    } else if (['FAILED', 'PAYOUT_FAILED', 'REJECTED', 'REVERSED', 'ERROR'].includes(rawStatus)) {
+      status = 'PAYOUT_FAILED';
+    }
+
+    return {
+      payoutId: data.payoutId || data.transferId || payoutId,
+      status,
+      providerReference: data.providerReference || data.transferId || data.payoutId || result.providerRequestId || '',
+      utr: data.utr || data.utrNumber || data.bankReference || '',
+      amount: data.amount ?? 0,
+      fees: data.fees ?? 0,
+      tax: data.tax ?? 0,
+      initiatedAt: data.initiatedAt || new Date().toISOString(),
+      completedAt: data.completedAt,
+      failureReason: data.failureReason || data.errorDescription || data.message,
     };
   }
 

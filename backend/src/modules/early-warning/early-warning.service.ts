@@ -425,23 +425,39 @@ export class EarlyWarningService {
       }
     }
 
-    // 2. Scan Delinquency Collection Cases (DPD >= 30)
+    // 2. Scan Delinquency Collection Cases (DPD >= 1)
     const collectionCases = await prisma.collectionCase.findMany({
-      where: { dpd: { gte: 30 }, status: { in: ['OPEN', 'IN_PROGRESS', 'ESCALATED', 'PROMISED'] } },
+      where: { dpd: { gte: 1 }, status: { in: ['OPEN', 'IN_PROGRESS', 'ESCALATED', 'PROMISED'] } },
       include: {
         customer: { select: { customerCode: true, firstName: true, lastName: true } },
-        loan: { select: { loanNo: true } },
+        loan: { select: { loanNo: true, principal: true } },
+        promises: { where: { status: 'BROKEN' }, take: 1, orderBy: { createdAt: 'desc' } },
       },
     });
 
     for (const cc of collectionCases) {
-      const ruleCode = cc.dpd >= 60 ? 'CRED_DPD_THRESHOLD_60' : 'CRED_DPD_THRESHOLD_30';
-      const priority = cc.dpd >= 60 ? 'CRITICAL' : 'HIGH';
+      let ruleCode: WarningRuleCode = 'FIRST_MISSED_PAYMENT';
+      let priority: WarningPriority = 'MEDIUM';
+      let title = 'First Missed Payment Detected (DPD 1-7)';
+
+      if (cc.promises.length > 0) {
+        ruleCode = 'COLL_BROKEN_PTP';
+        priority = 'HIGH';
+        title = 'Promise-to-Pay (PTP) Commitment Broken with Zero Remittance';
+      } else if (cc.dpd >= 60) {
+        ruleCode = 'CRED_DPD_THRESHOLD_60';
+        priority = 'CRITICAL';
+        title = 'Critical Delinquency Reached 60 DPD (SMA-2)';
+      } else if (cc.dpd >= 30) {
+        ruleCode = 'CRED_DPD_THRESHOLD_30';
+        priority = 'HIGH';
+        title = 'Delinquency Reached 30 DPD (SMA-1)';
+      }
 
       const { action } = await this.createOrEscalateAlert({
         ruleCode,
-        domain: 'CREDIT',
-        title: cc.dpd >= 60 ? 'Critical Delinquency Reached 60 DPD (SMA-2)' : 'Delinquency Reached 30 DPD (SMA-1)',
+        domain: 'COLLECTIONS',
+        title,
         priority,
         entityType: 'COLLECTION_CASE',
         entityId: cc.id,
@@ -463,11 +479,65 @@ export class EarlyWarningService {
       if (action === 'CREATED') alertsCreated++;
     }
 
+    // 3. Scan Active Loans for Upcoming EMIs (<= 3 Days)
+    const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const loansWithUpcomingEmi = (await prisma.loan.findMany({
+      where: {
+        status: 'ACTIVE',
+        schedule: {
+          some: {
+            status: { in: ['DUE', 'PARTIALLY_PAID'] },
+            dueDate: { lte: threeDaysFromNow, gte: new Date() },
+          },
+        },
+      },
+      include: {
+        customer: { select: { customerCode: true, firstName: true, lastName: true } },
+        schedule: {
+          where: {
+            status: { in: ['DUE', 'PARTIALLY_PAID'] },
+            dueDate: { lte: threeDaysFromNow, gte: new Date() },
+          },
+          take: 1,
+          orderBy: { dueDate: 'asc' },
+        },
+      },
+    })) as any[];
+
+    for (const loan of loansWithUpcomingEmi) {
+      const emi = loan.schedule?.[0];
+      if (!emi) continue;
+
+      const daysLeft = Math.max(0, Math.ceil((new Date(emi.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+      const { action } = await this.createOrEscalateAlert({
+        ruleCode: 'UPCOMING_EMI',
+        domain: 'CREDIT',
+        title: 'Upcoming EMI Due Soon (<= 3 Days)',
+        priority: 'LOW',
+        entityType: 'LOAN',
+        entityId: loan.id,
+        customerId: loan.customerId,
+        customerCode: loan.customer?.customerCode,
+        customerName: `${loan.customer?.firstName} ${loan.customer?.lastName}`,
+        loanId: loan.id,
+        loanNo: loan.loanNo,
+        whatHappened: `Installment #${emi.emiNumber} of INR ${Number(emi.totalDue).toLocaleString('en-IN')} is due in ${daysLeft} days on ${new Date(emi.dueDate).toISOString().slice(0, 10)}.`,
+        whyItMatters: 'Proactive payment reminder increases first-presentation success and reduces bounce fees.',
+        source: 'System Batch Scanner',
+        evidence: `Due Date: ${new Date(emi.dueDate).toISOString().slice(0, 10)}, Amount: INR ${Number(emi.totalDue).toLocaleString('en-IN')}`,
+        recommendedHumanAction: 'Send automated reminder SMS and verify autodebit mandate health.',
+        correlationId,
+      });
+      if (action === 'CREATED') alertsCreated++;
+    }
+
+
     return {
-      scannedEntities: applications.length + collectionCases.length,
+      scannedEntities: applications.length + collectionCases.length + loansWithUpcomingEmi.length,
       alertsCreated,
     };
   }
+
 
   /**
    * Generates advisory explanation for an alert using Gemini with deterministic fallback.

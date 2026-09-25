@@ -269,7 +269,7 @@ export class WarningRulesRegistry {
       },
     ],
 
-    // 5. Collections Rules
+    // 5. Collections & Servicing Rules
     [
       'COLL_BROKEN_PTP',
       {
@@ -279,7 +279,7 @@ export class WarningRulesRegistry {
         defaultPriority: 'HIGH',
         recommendedAction: 'Escalate collection case from soft-calling to field recovery visit within 24 hours.',
         evaluateEvent: (event) => {
-          if (event.eventType === 'PTP_BROKEN') {
+          if (event.eventType === 'PTP_BROKEN' || event.eventType === 'COLLECTION_PTP_BROKEN') {
             return {
               triggered: true,
               evidence: `Borrower failed to honor PTP commitment of INR ${Number(event.metadata?.promisedAmount || 0).toLocaleString('en-IN')} due on ${event.metadata?.promisedDate || 'agreed date'}.`,
@@ -289,7 +289,91 @@ export class WarningRulesRegistry {
         },
       },
     ],
+    [
+      'UPCOMING_EMI',
+      {
+        code: 'UPCOMING_EMI',
+        domain: 'CREDIT',
+        title: 'Upcoming EMI Due Soon (<= 3 Days)',
+        defaultPriority: 'LOW',
+        recommendedAction: 'Send proactive payment reminder with one-click payment link.',
+        evaluateEvent: (event) => {
+          if (event.eventType === 'SERVICING_UPCOMING_EMI') {
+            const daysLeft = Number(event.metadata?.daysUntilDue ?? 3);
+            return {
+              triggered: true,
+              evidence: `EMI installment of INR ${Number(event.metadata?.emiAmount || 0).toLocaleString('en-IN')} due in ${daysLeft} days on ${event.metadata?.dueDate || 'upcoming date'}.`,
+              severityOverride: daysLeft <= 0 ? 'MEDIUM' : 'LOW',
+            };
+          }
+          return null;
+        },
+      },
+    ],
+    [
+      'FIRST_MISSED_PAYMENT',
+      {
+        code: 'FIRST_MISSED_PAYMENT',
+        domain: 'COLLECTIONS',
+        title: 'First Missed Payment Detected (DPD 1-7)',
+        defaultPriority: 'MEDIUM',
+        recommendedAction: 'Initiate soft reminder SMS and courteous agent telecall to identify bounce reason.',
+        evaluateEvent: (event) => {
+          if (event.eventType === 'SERVICING_MISSED_PAYMENT' || event.eventType === 'DPD_THRESHOLD_CROSSED') {
+            const dpd = Number(event.currentValue || event.metadata?.dpd || 0);
+            if (dpd >= 1 && dpd <= 7) {
+              return {
+                triggered: true,
+                evidence: `Borrower missed scheduled EMI payment. Account entered delinquency at ${dpd} DPD with overdue of INR ${Number(event.metadata?.overdueAmount || 0).toLocaleString('en-IN')}.`,
+              };
+            }
+          }
+          return null;
+        },
+      },
+    ],
+    [
+      'INCREASING_OVERDUE',
+      {
+        code: 'INCREASING_OVERDUE',
+        domain: 'COLLECTIONS',
+        title: 'Multiple Consecutive Overdue Installments',
+        defaultPriority: 'HIGH',
+        recommendedAction: 'Assign senior recovery collector and initiate physical doorstep contact.',
+        evaluateEvent: (event) => {
+          if (event.eventType === 'SERVICING_MULTIPLE_OVERDUE') {
+            const overdueCount = Number(event.metadata?.overdueCount || 2);
+            return {
+              triggered: true,
+              evidence: `Account has ${overdueCount} consecutive overdue installments totaling INR ${Number(event.metadata?.overdueAmount || 0).toLocaleString('en-IN')}.`,
+              severityOverride: overdueCount >= 3 ? 'CRITICAL' : 'HIGH',
+            };
+          }
+          return null;
+        },
+      },
+    ],
+    [
+      'REPEATED_PARTIAL_PAYMENTS',
+      {
+        code: 'REPEATED_PARTIAL_PAYMENTS',
+        domain: 'COLLECTIONS',
+        title: 'Repeated Partial Payments (Shortfall in EMI Clearance)',
+        defaultPriority: 'MEDIUM',
+        recommendedAction: 'Review borrower cashflow stress and explore restructuring or tenure extension.',
+        evaluateEvent: (event) => {
+          if (event.eventType === 'SERVICING_PARTIAL_PAYMENT') {
+            return {
+              triggered: true,
+              evidence: `Payment of INR ${Number(event.metadata?.paidAmount || 0).toLocaleString('en-IN')} received against total due of INR ${Number(event.metadata?.totalDue || 0).toLocaleString('en-IN')}. Remaining overdue: INR ${Number(event.metadata?.outstanding || 0).toLocaleString('en-IN')}.`,
+            };
+          }
+          return null;
+        },
+      },
+    ],
   ]);
+
 
   public static getRule(code: WarningRuleCode): WarningRuleDefinition | undefined {
     return this.rules.get(code);

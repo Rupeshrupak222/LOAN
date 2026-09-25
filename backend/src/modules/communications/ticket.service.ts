@@ -14,7 +14,7 @@ export class TicketService {
   private ticketSequence: number = 1000;
 
   constructor(private slaService: SlaService = defaultSlaService) {
-    this.seedSampleTickets();
+    // Clean initial state
   }
 
   /**

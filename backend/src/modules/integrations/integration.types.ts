@@ -1,4 +1,10 @@
 // Integration Hub Core Type Definitions
+export type ExecutionMode =
+  | 'REAL_PROVIDER'
+  | 'SANDBOX_PROVIDER'
+  | 'MANUAL_REVIEW'
+  | 'SIMULATION';
+
 export type IntegrationCategory =
   | 'CREDIT'
   | 'KYC'
@@ -6,7 +12,9 @@ export type IntegrationCategory =
   | 'PAYMENT'
   | 'DISBURSEMENT'
   | 'COMMUNICATION'
-  | 'DOCUMENT';
+  | 'DOCUMENT'
+  | 'ESIGN'
+  | 'MANDATE';
 
 export type IntegrationHealthStatus =
   | 'HEALTHY'
@@ -17,6 +25,8 @@ export type IntegrationHealthStatus =
 
 export type IntegrationErrorCode =
   | 'PROVIDER_NOT_CONFIGURED'
+  | 'PROVIDER_CONFIGURATION_REQUIRED'
+  | 'PROVIDER_EXECUTION_FAILED'
   | 'PROVIDER_UNAVAILABLE'
   | 'PROVIDER_TIMEOUT'
   | 'PROVIDER_RATE_LIMITED'

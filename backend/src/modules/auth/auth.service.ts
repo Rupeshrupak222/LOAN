@@ -1,10 +1,11 @@
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { v4 as uuid } from 'uuid';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { UnauthorizedError, BadRequestError } from '../../common/errors';
 import { hashPassword, verifyPassword } from './password';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from './tokens';
+import { otpService } from '../otp/otp.service';
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -296,6 +297,151 @@ export async function register(input: {
       customerId: customer.id,
       customerCode: customer.customerCode,
       kycStatus: customer.kycStatus,
+    },
+  };
+}
+
+export async function loginWithOtp(mobile: string, otp: string) {
+  const digits = mobile.replace(/\D/g, '');
+  const mobile10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  if (!/^[6-9]\d{9}$/.test(mobile10)) {
+    throw new BadRequestError('Mobile number must be a valid 10-digit Indian mobile number');
+  }
+
+  // Authoritatively verify OTP code via otpService
+  const verifyResult = await otpService.verifyOtp({
+    target: mobile10,
+    type: 'MOBILE',
+    otp,
+  });
+
+  if (!verifyResult || !verifyResult.verified) {
+    throw new UnauthorizedError('Invalid or expired OTP code');
+  }
+
+  // Find linked customer & user by mobile number
+  let customer = await prisma.customer.findFirst({
+    where: { mobile: mobile10 },
+    include: {
+      user: {
+        include: { roles: { include: { role: true } } },
+      },
+    },
+  });
+
+  let user = customer?.user;
+
+  // If customer doesn't exist, check if user exists by borrower email
+  if (!user) {
+    const defaultEmail = `${mobile10}@borrower.adyapan.local`;
+    user = await prisma.user.findUnique({
+      where: { email: defaultEmail },
+      include: { roles: { include: { role: true } } },
+    });
+  }
+
+  // If user still doesn't exist, auto-register as CUSTOMER role
+  if (!user) {
+    let customerRole = await prisma.role.findUnique({ where: { name: 'CUSTOMER' } });
+    if (!customerRole) {
+      customerRole = await prisma.role.create({
+        data: { name: 'CUSTOMER', description: 'Self-service borrower customer role' },
+      });
+    }
+
+    const primaryTenant = await prisma.tenant.findFirst({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const defaultEmail = `${mobile10}@borrower.adyapan.local`;
+    const randomPassword = randomBytes(16).toString('hex');
+    const passwordHash = await hashPassword(randomPassword);
+
+    user = await prisma.user.create({
+      data: {
+        email: defaultEmail,
+        firstName: 'Borrower',
+        lastName: mobile10.slice(-4),
+        passwordHash,
+        status: 'ACTIVE',
+        tenantId: primaryTenant?.id || null,
+        roles: {
+          create: { roleId: customerRole.id },
+        },
+      },
+      include: {
+        roles: { include: { role: true } },
+      },
+    });
+
+    const custCode = `CUST-${Math.floor(100000 + Math.random() * 900000)}`;
+    customer = await prisma.customer.create({
+      data: {
+        userId: user.id,
+        email: defaultEmail,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mobile: mobile10,
+        customerCode: custCode,
+        status: 'ACTIVE',
+        kycStatus: 'NOT_STARTED',
+        tenantId: primaryTenant?.id || null,
+      },
+      include: {
+        user: {
+          include: { roles: { include: { role: true } } },
+        },
+      },
+    });
+  } else if (!customer) {
+    // If user exists without linked customer record, create and link customer record
+    const custCode = `CUST-${Math.floor(100000 + Math.random() * 900000)}`;
+    customer = await prisma.customer.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mobile: mobile10,
+        customerCode: custCode,
+        status: 'ACTIVE',
+        kycStatus: 'NOT_STARTED',
+        tenantId: user.tenantId,
+      },
+      include: {
+        user: {
+          include: { roles: { include: { role: true } } },
+        },
+      },
+    });
+  }
+
+  // Update user login activity
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      status: 'ACTIVE',
+      lastLoginAt: new Date(),
+    },
+  });
+
+  const roles = user.roles.map((r) => r.role.name);
+  const tokens = await issueTokens({ id: user.id, email: user.email, roles });
+
+  return {
+    ...tokens,
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles,
+      customerId: customer?.id,
+      customerCode: customer?.customerCode,
+      kycStatus: customer?.kycStatus,
     },
   };
 }

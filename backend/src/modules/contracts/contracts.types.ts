@@ -108,7 +108,10 @@ export interface ESignSession {
   sessionId: string;
   agreementId: string;
   applicationId: string;
-  provider: ESignProviderType;
+  provider: ESignProviderType | string;
+  providerReference?: string;
+  isSandbox?: boolean;
+  verificationMode?: string;
   signerName: string;
   signerMobile: string;
   signerEmail?: string;

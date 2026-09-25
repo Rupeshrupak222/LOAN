@@ -603,8 +603,11 @@ function UnderwritingWorkspaceContent() {
             <div className="text-slate-500">
               Gender: {cust.gender || 'Not specified'} · DOB: {cust.dateOfBirth ? formatDate(cust.dateOfBirth) : 'N/A'}
             </div>
-            <div className="text-slate-500">
-              PAN: {cust.panNumber ? `••••${cust.panNumber.slice(-4)}` : cust.panVerified ? 'Verified' : 'Not provided'}
+            <div className="text-slate-500 font-mono text-[11px]">
+              PAN: {cust.CustomerIdentifier?.find((c: any) => c.idType === 'PAN')?.maskedValue || (cust.panNumber ? `••••${cust.panNumber.slice(-4)}` : cust.panVerified ? 'Verified' : 'Not provided')}
+            </div>
+            <div className="text-slate-500 font-mono text-[11px]">
+              Aadhaar: {cust.CustomerIdentifier?.find((c: any) => c.idType === 'AADHAAR')?.maskedValue || (cust.aadhaarNumber ? `••••${cust.aadhaarNumber.slice(-4)}` : 'Not provided')}
             </div>
           </div>
 
@@ -821,6 +824,31 @@ function UnderwritingWorkspaceContent() {
             <div className="text-[10px] text-slate-400">Audited Status</div>
           </div>
         </div>
+
+        {/* Explicit Customer Consents */}
+        {cust.consents && cust.consents.length > 0 && (
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-slate-700 dark:text-slate-200 uppercase text-[10px] tracking-wider">
+                Explicit Customer Consents & Digital Mandates (Phase 9A Verified)
+              </span>
+              <span className="text-[10px] text-emerald-600 font-bold">{cust.consents.length} Consents Recorded</span>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {cust.consents.map((con: any) => (
+                <div
+                  key={con.id}
+                  className="px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 text-[11px]"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="font-bold">{con.consentType}</span>
+                  <span className="text-slate-400 font-mono">({con.version})</span>
+                  <span className="text-[10px] text-slate-500">· {con.grantedAt ? formatDate(con.grantedAt) : 'Granted'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Documents Checklist & Previews */}
         <div className="overflow-x-auto text-xs pt-2">

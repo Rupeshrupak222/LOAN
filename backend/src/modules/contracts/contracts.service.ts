@@ -3,8 +3,10 @@ import { v4 as uuid } from 'uuid';
 import { prisma } from '../../config/prisma';
 import { Money } from '../finance/money';
 import { calculateEmi } from '../finance/emi';
-import { NotFoundError, BadRequestError } from '../../common/errors';
+import { NotFoundError, BadRequestError, ForbiddenError } from '../../common/errors';
 import { logAudit } from '../audit/audit.service';
+import { providerRegistry } from '../integrations/provider-registry.service';
+import { WebhookFrameworkService } from '../integrations/webhooks/webhook-framework.service';
 import type {
   KfsDocument,
   KfsFeeItem,
@@ -45,16 +47,42 @@ export class ContractsService {
     const customer = application.customer;
     const product = application.product;
     const tenant = application.tenant;
+    const tenantId = application.tenantId || 'tenant-adyapan-default';
 
-    const principal = new Decimal(application.requestedAmount.toString());
-    const tenureMonths = application.tenureMonths;
-    const interestRatePct = new Decimal(product.interestRate.toString());
+    // Retrieve authoritative LoanOffer if generated
+    let authoritativeOffer: any = null;
+    try {
+      const { OfferEngineService } = await import('../offers/offers.service');
+      authoritativeOffer = OfferEngineService.getInstance().getActiveApplicationOffer(tenantId, applicationId);
+    } catch {
+      // Fallback to application values if offline
+    }
+
+    const principal = authoritativeOffer
+      ? new Decimal(authoritativeOffer.offeredAmount)
+      : new Decimal(application.requestedAmount.toString());
+    const tenureMonths = authoritativeOffer
+      ? authoritativeOffer.tenureMonths
+      : application.tenureMonths;
+    const interestRatePct = authoritativeOffer
+      ? new Decimal(authoritativeOffer.annualInterestRatePct)
+      : new Decimal(product.interestRate.toString());
 
     // Calculate EMI & Schedule
-    const emiResult = calculateEmi(principal.toNumber(), interestRatePct.toNumber(), tenureMonths);
-    const emi = new Decimal(emiResult.emi);
-    const totalInterest = new Decimal(emiResult.totalInterest);
-    const totalPayable = principal.plus(totalInterest);
+    let emi: Decimal;
+    let totalInterest: Decimal;
+    let totalPayable: Decimal;
+
+    if (authoritativeOffer) {
+      emi = new Decimal(authoritativeOffer.monthlyEmi);
+      totalInterest = new Decimal(authoritativeOffer.totalInterest);
+      totalPayable = new Decimal(authoritativeOffer.totalRepayment);
+    } else {
+      const emiResult = calculateEmi(principal.toNumber(), interestRatePct.toNumber(), tenureMonths);
+      emi = new Decimal(emiResult.emi);
+      totalInterest = new Decimal(emiResult.totalInterest);
+      totalPayable = principal.plus(totalInterest);
+    }
 
     // Calculate Upfront Fees & GST
     const procFeePct = new Decimal(product.processingFeePct?.toString() || '2.0');
@@ -126,7 +154,7 @@ export class ContractsService {
       borrowerName: `${customer.firstName} ${customer.lastName}`,
       borrowerMobile: customer.mobile,
       borrowerEmail: customer.email || undefined,
-      borrowerPanMasked: 'XXXXXX' + (customer.customerCode.slice(-4) || '9876'),
+      borrowerPanMasked: 'XXXXXX' + (customer.customerCode?.slice(-4) || '9876'),
       sanctionedPrincipalAmount: principal.toNumber(),
       netDisbursedAmount: netDisbursed.toNumber(),
       annualInterestRatePct: interestRatePct.toNumber(),
@@ -241,22 +269,61 @@ export class ContractsService {
    */
   public async initiateESign(
     applicationId: string,
-    provider: ESignProviderType = 'MOCK_DIGISIGN',
-    actor?: { id?: string; tenantId?: string }
+    providerType: ESignProviderType = 'MOCK_DIGISIGN',
+    actor?: { id?: string; tenantId?: string; role?: string },
+    options?: { forceMode?: any }
   ): Promise<ESignSession> {
+    const application = await prisma.loanApplication.findUnique({
+      where: { id: applicationId },
+      include: { customer: true },
+    });
+    if (!application) throw new NotFoundError('Loan application not found');
+
+    // IDOR Protection: Validate tenant boundaries if context tenantId is provided
+    if (actor?.tenantId && application.tenantId && application.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access denied: Loan application does not belong to your organization.');
+    }
+
     const agreement = agreementStore.get(applicationId) || (await this.generateDigitalAgreement(applicationId, actor));
-    const sessionId = `ESIGN-${uuid().slice(0, 8)}`;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours validity
+    const correlationId = `ESN-INIT-${Date.now().toString(36).toUpperCase()}`;
+
+    // Resolve provider via centralized Provider Gateway Foundation
+    const resolution = providerRegistry.getEsignProvider({
+      forceMode: options?.forceMode,
+      tenantId: actor?.tenantId,
+    });
+
+    const { provider, mode, isSandbox } = resolution;
+
+    // Outbound session creation
+    const sessionResult = await provider.createSigningSession(
+      {
+        documentId: agreement.agreementId,
+        documentTitle: agreement.agreementNumber,
+        signerName: agreement.borrowerFullName,
+        signerEmail: application.customer?.email || 'borrower@adyapan.io',
+        signerMobile: application.customer?.mobile || '9876543210',
+        signType: 'AADHAAR_OTP',
+      },
+      correlationId
+    );
+
+    const sessionId = sessionResult.sessionId;
+    const expiresAt = sessionResult.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const session: ESignSession = {
       sessionId,
       agreementId: agreement.agreementId,
       applicationId,
-      provider,
+      provider: provider.name,
+      providerReference: sessionResult.providerReference,
+      isSandbox,
+      verificationMode: isSandbox ? 'SANDBOX_SIMULATION' : 'PROVIDER_AUTOMATED',
       signerName: agreement.borrowerFullName,
-      signerMobile: '9876543210',
+      signerMobile: application.customer?.mobile || '9876543210',
+      signerEmail: application.customer?.email || undefined,
       status: 'INITIATED',
-      signingUrl: `https://sign.adyapan.dev/session/${sessionId}?token=${uuid()}`,
+      signingUrl: sessionResult.signingUrl,
       expiresAt,
       auditTrail: [
         {
@@ -272,16 +339,21 @@ export class ContractsService {
     esignSessions.set(sessionId, session);
     esignSessions.set(applicationId, session);
 
-    if (actor?.id) {
-      await logAudit({
-        userId: actor.id,
-        tenantId: actor.tenantId,
-        action: 'INITIATE_ESIGN',
-        entity: 'LoanApplication',
-        entityId: applicationId,
-        newValue: { sessionId, provider },
-      });
-    }
+    await logAudit({
+      userId: actor?.id,
+      tenantId: actor?.tenantId,
+      action: 'INITIATE_ESIGN',
+      entity: 'LoanApplication',
+      entityId: applicationId,
+      correlationId,
+      newValue: {
+        sessionId,
+        provider: provider.name,
+        providerReference: sessionResult.providerReference,
+        mode,
+        isSandbox,
+      },
+    });
 
     return session;
   }
@@ -291,43 +363,122 @@ export class ContractsService {
    */
   public async completeESign(
     sessionId: string,
-    metadata?: { ipAddress?: string; signerAadhaarLast4?: string; certificateThumbprint?: string }
+    metadata?: { ipAddress?: string; signerAadhaarLast4?: string; certificateThumbprint?: string; webhookVerified?: boolean },
+    actor?: { id?: string; tenantId?: string }
   ): Promise<ESignSession> {
     const session = esignSessions.get(sessionId);
     if (!session) throw new NotFoundError('eSign session not found');
 
+    const application = await prisma.loanApplication.findUnique({
+      where: { id: session.applicationId },
+    });
+
+    if (actor?.tenantId && application?.tenantId && application.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access denied: Loan application does not belong to your organization.');
+    }
+
+    const correlationId = `ESN-CMP-${Date.now().toString(36).toUpperCase()}`;
+
+    // For real provider sessions, enforce authoritative provider check or verified webhook
+    if (!session.isSandbox) {
+      if (!metadata?.webhookVerified) {
+        const resolution = providerRegistry.getEsignProvider({ tenantId: actor?.tenantId });
+        const verification = await resolution.provider.checkSigningStatus(sessionId, correlationId);
+        if (!verification.isSigned || verification.status !== 'SIGNED') {
+          throw new BadRequestError(`Cannot complete eSign: Upstream provider status is '${verification.status}'.`);
+        }
+        session.certificateId = verification.certificateThumbprint || `CERT-${Date.now()}`;
+        session.signedDocumentUrl = verification.signedDocumentUrl;
+      }
+    } else {
+      session.certificateId = `CERT-SBX-${uuid().slice(0, 10).toUpperCase()}`;
+      session.signedDocumentUrl = `https://sandbox.esign.adyapan.dev/docs/${session.sessionId}.pdf`;
+    }
+
     session.status = 'SIGNED';
-    session.signedDocumentUrl = `https://storage.adyapan.dev/signed-contracts/${session.agreementId}-signed.pdf`;
-    session.certificateId = `CERT-NSDL-${uuid().slice(0, 10).toUpperCase()}`;
     session.updatedAt = new Date().toISOString();
     session.auditTrail.push({
       timestamp: new Date().toISOString(),
       event: 'DOCUMENT_ELECTRONICALLY_SIGNED',
       ipAddress: metadata?.ipAddress || '127.0.0.1',
-      certificateThumbprint: metadata?.certificateThumbprint || `SHA256:${uuid().replace(/-/g, '')}`,
-      signerAadhaarLast4: metadata?.signerAadhaarLast4 || '4321',
+      certificateThumbprint: metadata?.certificateThumbprint || session.certificateId,
+      signerAadhaarLast4: metadata?.signerAadhaarLast4 || '8842',
     });
 
-    // Update agreement
+    // Update agreement state
     const agreement = agreementStore.get(session.agreementId);
     if (agreement) {
       agreement.status = 'EXECUTED';
     }
 
-    // Check if application can transition to READY_FOR_DISBURSEMENT
+    // Update application lifecycle
     await prisma.loanApplication.update({
       where: { id: session.applicationId },
       data: { status: 'READY_FOR_DISBURSEMENT' },
     });
 
     await logAudit({
+      userId: actor?.id,
+      tenantId: actor?.tenantId,
       action: 'COMPLETE_ESIGN',
       entity: 'LoanApplication',
       entityId: session.applicationId,
-      newValue: { sessionId, status: 'SIGNED', certificateId: session.certificateId },
+      correlationId,
+      newValue: {
+        sessionId,
+        status: 'SIGNED',
+        providerReference: session.providerReference,
+        certificateId: session.certificateId,
+        isSandbox: session.isSandbox,
+      },
     });
 
     return session;
+  }
+
+  /**
+   * Process and verify inbound eSign provider webhook
+   */
+  public async handleEsignWebhook(event: {
+    providerId: string;
+    eventId: string;
+    eventType: string;
+    rawPayload: string;
+    signature?: string;
+    timestamp: string;
+    headers?: Record<string, string>;
+  }): Promise<any> {
+    const webhookFramework = WebhookFrameworkService.getInstance();
+    const result = await webhookFramework.processInboundWebhook(event);
+
+    if (result.status !== 'PROCESSED') {
+      return result;
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(event.rawPayload);
+    } catch {
+      throw new BadRequestError('Malformed webhook JSON payload');
+    }
+
+    const sessionId = payload.sessionId || payload.documentId;
+    const session = esignSessions.get(sessionId);
+
+    if (!session) {
+      throw new NotFoundError(`eSign session '${sessionId}' not found for webhook`);
+    }
+
+    if (payload.status === 'SIGNED' || payload.event === 'DOCUMENT_SIGNED' || payload.isSigned === true) {
+      await this.completeESign(sessionId, {
+        ipAddress: payload.ipAddress,
+        signerAadhaarLast4: payload.signerAadhaarLast4,
+        certificateThumbprint: payload.certificateThumbprint,
+        webhookVerified: true,
+      });
+    }
+
+    return result;
   }
 
   /**

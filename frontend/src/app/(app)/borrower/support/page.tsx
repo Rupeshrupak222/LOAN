@@ -53,7 +53,7 @@ export default function BorrowerSupportHubPage() {
 
   const createTicketMutation = useMutation({
     mutationFn: async (payload: typeof ticketData) => {
-      const res = await api.post<{ data: any }>('/api/v1/borrower/support/tickets', payload);
+      const res = await api.post<{ data: any }>('/borrower/support/tickets', payload);
       return res.data?.data || res.data;
     },
     onSuccess: (data) => {

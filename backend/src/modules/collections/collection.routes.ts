@@ -5,12 +5,23 @@ import { success } from '../../common/response';
 import { validate } from '../../middleware/validate';
 import { authenticate, authorize } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenant-context';
-import { logActivitySchema, recordPtpSchema } from './collection.schema';
+import {
+  logActivitySchema,
+  recordPtpSchema,
+  createCaseSchema,
+  updateCaseStatusSchema,
+  resolveCaseSchema,
+  closeCaseSchema,
+} from './collection.schema';
 import { prisma } from '../../config/prisma';
 import {
   getCollectionDashboard,
   listCollectionCases,
   getCollectionCaseDetail,
+  createManualCollectionCase,
+  updateCollectionCaseStatus,
+  resolveCollectionCase,
+  closeCollectionCase,
   logCollectionActivity,
   recordPromiseToPay,
   getBorrowerSafeCollection,
@@ -86,7 +97,19 @@ router.get(
   })
 );
 
-// 3. Case Detail
+// 3. Create Manual Collection Case
+router.post(
+  '/cases',
+  authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'BRANCH_MANAGER', 'COLLECTION_OFFICER'),
+  validate(createCaseSchema),
+  asyncHandler(async (req, res) => {
+    const actor = await getActor(req);
+    const colCase = await createManualCollectionCase(req.body, actor);
+    res.status(201).json(success(colCase));
+  })
+);
+
+// 4. Case Detail
 router.get(
   '/cases/:id',
   authorize('SUPER_ADMIN', 'COMPANY_ADMIN', 'ADMIN', 'COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'FINANCE_OFFICER', 'AUDITOR'),
@@ -97,7 +120,43 @@ router.get(
   })
 );
 
-// 4. Contact Activity
+// 5. Case Status Transition
+router.patch(
+  '/cases/:id/status',
+  authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
+  validate(updateCaseStatusSchema),
+  asyncHandler(async (req, res) => {
+    const actor = await getActor(req);
+    const updated = await updateCollectionCaseStatus(req.params.id, req.body, actor);
+    res.json(success(updated));
+  })
+);
+
+// 6. Case Resolution (Gated)
+router.post(
+  '/cases/:id/resolve',
+  authorize('COLLECTION_OFFICER', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
+  validate(resolveCaseSchema),
+  asyncHandler(async (req, res) => {
+    const actor = await getActor(req);
+    const resolved = await resolveCollectionCase(req.params.id, req.body, actor);
+    res.json(success(resolved));
+  })
+);
+
+// 7. Case Closure
+router.post(
+  '/cases/:id/close',
+  authorize('BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
+  validate(closeCaseSchema),
+  asyncHandler(async (req, res) => {
+    const actor = await getActor(req);
+    const closed = await closeCollectionCase(req.params.id, req.body, actor);
+    res.json(success(closed));
+  })
+);
+
+// 8. Contact Activity
 router.post(
   '/activities',
   authorize('COLLECTION_OFFICER', 'COLLECTION_AGENT', 'BRANCH_MANAGER', 'COMPANY_ADMIN', 'ADMIN'),
@@ -108,6 +167,7 @@ router.post(
     res.status(201).json(success(activity));
   })
 );
+
 
 // 5. PTP Recording
 router.post(

@@ -23,6 +23,7 @@ export type RoleName =
 
 export type NavKey =
   | 'dashboard'
+  | 'borrower'
   | 'leads'
   | 'customers'
   | 'applications'
@@ -123,6 +124,7 @@ export interface NavItemConfig {
 
 export const NAV_ITEMS: Record<NavKey, NavItemConfig> = {
   dashboard: { key: 'dashboard', href: '/dashboard', label: 'Dashboard', group: 'OVERVIEW' },
+  borrower: { key: 'borrower', href: '/borrower', label: 'Borrower Portal', group: 'OVERVIEW' },
   'credit-queue': { key: 'credit-queue', href: '/credit-queue', label: 'Credit Queue', group: 'OVERVIEW' },
   applications: { key: 'applications', href: '/applications', label: 'Applications', group: 'OVERVIEW' },
   'credit-assessment': { key: 'credit-assessment', href: '/credit-assessment', label: 'Credit Assessment', group: 'OVERVIEW' },
@@ -504,13 +506,13 @@ export const ROLE_CONFIG: Record<RoleName, RoleConfig> = {
     label: 'Borrower',
     description: 'Self-service borrower portal for active loans, repayments, and NOC certificates',
     nav: [
-      'dashboard',
+      'borrower',
       'loans',
       'payments',
       'emi-calculator',
       'privacy',
     ],
-    landing: '/customer/dashboard',
+    landing: '/borrower',
     dashboard: 'CUSTOMER',
   },
   PARTNER_ADMIN: {

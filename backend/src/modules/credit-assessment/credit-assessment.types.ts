@@ -195,6 +195,26 @@ export interface CreditAssessmentDetail {
     bankIfsc?: string | null;
     kycStatus: KycStatus;
     riskCategory?: RiskCategory | null;
+    panNumber?: string | null;
+    aadhaarNumber?: string | null;
+    identifiers?: {
+      id: string;
+      idType: string;
+      maskedValue: string;
+      verificationStatus: string;
+      verifiedAt?: string | null;
+      verifiedBy?: string | null;
+    }[];
+    consents?: {
+      id: string;
+      consentType: string;
+      purpose: string;
+      version: string;
+      granted: boolean;
+      grantedAt: string;
+      channel?: string;
+      ipAddress?: string | null;
+    }[];
   };
   kycChecklist: KycDocumentChecklist;
   creditHealth: CreditHealthBureauData;

@@ -61,6 +61,7 @@ import { NotificationBell } from './NotificationBell';
 import { CopilotDrawer } from './CopilotDrawer';
 import { WorkflowExceptionCenterModal } from './WorkflowExceptionCenterModal';
 import { NavigationProgressBar } from './NavigationProgressBar';
+import { BorrowerShell } from '@/components/borrower/BorrowerShell';
 import { useNavigation, canAccessRoute, WorkspaceId, WORKSPACES } from '@/lib/navigation';
 
 const NAV_ICONS: Record<string, any> = {
@@ -163,6 +164,7 @@ const WORKSPACE_ICONS: Record<WorkspaceId, any> = {
   PARTNER: Handshake,
   SUPPORT: Headphones,
   PLATFORM: Layers,
+  RISK: ShieldAlert,
   BORROWER: Users,
 };
 
@@ -241,6 +243,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
+  }
+
+  const isBorrowerRoute = pathname?.startsWith('/borrower') || pathname === '/apply';
+  const isOnlyCustomer = user.roles.length === 1 && user.roles[0] === 'CUSTOMER';
+
+  if (isBorrowerRoute || isOnlyCustomer) {
+    return <BorrowerShell>{children}</BorrowerShell>;
   }
 
   const primaryRole = (user.roles?.[0] || 'CUSTOMER') as RoleName;

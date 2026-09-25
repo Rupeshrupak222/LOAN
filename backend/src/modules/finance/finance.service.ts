@@ -1,4 +1,3 @@
-// Phase P5: Authoritative Finance Officer Service — M2P + mPokket Hybrid Model
 import Decimal from 'decimal.js';
 import { prisma } from '../../config/prisma';
 import {
@@ -21,6 +20,14 @@ import { generateLoanNo } from '../shared/codes';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
+import { generalLedgerService } from './gl.service';
+import { OfferEngineService } from '../offers/offers.service';
+import { providerRegistry } from '../integrations/provider-registry.service';
+import { ExecutionMode } from '../integrations/integration.types';
+import { webhookFramework } from '../integrations/webhooks/webhook-framework.service';
+import { maskSecret } from '../integrations/integration.config';
+import { PayoutRequest } from '../integrations/interfaces/payments.interface';
+
 
 export interface FinanceQueueItem {
   id: string;
@@ -89,7 +96,6 @@ export class FinanceService {
 
     // STRICT FORWARDING RESTRICTION:
     // Applications MUST be explicitly forwarded to Finance Officer (status = READY_FOR_DISBURSEMENT or DISBURSED)
-    // Applications merely in APPROVED, UNDERWRITING, or AGREEMENT_PENDING will NOT appear until an officer clicks 'Forward to Finance Officer'.
     let where: any = {
       status: { in: ['READY_FOR_DISBURSEMENT', 'DISBURSED'] },
     };
@@ -166,15 +172,36 @@ export class FinanceService {
     });
 
     const tenantId = actor?.tenantId || 'tenant-adyapan-default';
-
     const queueItems: FinanceQueueItem[] = [];
 
     for (const app of applications) {
-      const principalDec = new Decimal(app.requestedAmount ? app.requestedAmount.toString() : '0');
-      const feePctDec = new Decimal(1.5).div(100);
-      const processingFeeDec = principalDec.times(feePctDec).toDecimalPlaces(2);
-      const gstDec = processingFeeDec.times(0.18).toDecimalPlaces(2);
-      const netDisbursalDec = principalDec.minus(processingFeeDec).minus(gstDec);
+      // Authoritative offer inspection
+      const appOffers = OfferEngineService.getInstance().getApplicationOffers(tenantId, app.id);
+      const latestOffer = appOffers.length > 0 ? appOffers[appOffers.length - 1] : null;
+
+      // If in READY_FOR_DISBURSEMENT but latest offer was declined or expired, exclude from queue
+      if (app.status === 'READY_FOR_DISBURSEMENT' && latestOffer) {
+        if (latestOffer.status === 'DECLINED' || latestOffer.status === 'EXPIRED') {
+          continue;
+        }
+      }
+
+      let principalDec = new Decimal(app.requestedAmount ? app.requestedAmount.toString() : '0');
+      let feePctDec = new Decimal(1.5).div(100);
+      let processingFeeDec = principalDec.times(feePctDec).toDecimalPlaces(2);
+      let gstDec = processingFeeDec.times(0.18).toDecimalPlaces(2);
+      let netDisbursalDec = principalDec.minus(processingFeeDec).minus(gstDec);
+      let interestRate = Number(app.product?.interestRate || 12.0);
+      let tenureMonths = app.tenureMonths || 12;
+
+      if (latestOffer && latestOffer.status === 'ACCEPTED') {
+        principalDec = new Decimal(latestOffer.offeredAmount);
+        processingFeeDec = new Decimal(latestOffer.processingFee);
+        gstDec = new Decimal(latestOffer.processingFeeGst);
+        netDisbursalDec = new Decimal(latestOffer.netDisbursedAmount);
+        interestRate = latestOffer.annualInterestRatePct;
+        tenureMonths = latestOffer.tenureMonths;
+      }
 
       // Bank account
       const verifiedBank = app.customer?.bankAccounts?.find((b) => b.isVerified);
@@ -236,8 +263,8 @@ export class FinanceService {
         productCode: app.product?.code || 'PL-STD',
         approvedAmount: principalDec.toNumber(),
         netDisbursalAmount: netDisbursalDec.toNumber(),
-        tenureMonths: app.tenureMonths || 12,
-        interestRate: Number(app.product?.interestRate || 12.0),
+        tenureMonths,
+        interestRate,
         status: app.status,
         stage: (app as any).stage || 'DISBURSEMENT_READY',
         channel: (app as any).channel || 'DIGITAL',
@@ -305,7 +332,7 @@ export class FinanceService {
   }
 
   /**
-   * 2. GET CONSOLIDATED FINANCIAL WORKSPACE (10 Contextual Sections)
+   * 2. GET CONSOLIDATED FINANCIAL WORKSPACE (10 Contextual Sections + 6-Category Checklist)
    */
   public async getFinanceWorkspace(
     applicationId: string,
@@ -358,23 +385,35 @@ export class FinanceService {
       }
     }
 
-    // 10-Point Gatekeeper Verification
+    // 10-Point Gatekeeper Verification & 6-Category Checklist
     const gateOutcome = await payoutGatekeeper.verifyPreDisbursementGates(
       applicationId,
       app.tenantId || tenantId,
       { id: actor.id, email: actor.email || '', roles: actor.roles }
     );
 
-    // Section 5: Authoritative Decimal.js Calculation
-    const principalDec = new Decimal(app.requestedAmount ? app.requestedAmount.toString() : '0');
-    const feePctDec = new Decimal(1.5).div(100);
-    const processingFeeDec = principalDec.times(feePctDec).toDecimalPlaces(2);
-    const gstDec = processingFeeDec.times(0.18).toDecimalPlaces(2);
-    const netDisbursalDec = principalDec.minus(processingFeeDec).minus(gstDec);
+    // Section 5: Authoritative Decimal.js Calculation from Offer
+    const appOffers = OfferEngineService.getInstance().getApplicationOffers(tenantId, app.id);
+    const latestOffer = appOffers.length > 0 ? appOffers[appOffers.length - 1] : null;
+
+    let principalDec = new Decimal(app.requestedAmount ? app.requestedAmount.toString() : '0');
+    let feePctDec = new Decimal(1.5).div(100);
+    let processingFeeDec = principalDec.times(feePctDec).toDecimalPlaces(2);
+    let gstDec = processingFeeDec.times(0.18).toDecimalPlaces(2);
+    let netDisbursalDec = principalDec.minus(processingFeeDec).minus(gstDec);
+    let annualRate = Number(app.product?.interestRate || 12.0);
+    let tenureMonths = app.tenureMonths || 12;
+
+    if (latestOffer && latestOffer.status === 'ACCEPTED') {
+      principalDec = new Decimal(latestOffer.offeredAmount);
+      processingFeeDec = new Decimal(latestOffer.processingFee);
+      gstDec = new Decimal(latestOffer.processingFeeGst);
+      netDisbursalDec = new Decimal(latestOffer.netDisbursedAmount);
+      annualRate = latestOffer.annualInterestRatePct;
+      tenureMonths = latestOffer.tenureMonths;
+    }
 
     // Section 6: Amortization & Repayment Setup
-    const annualRate = Number(app.product?.interestRate || 12.0);
-    const tenureMonths = app.tenureMonths || 12;
     const emiResult = calculateEmi(principalDec.toNumber(), annualRate, tenureMonths);
 
     // Section 2: Borrower Bank Account
@@ -390,7 +429,8 @@ export class FinanceService {
       bankName: primaryBank?.bankName || 'Not Linked',
       ifsc: primaryBank?.ifscCode || 'N/A',
       isVerified: Boolean(primaryBank?.isVerified),
-      verificationMethod: primaryBank?.isVerified ? 'AUTOMATED_PENNY_DROP' : 'PENDING_VALIDATION',
+      verificationMethod: primaryBank?.isVerified ? 'SANDBOX_PENNY_DROP' : 'PENDING_VALIDATION',
+      verificationMode: primaryBank?.isVerified ? 'SANDBOX / SIMULATION' : 'NOT VERIFIED',
       nameMatchScore: primaryBank?.isVerified ? 100 : 0,
       pennyDropStatus: primaryBank?.isVerified ? 'SUCCESS' : 'PENDING',
     };
@@ -406,11 +446,6 @@ export class FinanceService {
     const officerLimit = isJuniorDisbursementOfficer ? 5000000 : 10000000;
     const exceedsAuthority = principalDec.greaterThan(officerLimit);
 
-    // Can Disburse Condition:
-    // 1. All 10 gates passed
-    // 2. Bank account verified
-    // 3. Within officer limit
-    // 4. If Maker-Checker task exists, it must be APPROVED
     const isBankVerified = Boolean(bankDetails.isVerified);
     const canDisburse =
       gateOutcome.canDisburse &&
@@ -454,10 +489,11 @@ export class FinanceService {
         kfsStatus: 'ACCEPTED_BY_BORROWER',
       },
 
-      // 4. Pre-Disbursement Checks (10-Point Gatekeeper)
+      // 4. Pre-Disbursement Checks (10-Point Gatekeeper + 6-Category Checklist)
       preDisbursementChecks: {
         canDisburse: gateOutcome.canDisburse,
         checks: gateOutcome.checks,
+        categories: gateOutcome.categories,
         failedChecks: gateOutcome.failedChecks,
         verifiedAt: gateOutcome.verifiedAt,
         blockReason: gateOutcome.blockReason,
@@ -521,7 +557,7 @@ export class FinanceService {
         accountType: 'CURRENT_ESCROW_NODAL',
         glCode: '1010-DISBURSEMENT-NODAL',
         availableLiquidity: 48500000,
-        connectedGateway: 'NPCI / Connected Banking API',
+        connectedGateway: 'NPCI / Connected Banking API (SANDBOX)',
         payoutStatus: 'ONLINE_ACTIVE',
       },
       disbursementDesk: {
@@ -610,16 +646,26 @@ export class FinanceService {
       throw new NotFoundError(`Loan application ${applicationId} not found.`);
     }
 
-    const principalDec = new Decimal(app.requestedAmount ? app.requestedAmount.toString() : '0');
-    const feePctDec = new Decimal(1.5).div(100);
-    const processingFeeDec = principalDec.times(feePctDec).toDecimalPlaces(2);
-    const gstDec = processingFeeDec.times(0.18).toDecimalPlaces(2);
+    const tenantId = app.tenantId || actor.tenantId || 'tenant-adyapan-default';
+    const appOffers = OfferEngineService.getInstance().getApplicationOffers(tenantId, app.id);
+    const latestOffer = appOffers.length > 0 ? appOffers[appOffers.length - 1] : null;
 
-    const verifiedBank = app.customer?.bankAccounts?.find((b) => b.isVerified);
+    let principalDec = new Decimal(app.requestedAmount ? app.requestedAmount.toString() : '0');
+    let feePctDec = new Decimal(1.5).div(100);
+    let processingFeeDec = principalDec.times(feePctDec).toDecimalPlaces(2);
+    let gstDec = processingFeeDec.times(0.18).toDecimalPlaces(2);
+
+    if (latestOffer && latestOffer.status === 'ACCEPTED') {
+      principalDec = new Decimal(latestOffer.offeredAmount);
+      processingFeeDec = new Decimal(latestOffer.processingFee);
+      gstDec = new Decimal(latestOffer.processingFeeGst);
+    }
+
+    const verifiedBank = app.customer?.bankAccounts?.find((b) => b.isVerified) || app.customer?.bankAccounts?.[0];
 
     return financialControlService.createFinancialTask(
       {
-        tenantId: app.tenantId || actor.tenantId || 'tenant-adyapan-default',
+        tenantId,
         branchId: app.branchId || actor.branchId,
         resourceType: 'LoanApplication',
         resourceId: app.id,
@@ -649,6 +695,15 @@ export class FinanceService {
     input: { decision?: 'APPROVE' | 'REJECT'; comments?: string },
     checker: FinancialActorContext
   ): Promise<FinancialTaskRecord> {
+    const task = financialControlService.getTask(taskId);
+    if (!task) {
+      throw new NotFoundError(`Financial task ${taskId} not found.`);
+    }
+
+    if (task.makerId === checker.id) {
+      throw new ForbiddenError('Segregation of Duties: Maker and Checker cannot be the same user.');
+    }
+
     if (input?.decision === 'REJECT') {
       return financialControlService.rejectFinancialTask(
         taskId,
@@ -670,6 +725,7 @@ export class FinanceService {
       disbursementMethod?: string;
       referenceNumber?: string;
       idempotencyKey?: string;
+      forceMode?: ExecutionMode;
     },
     actor: FinancialActorContext
   ) {
@@ -711,6 +767,16 @@ export class FinanceService {
       }
     }
 
+    // Idempotency check: If already disbursed, return existing loan to prevent duplicate payouts
+    if (app.status === 'DISBURSED') {
+      const existingLoan = await prisma.loan.findFirst({
+        where: { applicationId: app.id },
+      });
+      if (existingLoan) {
+        return existingLoan;
+      }
+    }
+
     // 10-Point Pre-Disbursement Gatekeeper Verification
     const gateOutcome = await payoutGatekeeper.verifyPreDisbursementGates(applicationId, tenantId, {
       id: actor.id,
@@ -725,8 +791,8 @@ export class FinanceService {
     }
 
     // Verified Borrower Bank Account Gate
-    const hasVerifiedBank = app.customer?.bankAccounts?.some((b) => b.isVerified);
-    if (!hasVerifiedBank) {
+    const verifiedBank = app.customer?.bankAccounts?.find((b) => b.isVerified);
+    if (!verifiedBank) {
       throw new BadRequestError(
         'Disbursement blocked: Beneficiary bank account is not verified via penny-drop validation.'
       );
@@ -742,25 +808,91 @@ export class FinanceService {
       );
     }
 
-    // Check Dual-Control Task (Auto-resolve for authorized single Finance Officer or enforce signoff)
+    // Check Dual-Control Task (Auto-resolve for authorized supervisory roles or enforce signoff)
     const activeTask = Array.from(financialControlService['tasks'].values()).find(
       (t) => t.resourceId === app.id && t.resourceType === 'LoanApplication'
     );
     if (activeTask && activeTask.status === 'PENDING_CHECKER') {
+      if (activeTask.makerId === actor.id) {
+        throw new ForbiddenError('Segregation of Duties: Maker cannot execute unverified task without checker signoff.');
+      }
       if (actor.roles.some((r) => ['FINANCE_OFFICER', 'SUPER_ADMIN', 'BRANCH_MANAGER'].includes(r))) {
         activeTask.status = 'APPROVED';
         activeTask.checkerId = actor.id;
         activeTask.approvedAt = new Date().toISOString();
         activeTask.updatedAt = new Date().toISOString();
-      } else if (activeTask.makerId === actor.id) {
-        throw new ForbiddenError('Segregation of Duties: Maker cannot execute unverified task without checker signoff.');
       }
     }
 
-    // Mathematical Precision via Decimal.js
-    const rateNum = Number(app.product?.interestRate || 12.0);
-    const tenure = app.tenureMonths || 12;
-    const emiResult = calculateEmi(principalNum, rateNum, tenure);
+    // Mathematical Precision via Decimal.js & OfferEngine
+    const appOffers = OfferEngineService.getInstance().getApplicationOffers(tenantId, app.id);
+    const latestOffer = appOffers.length > 0 ? appOffers[appOffers.length - 1] : null;
+
+    let principalAmount = principalNum;
+    let rateNum = Number(app.product?.interestRate || 12.0);
+    let tenure = app.tenureMonths || 12;
+    let procFee = principalAmount * 0.015;
+    let gstAmount = procFee * 0.18;
+    let docCharges = 0;
+    let netDisbursed = principalAmount - procFee - gstAmount;
+
+    if (latestOffer && latestOffer.status === 'ACCEPTED') {
+      principalAmount = latestOffer.offeredAmount;
+      rateNum = latestOffer.annualInterestRatePct;
+      tenure = latestOffer.tenureMonths;
+      procFee = latestOffer.processingFee;
+      gstAmount = latestOffer.processingFeeGst;
+      netDisbursed = latestOffer.netDisbursedAmount;
+      const totalDeductions = principalAmount - netDisbursed;
+      const otherCharges = totalDeductions - procFee - gstAmount;
+      if (otherCharges > 0) {
+        docCharges = otherCharges;
+      }
+    }
+
+    // Central Provider Resolution
+    const correlationId = `corr_pout_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const resolved = providerRegistry.getPayoutProvider({
+      tenantId,
+      forceMode: input.forceMode,
+    });
+
+    const disbMethod = input.disbursementMethod || 'IMPS';
+    const payoutReq: PayoutRequest = {
+      payoutId: `pout_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      loanId: app.id,
+      amount: netDisbursed,
+      currency: 'INR',
+      beneficiaryName: `${app.customer.firstName} ${app.customer.lastName}`.trim(),
+      accountNumber: verifiedBank.accountNumber,
+      ifscCode: verifiedBank.ifscCode,
+      paymentMode: (['IMPS', 'NEFT', 'RTGS', 'UPI'].includes(disbMethod) ? disbMethod : 'IMPS') as any,
+      purpose: `LOAN_DISBURSEMENT_${app.applicationNo}`,
+    };
+
+    let payoutResult: any;
+    if (resolved.mode === 'REAL_PROVIDER') {
+      payoutResult = await resolved.provider.initiatePayout(payoutReq, correlationId);
+      const isSuccess = payoutResult.status === 'PAYOUT_SUCCESS' || payoutResult.status === 'SUCCESS';
+      if (!isSuccess) {
+        throw new BadRequestError(
+          `Disbursement payout was rejected by real provider: ${payoutResult.failureReason || 'Payout transaction failed'}`
+        );
+      }
+    } else {
+      payoutResult = await resolved.provider.initiatePayout(payoutReq, correlationId);
+      const isSuccess = payoutResult.status === 'PAYOUT_SUCCESS' || payoutResult.status === 'SUCCESS';
+      if (!isSuccess) {
+        throw new BadRequestError(
+          `Disbursement payout was rejected by sandbox provider: ${payoutResult.failureReason || 'Sandbox payout simulation failed'}`
+        );
+      }
+    }
+
+    const finalUtr = input.referenceNumber || payoutResult.utr || payoutResult.utrNumber || `UTR-DISB-SBX-${Date.now()}`;
+    const providerRef = payoutResult.providerReference || payoutResult.providerPayoutId || payoutResult.payoutId || finalUtr;
+
+    const emiResult = calculateEmi(principalAmount, rateNum, tenure);
     const emiAmount = emiResult.emi;
     const loanNo = generateLoanNo();
     const disbursementDate = new Date();
@@ -769,9 +901,6 @@ export class FinanceService {
 
     const firstDueDate = new Date();
     firstDueDate.setMonth(firstDueDate.getMonth() + 1);
-
-    const disbMethod = input.disbursementMethod || 'IMPS';
-    const disbRef = input.referenceNumber || `DISB-TXN-${Date.now()}`;
 
     // Atomic database transaction
     const loan = await prisma.$transaction(async (tx) => {
@@ -784,13 +913,13 @@ export class FinanceService {
           productId: app.productId,
           branchId: app.branchId || app.customer.branchId,
           tenantId: app.tenantId || actor.tenantId,
-          principal: Money.toDb(principalNum),
+          principal: Money.toDb(principalAmount),
           interestRate: Money.round(rateNum).toFixed(3),
           tenureMonths: tenure,
           emiAmount,
           disbursementDate,
           maturityDate,
-          outstandingPrincipal: Money.toDb(principalNum),
+          outstandingPrincipal: Money.toDb(principalAmount),
           outstandingInterest: '0.00',
           outstandingFees: '0.00',
           nextDueDate: firstDueDate,
@@ -823,9 +952,9 @@ export class FinanceService {
       await tx.disbursement.create({
         data: {
           loanId: createdLoan.id,
-          amount: Money.toDb(principalNum),
+          amount: Money.toDb(principalAmount),
           method: disbMethod,
-          reference: disbRef,
+          reference: finalUtr,
           status: 'COMPLETED',
           disbursedBy: actor.email || actor.id,
         },
@@ -837,9 +966,9 @@ export class FinanceService {
           loanId: createdLoan.id,
           type: 'DISBURSEMENT',
           direction: 'DEBIT',
-          amount: Money.toDb(principalNum),
-          reference: disbRef,
-          description: `Electronic disbursement via ${disbMethod}. Ref: ${disbRef}`,
+          amount: Money.toDb(principalAmount),
+          reference: finalUtr,
+          description: `Electronic disbursement via ${disbMethod} (${resolved.isSandbox ? 'SANDBOX_SIMULATION' : 'REAL_PROVIDER'}). Ref: ${finalUtr}`,
         },
       });
 
@@ -855,12 +984,30 @@ export class FinanceService {
           fromStatus: app.status,
           toStatus: 'DISBURSED',
           changedBy: actor.email || actor.id,
-          reason: `Loan disbursed with account #${loanNo}. Ref: ${disbRef}`,
+          reason: `Loan disbursed with account #${loanNo}. Ref: ${finalUtr}`,
         },
       });
 
       return createdLoan;
     });
+
+    // 6. Post double-entry General Ledger journal
+    try {
+      await generalLedgerService.postDisbursementJournal({
+        loanId: loan.id,
+        loanNo,
+        tenantId,
+        branchId: app.branchId || undefined,
+        principalAmount,
+        netDisbursedAmount: netDisbursed,
+        processingFee: procFee,
+        gstAmount,
+        documentationCharges: docCharges,
+        disbursedBy: actor.email || actor.id,
+      });
+    } catch {
+      // Non-blocking GL posting
+    }
 
     // Mark financial task executed if one existed
     if (activeTask) {
@@ -877,9 +1024,18 @@ export class FinanceService {
       entityId: loan.id,
       newValue: {
         loanNo,
-        amount: principalNum,
+        amount: principalAmount,
+        netDisbursedAmount: netDisbursed,
         method: disbMethod,
-        reference: disbRef,
+        reference: finalUtr,
+        utr: finalUtr,
+        providerReference: providerRef,
+        providerId: resolved.provider.providerId || resolved.provider.code || 'disbursement_payout',
+        executionMode: resolved.mode,
+        isSandbox: resolved.isSandbox,
+        verificationMode: resolved.isSandbox ? 'SANDBOX_SIMULATION' : 'PROVIDER_AUTOMATED',
+        correlationId,
+        beneficiaryAccountMasked: maskSecret(verifiedBank.accountNumber),
       },
     });
 
@@ -889,7 +1045,7 @@ export class FinanceService {
       channel: 'IN_APP',
       type: 'SUCCESS',
       title: `Loan #${loanNo} Disbursed Successfully`,
-      message: `Principal amount of ₹${principalNum.toLocaleString('en-IN')} has been transferred via ${disbMethod}. Ref: ${disbRef}.`,
+      message: `Principal amount of ₹${principalAmount.toLocaleString('en-IN')} has been transferred via ${disbMethod}. Ref: ${finalUtr}.`,
     }).catch(() => {});
 
     void communicationService.dispatchSystemEvent(
@@ -900,15 +1056,86 @@ export class FinanceService {
         customerEmail: app.customer?.email || undefined,
         customerMobile: app.customer?.mobile || undefined,
         loanNo,
-        netDisbursedAmount: String(principalNum),
+        netDisbursedAmount: String(netDisbursed),
         bankAccount: app.customer?.bankAccountNo || 'On Record',
-        utrNumber: disbRef,
+        utrNumber: finalUtr,
         emiAmount: String(loan.emiAmount || '0.00'),
       },
       app.tenantId || undefined
     ).catch(() => {});
 
     return loan;
+  }
+
+  /**
+   * Handle incoming provider payout webhooks with HMAC signature verification & replay protection
+   */
+  public async handlePayoutWebhook(input: {
+    rawPayload: string;
+    signature?: string;
+    timestamp?: string;
+    headers?: Record<string, string>;
+  }) {
+    const inbound = {
+      providerId: 'disbursement_payout',
+      eventId: `evt_pout_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      eventType: 'PAYOUT_STATUS_UPDATE',
+      rawPayload: input.rawPayload,
+      signature: input.signature,
+      timestamp: input.timestamp || new Date().toISOString(),
+      headers: input.headers,
+    };
+
+    const webhookResult = await webhookFramework.processInboundWebhook(inbound);
+    if (webhookResult.status === 'INVALID_SIGNATURE') {
+      throw new ForbiddenError('Invalid payout webhook signature. Untrusted sender.');
+    }
+    if (webhookResult.status === 'REPLAY_ATTACK') {
+      throw new BadRequestError('Payout webhook replay attack detected. Timestamp drift exceeded.');
+    }
+    if (webhookResult.status === 'DUPLICATE') {
+      return {
+        success: true,
+        status: 'DUPLICATE',
+        message: 'Duplicate payout webhook event already processed.',
+      };
+    }
+
+    const payload = webhookResult.normalizedData;
+    const payoutId = payload.payoutId || payload.transferId || payload.id;
+    const utr = payload.utr || payload.utrNumber;
+    const rawStatus = (payload.status || payload.transferStatus || '').toUpperCase();
+
+    if (payoutId && utr) {
+      const disbursement = await prisma.disbursement.findFirst({
+        where: {
+          OR: [
+            { reference: payoutId },
+            { reference: { contains: payoutId } },
+          ],
+        },
+      });
+
+      if (disbursement && utr) {
+        await prisma.disbursement.update({
+          where: { id: disbursement.id },
+          data: {
+            reference: utr,
+            status: ['SUCCESS', 'PAYOUT_SUCCESS', 'PROCESSED', 'COMPLETED'].includes(rawStatus)
+              ? 'COMPLETED'
+              : disbursement.status,
+          },
+        });
+      }
+    }
+
+    return {
+      success: true,
+      eventId: webhookResult.eventId,
+      status: 'PROCESSED',
+      payoutId,
+      utr,
+    };
   }
 }
 

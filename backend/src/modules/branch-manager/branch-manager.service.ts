@@ -341,6 +341,25 @@ export async function submitBranchManagerDecision(
       );
     }
 
+    // 5c. Prerequisite: Authoritative KYC Verification Gate
+    if (app.customer?.kycStatus !== 'VERIFIED') {
+      throw new BadRequestError(
+        'KYC_VERIFICATION_REQUIRED: Customer KYC must be VERIFIED prior to sanction approval.'
+      );
+    }
+
+    // 5d. Prerequisite: Verified Beneficiary Bank Account Gate
+    const hasVerifiedBank =
+      (app.customer as any)?.bankAccounts?.some((b: any) => b.isVerified) ||
+      (await (prisma as any).customerBankAccount?.findFirst?.({
+        where: { customerId: app.customer.id, isVerified: true },
+      }));
+    if (!hasVerifiedBank) {
+      throw new BadRequestError(
+        'BANK_VERIFICATION_REQUIRED: A verified beneficiary bank account is required prior to sanction approval.'
+      );
+    }
+
     nextApplicationStatus = 'UNDERWRITING';
     historyReason = `Branch Approved Within Delegated Limit (₹${BRANCH_MANAGER_LIMIT.toLocaleString('en-IN')}) & Sent to Underwriter${remarksText ? ': ' + remarksText : ''
       }`;

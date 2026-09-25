@@ -100,11 +100,16 @@ export function getProviderConfigurations(): Record<string, ProviderConfig> {
   const kycApiKey = process.env.KYC_GATEWAY_API_KEY;
   const kycBaseUrl = process.env.KYC_GATEWAY_BASE_URL;
 
-  // 3. Banking Data (Account Aggregator / Setu / Finvu)
-  const bankingApiKey = process.env.ACCOUNT_AGGREGATOR_API_KEY;
-  const bankingBaseUrl = process.env.ACCOUNT_AGGREGATOR_BASE_URL;
+  // 3. Banking Data (Account Aggregator / Setu / Finvu / Penny Drop)
+  const bankingApiKey = process.env.BANKING_GATEWAY_API_KEY || process.env.ACCOUNT_AGGREGATOR_API_KEY;
+  const bankingBaseUrl = process.env.BANKING_GATEWAY_BASE_URL || process.env.ACCOUNT_AGGREGATOR_BASE_URL;
 
-  // 4. Payment Gateway (Razorpay / Cashfree)
+  // 4. Digital eSign (Digio / Leegality / NSDL)
+  const esignApiKey = process.env.ESIGN_GATEWAY_API_KEY || process.env.DIGIO_API_KEY || process.env.LEGALITY_API_KEY;
+  const esignBaseUrl = process.env.ESIGN_GATEWAY_BASE_URL || process.env.DIGIO_BASE_URL || process.env.LEGALITY_BASE_URL;
+  const esignWebhookSecret = process.env.ESIGN_WEBHOOK_SECRET;
+
+  // 5. Payment Gateway (Razorpay / Cashfree)
   const paymentKey = process.env.PAYMENT_GATEWAY_KEY_ID;
   const paymentSecret = process.env.PAYMENT_GATEWAY_KEY_SECRET;
   const paymentBaseUrl = process.env.PAYMENT_GATEWAY_BASE_URL;
@@ -147,16 +152,16 @@ export function getProviderConfigurations(): Record<string, ProviderConfig> {
       name: 'Identity & KYC Verification (NSDL / UIDAI GSP)',
       category: 'KYC',
       description: 'Authoritative PAN verification, Aadhaar OTP XML, and name matching',
-      enabled: Boolean(kycApiKey && kycBaseUrl),
+      enabled: Boolean(kycApiKey && kycBaseUrl && !kycBaseUrl.includes('sandbox.co.in')),
       environment: nodeEnv,
-      baseUrl: kycBaseUrl || undefined,
+      baseUrl: (kycBaseUrl && !kycBaseUrl.includes('sandbox.co.in')) ? kycBaseUrl : undefined,
       timeoutMs: 8000,
       maxRetries: 2,
       rateLimitPerMinute: 120,
       authType: 'API_KEY',
-      isConfigured: Boolean(kycApiKey && kycBaseUrl),
+      isConfigured: Boolean(kycApiKey && kycBaseUrl && !kycBaseUrl.includes('sandbox.co.in')),
       maskedConfigSummary: {
-        baseUrl: kycBaseUrl || 'NOT_SET',
+        baseUrl: (kycBaseUrl && !kycBaseUrl.includes('sandbox.co.in')) ? kycBaseUrl : 'NOT_SET',
         apiKey: maskSecret(kycApiKey),
         timeoutMs: 8000,
       },
@@ -262,6 +267,28 @@ export function getProviderConfigurations(): Record<string, ProviderConfig> {
       maskedConfigSummary: {
         cloudName: env.cloudinary.cloudName,
         apiKey: maskSecret(env.cloudinary.apiKey),
+        timeoutMs: 15000,
+      },
+    },
+
+    esign: {
+      providerId: 'esign',
+      name: 'Digital Agreement eSign Gateway (Digio / Leegality / NSDL)',
+      category: 'ESIGN',
+      description: 'Aadhaar eSign & digital signature execution for loan contracts and KFS',
+      enabled: Boolean(esignApiKey && esignBaseUrl),
+      environment: nodeEnv,
+      baseUrl: esignBaseUrl || undefined,
+      timeoutMs: 15000,
+      maxRetries: 1,
+      rateLimitPerMinute: 60,
+      authType: 'API_KEY',
+      webhookSecret: esignWebhookSecret,
+      isConfigured: Boolean(esignApiKey && esignBaseUrl),
+      maskedConfigSummary: {
+        baseUrl: esignBaseUrl || 'NOT_SET',
+        apiKey: maskSecret(esignApiKey),
+        webhookSecret: maskSecret(esignWebhookSecret),
         timeoutMs: 15000,
       },
     },

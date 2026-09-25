@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   CreditCard,
@@ -30,16 +31,15 @@ import { KycVerificationView } from './KycVerificationView';
 import { BorrowerOfferModal } from './BorrowerOfferModal';
 import { AgreementAndEsignView } from './AgreementAndEsignView';
 import { MandateSetupView } from './MandateSetupView';
-import { ApplicationWizard } from './ApplicationWizard';
 import type { BorrowerApplicationSummary } from '../types';
 
 export const BorrowerDashboardView: React.FC = () => {
+  const router = useRouter();
   const { data: profile, isLoading: isProfileLoading, refetch: refetchProfile } = useBorrowerProfile();
   const { data: products = [], isLoading: isProductsLoading, refetch: refetchProducts } = useBorrowerProducts();
   const { data: creditFacilities = [], refetch: refetchFacilities } = useBorrowerCreditFacilities();
 
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'APPLY' | 'LOANS' | 'CREDIT_LINE' | 'DOCUMENTS' | 'KYC'>('OVERVIEW');
-  const [selectedProductIdForApply, setSelectedProductIdForApply] = useState<string | undefined>();
   const [selectedOfferApp, setSelectedOfferApp] = useState<BorrowerApplicationSummary | null>(null);
   const [selectedAgreementApp, setSelectedAgreementApp] = useState<BorrowerApplicationSummary | null>(null);
   const [selectedMandateApp, setSelectedMandateApp] = useState<BorrowerApplicationSummary | null>(null);
@@ -118,10 +118,7 @@ export const BorrowerDashboardView: React.FC = () => {
               Refresh
             </button>
             <button
-              onClick={() => {
-                setSelectedProductIdForApply(undefined);
-                setActiveTab('APPLY');
-              }}
+              onClick={() => router.push('/borrower/apply')}
               className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all"
             >
               <Plus className="w-4 h-4" />
@@ -145,7 +142,13 @@ export const BorrowerDashboardView: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  if (tab.id === 'APPLY') {
+                    router.push('/borrower/apply');
+                  } else {
+                    setActiveTab(tab.id as any);
+                  }
+                }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
                   isSelected
                     ? 'bg-blue-600 text-white shadow-xs'
@@ -244,28 +247,11 @@ export const BorrowerDashboardView: React.FC = () => {
               </div>
               <ProductDiscovery
                 onSelectProduct={(prod, amt, ten) => {
-                  setSelectedProductIdForApply(prod.id);
-                  setActiveTab('APPLY');
+                  router.push(`/borrower/apply?product=${prod.id}`);
                 }}
               />
             </div>
           )}
-        </div>
-      )}
-
-      {/* TAB 2: APPLY FOR LOAN WIZARD */}
-      {activeTab === 'APPLY' && (
-        <div className="space-y-6">
-          <ApplicationWizard
-            products={products}
-            profile={profile}
-            initialProductId={selectedProductIdForApply}
-            onApplicationCompleted={() => {
-              handleRefresh();
-              setActiveTab('OVERVIEW');
-            }}
-            onCancel={() => setActiveTab('OVERVIEW')}
-          />
         </div>
       )}
 

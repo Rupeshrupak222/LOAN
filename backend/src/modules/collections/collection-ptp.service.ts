@@ -154,6 +154,16 @@ export class CollectionPtpService {
           data: { status: 'KEPT' },
         });
         fulfilledIds.push(ptp.id);
+
+        await prisma.collectionActivity.create({
+          data: {
+            caseId: ptp.caseId,
+            activityType: 'EVENT',
+            outcome: 'PTP_KEPT',
+            notes: `Promise To Pay for ₹${Number(ptp.promisedAmount)} honored via payment of ₹${params.paymentAmount}${params.paymentReference ? ' (Ref: ' + params.paymentReference + ')' : ''}.`,
+            performedBy: 'system',
+          },
+        }).catch(() => {});
       } else if (paymentDecimal.greaterThan(0)) {
         // Partial fulfillment
         await prisma.promiseToPay.update({
@@ -161,6 +171,16 @@ export class CollectionPtpService {
           data: { status: 'PARTIALLY_FULFILLED' },
         });
         fulfilledIds.push(ptp.id);
+
+        await prisma.collectionActivity.create({
+          data: {
+            caseId: ptp.caseId,
+            activityType: 'EVENT',
+            outcome: 'PTP_PARTIALLY_FULFILLED',
+            notes: `Promise To Pay for ₹${Number(ptp.promisedAmount)} partially fulfilled with payment of ₹${params.paymentAmount}.`,
+            performedBy: 'system',
+          },
+        }).catch(() => {});
       }
     }
 
@@ -189,7 +209,7 @@ export class CollectionPtpService {
 
     const expiredPtps = await prisma.promiseToPay.findMany({
       where,
-      select: { id: true, caseId: true },
+      include: { collectionCase: { include: { loan: true } } },
     });
 
     if (expiredPtps.length === 0) return { brokenCount: 0 };
@@ -210,10 +230,33 @@ export class CollectionPtpService {
           data: { status: 'IN_PROGRESS', priority: 'HIGH' },
         });
       }
+
+      await prisma.collectionActivity.create({
+        data: {
+          caseId: ptp.caseId,
+          activityType: 'EVENT',
+          outcome: 'PTP_BROKEN',
+          notes: `Promise To Pay for ₹${Number(ptp.promisedAmount)} expired on ${new Date(ptp.promisedDate).toLocaleDateString()} without remittance. Priority escalated to HIGH.`,
+          performedBy: 'system',
+        },
+      }).catch(() => {});
+
+      await logAudit({
+        action: 'COLLECTION_PTP_BROKEN',
+        entity: 'PromiseToPay',
+        entityId: ptp.id,
+        newValue: {
+          caseId: ptp.caseId,
+          loanId: ptp.collectionCase.loanId,
+          promisedAmount: Number(ptp.promisedAmount),
+          promisedDate: ptp.promisedDate,
+        },
+      }).catch(() => {});
     }
 
     return { brokenCount: expiredPtps.length };
   }
+
 
   /**
    * List PTPs for a case

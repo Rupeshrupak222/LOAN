@@ -84,8 +84,44 @@ contractsRoutes.post(
     try {
       const { sessionId } = req.params;
       const metadata = req.body;
-      const session = await contractsService.completeESign(sessionId, metadata);
+      const user = (req as any).user;
+      const session = await contractsService.completeESign(sessionId, metadata, {
+        id: user?.id,
+        tenantId: user?.tenantId,
+      });
       return ok(res, session);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/v1/contracts/webhooks/esign
+ * Authoritative inbound webhook endpoint for real eSign providers
+ */
+contractsRoutes.post(
+  '/webhooks/esign',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const signature = (req.headers['x-provider-signature'] || req.headers['x-hub-signature-256']) as string;
+      const timestamp = (req.headers['x-provider-timestamp'] || new Date().toISOString()) as string;
+      const providerId = (req.headers['x-provider-id'] as string) || 'sandbox_esign';
+      const eventId = (req.headers['x-event-id'] as string) || `EVT-${Date.now()}`;
+
+      const rawPayload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+
+      const result = await contractsService.handleEsignWebhook({
+        providerId,
+        eventId,
+        eventType: req.body?.event || 'DOCUMENT_SIGNED',
+        rawPayload,
+        signature,
+        timestamp,
+        headers: req.headers as Record<string, string>,
+      });
+
+      return ok(res, result);
     } catch (err) {
       next(err);
     }

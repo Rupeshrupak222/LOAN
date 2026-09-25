@@ -8,6 +8,7 @@ import { Money } from '../finance/money';
 import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
+import crypto from 'crypto';
 import {
   validateCustomerDocumentFulfillment,
   calculateApplicableDocuments,
@@ -19,6 +20,9 @@ import type {
   UpdateKycStatusInput,
   CreateAddressInput,
   CreateBankAccountInput,
+  CreateConsentInput,
+  BatchConsentInput,
+  CreateIdentifierInput,
 } from './customer.schema';
 
 export interface CustomerActorContext {
@@ -623,6 +627,11 @@ export async function createCustomer(
   const bankAccountNo = input.bankAccountNo || input.bankAccount?.accountNumber || input.bankAccount?.bankAccountNo || null;
   const bankIfsc = input.bankIfsc || input.bankAccount?.ifscCode || input.bankAccount?.bankIfsc || null;
 
+  const effectiveFirstName = input.middleName && input.middleName.trim().length > 0
+    ? `${input.firstName.trim()} ${input.middleName.trim()}`
+    : input.firstName.trim();
+  const effectiveLastName = input.lastName.trim();
+
   // Compute password hash outside transaction
   const rawPassword =
     input.password && input.password.trim().length >= 6
@@ -630,12 +639,13 @@ export async function createCustomer(
       : process.env.DEFAULT_USER_PASSWORD || 'TemporarySetup@2026';
   const passwordHash = input.email ? await argon2.hash(rawPassword, { type: argon2.argon2id }) : null;
 
-  const customer = await prisma.$transaction(async (tx) => {
-    let customerUserId: string | undefined = undefined;
+  const customer = await prisma.$transaction(
+    async (tx) => {
+      let customerUserId: string | undefined = undefined;
 
-    // If email is provided, create linked User account with CUSTOMER role and hashed password
-    if (input.email && passwordHash) {
-      const cleanEmail = input.email.toLowerCase().trim();
+      // If email is provided, create linked User account with CUSTOMER role and hashed password
+      if (input.email && passwordHash) {
+        const cleanEmail = input.email.toLowerCase().trim();
 
       const existingUser = await tx.user.findUnique({ where: { email: cleanEmail } });
       if (existingUser) {
@@ -647,15 +657,15 @@ export async function createCustomer(
       const user = await tx.user.upsert({
         where: { email: cleanEmail },
         update: {
-          firstName: input.firstName,
-          lastName: input.lastName,
+          firstName: effectiveFirstName,
+          lastName: effectiveLastName,
           status: 'ACTIVE',
           ...(input.branchId ? { branchId: input.branchId } : {}),
         },
         create: {
           email: cleanEmail,
-          firstName: input.firstName,
-          lastName: input.lastName,
+          firstName: effectiveFirstName,
+          lastName: effectiveLastName,
           passwordHash,
           status: 'ACTIVE',
           ...(input.branchId ? { branchId: input.branchId } : {}),
@@ -715,8 +725,8 @@ export async function createCustomer(
         data: {
           userId: targetUserId || undefined,
           ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
-          firstName: input.firstName,
-          lastName: input.lastName,
+          firstName: effectiveFirstName,
+          lastName: effectiveLastName,
           dateOfBirth: input.dateOfBirth || existingCust.dateOfBirth,
           gender: input.gender || existingCust.gender,
           mobile: mobile || input.mobile,
@@ -749,8 +759,8 @@ export async function createCustomer(
           userId: newCustUserId,
           ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}),
           customerCode: generateCustomerCode(),
-          firstName: input.firstName,
-          lastName: input.lastName,
+          firstName: effectiveFirstName,
+          lastName: effectiveLastName,
           dateOfBirth: input.dateOfBirth,
           gender: input.gender,
           mobile: mobile || input.mobile || '',
@@ -1027,7 +1037,7 @@ export async function updateCustomer(
 
     // 5. Update customer record
     return tx.customer.update({ where: { id }, data });
-  });
+  }, { maxWait: 20000, timeout: 60000 });
 
   await logAudit({
     userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,
@@ -1255,6 +1265,260 @@ export async function deleteCustomerBankAccount(
   return { success: true, message: 'Bank account record deleted successfully' };
 }
 
+export async function captureCustomerConsent(
+  customerId: string,
+  input: CreateConsentInput,
+  actor?: CustomerActorContext,
+  ipAddress?: string,
+  userAgent?: string
+) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, tenantId: true, customerCode: true },
+  });
+  if (!customer) {
+    throw new NotFoundError('Customer not found');
+  }
+
+  // Multi-tenant check
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+  }
+
+  const consent = await prisma.customerConsent.create({
+    data: {
+      customerId,
+      tenantId: customer.tenantId || actor?.tenantId,
+      consentType: input.consentType,
+      purpose: input.purpose,
+      version: input.version || 'v1.0',
+      granted: input.granted !== false,
+      channel: input.channel || 'BRANCH_PORTAL',
+      ipAddress: input.ipAddress || ipAddress || null,
+      userAgent: input.userAgent || userAgent || null,
+    },
+  });
+
+  await logAudit({
+    userId: actor?.id?.startsWith('usr-') ? actor.id : undefined,
+    tenantId: customer.tenantId || undefined,
+    action: 'BORROWER_CONSENT_RECORDED',
+    entity: 'CustomerConsent',
+    entityId: consent.id,
+    newValue: {
+      customerId,
+      consentType: consent.consentType,
+      purpose: consent.purpose,
+      version: consent.version,
+      granted: consent.granted,
+      channel: consent.channel,
+    },
+  }).catch(() => {});
+
+  return consent;
+}
+
+export async function batchCaptureCustomerConsents(
+  customerId: string,
+  input: BatchConsentInput,
+  actor?: CustomerActorContext,
+  ipAddress?: string,
+  userAgent?: string
+) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, tenantId: true, customerCode: true },
+  });
+  if (!customer) {
+    throw new NotFoundError('Customer not found');
+  }
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+  }
+
+  const createdConsents = await prisma.$transaction(
+    input.consents.map((c) =>
+      prisma.customerConsent.create({
+        data: {
+          customerId,
+          tenantId: customer.tenantId || actor?.tenantId,
+          consentType: c.consentType,
+          purpose: c.purpose,
+          version: c.version || 'v1.0',
+          granted: c.granted !== false,
+          channel: c.channel || 'BRANCH_PORTAL',
+          ipAddress: c.ipAddress || ipAddress || null,
+          userAgent: c.userAgent || userAgent || null,
+        },
+      })
+    )
+  );
+
+  await logAudit({
+    userId: actor?.id?.startsWith('usr-') ? actor.id : undefined,
+    tenantId: customer.tenantId || undefined,
+    action: 'BORROWER_BATCH_CONSENTS_RECORDED',
+    entity: 'CustomerConsent',
+    entityId: customerId,
+    newValue: {
+      count: createdConsents.length,
+      types: createdConsents.map((c) => c.consentType),
+    },
+  }).catch(() => {});
+
+  return createdConsents;
+}
+
+export async function listCustomerConsents(customerId: string, actor?: CustomerActorContext) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, tenantId: true, userId: true },
+  });
+  if (!customer) {
+    throw new NotFoundError('Customer not found');
+  }
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+    const isStaff = actor.roles?.some((r) =>
+      ['ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR'].includes(r)
+    );
+    if (!isStaff && customer.userId !== actor.id) {
+      throw new ForbiddenError('Access forbidden: Cannot view another customer consents');
+    }
+  }
+
+  return prisma.customerConsent.findMany({
+    where: { customerId },
+    orderBy: { grantedAt: 'desc' },
+  });
+}
+
+export function maskIdentifierValue(idType: string, rawVal: string): string {
+  const clean = rawVal.trim().toUpperCase().replace(/\s+/g, '');
+  if (idType === 'PAN') {
+    if (clean.length === 10) {
+      return `XXXXX${clean.slice(5)}`;
+    }
+    return `XXXXX${clean.slice(-4)}`;
+  }
+  if (idType === 'AADHAAR') {
+    const digits = clean.replace(/\D/g, '');
+    const last4 = digits.slice(-4);
+    return `XXXX-XXXX-${last4}`;
+  }
+  if (clean.length > 4) {
+    return `${'X'.repeat(clean.length - 4)}${clean.slice(-4)}`;
+  }
+  return clean;
+}
+
+export async function saveCustomerIdentifier(
+  customerId: string,
+  input: CreateIdentifierInput,
+  actor?: CustomerActorContext
+) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, tenantId: true, customerCode: true },
+  });
+  if (!customer) {
+    throw new NotFoundError('Customer not found');
+  }
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+  }
+
+  const cleanVal = input.value.trim().toUpperCase();
+  const idHash = crypto.createHash('sha256').update(cleanVal).digest('hex');
+  const maskedValue = maskIdentifierValue(input.idType, cleanVal);
+
+  const existing = await prisma.customerIdentifier.findFirst({
+    where: { customerId, idType: input.idType },
+  });
+
+  let identifier;
+  if (existing) {
+    identifier = await prisma.customerIdentifier.update({
+      where: { id: existing.id },
+      data: {
+        maskedValue,
+        idHash,
+        verificationStatus: input.verificationStatus || 'PENDING',
+        verifiedBy: input.verifiedBy || (input.verificationStatus === 'VERIFIED' ? actor?.id : null),
+        verifiedAt: input.verificationStatus === 'VERIFIED' ? new Date() : null,
+      },
+    });
+  } else {
+    identifier = await prisma.customerIdentifier.create({
+      data: {
+        customerId,
+        idType: input.idType,
+        maskedValue,
+        idHash,
+        verificationStatus: input.verificationStatus || 'PENDING',
+        verifiedBy: input.verifiedBy || (input.verificationStatus === 'VERIFIED' ? actor?.id : null),
+        verifiedAt: input.verificationStatus === 'VERIFIED' ? new Date() : null,
+      },
+    });
+  }
+
+  await logAudit({
+    userId: actor?.id?.startsWith('usr-') ? actor.id : undefined,
+    tenantId: customer.tenantId || undefined,
+    action: 'CUSTOMER_IDENTIFIER_RECORDED',
+    entity: 'CustomerIdentifier',
+    entityId: identifier.id,
+    newValue: {
+      customerId,
+      idType: identifier.idType,
+      maskedValue: identifier.maskedValue,
+      verificationStatus: identifier.verificationStatus,
+    },
+  }).catch(() => {});
+
+  return identifier;
+}
+
+export async function listCustomerIdentifiers(customerId: string, actor?: CustomerActorContext) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, tenantId: true, userId: true },
+  });
+  if (!customer) {
+    throw new NotFoundError('Customer not found');
+  }
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (customer.tenantId && actor.tenantId && customer.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Customer belongs to another institution');
+    }
+    const isStaff = actor.roles?.some((r) =>
+      ['ADMIN', 'COMPANY_ADMIN', 'LOAN_OFFICER', 'CREDIT_ANALYST', 'UNDERWRITER', 'BRANCH_MANAGER', 'AUDITOR'].includes(r)
+    );
+    if (!isStaff && customer.userId !== actor.id) {
+      throw new ForbiddenError('Access forbidden: Cannot view another customer identifiers');
+    }
+  }
+
+  return prisma.customerIdentifier.findMany({
+    where: { customerId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+
+
 export async function deleteCustomer(
   id: string,
   actorUserId?: string,
@@ -1267,112 +1531,125 @@ export async function deleteCustomer(
 
   const customer = await getCustomer(id, actor);
 
-  // Perform cascading deletion in transaction
-  await prisma.$transaction(async (tx) => {
-    // 1. Delete notifications
-    await tx.notification.deleteMany({ where: { customerId: id } });
+  // Perform cascading deletion in transaction with generous 60s timeout for remote cloud db
+  await prisma.$transaction(
+    async (tx) => {
+      // 1. Delete notifications
+      await tx.notification.deleteMany({ where: { customerId: id } }).catch(() => {});
 
-    // 2. Delete collection cases & activities
-    const caseIds = (await tx.collectionCase.findMany({ where: { customerId: id }, select: { id: true } })).map((c) => c.id);
-    if (caseIds.length > 0) {
-      await tx.collectionActivity.deleteMany({ where: { caseId: { in: caseIds } } });
-      await tx.promiseToPay.deleteMany({ where: { caseId: { in: caseIds } } });
-      await tx.collectionCase.deleteMany({ where: { id: { in: caseIds } } });
-    }
+      // 2. Delete collection cases & activities
+      const caseIds = (await tx.collectionCase.findMany({ where: { customerId: id }, select: { id: true } })).map((c) => c.id);
+      if (caseIds.length > 0) {
+        await Promise.all([
+          tx.collectionActivity.deleteMany({ where: { caseId: { in: caseIds } } }).catch(() => {}),
+          tx.promiseToPay.deleteMany({ where: { caseId: { in: caseIds } } }).catch(() => {}),
+        ]);
+        await tx.collectionCase.deleteMany({ where: { id: { in: caseIds } } }).catch(() => {});
+      }
 
-    // 3. Delete payments, allocations & submissions
-    const paymentIds = (await tx.payment.findMany({ where: { customerId: id }, select: { id: true } })).map((p) => p.id);
-    if (paymentIds.length > 0) {
-      await tx.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
-      await tx.payment.deleteMany({ where: { id: { in: paymentIds } } });
-    }
-    await tx.paymentSubmission.deleteMany({ where: { customerId: id } }).catch(() => {});
+      // 3. Delete payments, allocations & submissions
+      const paymentIds = (await tx.payment.findMany({ where: { customerId: id }, select: { id: true } })).map((p) => p.id);
+      if (paymentIds.length > 0) {
+        await tx.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } }).catch(() => {});
+        await tx.payment.deleteMany({ where: { id: { in: paymentIds } } }).catch(() => {});
+      }
+      await tx.paymentSubmission.deleteMany({ where: { customerId: id } }).catch(() => {});
 
-    // 4. Delete loans and related records
-    const loanIds = customer.loans?.map((l: any) => l.id) || [];
-    if (loanIds.length > 0) {
-      await tx.loanClosure.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
-      await tx.settlement.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
-      await tx.loanRestructure.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
-      await tx.disbursement.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
-      await tx.repaymentScheduleItem.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
-      await tx.transaction.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {});
-      await tx.loan.deleteMany({ where: { id: { in: loanIds } } }).catch(() => {});
-    }
+      // 4. Delete loans and related records
+      const loanIds = customer.loans?.map((l: any) => l.id) || [];
+      if (loanIds.length > 0) {
+        await Promise.all([
+          tx.loanClosure.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {}),
+          tx.settlement.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {}),
+          tx.loanRestructure.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {}),
+          tx.disbursement.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {}),
+          tx.repaymentScheduleItem.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {}),
+          tx.transaction.deleteMany({ where: { loanId: { in: loanIds } } }).catch(() => {}),
+        ]);
+        await tx.loan.deleteMany({ where: { id: { in: loanIds } } }).catch(() => {});
+      }
 
-    // 5. Delete loan applications and underwriting records
-    const appIds = customer.applications?.map((a: any) => a.id) || [];
-    if (appIds.length > 0) {
-      await tx.task.deleteMany({
-        where: {
-          OR: [
-            { applicationId: { in: appIds } },
-            { entityType: 'APPLICATION', entityId: { in: appIds } },
-          ],
-        },
-      }).catch(() => {});
-      await tx.activityLog.deleteMany({
-        where: {
-          entityType: 'APPLICATION',
-          entityId: { in: appIds },
-        },
-      }).catch(() => {});
-      await tx.approval.deleteMany({
-        where: {
-          OR: [
-            { applicationId: { in: appIds } },
-            { entityType: 'APPLICATION', entityId: { in: appIds } },
-          ],
-        },
-      }).catch(() => {});
-      await tx.creditReview.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.approvalRequest.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.applicationAssignment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.underwritingDecision.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.riskAssessment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.eligibilityAssessment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.document.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {});
-      await tx.loanApplication.deleteMany({ where: { id: { in: appIds } } }).catch(() => {});
-    }
+      // 5. Delete loan applications and underwriting records
+      const appIds = customer.applications?.map((a: any) => a.id) || [];
+      if (appIds.length > 0) {
+        await Promise.all([
+          tx.task.deleteMany({
+            where: {
+              OR: [
+                { applicationId: { in: appIds } },
+                { entityType: 'APPLICATION', entityId: { in: appIds } },
+              ],
+            },
+          }).catch(() => {}),
+          tx.activityLog.deleteMany({
+            where: {
+              entityType: 'APPLICATION',
+              entityId: { in: appIds },
+            },
+          }).catch(() => {}),
+          tx.approval.deleteMany({
+            where: {
+              OR: [
+                { applicationId: { in: appIds } },
+                { entityType: 'APPLICATION', entityId: { in: appIds } },
+              ],
+            },
+          }).catch(() => {}),
+          tx.creditReview.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.approvalRequest.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.applicationAssignment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.underwritingDecision.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.riskAssessment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.eligibilityAssessment.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+          tx.document.deleteMany({ where: { applicationId: { in: appIds } } }).catch(() => {}),
+        ]);
+        await tx.loanApplication.deleteMany({ where: { id: { in: appIds } } }).catch(() => {});
+      }
 
-    // Customer level tasks and activity logs
-    await tx.task.deleteMany({
-      where: {
-        OR: [
-          { entityType: 'CUSTOMER', entityId: id },
-        ],
-      },
-    }).catch(() => {});
-    await tx.activityLog.deleteMany({
-      where: {
-        entityType: 'CUSTOMER',
-        entityId: id,
-      },
-    }).catch(() => {});
+      // Customer level tasks and activity logs
+      await Promise.all([
+        tx.task.deleteMany({
+          where: {
+            OR: [{ entityType: 'CUSTOMER', entityId: id }],
+          },
+        }).catch(() => {}),
+        tx.activityLog.deleteMany({
+          where: {
+            entityType: 'CUSTOMER',
+            entityId: id,
+          },
+        }).catch(() => {}),
+      ]);
 
-    // 6. Delete direct customer relations
-    await tx.document.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.customerAddress.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.customerBankAccount.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.customerEmployment.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.customerIdentifier.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.customerConsent.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.customerLifecycleHistory.deleteMany({ where: { customerId: id } }).catch(() => {});
-    await tx.creditReassessment.deleteMany({ where: { customerId: id } }).catch(() => {});
+      // 6. Delete direct customer relations in parallel
+      await Promise.all([
+        tx.document.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.customerAddress.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.customerBankAccount.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.customerEmployment.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.customerIdentifier.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.customerConsent.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.customerLifecycleHistory.deleteMany({ where: { customerId: id } }).catch(() => {}),
+        tx.creditReassessment.deleteMany({ where: { customerId: id } }).catch(() => {}),
+      ]);
 
-    // 7. Delete customer record
-    await tx.customer.delete({ where: { id } });
+      // 7. Delete customer record
+      await tx.customer.delete({ where: { id } });
 
-    // 8. Delete linked User login account if exists
-    if (customer.userId) {
-      await tx.userRole.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
-      await tx.notification.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
-      await tx.refreshToken.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
-      await tx.auditLog.deleteMany({ where: { userId: customer.userId } }).catch(() => {});
-      await tx.user.delete({ where: { id: customer.userId } }).catch(() => {});
-    }
-  });
+      // 8. Delete linked User login account if exists
+      if (customer.userId) {
+        await Promise.all([
+          tx.userRole.deleteMany({ where: { userId: customer.userId } }).catch(() => {}),
+          tx.notification.deleteMany({ where: { userId: customer.userId } }).catch(() => {}),
+          tx.refreshToken.deleteMany({ where: { userId: customer.userId } }).catch(() => {}),
+          tx.auditLog.deleteMany({ where: { userId: customer.userId } }).catch(() => {}),
+        ]);
+        await tx.user.delete({ where: { id: customer.userId } }).catch(() => {});
+      }
+    },
+    { timeout: 60000, maxWait: 20000 }
+  );
 
   await logAudit({
     userId: actorUserId?.startsWith('usr-') ? actorUserId : undefined,

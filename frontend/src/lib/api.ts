@@ -75,8 +75,17 @@ export function notifyAuthInvalidated() {
   });
 }
 
-// Request Interceptor: Attach Auth, Correlation ID, and Dynamic Timeout
+// Request Interceptor: Attach Auth, Correlation ID, URL Normalization, and Dynamic Timeout
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Normalize redundant /api/v1 prefix if provided by caller since baseURL already has /api/v1
+  if (config.url) {
+    if (config.url.startsWith('/api/v1/')) {
+      config.url = config.url.substring('/api/v1'.length);
+    } else if (config.url === '/api/v1') {
+      config.url = '/';
+    }
+  }
+
   const token = getAccessToken();
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -91,12 +100,15 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // Assign appropriate timeout by endpoint pattern if not explicitly overridden
   if (!config.timeout || config.timeout === TIMEOUT_CONFIG.DEFAULT) {
     const url = config.url || '';
+    const method = config.method?.toLowerCase() || '';
     if (url.includes('/ai/') || url.includes('intelligence') || url.includes('simulate')) {
       config.timeout = TIMEOUT_CONFIG.AI;
     } else if (url.includes('/documents/upload') || (config.data instanceof FormData)) {
       config.timeout = TIMEOUT_CONFIG.UPLOAD;
     } else if (url.includes('/reports/export') || url.includes('/export')) {
       config.timeout = TIMEOUT_CONFIG.EXPORT;
+    } else if (method === 'delete' || url.includes('/customers')) {
+      config.timeout = 60_000;
     }
   }
 

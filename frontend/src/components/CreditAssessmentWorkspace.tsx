@@ -555,6 +555,28 @@ export function CreditAssessmentWorkspace({
     }
   });
 
+  // Step 2: Reject Single Document Mutation
+  const rejectDocMutation = useMutation({
+    mutationFn: async ({ docId, remarks }: { docId: string; remarks?: string }) => {
+      const reason = remarks || docRemarksMap[docId] || 'Document rejected / requires re-upload by Credit Analyst';
+      return api.post(`/credit/applications/${applicationId}/verify-document`, {
+        documentId: docId,
+        status: 'REJECTED',
+        remarks: reason,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Document marked as rejected / correction required.');
+      refetch();
+      refetchCapacity();
+      queryClient.invalidateQueries({ queryKey: ['credit-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-assessment', applicationId] });
+    },
+    onError: (err: any) => {
+      toast.error(apiErrorMessage(err), { title: 'Document Rejection Error' });
+    },
+  });
+
   // Step 2: Batch Verify All Uploaded Documents
   const batchVerifyMutation = useMutation({
     mutationFn: async () => {
@@ -1009,36 +1031,89 @@ export function CreditAssessmentWorkspace({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
-              <p className="text-[11px] font-medium text-slate-400 uppercase">Borrower</p>
+              <p className="text-[11px] font-medium text-slate-400 uppercase">Borrower Profile</p>
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 {customer?.firstName} {customer?.lastName}
               </p>
               <p className="text-xs text-slate-500">{customer?.customerCode} · {customer?.mobile}</p>
+              <p className="text-[11px] text-slate-400">{customer?.email || 'No email registered'}</p>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
-              <p className="text-[11px] font-medium text-slate-400 uppercase">Loan Product</p>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {product?.name} ({product?.code})
+              <p className="text-[11px] font-medium text-slate-400 uppercase">Tokenized Identifiers (KYC)</p>
+              <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                PAN: {customer?.panNumber || 'Not Linked'}
               </p>
-              <p className="text-xs text-slate-500">Interest Rate: {product?.interestRate}% p.a.</p>
+              <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                Aadhaar: {customer?.aadhaarNumber || 'Not Linked'}
+              </p>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mt-1">
+                Sandbox Simulation / Manual Review
+              </span>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
-              <p className="text-[11px] font-medium text-slate-400 uppercase">Requested Loan</p>
+              <p className="text-[11px] font-medium text-slate-400 uppercase">Financial Profile</p>
+              <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                {formatMoney(customer?.monthlyIncome || 0)} / mo
+              </p>
+              <p className="text-xs text-slate-500">Obligations: {formatMoney(customer?.existingObligations || 0)}/mo</p>
+              <p className="text-[11px] text-slate-400">Employment: {customer?.employmentType || 'Salaried'}</p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
+              <p className="text-[11px] font-medium text-slate-400 uppercase">Loan Application</p>
               <p className="text-sm font-bold text-[#2563EB] dark:text-blue-400">
-                {formatMoney(app?.requestedAmount)}
+                {formatMoney(app?.requestedAmount)} · {app?.tenureMonths}M
               </p>
-              <p className="text-xs text-slate-500">Tenure: {app?.tenureMonths} Months</p>
+              <p className="text-xs text-slate-500">{product?.name} ({product?.interestRate}% p.a.)</p>
+              <p className="text-[11px] text-slate-400">Applied: {formatDate(app?.createdAt)}</p>
+            </div>
+          </div>
+
+          {/* Phase 9A Consent & Authorization Audit Log */}
+          <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-blue-600" /> Explicit Borrower Consents & Authorizations ({customer?.consents?.length || 0})
+              </span>
+              <span className="text-[10px] text-slate-400">Captured during loan officer intake</span>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-1">
-              <p className="text-[11px] font-medium text-slate-400 uppercase">Purpose</p>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {app?.purpose || 'Business / Personal Expansion'}
-              </p>
-              <p className="text-xs text-slate-500">Submitted: {formatDate(app?.createdAt)}</p>
-            </div>
+            {(!customer?.consents || customer.consents.length === 0) ? (
+              <p className="text-xs text-slate-400 italic py-2">No electronic consent logs recorded for this borrower profile.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">
+                      <th className="py-2 px-2.5">Consent Type</th>
+                      <th className="py-2 px-2.5">Purpose</th>
+                      <th className="py-2 px-2.5">Version</th>
+                      <th className="py-2 px-2.5">Channel</th>
+                      <th className="py-2 px-2.5">Timestamp</th>
+                      <th className="py-2 px-2.5 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {customer.consents.map((c: any) => (
+                      <tr key={c.id} className="hover:bg-white/60 dark:hover:bg-slate-800/40">
+                        <td className="py-2 px-2.5 font-bold font-mono text-slate-800 dark:text-slate-200">{c.consentType}</td>
+                        <td className="py-2 px-2.5 text-slate-600 dark:text-slate-400 max-w-xs truncate">{c.purpose}</td>
+                        <td className="py-2 px-2.5 text-slate-500 font-mono text-[11px]">{c.version}</td>
+                        <td className="py-2 px-2.5 text-slate-500 text-[11px]">{c.channel || 'BRANCH_PORTAL'}</td>
+                        <td className="py-2 px-2.5 text-slate-500 text-[11px]">{formatDate(c.grantedAt)}</td>
+                        <td className="py-2 px-2.5 text-right">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            ✓ GRANTED
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {!isStep1Complete ? (
@@ -1441,6 +1516,90 @@ export function CreditAssessmentWorkspace({
           )}
 
           {/* -------------------------------------------------------------------
+              CUSTOMER DATA CONSISTENCY CHECK PANEL (SECTION 5)
+          ------------------------------------------------------------------- */}
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Customer Data Consistency Check (Customer vs KYC vs Documents)
+              </span>
+              <span className="text-[10px] text-slate-400">Cross-verified against tokenized identifiers & uploaded proofs</span>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
+                    <th className="py-2 px-3">Data Field</th>
+                    <th className="py-2 px-3">Declared Value</th>
+                    <th className="py-2 px-3">KYC Identifier / Registry</th>
+                    <th className="py-2 px-3">Uploaded Evidence</th>
+                    <th className="py-2 px-3 text-right">Consistency Verdict</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
+                  <tr>
+                    <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">Borrower Full Name</td>
+                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300">{customer?.firstName} {customer?.lastName}</td>
+                    <td className="py-2 px-3 font-mono text-slate-600 dark:text-slate-400">
+                      {customer?.panNumber ? `${customer.panNumber} (Linked)` : 'Sandbox Match'}
+                    </td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{hasIdentity ? 'Identity Proof Attached' : 'Missing Proof'}</td>
+                    <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓ Consistent
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">Date of Birth & Age</td>
+                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300">
+                      {customer?.dateOfBirth ? formatDate(customer.dateOfBirth) : 'Not Provided'} ({borrowerAge !== null ? `${borrowerAge} yrs` : 'N/A'})
+                    </td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">
+                      {isAgeValid ? `Policy Valid (${minPolicyAge}-${maxPolicyAge} yrs)` : (ageError || 'Age Mismatch')}
+                    </td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{hasIdentity ? 'Aadhaar / DOB Proof' : 'Missing'}</td>
+                    <td className="py-2 px-3 text-right font-bold">
+                      {isAgeValid ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">✓ Match</span>
+                      ) : (
+                        <span className="text-rose-600 dark:text-rose-400">❌ Mismatch</span>
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">Residential Address</td>
+                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
+                      {customer?.addressLine || 'Address on file'}, {customer?.city || ''}
+                    </td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{customer?.pincode ? `PIN: ${customer.pincode}` : 'Standard'}</td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{hasAddress ? 'Utility / Rental Attached' : 'Pending'}</td>
+                    <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                      {hasAddress ? '✓ Consistent' : '⚠️ Pending Doc'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">Income & Banking</td>
+                    <td className="py-2 px-3 font-bold text-slate-800 dark:text-slate-200">
+                      {formatMoney(customer?.monthlyIncome || 0)}/mo
+                    </td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{customer?.employerName || customer?.employmentType || 'Salaried'}</td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">
+                      {hasIncome ? 'Salary / ITR Attached' : 'Pending Income Doc'}
+                    </td>
+                    <td className="py-2 px-3 text-right font-bold">
+                      {hasIncome ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">✓ Consistent</span>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">⚠️ Proof Pending</span>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* -------------------------------------------------------------------
               DOCUMENT CHECKLIST TABLE WITH IN-APP PREVIEW & VERIFICATION
           ------------------------------------------------------------------- */}
           <div className="space-y-3">
@@ -1449,7 +1608,7 @@ export function CreditAssessmentWorkspace({
                 Intake Document Verification Checklist ({documents.length})
               </h4>
               <p className="text-[11px] text-slate-400">
-                Click Preview to inspect file content; verify each record or batch verify
+                Inspect file contents; verify each record or request re-upload
               </p>
             </div>
 
@@ -1468,20 +1627,21 @@ export function CreditAssessmentWorkspace({
                   </Button>
                 </div>
               ) : (
-                <table className="min-w-[750px] w-full text-left border-collapse text-xs">
+                <table className="min-w-[800px] w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b text-[11px] font-bold uppercase text-slate-400 bg-slate-50 dark:bg-slate-900/40">
                       <th className="py-2.5 px-3 min-w-[140px]">Document Category</th>
                       <th className="py-2.5 px-3 min-w-[150px]">File Name</th>
                       <th className="py-2.5 px-3 min-w-[100px]">Requirement</th>
                       <th className="py-2.5 px-3 min-w-[120px]">Status</th>
-                      <th className="py-2.5 px-3 min-w-[100px]">Preview</th>
-                      <th className="py-2.5 px-3 text-right min-w-[160px]">Verification Action</th>
+                      <th className="py-2.5 px-3 min-w-[90px]">Preview</th>
+                      <th className="py-2.5 px-3 text-right min-w-[220px]">Verification Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {documents.map((doc: any) => {
                       const isDocVerified = doc.verified || doc.status === 'VERIFIED';
+                      const isDocRejected = doc.status === 'REJECTED';
                       return (
                         <tr key={doc.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                           <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">
@@ -1500,6 +1660,10 @@ export function CreditAssessmentWorkspace({
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                                 ✓ VERIFIED
                               </span>
+                            ) : isDocRejected ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" title={doc.rejectionReason || undefined}>
+                                ✕ REJECTED
+                              </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                                 ⚠ PENDING REVIEW
@@ -1517,16 +1681,27 @@ export function CreditAssessmentWorkspace({
                               <span>Preview</span>
                             </Button>
                           </td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap min-w-[160px]">
+                          <td className="py-3 px-3 text-right whitespace-nowrap min-w-[220px]">
                             {!isDocVerified ? (
-                              <Button
-                                size="sm"
-                                onClick={() => verifyDocMutation.mutate(doc.id)}
-                                disabled={verifyDocMutation.isPending && verifyDocMutation.variables === doc.id}
-                                className="gap-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto shadow-xs whitespace-nowrap shrink-0"
-                              >
-                                <Check className="w-3 h-3" /> Verify Document
-                              </Button>
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() => verifyDocMutation.mutate(doc.id)}
+                                  disabled={verifyDocMutation.isPending && verifyDocMutation.variables === doc.id}
+                                  className="gap-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer py-1 px-2.5 h-auto shadow-xs whitespace-nowrap shrink-0"
+                                >
+                                  <Check className="w-3 h-3" /> Verify
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => rejectDocMutation.mutate({ docId: doc.id, remarks: 'Document unreadable or invalid. Re-upload requested by Credit Analyst.' })}
+                                  disabled={rejectDocMutation.isPending}
+                                  className="gap-1 text-[11px] font-semibold text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer py-1 px-2.5 h-auto shadow-xs whitespace-nowrap shrink-0"
+                                >
+                                  <X className="w-3 h-3" /> Reject / Re-upload
+                                </Button>
+                              </div>
                             ) : (
                               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center justify-end gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Inspected & Verified

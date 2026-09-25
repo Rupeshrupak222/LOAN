@@ -154,7 +154,7 @@ router.post(
   authorize(...financeAuthorizedRoles),
   asyncHandler(async (req: Request, res: Response) => {
     const { applicationId } = req.params;
-    const { paymentRail, transactionReference, comments, disbursementMethod, referenceNumber, idempotencyKey } = req.body || {};
+    const { paymentRail, transactionReference, comments, disbursementMethod, referenceNumber, idempotencyKey, forceMode } = req.body || {};
     const actor = getActor(req);
 
     const loan = await financeService.executeDisbursementWithControls(
@@ -163,10 +163,35 @@ router.post(
         disbursementMethod: disbursementMethod || paymentRail || 'IMPS',
         referenceNumber: referenceNumber || transactionReference,
         idempotencyKey,
+        forceMode,
       },
       actor
     );
     return ok(res, loan);
+  })
+);
+
+/**
+ * POST /api/v1/finance/webhooks/payout
+ * Inbound provider payout status webhook receiver with HMAC signature verification & replay protection
+ */
+router.post(
+  '/webhooks/payout',
+  asyncHandler(async (req: Request, res: Response) => {
+    const signature =
+      (req.headers['x-webhook-signature'] as string) ||
+      (req.headers['x-signature'] as string) ||
+      (req.headers['x-razorpay-signature'] as string);
+    const timestamp = (req.headers['x-webhook-timestamp'] as string) || (req.headers['x-timestamp'] as string);
+    const rawPayload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+
+    const result = await financeService.handlePayoutWebhook({
+      rawPayload,
+      signature,
+      timestamp,
+      headers: req.headers as Record<string, string>,
+    });
+    return ok(res, result);
   })
 );
 

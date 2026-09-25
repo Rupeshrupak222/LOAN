@@ -17,7 +17,8 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<any>;
+  loginWithOtp: (mobile: string, otp: string) => Promise<any>;
   register: (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -28,6 +29,7 @@ const PUBLIC_PREFIXES = [
   '/',
   '/apply',
   '/login',
+  '/staff',
   '/about',
   '/contact',
   '/products',
@@ -91,6 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await api.post('/auth/login', { identifier, password });
     setAccessToken(res.data.data.accessToken);
     setUser(res.data.data.user);
+    return res.data.data;
+  }, []);
+
+  const loginWithOtp = useCallback(async (mobile: string, otp: string) => {
+    const res = await api.post('/auth/otp-login', { mobile, otp });
+    setAccessToken(res.data.data.accessToken);
+    setUser(res.data.data.user);
+    return res.data.data;
   }, []);
 
   const register = useCallback(async (data: { email: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => {
@@ -112,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithOtp, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

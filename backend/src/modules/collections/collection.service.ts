@@ -46,6 +46,55 @@ function buildCollectionCaseScopeFilter(actor?: CollectionActorContext) {
   return Object.keys(loanFilter).length > 0 ? { loan: loanFilter } : {};
 }
 
+export function maskCustomerInfo(customer: any) {
+  if (!customer) return customer;
+  return {
+    ...customer,
+    pan: customer.pan ? `${customer.pan.slice(0, 2)}*****${customer.pan.slice(-2)}` : undefined,
+    aadhaarNumber: customer.aadhaarNumber ? `********${customer.aadhaarNumber.slice(-4)}` : undefined,
+    bankAccountNo: customer.bankAccountNo ? `*****${customer.bankAccountNo.slice(-4)}` : undefined,
+  };
+}
+
+
+/**
+ * Log an immutable Collection Case Event into collectionActivity and auditLog
+ */
+export async function logCaseEvent(params: {
+  caseId: string;
+  eventType: string;
+  actor?: CollectionActorContext;
+  notes?: string;
+  previousState?: string;
+  newState?: string;
+  metadata?: Record<string, any>;
+}) {
+  await prisma.collectionActivity.create({
+    data: {
+      caseId: params.caseId,
+      activityType: 'EVENT',
+      outcome: params.eventType,
+      notes: params.notes || `Event: ${params.eventType}`,
+      performedBy: params.actor?.email || 'system',
+    },
+  });
+
+  await logAudit({
+    userId: params.actor?.id,
+    action: `COLLECTION_${params.eventType}`,
+    entity: 'CollectionCase',
+    entityId: params.caseId,
+    newValue: {
+      eventType: params.eventType,
+      previousState: params.previousState,
+      newState: params.newState,
+      actor: params.actor?.email,
+      notes: params.notes,
+      ...(params.metadata || {}),
+    },
+  }).catch(() => {});
+}
+
 /**
  * Authoritatively inspects active loans with overdue installments and ensures an active
  * CollectionCase is synced with exact DPD, aging bucket, overdue amount, priority score, and strategy.
@@ -77,7 +126,7 @@ export async function syncDelinquentCases(actor?: CollectionActorContext): Promi
         orderBy: { dueDate: 'asc' },
       },
       collectionCases: {
-        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED', 'LEGAL_REVIEW', 'SETTLEMENT_REVIEW'] } },
+        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED', 'ON_HOLD', 'LEGAL_REVIEW', 'SETTLEMENT_REVIEW'] } },
         include: {
           promises: { where: { status: 'BROKEN' } },
         },
@@ -119,7 +168,7 @@ export async function syncDelinquentCases(actor?: CollectionActorContext): Promi
       });
     } else {
       const caseNo = `CC-${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-      await prisma.collectionCase.create({
+      const created = await prisma.collectionCase.create({
         data: {
           caseNo,
           loanId: loan.id,
@@ -130,6 +179,14 @@ export async function syncDelinquentCases(actor?: CollectionActorContext): Promi
           priority: priorityCalc.band as any,
           status: dpd > 60 ? 'ESCALATED' : 'OPEN',
         },
+      });
+
+      await logCaseEvent({
+        caseId: created.id,
+        eventType: 'CASE_CREATED',
+        actor,
+        notes: `System created collection case due to ${dpd} DPD and ₹${overdueAmount.toFixed(2)} overdue.`,
+        metadata: { dpd, overdueAmount: overdueAmount.toNumber() },
       });
     }
 
@@ -144,6 +201,265 @@ export async function syncDelinquentCases(actor?: CollectionActorContext): Promi
 
   return synced;
 }
+
+/**
+ * Manually create a collection case with full validation & duplicate prevention
+ */
+export async function createManualCollectionCase(
+  input: { loanId: string; priority?: string; notes?: string },
+  actor: CollectionActorContext
+) {
+  const loan = await prisma.loan.findUnique({
+    where: { id: input.loanId },
+    include: {
+      customer: true,
+      collectionCases: {
+        where: {
+          status: { in: ['OPEN', 'IN_PROGRESS', 'PROMISED', 'ESCALATED', 'ON_HOLD', 'LEGAL_REVIEW', 'SETTLEMENT_REVIEW'] },
+        },
+      },
+      schedule: {
+        where: { status: { in: ['OVERDUE', 'DUE', 'PARTIALLY_PAID'] } },
+      },
+    },
+  });
+
+  if (!loan) throw new NotFoundError('Loan not found');
+
+  // Anti-IDOR Check
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (loan.tenantId && actor.tenantId && loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Loan belongs to another institution');
+    }
+    if (isBranchScopedRole(actor.roles) && actor.branchId && loan.branchId && loan.branchId !== actor.branchId) {
+      throw new ForbiddenError('Access forbidden: Loan belongs to a different branch');
+    }
+  }
+
+  // Prevent duplicate active cases
+  if (loan.collectionCases.length > 0) {
+    throw new BadRequestError(`An active collection case (${loan.collectionCases[0].caseNo}) already exists for this loan.`);
+  }
+
+  const dpdCalc = await dpdService.calculateLoanDpd(loan.id);
+  const caseNo = `CC-${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const createdCase = await prisma.collectionCase.create({
+    data: {
+      caseNo,
+      loanId: loan.id,
+      customerId: loan.customerId,
+      dpd: dpdCalc.dpd,
+      agingBucket: dpdCalc.agingBucket,
+      overdueAmount: Money.toDb(dpdCalc.totalOverdueAmount),
+      priority: (input.priority as any) || 'MEDIUM',
+      status: 'OPEN',
+    },
+  });
+
+  await logCaseEvent({
+    caseId: createdCase.id,
+    eventType: 'CASE_CREATED',
+    actor,
+    notes: input.notes || 'Collection case manually initiated by officer.',
+    metadata: { dpd: dpdCalc.dpd, overdueAmount: dpdCalc.totalOverdueAmount },
+  });
+
+  return createdCase;
+}
+
+/**
+ * Update case status with backend workflow state-machine validation
+ */
+export async function updateCollectionCaseStatus(
+  caseId: string,
+  input: { status: string; notes: string },
+  actor: CollectionActorContext
+) {
+  const colCase = await prisma.collectionCase.findUnique({
+    where: { id: caseId },
+    include: { loan: true },
+  });
+
+  if (!colCase) throw new NotFoundError('Collection case not found');
+
+  // Anti-IDOR Check
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (colCase.loan.tenantId && actor.tenantId && colCase.loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Case belongs to another institution');
+    }
+    if (isBranchScopedRole(actor.roles) && actor.branchId && colCase.loan.branchId && colCase.loan.branchId !== actor.branchId) {
+      throw new ForbiddenError('Access forbidden: Case belongs to a different branch');
+    }
+  }
+
+  const allowedTransitions: Record<string, string[]> = {
+    OPEN: ['IN_PROGRESS', 'PROMISED', 'ON_HOLD', 'ESCALATED', 'RESOLVED'],
+    IN_PROGRESS: ['PROMISED', 'ON_HOLD', 'ESCALATED', 'RESOLVED', 'LEGAL_REVIEW', 'SETTLEMENT_REVIEW'],
+    PROMISED: ['IN_PROGRESS', 'ON_HOLD', 'ESCALATED', 'RESOLVED'],
+    ON_HOLD: ['IN_PROGRESS', 'OPEN', 'ESCALATED', 'RESOLVED'],
+    ESCALATED: ['IN_PROGRESS', 'LEGAL_REVIEW', 'SETTLEMENT_REVIEW', 'RESOLVED', 'ON_HOLD'],
+    RESOLVED: ['CLOSED', 'IN_PROGRESS', 'OPEN'],
+    CLOSED: [],
+  };
+
+  const currentStatus = colCase.status;
+  const targetStatus = input.status;
+
+  if (currentStatus === 'CLOSED') {
+    throw new BadRequestError('Cannot modify a closed collection case.');
+  }
+
+  if (targetStatus === 'RESOLVED') {
+    return resolveCollectionCase(caseId, { resolutionReason: 'ADMINISTRATIVE_RESOLUTION', notes: input.notes }, actor);
+  }
+
+  if (targetStatus === 'CLOSED') {
+    return closeCollectionCase(caseId, { closureReason: input.notes }, actor);
+  }
+
+  const allowed = allowedTransitions[currentStatus] || [];
+  if (!allowed.includes(targetStatus)) {
+    throw new BadRequestError(`Invalid case status transition from '${currentStatus}' to '${targetStatus}'.`);
+  }
+
+  const updated = await prisma.collectionCase.update({
+    where: { id: caseId },
+    data: { status: targetStatus },
+  });
+
+  const eventType = targetStatus === 'ON_HOLD' ? 'CASE_ON_HOLD' : targetStatus === 'ESCALATED' ? 'ESCALATED' : 'STATUS_CHANGED';
+
+  await logCaseEvent({
+    caseId,
+    eventType,
+    actor,
+    previousState: currentStatus,
+    newState: targetStatus,
+    notes: input.notes,
+  });
+
+  return updated;
+}
+
+/**
+ * Gated Case Resolution strictly validating Phase 9F authoritative servicing state
+ */
+export async function resolveCollectionCase(
+  caseId: string,
+  input: { resolutionReason: string; notes: string },
+  actor: CollectionActorContext
+) {
+  const colCase = await prisma.collectionCase.findUnique({
+    where: { id: caseId },
+    include: {
+      loan: {
+        include: {
+          schedule: {
+            where: {
+              status: { in: ['OVERDUE', 'DUE', 'PARTIALLY_PAID'] },
+              dueDate: { lt: new Date() },
+              outstanding: { gt: 0 },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!colCase) throw new NotFoundError('Collection case not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (colCase.loan.tenantId && actor.tenantId && colCase.loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Case belongs to another institution');
+    }
+  }
+
+  // Strict verification if DUES_CLEARED: Overdue amount on schedule must be zero
+  if (input.resolutionReason === 'DUES_CLEARED') {
+    const overdueSum = colCase.loan.schedule.reduce(
+      (acc, s) => acc.plus(new Decimal(s.outstanding)),
+      new Decimal(0)
+    );
+    if (overdueSum.greaterThan(0)) {
+      throw new BadRequestError(`Cannot resolve case with DUES_CLEARED: Account still has ₹${overdueSum.toFixed(2)} in overdue installments.`);
+    }
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const c = await tx.collectionCase.update({
+      where: { id: caseId },
+      data: {
+        status: 'RESOLVED',
+        overdueAmount: 0,
+        dpd: 0,
+      },
+    });
+
+    await tx.promiseToPay.updateMany({
+      where: { caseId, status: 'PENDING' },
+      data: { status: 'KEPT' },
+    });
+
+    return c;
+  });
+
+  await logCaseEvent({
+    caseId,
+    eventType: 'CASE_RESOLVED',
+    actor,
+    previousState: colCase.status,
+    newState: 'RESOLVED',
+    notes: `Resolved (${input.resolutionReason}): ${input.notes}`,
+    metadata: { resolutionReason: input.resolutionReason },
+  });
+
+  return updated;
+}
+
+/**
+ * Close a collection case after resolution or write-off
+ */
+export async function closeCollectionCase(
+  caseId: string,
+  input: { closureReason: string; notes?: string },
+  actor: CollectionActorContext
+) {
+  const colCase = await prisma.collectionCase.findUnique({
+    where: { id: caseId },
+    include: { loan: true },
+  });
+
+  if (!colCase) throw new NotFoundError('Collection case not found');
+
+  if (actor && !actor.roles?.includes('SUPER_ADMIN')) {
+    if (colCase.loan.tenantId && actor.tenantId && colCase.loan.tenantId !== actor.tenantId) {
+      throw new ForbiddenError('Access forbidden: Case belongs to another institution');
+    }
+  }
+
+  if (colCase.status !== 'RESOLVED' && colCase.status !== 'SETTLEMENT_REVIEW' && colCase.status !== 'WRITTEN_OFF') {
+    throw new BadRequestError(`Cannot close case in '${colCase.status}' status. Case must be RESOLVED, SETTLED, or WRITTEN_OFF before closing.`);
+  }
+
+  const updated = await prisma.collectionCase.update({
+    where: { id: caseId },
+    data: { status: 'CLOSED' },
+  });
+
+  await logCaseEvent({
+    caseId,
+    eventType: 'CASE_CLOSED',
+    actor,
+    previousState: colCase.status,
+    newState: 'CLOSED',
+    notes: `Closed (${input.closureReason}): ${input.notes || ''}`,
+    metadata: { closureReason: input.closureReason },
+  });
+
+  return updated;
+}
+
 
 /**
  * Get Collection Dashboard KPIs & Aging Distribution
@@ -436,6 +752,7 @@ export async function getCollectionCaseDetail(id: string, actor?: CollectionActo
 
   return {
     ...colCase,
+    customer: maskCustomerInfo(colCase.customer),
     priorityScore: priorityCalc.score,
     recommendedAction: priorityCalc.recommendedAction,
     strategyPhase: priorityCalc.strategyPhase,
@@ -444,8 +761,17 @@ export async function getCollectionCaseDetail(id: string, actor?: CollectionActo
     escalations,
     settlements,
     writeOffs,
+    timeline: colCase.activities.map((a) => ({
+      id: a.id,
+      activityType: a.activityType,
+      outcome: a.outcome,
+      notes: a.notes,
+      performedBy: a.performedBy,
+      createdAt: a.createdAt,
+    })),
   };
 }
+
 
 /**
  * Log Customer Contact Activity

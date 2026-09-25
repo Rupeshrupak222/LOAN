@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const createCustomerSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required'),
+  middleName: z.string().trim().optional().or(z.literal('')),
   lastName: z.string().trim().min(1, 'Last name is required'),
   dateOfBirth: z.coerce.date({ invalid_type_error: 'Valid date of birth is required' }).optional(),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
@@ -124,7 +125,32 @@ export const createBankAccountSchema = z.object({
   isPrimary: z.boolean().default(true),
 });
 
+export const createConsentSchema = z.object({
+  consentType: z.string().min(1, 'Consent type is required'),
+  purpose: z.string().min(1, 'Consent purpose is required'),
+  version: z.string().default('v1.0'),
+  granted: z.boolean().default(true),
+  channel: z.string().default('BRANCH_PORTAL'),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+});
+
+export const batchConsentSchema = z.object({
+  consents: z.array(createConsentSchema).min(1, 'At least one consent record is required'),
+});
+
+export const createIdentifierSchema = z.object({
+  idType: z.enum(['PAN', 'AADHAAR', 'PASSPORT', 'VOTER_ID', 'DRIVING_LICENSE', 'GSTIN']),
+  value: z.string().min(1, 'Identifier value is required'),
+  verificationStatus: z.enum(['PENDING', 'VERIFIED', 'REJECTED', 'MANUAL_REVIEW', 'EXPIRED']).default('PENDING'),
+  verifiedBy: z.string().optional(),
+  providerReference: z.string().optional(),
+});
+
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateKycStatusInput = z.infer<typeof updateKycStatusSchema>;
 export type CreateAddressInput = z.infer<typeof createAddressSchema>;
 export type CreateBankAccountInput = z.infer<typeof createBankAccountSchema>;
+export type CreateConsentInput = z.infer<typeof createConsentSchema>;
+export type BatchConsentInput = z.infer<typeof batchConsentSchema>;
+export type CreateIdentifierInput = z.infer<typeof createIdentifierSchema>;
