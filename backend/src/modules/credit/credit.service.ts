@@ -10,6 +10,7 @@ import { evaluateApplicationRisk } from '../risk/risk.service';
 import { updateKycStatus } from '../customer/customer.service';
 import { configurationService } from '../configuration/configuration.service';
 import { validateCustomerDocumentFulfillment } from '../documents/document-rules';
+import { verificationGateService } from '../verification/verification-gate.service';
 import type {
   SubmitCreditDecisionInput,
   VerifyFinancialsInput,
@@ -585,6 +586,9 @@ export async function startCreditAssessment(
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
+  // Enforce Verification Gate
+  await verificationGateService.assertCreditAssessmentAllowed(applicationId);
+
   if (app.status === 'SUBMITTED' || app.status === 'KYC_PENDING' || app.status === 'KYC_VERIFIED') {
     await prisma.loanApplication.update({
       where: { id: applicationId },
@@ -759,9 +763,8 @@ export async function evaluateFinancialEligibilityStep(
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
-  if (app.customer.kycStatus !== 'VERIFIED') {
-    throw new BadRequestError('Cannot evaluate financial eligibility: KYC must be VERIFIED first.');
-  }
+  // Enforce Verification Gate
+  await verificationGateService.assertCreditAssessmentAllowed(applicationId);
 
   // Update verified income if provided
   if (input.verifiedIncome != null) {
@@ -800,9 +803,9 @@ export async function recordRiskAssessmentStep(
   });
   if (!app) throw new NotFoundError('Loan application not found');
 
-  if (app.customer.kycStatus !== 'VERIFIED') {
-    throw new BadRequestError('Cannot assess credit risk: KYC must be VERIFIED first.');
-  }
+  // Enforce Verification Gate
+  await verificationGateService.assertCreditAssessmentAllowed(applicationId);
+
   if (!app.eligibility) {
     throw new BadRequestError('Cannot assess credit risk: Financial eligibility check must be completed first.');
   }
@@ -876,34 +879,8 @@ export async function submitCreditDecision(
     throw new NotFoundError(`Loan application with ID '${applicationId}' not found.`);
   }
 
-  // 3. Sequential Workflow Enforcement: Verify all prerequisite steps
-  // Prerequisite 1: Step 2 KYC Verification
-  if (app.customer.kycStatus !== 'VERIFIED') {
-    throw new BadRequestError(
-      'Cannot submit credit decision: Borrower KYC is not VERIFIED. Please complete Step 2 (KYC Verification) before proceeding.'
-    );
-  }
-
-  // Prerequisite 2: Step 3 Dynamic Document Verification Checklist
-  const allDocs = [...(app.customer.documents || []), ...(app.documents || [])];
-  const uniqueDocs = Array.from(new Map(allDocs.map((d) => [d.id, d])).values());
-
-  const docFulfillment = validateCustomerDocumentFulfillment(
-    uniqueDocs,
-    app.customer.employmentType || 'SALARIED',
-    app.product.productType || 'PERSONAL',
-    {
-      monthlyIncome: Number(app.customer.monthlyIncome || 0),
-      requestedAmount: Number(app.requestedAmount || 0),
-    }
-  );
-
-  if (!docFulfillment.isComplete) {
-    const missingNames = docFulfillment.missingNames.join(', ');
-    throw new BadRequestError(
-      `Cannot submit credit decision: Missing mandatory document(s) for ${app.customer.employmentType || 'borrower'}: ${missingNames}. Please verify all mandatory documents in Step 3.`
-    );
-  }
+  // Enforce Verification Gate
+  await verificationGateService.assertCreditAssessmentAllowed(applicationId);
 
   // Prerequisite 3: Step 4 Financial Eligibility Check
   if (!app.eligibility) {

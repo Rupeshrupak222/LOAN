@@ -5,6 +5,7 @@ import { logAudit } from '../audit/audit.service';
 import { sendNotification } from '../notifications/notification.service';
 import { communicationService } from '../communication/communication.service';
 import { approvalAuthorityService } from '../approval-authority/approval-authority.service';
+import { verificationGateService } from '../verification/verification-gate.service';
 import type { UnderwritingDecisionInput, ResolveDeviationInput } from './underwriting.schema';
 
 export interface UnderwriterActorContext {

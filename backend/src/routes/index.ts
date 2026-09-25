@@ -48,6 +48,7 @@ import { hadrRoutes } from '../modules/hadr/hadr.routes';
 import { observabilityRoutes } from '../modules/observability/observability.routes';
 import { complianceRoutes } from '../modules/compliance/compliance.routes';
 import { privacyRoutes } from '../modules/privacy/consent.routes';
+import { verificationRoutes } from '../modules/verification/verification.routes';
 import { roleRoutes } from '../modules/roles/role.routes';
 import { workflowRoutes } from '../modules/workflows/workflow.routes';
 import { orchestrationRoutes } from '../modules/orchestration/orchestration.routes';
